@@ -111,6 +111,9 @@
         .wf-hand .wf-card .c { font-size: 18px; }
         .wf-hand .wf-card.sel { outline: 3px solid #00aaff; transform: translateY(-5px); box-shadow: 0 0 10px rgba(0,170,255,0.8); }
         .wf-hand .wf-card.locked { opacity: 0.45; cursor: not-allowed; }
+        .wf-card.facedown { background: #1c2333; background-image: repeating-linear-gradient(45deg, transparent, transparent 6px, #141a28 6px, #141a28 12px); border-color: rgba(0,255,204,0.35); color: #00ffcc; cursor: default; }
+        .wf-card.facedown .c { font-size: 15px; }
+        .wf-hand .wf-card.scanned { outline: 2px solid #c48a00; }
         .wf-frow { display: flex; gap: 6px; flex-wrap: wrap; align-items: center; }
         .wf-pill { font-family: monospace; font-size: 11px; padding: 4px 8px; border-radius: 999px; border: 1px solid #444; background: #1a1a1a; color: #ccc; cursor: pointer; }
         .wf-pill.mine { border-color: #00ffcc; color: #00ffcc; background: rgba(0,255,204,0.08); }
@@ -224,7 +227,7 @@
             </div>
 
             <div>
-                <span class="wf-sub">FACTIONS — one player is Federation ♦, one is Klingons ♥, one is Ferengi ♣. With two players, one of you must take two. Click to claim:</span>
+                <span class="wf-sub">FACTIONS — claim yours. One player is Federation ♦, one Klingons ♥, one Ferengi ♣. With two players, one of you must take two. Unclaimed factions wait their turn:</span>
                 <div class="wf-frow" id="warp-claims"></div>
             </div>
 
@@ -240,6 +243,7 @@
                 <button id="btn-wf-regroup" class="btn-bouncy bg-amber-500 hover:bg-amber-400 text-black text-xs font-bold py-1 px-3 rounded-xl ml-2" disabled>Confirm regroup</button>
             </div>
             <div id="wf-over" class="wf-over hidden"></div>
+            <div id="wf-wait" class="wf-banner hidden"></div>
 
             <div class="wf-panel" style="padding:10px;">
                 <span class="wf-sub">BATTLE GRID — play one card per faction turn beside a planet. Match exactly (home suit +1). Borg may overshoot. First to 5 planets wins.</span>
@@ -247,7 +251,10 @@
             </div>
 
             <div>
-                <span class="wf-sub">COMMAND — your claimed factions are highlighted. Select a card, then click a planet.</span>
+                <span class="wf-sub">COMMAND — you see only your own cards; teammates' hands are face-down. Plan in chat, Scan to reveal a card to everyone. Talk rule: never name the rank of a face-down card.</span>
+                <div class="flex gap-2 mb-2">
+                    <button id="btn-wf-scan" class="btn-bouncy bg-amber-500 hover:bg-amber-400 text-black text-xs font-bold py-1.5 px-3 rounded-xl" disabled>Scan a card (reveal)</button>
+                </div>
                 <div id="wf-hands" class="flex flex-col gap-2"></div>
                 <div id="wf-handinfo" class="text-[11px] font-mono text-slate-300 bg-black/60 border border-slate-700 rounded-xl px-3 py-2 mt-2">Press “New battle” to deploy.</div>
             </div>
@@ -496,6 +503,7 @@
             let borgTimer = null;
             let localSolo = false;      // guest fallback: no host answering, play locally
             let soloFallbackT = null;
+            let scanMode = false;       // local only: next own-card click scans instead of selecting
 
             const $ = (id) => document.getElementById(id);
             const boardEl = $('wf-board'), handsEl = $('wf-hands'), logEl = $('warp-log');
@@ -562,7 +570,7 @@
                 st.planets = pcs;
                 ['♦','♥','♣'].forEach(suit => {
                     const deck = [];
-                    ['A','2','3','4','5','6','7','8','9','10'].forEach(rank => deck.push({ suit, rank }));
+                    ['A','2','3','4','5','6','7','8','9','10'].forEach(rank => deck.push({ suit, rank, scanned: false }));
                     shuffle(deck);
                     st.factions[suit] = { deck, discard: [], hand: [] };
                     for (let i = 0; i < handSize; i++) drawTo(st, suit);
@@ -579,7 +587,9 @@
                     if (f.discard.length === 0) return;
                     f.deck = shuffle(f.discard.splice(0));
                 }
-                f.hand.push(f.deck.pop());
+                const c = f.deck.pop();
+                c.scanned = false;   // a fresh draw is always hidden again
+                f.hand.push(c);
             }
 
             function drawBorg(st){
@@ -720,6 +730,26 @@
                 return null;
             }
 
+            // Scan: reveal one of your active-faction cards to the whole team (free action).
+            function doScan(suit, cardIdx, byName){
+                if (S.activeFaction !== suit) return 'Scan only on your faction’s turn.';
+                const f = S.factions[suit];
+                const card = f.hand[cardIdx];
+                if (!card) return 'No such card.';
+                if (card.scanned) return 'That card is already revealed.';
+                if (f.hand.some(c => c.scanned)) return 'You already show a card — play it first.';
+                card.scanned = true;
+                wlog(`${FACTIONS[suit]} (${byName}) scanned ${card.rank}${card.suit} — revealed to the team.`, 'player');
+                return null;
+            }
+
+            // True only if `name` is the assigned owner of the faction (solo: everyone).
+            function senderOwns(faction, name){
+                if (!S) return false;
+                if (!peerConnected()) return true;
+                return S.claims[faction] === name;
+            }
+
             function borgTarget(){
                 const active = S.planets.filter(p => p.status === 'active');
                 if (!active.length) return null;
@@ -813,7 +843,13 @@
                     clearTimeout(soloFallbackT);
                     S = d.state;
                     sel = null;
+                    scanMode = false;
                     render();
+                    // first sync and I hold nothing: take the first open faction so I can play
+                    if (!Object.values(S.claims).includes(getName())){
+                        const free = ['♥','♣','♦'].find(f => !S.claims[f]);
+                        if (free) claimSet(free, true);
+                    }
                     if (ui.warpPanel.classList.contains('hidden')) showWarpInvite(d.from);
                     const cur = $('wf-handinfo').textContent;
                     if (/Starting battle|Order sent|Regroup sent|Host did not answer|No link/.test(cur)) setInfo('');
@@ -833,50 +869,100 @@
                 else if (d.action === 'claim'){ S.claims[d.faction] = d.on ? d.name : null; broadcast(); }
                 else if (d.action === 'sync'){ broadcast(); }
                 else if (d.action === 'play'){
-                    const err = doPlay(d.faction, d.cardIdx, d.planetIdx);
-                    if (err) send({ type: 'warp', action: 'denied', text: err });
-                    else broadcast();
+                    if (!senderOwns(d.faction, d.name)){ send({ type: 'warp', action: 'denied', text: `${FACTIONS[d.faction] || d.faction} is assigned to ${S.claims[d.faction] || 'nobody'} — claim it first.` }); }
+                    else {
+                        const err = doPlay(d.faction, d.cardIdx, d.planetIdx);
+                        if (err) send({ type: 'warp', action: 'denied', text: err });
+                        else broadcast();
+                    }
                 }
                 else if (d.action === 'regroup'){
-                    const err = doRegroup(d.faction, d.cardIdx);
-                    if (err) send({ type: 'warp', action: 'denied', text: err });
-                    else broadcast();
+                    if (!senderOwns(d.faction, d.name)){ send({ type: 'warp', action: 'denied', text: `${FACTIONS[d.faction] || d.faction} is assigned to ${S.claims[d.faction] || 'nobody'} — claim it first.` }); }
+                    else {
+                        const err = doRegroup(d.faction, d.cardIdx);
+                        if (err) send({ type: 'warp', action: 'denied', text: err });
+                        else broadcast();
+                    }
+                }
+                else if (d.action === 'scan'){
+                    if (!senderOwns(d.faction, d.name)){ send({ type: 'warp', action: 'denied', text: `${FACTIONS[d.faction] || d.faction} is assigned to ${S.claims[d.faction] || 'nobody'} — claim it first.` }); }
+                    else {
+                        const err = doScan(d.faction, d.cardIdx, d.name);
+                        if (err) send({ type: 'warp', action: 'denied', text: err });
+                        else broadcast();
+                    }
                 }
             }
             function onPeerOpen(){
                 if (!S) return;
                 if (authority()){
-                    // auto-claim a free faction for the guest's arrival is handled by guest; just sync
+                    // fresh eyes joined: reopen factions held by anyone no longer here
+                    let cleared = false;
+                    ['♦','♥','♣'].forEach(f => {
+                        if (S.claims[f] && S.claims[f] !== getName()){ S.claims[f] = null; cleared = true; }
+                    });
+                    if (cleared) wlog('New link — factions reopened, claim yours.');
                     broadcast();
                 } else {
                     send({ type: 'warp', action: 'sync', name: getName() });
                     // claim first free faction for seamless entry
                     const free = ['♥','♣','♦'].find(f => !S.claims || !S.claims[f]);
-                    if (free) toggleClaim(free);
+                    if (free) claimSet(free, true);
                 }
             }
 
             // ---- local input ----
+            // Strict roles: with a peer linked you may touch ONLY your claimed factions.
+            // Unclaimed factions wait until someone claims them. Solo: you play everything.
             function iControl(suit){
                 if (!S) return false;
-                if (!peerConnected()) return true;              // solo: play everything
-                const c = S.claims[suit];
-                return !c || c === getName();                   // unclaimed = anyone; claimed by me = mine
+                if (!peerConnected()) return true;
+                return S.claims[suit] === getName();
             }
-            function toggleClaim(suit){
-                myClaim[suit] = !myClaim[suit];
+            function claimSet(suit, on){
+                if (!S) return;
+                myClaim[suit] = on;
+                sel = null;
+                scanMode = false;
                 const name = getName();
                 if (authority()){
-                    S.claims[suit] = myClaim[suit] ? name : null;
+                    S.claims[suit] = on ? name : null;
                     broadcast();
                 } else {
-                    send({ type: 'warp', action: 'claim', faction: suit, on: myClaim[suit], name });
+                    send({ type: 'warp', action: 'claim', faction: suit, on, name });
                     // optimistic local mirror until host echoes
-                    if (S){ S.claims[suit] = myClaim[suit] ? name : S.claims[suit]; render(); }
+                    S.claims[suit] = on ? name : S.claims[suit];
+                    render();
                 }
+            }
+            function toggleClaim(suit){
+                if (!S) return;
+                claimSet(suit, S.claims[suit] !== getName());
+            }
+            function clickScanBtn(){
+                if (!S || S.over || !S.activeFaction || !iControl(S.activeFaction)) return;
+                const hand = S.factions[S.activeFaction].hand;
+                if (!hand.length || hand.some(c => c.scanned)){ setInfo('Nothing to scan — you already show a card.'); return; }
+                scanMode = !scanMode;
+                setInfo(scanMode ? 'Scan mode: click one of YOUR cards to reveal it to the team.' : '');
+                render();
             }
             function clickCard(suit, idx){
                 if (!S || S.over || S.activeFaction !== suit || !iControl(suit)) return;
+                if (scanMode){
+                    scanMode = false;
+                    const c = S.factions[suit].hand[idx];
+                    if (!c || c.scanned){ render(); return; }
+                    if (authority()){
+                        const err = doScan(suit, idx, getName());
+                        if (err) setInfo(err);
+                        broadcast();
+                    } else {
+                        send({ type: 'warp', action: 'scan', faction: suit, cardIdx: idx, name: getName() });
+                        setInfo('Scan sent…');
+                    }
+                    return;
+                }
                 sel = (sel && sel.faction === suit && sel.idx === idx) ? null : { faction: suit, idx };
                 render();
             }
@@ -953,6 +1039,22 @@
                     $('btn-wf-regroup').disabled = !(sel && sel.faction === S.activeFaction);
                 } else rg.classList.add('hidden');
 
+                // waiting-for-player banner: active faction has no owner yet
+                const wt = $('wf-wait');
+                if (!S.over && S.activeFaction && !S.claims[S.activeFaction]){
+                    wt.textContent = `${FACTIONS[S.activeFaction]} ${S.activeFaction} is waiting for a player — claim it above to take this turn.`;
+                    wt.classList.remove('hidden');
+                } else wt.classList.add('hidden');
+
+                // scan button: only the active faction's owner, and only while nothing revealed
+                const scb = $('btn-wf-scan');
+                const af = S.activeFaction;
+                const canScan = !S.over && af && iControl(af) &&
+                    S.factions[af].hand.length > 0 &&
+                    !S.factions[af].hand.some(c => c.scanned);
+                scb.disabled = !canScan;
+                scb.textContent = scanMode ? 'Cancel scan' : 'Scan a card (reveal)';
+
                 // game-over banner
                 const ov = $('wf-over');
                 if (S.over && S.result){
@@ -1002,7 +1104,8 @@
                     boardEl.appendChild(col);
                 });
 
-                // hands
+                // hands: you see ONLY your own cards; teammates' hands are face-down
+                // (scanned cards are public). Solo: you play everything, so all face-up.
                 handsEl.innerHTML = '';
                 ['♦','♥','♣'].forEach(suit => {
                     const f = S.factions[suit];
@@ -1011,19 +1114,24 @@
                     const wrap = document.createElement('div');
                     wrap.className = 'wf-panel';
                     wrap.style.padding = '8px';
-                    wrap.style.borderColor = active ? '#00ffcc' : '#333';
+                    wrap.style.borderColor = active ? (S.claims[suit] ? '#00ffcc' : '#c48a00') : '#333';
                     const holder = S.claims[suit];
-                    wrap.innerHTML = `<div class="wf-sub" style="margin-bottom:4px;">${FACTIONS[suit].toUpperCase()} ${suit} · deck ${f.deck.length} · ${holder ? escapeHtml(holder) : 'open'}${active ? ' · TO MOVE' : ''}${mine ? '' : ' · (theirs)'}</div>`;
+                    wrap.innerHTML = `<div class="wf-sub" style="margin-bottom:4px;">${FACTIONS[suit].toUpperCase()} ${suit} · deck ${f.deck.length} · ${holder ? escapeHtml(holder) : 'open'}${active ? ' · TO MOVE' : ''}${mine ? '' : ' · (hidden)'}</div>`;
                     const row = document.createElement('div');
                     row.className = 'wf-hand';
                     f.hand.forEach((c, ci) => {
                         const d = document.createElement('div');
-                        const isSel = sel && sel.faction === suit && sel.idx === ci;
-                        d.className = `wf-card${isSel ? ' sel' : ''}${(!mine || !active) ? ' locked' : ''}`;
-                        const red = c.suit === '♥' || c.suit === '♦';
-                        if (red) d.classList.add('red');
-                        d.innerHTML = `<div>${c.rank}</div><div class="c">${c.suit}</div><div style="text-align:right">${c.rank}</div>`;
-                        if (mine && active) d.addEventListener('click', () => clickCard(suit, ci));
+                        if (!mine && !c.scanned) {
+                            d.className = 'wf-card mini facedown';
+                            d.innerHTML = `<div>?</div><div class="c">?</div><div style="text-align:right">?</div>`;
+                        } else {
+                            const isSel = sel && sel.faction === suit && sel.idx === ci;
+                            d.className = `wf-card${isSel ? ' sel' : ''}${c.scanned ? ' scanned' : ''}${(!mine || !active) ? ' locked' : ''}`;
+                            const red = c.suit === '♥' || c.suit === '♦';
+                            if (red) d.classList.add('red');
+                            d.innerHTML = `<div>${c.rank}</div><div class="c">${c.suit}</div><div style="text-align:right">${c.rank}</div>`;
+                            if (mine && active) d.addEventListener('click', () => clickCard(suit, ci));
+                        }
                         row.appendChild(d);
                     });
                     wrap.appendChild(row);
@@ -1032,9 +1140,9 @@
                 renderLog();
             }
 
-            function reset(){ S = null; sel = null; clearTimeout(borgTimer); clearTimeout(soloFallbackT); localSolo = false; myClaim = { '♦': false, '♥': false, '♣': false }; }
+            function reset(){ S = null; sel = null; scanMode = false; clearTimeout(borgTimer); clearTimeout(soloFallbackT); localSolo = false; myClaim = { '♦': false, '♥': false, '♣': false }; }
 
-            return { startBattle, onNet, onPeerOpen, reset, clickRegroup,
+            return { startBattle, onNet, onPeerOpen, reset, clickRegroup, clickScanBtn,
                 get started(){ return !!S; } };
         })();
 
@@ -1081,6 +1189,7 @@
             WF.startBattle(document.getElementById('warp-diff').value);
         });
         document.getElementById('btn-wf-regroup').addEventListener('click', () => WF.clickRegroup());
+        document.getElementById('btn-wf-scan').addEventListener('click', () => WF.clickScanBtn());
     </script>
 </body>
 </html>
