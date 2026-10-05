@@ -7,80 +7,161 @@
     <script src="https://cdn.tailwindcss.com"></script>
     <script src="https://unpkg.com/peerjs@1.5.2/dist/peerjs.min.js"></script>
     <style>
-        body { background-color: #0f172a; color: #e2e8f0; }
+        body {
+            background: radial-gradient(1200px 600px at 20% -10%, #134e4a 0%, transparent 60%),
+                        radial-gradient(1000px 500px at 90% 10%, #1e3a8a 0%, transparent 55%),
+                        #0f172a;
+            color: #e2e8f0;
+            min-height: 100vh;
+        }
+
+        /* Floating bubble background */
+        .bubbles { position: fixed; inset: 0; overflow: hidden; pointer-events: none; z-index: 0; }
+        .bubbles span {
+            position: absolute; bottom: -60px;
+            background: radial-gradient(circle at 30% 30%, rgba(255,255,255,0.35), rgba(45,212,191,0.12));
+            border: 1px solid rgba(45,212,191,0.25);
+            border-radius: 9999px;
+            animation: float-up linear infinite;
+            opacity: 0.6;
+        }
+        @keyframes float-up {
+            from { transform: translateY(0) scale(1); }
+            to { transform: translateY(-110vh) scale(1.15); }
+        }
+
+        /* Bouncy buttons */
+        .btn-bouncy {
+            transition: transform 0.22s cubic-bezier(0.34, 1.56, 0.64, 1),
+                        box-shadow 0.22s ease,
+                        filter 0.2s ease;
+            will-change: transform;
+            box-shadow: 0 4px 0 rgba(0,0,0,0.35);
+        }
+        .btn-bouncy:hover {
+            transform: translateY(-2px) scale(1.07);
+            filter: brightness(1.12);
+            box-shadow: 0 8px 0 rgba(0,0,0,0.3), 0 10px 25px rgba(0,0,0,0.35);
+        }
+        .btn-bouncy:active {
+            transform: translateY(2px) scale(0.92);
+            box-shadow: 0 1px 0 rgba(0,0,0,0.4);
+        }
+        .btn-bouncy:focus-visible {
+            outline: 2px solid #5eead4;
+            outline-offset: 2px;
+        }
+
+        @keyframes pop-in {
+            0% { transform: scale(0.9); }
+            60% { transform: scale(1.04); }
+            100% { transform: scale(1); }
+        }
+        .pop-in { animation: pop-in 0.35s cubic-bezier(0.34,1.56,0.64,1); }
+
+        .card-glow {
+            box-shadow: 0 10px 30px rgba(0,0,0,0.35), inset 0 1px 0 rgba(255,255,255,0.06);
+        }
+
+        #chat-box::-webkit-scrollbar { width: 8px; }
+        #chat-box::-webkit-scrollbar-thumb { background: #334155; border-radius: 8px; }
+
+        .title-gradient {
+            background: linear-gradient(90deg, #5eead4, #22d3ee 50%, #a5b4fc);
+            -webkit-background-clip: text;
+            background-clip: text;
+            color: transparent;
+        }
     </style>
 </head>
-<body class="p-4 max-w-4xl mx-auto flex flex-col gap-4 h-screen overflow-hidden">
+<body class="p-4 max-w-4xl mx-auto flex flex-col gap-4 min-h-screen relative">
 
-    <header class="border-b border-slate-700 pb-2 flex justify-between items-end flex-none">
+    <div class="bubbles" aria-hidden="true">
+        <span style="left:5%; width:22px; height:22px; animation-duration:14s;"></span>
+        <span style="left:18%; width:38px; height:38px; animation-duration:19s; animation-delay:-6s;"></span>
+        <span style="left:35%; width:14px; height:14px; animation-duration:11s; animation-delay:-3s;"></span>
+        <span style="left:55%; width:28px; height:28px; animation-duration:16s; animation-delay:-9s;"></span>
+        <span style="left:72%; width:44px; height:44px; animation-duration:22s; animation-delay:-4s;"></span>
+        <span style="left:88%; width:18px; height:18px; animation-duration:13s; animation-delay:-7s;"></span>
+    </div>
+
+    <header class="border-b border-slate-700/70 pb-4 flex justify-between items-end flex-none relative z-10">
         <div>
-            <h1 class="text-3xl font-bold text-teal-400">BUB HUB</h1>
-            <p class="text-slate-400 text-sm">Peer-to-Peer Arcade</p>
+            <h1 class="text-4xl font-black tracking-tight title-gradient drop-shadow">BUB HUB</h1>
+            <p class="text-slate-400 text-sm mt-1">Peer-to-Peer Arcade • splash in, play together</p>
         </div>
-        <div class="flex items-center gap-2">
-            <label class="text-sm text-slate-400">Display Name:</label>
-            <input type="text" id="player-name" placeholder="Player" value="Player" class="bg-slate-900 border border-slate-600 rounded px-2 py-1 w-32 focus:outline-none focus:border-teal-500 font-bold text-teal-100">
+        <div class="flex items-center gap-2 bg-slate-800/80 backdrop-blur px-3 py-2 rounded-2xl border border-slate-700 card-glow">
+            <label for="player-name" class="text-sm text-slate-400">Display Name:</label>
+            <input type="text" id="player-name" placeholder="Player" value="Player" class="bg-slate-900 border border-slate-600 rounded-xl px-2 py-1 w-32 focus:outline-none focus:border-teal-400 font-bold text-teal-100">
         </div>
     </header>
 
     <!-- Lobby UI -->
-    <div id="lobby-ui" class="flex flex-col md:flex-row gap-4 flex-none">
-        <div class="bg-slate-800 p-4 rounded-lg border border-slate-700 flex-1">
+    <div id="lobby-ui" class="flex flex-col md:flex-row gap-4 flex-none relative z-10">
+        <div class="bg-slate-800/90 backdrop-blur p-5 rounded-2xl border border-slate-700 flex-1 card-glow">
             <h2 class="text-lg font-bold text-white mb-1">Host a Room</h2>
+            <p class="text-slate-400 text-xs mb-3">Create a bubbly new room and share the ID.</p>
             <div class="flex gap-2">
-                <input type="text" id="host-id-input" class="bg-slate-900 border border-slate-600 rounded px-3 py-2 w-full focus:outline-none focus:border-teal-500 font-mono text-sm">
-                <button id="btn-host" class="bg-teal-600 hover:bg-teal-500 text-white font-bold py-2 px-4 rounded">Create</button>
+                <input type="text" id="host-id-input" class="bg-slate-900 border border-slate-600 rounded-xl px-3 py-2 w-full focus:outline-none focus:border-teal-400 font-mono text-sm">
+                <button id="btn-shuffle" title="New random name" class="btn-bouncy bg-slate-700 hover:bg-slate-600 text-white font-bold py-2 px-3 rounded-xl">↻</button>
+                <button id="btn-host" class="btn-bouncy bg-teal-500 hover:bg-teal-400 text-slate-950 font-extrabold py-2 px-5 rounded-xl">Create</button>
             </div>
-            <p id="host-status" class="text-teal-400 text-xs mt-2 font-mono hidden"></p>
+            <p id="host-status" class="text-teal-300 text-xs mt-2 font-mono hidden"></p>
         </div>
 
-        <div class="bg-slate-800 p-4 rounded-lg border border-slate-700 flex-1">
+        <div class="bg-slate-800/90 backdrop-blur p-5 rounded-2xl border border-slate-700 flex-1 card-glow">
             <h2 class="text-lg font-bold text-white mb-1">Join a Room</h2>
+            <p class="text-slate-400 text-xs mb-3">Got an invite? Paste the room ID here.</p>
             <div class="flex gap-2">
-                <input type="text" id="join-id-input" placeholder="Room ID" class="bg-slate-900 border border-slate-600 rounded px-3 py-2 w-full focus:outline-none focus:border-teal-500 font-mono text-sm">
-                <button id="btn-join" class="bg-blue-600 hover:bg-blue-500 text-white font-bold py-2 px-4 rounded">Connect</button>
+                <input type="text" id="join-id-input" placeholder="e.g. bubbies123" class="bg-slate-900 border border-slate-600 rounded-xl px-3 py-2 w-full focus:outline-none focus:border-blue-400 font-mono text-sm">
+                <button id="btn-join" class="btn-bouncy bg-blue-500 hover:bg-blue-400 text-white font-extrabold py-2 px-5 rounded-xl">Connect</button>
             </div>
-            <p id="join-status" class="text-blue-400 text-xs mt-2 font-mono hidden"></p>
+            <p id="join-status" class="text-blue-300 text-xs mt-2 font-mono hidden"></p>
         </div>
     </div>
 
     <!-- Active Room UI -->
-    <div id="room-ui" class="hidden flex-col gap-4 flex-1 min-h-0">
-        
+    <div id="room-ui" class="hidden flex-col gap-4 flex-1 min-h-0 relative z-10">
+
         <!-- Controls & Status -->
-        <div class="flex justify-between items-center bg-slate-800 p-3 rounded-lg border border-slate-700 flex-none">
-            <div class="flex gap-4 items-center">
+        <div class="flex flex-wrap justify-between items-center gap-3 bg-slate-800/90 backdrop-blur p-4 rounded-2xl border border-slate-700 flex-none card-glow pop-in">
+            <div class="flex gap-4 items-center flex-wrap">
                 <div>
-                    <span class="text-slate-400 text-xs block">Room ID</span>
-                    <span id="active-room-id" class="font-mono font-bold text-white"></span>
+                    <span class="text-slate-400 text-xs block uppercase tracking-wide">Room ID</span>
+                    <button id="active-room-id" title="Click to copy" class="font-mono font-bold text-white text-lg hover:text-teal-300 transition-colors"></button>
                 </div>
-                <div class="border-l border-slate-600 pl-4">
-                    <span class="text-slate-400 text-xs block">Launch Game</span>
-                    <button id="btn-launch-warp" class="bg-purple-600 hover:bg-purple-500 text-white text-sm font-bold py-1 px-3 rounded">Warp Front</button>
+                <div class="border-l border-slate-600 pl-4 flex items-center gap-2">
+                    <div>
+                        <span class="text-slate-400 text-xs block uppercase tracking-wide">Launch Game</span>
+                        <button id="btn-launch-warp" class="btn-bouncy bg-purple-500 hover:bg-purple-400 text-white text-sm font-bold py-1.5 px-4 rounded-xl mt-1">Warp Front</button>
+                    </div>
                 </div>
+                <span id="peer-status" class="text-xs font-mono px-2 py-1 rounded-full bg-amber-500/15 text-amber-300 border border-amber-500/30">waiting for peer…</span>
             </div>
-            <button id="btn-disconnect" class="bg-red-900 hover:bg-red-800 text-red-100 px-3 py-1 text-sm rounded">Disconnect</button>
+            <button id="btn-disconnect" class="btn-bouncy bg-red-500 hover:bg-red-400 text-white px-4 py-1.5 text-sm font-bold rounded-xl">Disconnect</button>
         </div>
 
-        <!-- Chat Container (Shorter, flex layout) -->
-        <div id="chat-container" class="bg-slate-800 rounded-lg border border-slate-700 flex flex-col flex-none h-48">
+        <!-- Chat Container -->
+        <div id="chat-container" class="bg-slate-800/90 backdrop-blur rounded-2xl border border-slate-700 flex flex-col flex-none h-48 card-glow overflow-hidden">
             <div id="chat-box" class="flex-1 p-3 overflow-y-auto flex flex-col gap-1 text-sm"></div>
-            <div class="p-2 border-t border-slate-700 flex gap-2">
-                <input type="text" id="chat-input" placeholder="Chat here..." class="bg-slate-900 border border-slate-600 rounded px-3 py-1 w-full focus:outline-none focus:border-teal-500">
-                <button id="btn-send" class="bg-teal-600 hover:bg-teal-500 text-white font-bold py-1 px-4 rounded">Send</button>
+            <div class="p-2 border-t border-slate-700 flex gap-2 bg-slate-900/50">
+                <input type="text" id="chat-input" placeholder="Chat here..." class="bg-slate-900 border border-slate-600 rounded-xl px-3 py-1.5 w-full focus:outline-none focus:border-teal-400">
+                <button id="btn-send" class="btn-bouncy bg-teal-500 hover:bg-teal-400 text-slate-950 font-bold py-1.5 px-5 rounded-xl">Send</button>
             </div>
         </div>
 
-        <!-- The Game Iframe (Expands to fill remaining space) -->
-        <div id="game-container" class="hidden flex-1 min-h-0 bg-black rounded-lg border border-slate-700 overflow-hidden relative">
-            <div class="absolute top-0 left-0 bg-slate-800 text-xs text-slate-400 px-2 py-1 rounded-br z-10 border-b border-r border-slate-700">
+        <!-- The Game Iframe -->
+        <div id="game-container" class="hidden flex-1 min-h-0 bg-black rounded-2xl border border-slate-700 overflow-hidden relative" style="min-height:480px;">
+            <div class="absolute top-0 left-0 bg-slate-800/95 text-xs text-slate-300 px-3 py-1.5 rounded-br-xl z-10 border-b border-r border-slate-700 flex items-center gap-2">
                 <span id="game-title">Game Running</span>
-                <button id="btn-close-game" class="ml-2 text-red-400 hover:text-red-300 font-bold">X</button>
+                <button id="btn-close-game" class="btn-bouncy ml-1 bg-red-500/20 hover:bg-red-500/40 text-red-300 hover:text-red-200 font-bold w-6 h-6 rounded-full leading-none">×</button>
             </div>
-            <iframe id="game-frame" class="w-full h-full border-none"></iframe>
+            <iframe id="game-frame" class="w-full h-full border-none" style="min-height:480px;"></iframe>
         </div>
 
     </div>
+
+    <footer class="text-center text-slate-500 text-xs pt-2 relative z-10">Bub Hub • click the Room ID to copy • be kind, have fun</footer>
 
     <script>
         let peer = null;
@@ -95,6 +176,7 @@
             hostStatus: document.getElementById('host-status'),
             joinStatus: document.getElementById('join-status'),
             activeRoom: document.getElementById('active-room-id'),
+            peerStatus: document.getElementById('peer-status'),
             chatContainer: document.getElementById('chat-container'),
             chatBox: document.getElementById('chat-box'),
             chatInput: document.getElementById('chat-input'),
@@ -104,26 +186,201 @@
             gameTitle: document.getElementById('game-title')
         };
 
-        ui.hostInput.value = 'hub-' + Math.random().toString(36).substring(2, 6);
+        function randomRoomName() {
+            const n = Math.floor(100 + Math.random() * 900); // 100-999, always 3 digits
+            return 'bubbies' + n;
+        }
+
+        ui.hostInput.value = randomRoomName();
+
+        document.getElementById('btn-shuffle').addEventListener('click', () => {
+            ui.hostInput.value = randomRoomName();
+            ui.hostInput.focus();
+        });
 
         function getName() { return ui.nameInput.value.trim() || 'Player'; }
 
+        function setStatus(el, msg) {
+            el.textContent = msg;
+            el.classList.remove('hidden');
+        }
+
         function logChat(msg, senderName, isSystem = false) {
             const el = document.createElement('div');
-            el.className = 'p-1 rounded max-w-[90%] break-words';
+            el.className = 'p-1.5 px-2.5 rounded-xl max-w-[90%] break-words';
             if (isSystem) {
                 el.classList.add('text-slate-400', 'self-center', 'text-xs', 'italic');
                 el.innerText = msg;
             } else if (senderName === getName()) {
-                el.classList.add('text-teal-300', 'self-end', 'text-right');
-                el.innerHTML = `<span class="font-bold opacity-50 mr-1">${senderName}:</span>${msg}`;
+                el.classList.add('bg-teal-500/15', 'text-teal-200', 'self-end', 'text-right', 'border', 'border-teal-500/20');
+                el.innerHTML = `<span class="font-bold opacity-60 mr-1">${escapeHtml(senderName)}:</span><span></span>`;
+                el.lastChild.textContent = msg;
             } else {
-                el.classList.add('text-slate-200', 'self-start');
-                el.innerHTML = `<span class="font-bold text-blue-400 mr-1">${senderName}:</span>${msg}`;
+                el.classList.add('bg-slate-700/60', 'text-slate-100', 'self-start', 'border', 'border-slate-600/50');
+                el.innerHTML = `<span class="font-bold text-blue-300 mr-1">${escapeHtml(senderName)}:</span><span></span>`;
+                el.lastChild.textContent = msg;
             }
             ui.chatBox.appendChild(el);
             ui.chatBox.scrollTop = ui.chatBox.scrollHeight;
         }
 
+        function escapeHtml(s) {
+            return String(s).replace(/[&<>"']/g, c => ({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;'}[c]));
+        }
+
+        function setPeerStatus(connected) {
+            if (!ui.peerStatus) return;
+            if (connected) {
+                ui.peerStatus.textContent = '● connected';
+                ui.peerStatus.className = 'text-xs font-mono px-2 py-1 rounded-full bg-emerald-500/15 text-emerald-300 border border-emerald-500/30';
+            } else {
+                ui.peerStatus.textContent = 'waiting for peer…';
+                ui.peerStatus.className = 'text-xs font-mono px-2 py-1 rounded-full bg-amber-500/15 text-amber-300 border border-amber-500/30';
+            }
+        }
+
         function showRoom(roomId) {
-            ui.lobby.classList.add
+            ui.lobby.classList.add('hidden');
+            ui.lobby.classList.remove('flex');
+            ui.room.classList.remove('hidden');
+            ui.room.classList.add('flex');
+            ui.activeRoom.textContent = roomId;
+            ui.chatBox.innerHTML = '';
+            setPeerStatus(false);
+            logChat(`Welcome to ${roomId}! Share the Room ID to invite a friend.`, 'system', true);
+        }
+
+        function showLobby() {
+            ui.room.classList.add('hidden');
+            ui.room.classList.remove('flex');
+            ui.lobby.classList.remove('hidden');
+            ui.lobby.classList.add('flex');
+            ui.gameContainer.classList.add('hidden');
+            ui.gameFrame.src = 'about:blank';
+        }
+
+        function wireConnection(conn) {
+            connection = conn;
+            connection.on('open', () => {
+                setPeerStatus(true);
+                logChat('Peer connected!', 'system', true);
+            });
+            connection.on('data', (data) => {
+                if (data && data.type === 'chat') {
+                    logChat(data.text, data.name, false);
+                }
+            });
+            connection.on('close', () => {
+                setPeerStatus(false);
+                logChat('Peer disconnected.', 'system', true);
+            });
+            connection.on('error', () => {
+                setPeerStatus(false);
+            });
+        }
+
+        function sendChat() {
+            const text = ui.chatInput.value.trim();
+            if (!text) return;
+            logChat(text, getName(), false);
+            if (connection && connection.open) {
+                connection.send({ type: 'chat', name: getName(), text });
+            }
+            ui.chatInput.value = '';
+            ui.chatInput.focus();
+        }
+
+        document.getElementById('btn-send').addEventListener('click', sendChat);
+        ui.chatInput.addEventListener('keydown', (e) => {
+            if (e.key === 'Enter') sendChat();
+        });
+
+        document.getElementById('btn-host').addEventListener('click', () => {
+            const roomId = ui.hostInput.value.trim() || randomRoomName();
+            cleanup();
+            isHost = true;
+            setStatus(ui.hostStatus, 'creating room ' + roomId + '…');
+            try {
+                peer = new Peer(roomId);
+            } catch (err) {
+                setStatus(ui.hostStatus, 'error: ' + err.message);
+                return;
+            }
+            peer.on('open', () => {
+                showRoom(roomId);
+            });
+            peer.on('connection', (conn) => {
+                wireConnection(conn);
+            });
+            peer.on('error', (err) => {
+                const msg = err && err.type ? err.type : err.message;
+                setStatus(ui.hostStatus, 'error: ' + msg);
+                if (String(msg).includes('taken')) {
+                    ui.hostInput.value = randomRoomName();
+                }
+            });
+        });
+
+        document.getElementById('btn-join').addEventListener('click', () => {
+            const roomId = ui.joinInput.value.trim();
+            if (!roomId) {
+                setStatus(ui.joinStatus, 'enter a Room ID first');
+                return;
+            }
+            cleanup();
+            isHost = false;
+            setStatus(ui.joinStatus, 'connecting to ' + roomId + '…');
+            peer = new Peer();
+            peer.on('open', () => {
+                const conn = peer.connect(roomId, { reliable: true });
+                wireConnection(conn);
+                showRoom(roomId);
+                setStatus(ui.joinStatus, 'connected!');
+            });
+            peer.on('error', (err) => {
+                setStatus(ui.joinStatus, 'error: ' + (err.type || err.message));
+            });
+        });
+
+        document.getElementById('btn-disconnect').addEventListener('click', () => {
+            cleanup();
+            showLobby();
+            ui.hostStatus.classList.add('hidden');
+            ui.joinStatus.classList.add('hidden');
+        });
+
+        ui.activeRoom.addEventListener('click', async () => {
+            const id = ui.activeRoom.textContent;
+            try {
+                await navigator.clipboard.writeText(id);
+                const orig = id;
+                ui.activeRoom.textContent = 'copied!';
+                setTimeout(() => { ui.activeRoom.textContent = orig; }, 900);
+            } catch {}
+        });
+
+        document.getElementById('btn-launch-warp').addEventListener('click', () => {
+            const roomId = ui.activeRoom.textContent;
+            ui.gameTitle.textContent = 'Warp Front — ' + roomId;
+            ui.gameContainer.classList.remove('hidden');
+            ui.gameFrame.src = 'warpfront.html?room=' + encodeURIComponent(roomId)
+                + '&name=' + encodeURIComponent(getName())
+                + '&host=' + (isHost ? '1' : '0');
+        });
+
+        document.getElementById('btn-close-game').addEventListener('click', () => {
+            ui.gameContainer.classList.add('hidden');
+            ui.gameFrame.src = 'about:blank';
+        });
+
+        function cleanup() {
+            try { if (connection) connection.close(); } catch {}
+            try { if (peer) peer.destroy(); } catch {}
+            connection = null;
+            peer = null;
+        }
+
+        window.addEventListener('beforeunload', cleanup);
+    </script>
+</body>
+</html>
