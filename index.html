@@ -15,19 +15,17 @@
             min-height: 100vh;
         }
 
-        /* Floating bubble background */
-        .bubbles { position: fixed; inset: 0; overflow: hidden; pointer-events: none; z-index: 0; }
-        .bubbles span {
-            position: absolute; bottom: -60px;
-            background: radial-gradient(circle at 30% 30%, rgba(255,255,255,0.35), rgba(45,212,191,0.12));
-            border: 1px solid rgba(45,212,191,0.25);
-            border-radius: 9999px;
-            animation: float-up linear infinite;
-            opacity: 0.6;
+        /* Floating horse background */
+        .horses { position: fixed; inset: 0; overflow: hidden; pointer-events: none; z-index: 0; }
+        .horses img {
+            position: absolute; bottom: -140px;
+            border-radius: 24px;
+            opacity: 0.22;
+            animation: horse-float linear infinite;
         }
-        @keyframes float-up {
-            from { transform: translateY(0) scale(1); }
-            to { transform: translateY(-110vh) scale(1.15); }
+        @keyframes horse-float {
+            from { transform: translateY(0) rotate(-2deg); }
+            to { transform: translateY(-115vh) rotate(2deg); }
         }
 
         /* Bouncy buttons */
@@ -51,6 +49,7 @@
             outline: 2px solid #5eead4;
             outline-offset: 2px;
         }
+        .btn-bouncy:disabled { opacity: 0.45; transform: none; cursor: not-allowed; }
 
         @keyframes pop-in {
             0% { transform: scale(0.9); }
@@ -72,27 +71,76 @@
             background-clip: text;
             color: transparent;
         }
+
+        /* ---- Warp Front (inline, compact — no fixed/scroll boxes) ---- */
+        .wf-panel { background: #0a0a0a; border: 1px solid #333; border-radius: 12px; }
+        .wf-sub { color: #aaa; font-size: 11px; margin-bottom: 6px; display: block; font-family: monospace; }
+        .wf-hud { display: grid; grid-template-columns: 1fr 1fr; gap: 8px; margin-bottom: 8px; }
+        .wf-score { background: #050505; padding: 6px 8px; border-radius: 6px; border: 1px solid #00ff00; font-family: monospace; font-size: 12px; font-weight: bold; }
+        .wf-score .a { color: #00ff00; } .wf-score .b { color: #ff3333; }
+        .wf-sensor { background: #050505; padding: 6px 8px; border-radius: 6px; border: 1px solid #00ffcc; display: flex; justify-content: space-between; align-items: center; font-family: monospace; font-size: 11px; }
+        .wf-seq { text-align: center; font-family: monospace; font-size: 11px; color: #888; margin-bottom: 8px; background: #050505; padding: 6px; border: 1px solid #222; border-radius: 6px; display: flex; justify-content: center; align-items: center; gap: 6px; flex-wrap: wrap; }
+        .wf-seq span { opacity: 0.4; padding: 2px 6px; border-radius: 4px; }
+        .wf-seq span.active { opacity: 1; font-weight: bold; color: #000; background: #00ffcc; }
+        .wf-log { max-height: 72px; overflow-y: auto; font-size: 11px; border: 1px solid #333; background: #000; padding: 6px; font-family: monospace; border-radius: 6px; }
+        .wf-log .borg { color: #ff3333; } .wf-log .player { color: #00ff00; }
+        .wf-grid { display: flex; flex-wrap: wrap; gap: 10px 12px; justify-content: center; align-items: flex-start; }
+        .wf-col { display: flex; flex-direction: column; align-items: center; width: 60px; }
+        .wf-bzone, .wf-pzone { display: flex; flex-direction: column; align-items: center; min-height: 28px; }
+        .wf-bzone { margin-bottom: 2px; justify-content: flex-end; }
+        .wf-pzone { margin-top: 2px; justify-content: flex-start; }
+        .wf-card { background: #fff; border: 1px solid #666; border-radius: 4px; display: flex; flex-direction: column; justify-content: space-between; padding: 1px 2px; font-family: Georgia, serif; font-weight: bold; user-select: none; width: 32px; height: 44px; font-size: 10px; color: #222; cursor: pointer; }
+        .wf-card.red { color: #b4232b; }
+        .wf-card .c { text-align: center; line-height: 1; font-size: 14px; }
+        .wf-card.mini { width: 30px; height: 42px; cursor: default; }
+        .wf-card.stack { margin-bottom: -32px; position: relative; z-index: 1; cursor: default; }
+        .wf-pzone .wf-card.stack { margin-bottom: 0; margin-top: -32px; }
+        .wf-pzone .wf-card.stack:first-child { margin-top: 0; }
+        .wf-bzone .wf-card.stack:last-child { margin-bottom: 0; }
+        .wf-node { width: 58px; height: 58px; border-radius: 50%; background: #0a0a0a; border: 2px solid #555; display: flex; flex-direction: column; justify-content: center; align-items: center; position: relative; cursor: pointer; color: #ccc; }
+        .wf-node.redp { color: #ff4444; border-color: #882222; background: radial-gradient(circle at 30% 30%, #3a0000, #0a0a0a); }
+        .wf-node .s { font-size: 20px; line-height: 1; font-family: Georgia, serif; }
+        .wf-node .r { font-size: 11px; font-weight: bold; position: absolute; top: 3px; font-family: monospace; color: #fff; }
+        .wf-node .pg { font-size: 10px; font-weight: bold; background: #000; padding: 1px 5px; border-radius: 10px; border: 1px solid #666; position: absolute; bottom: -6px; color: #fff; font-family: monospace; white-space: nowrap; }
+        .wf-node .hb { position: absolute; top: -11px; white-space: nowrap; background: #00ffcc; color: #000; font-size: 8px; font-weight: bold; padding: 1px 4px; border-radius: 8px; font-family: monospace; }
+        .wf-node.claimed { border-color: #00ff00; cursor: default; }
+        .wf-node.claimed .s { color: #00ff00; }
+        .wf-node.assim { border-color: #ff3333; opacity: 0.65; cursor: default; }
+        .wf-hand { display: flex; gap: 8px; justify-content: center; min-height: 52px; flex-wrap: wrap; }
+        .wf-hand .wf-card { width: 40px; height: 58px; font-size: 12px; }
+        .wf-hand .wf-card .c { font-size: 18px; }
+        .wf-hand .wf-card.sel { outline: 3px solid #00aaff; transform: translateY(-5px); box-shadow: 0 0 10px rgba(0,170,255,0.8); }
+        .wf-hand .wf-card.locked { opacity: 0.45; cursor: not-allowed; }
+        .wf-frow { display: flex; gap: 6px; flex-wrap: wrap; align-items: center; }
+        .wf-pill { font-family: monospace; font-size: 11px; padding: 4px 8px; border-radius: 999px; border: 1px solid #444; background: #1a1a1a; color: #ccc; cursor: pointer; }
+        .wf-pill.mine { border-color: #00ffcc; color: #00ffcc; background: rgba(0,255,204,0.08); }
+        .wf-pill.theirs { border-color: #554; color: #888; cursor: default; }
+        .wf-banner { background: #2a1a00; padding: 6px 8px; border: 1px solid #c48a00; border-radius: 8px; margin-bottom: 8px; text-align: center; font-family: monospace; font-size: 11px; color: #f5d76e; }
+        .wf-over { background: #04120e; border: 1px solid #00ff00; color: #00ff00; padding: 8px; border-radius: 8px; text-align: center; font-family: monospace; font-weight: bold; }
+        .wf-over.bad { background: #1a0505; border-color: #ff3333; color: #ff8888; }
     </style>
 </head>
 <body class="p-4 max-w-4xl mx-auto flex flex-col gap-4 min-h-screen relative">
 
-    <div class="bubbles" aria-hidden="true">
-        <span style="left:5%; width:22px; height:22px; animation-duration:14s;"></span>
-        <span style="left:18%; width:38px; height:38px; animation-duration:19s; animation-delay:-6s;"></span>
-        <span style="left:35%; width:14px; height:14px; animation-duration:11s; animation-delay:-3s;"></span>
-        <span style="left:55%; width:28px; height:28px; animation-duration:16s; animation-delay:-9s;"></span>
-        <span style="left:72%; width:44px; height:44px; animation-duration:22s; animation-delay:-4s;"></span>
-        <span style="left:88%; width:18px; height:18px; animation-duration:13s; animation-delay:-7s;"></span>
+    <div class="horses" aria-hidden="true">
+        <img src="horse.jpg" alt="" style="left:4%; width:90px; animation-duration:26s;">
+        <img src="horse.jpg" alt="" style="left:26%; width:140px; animation-duration:38s; animation-delay:-12s; opacity:0.16;">
+        <img src="horse.jpg" alt="" style="left:52%; width:70px; animation-duration:22s; animation-delay:-6s;">
+        <img src="horse.jpg" alt="" style="left:74%; width:120px; animation-duration:33s; animation-delay:-18s; opacity:0.18;">
+        <img src="horse.jpg" alt="" style="left:90%; width:64px; animation-duration:24s; animation-delay:-9s;">
     </div>
 
     <header class="border-b border-slate-700/70 pb-4 flex justify-between items-end flex-none relative z-10">
-        <div>
-            <h1 class="text-4xl font-black tracking-tight title-gradient drop-shadow">BUB HUB</h1>
-            <p class="text-slate-400 text-sm mt-1">Peer-to-Peer Arcade • splash in, play together</p>
+        <div class="flex items-center gap-3">
+            <img src="horse.jpg" alt="Horse" class="w-14 h-14 rounded-2xl object-cover border border-slate-600 shadow-lg">
+            <div>
+                <h1 class="text-4xl font-black tracking-tight title-gradient drop-shadow">BUB HUB</h1>
+                <p class="text-slate-400 text-sm mt-1">Peer-to-Peer Arcade</p>
+            </div>
         </div>
         <div class="flex items-center gap-2 bg-slate-800/80 backdrop-blur px-3 py-2 rounded-2xl border border-slate-700 card-glow">
             <label for="player-name" class="text-sm text-slate-400">Display Name:</label>
-            <input type="text" id="player-name" placeholder="Player" value="Player" class="bg-slate-900 border border-slate-600 rounded-xl px-2 py-1 w-32 focus:outline-none focus:border-teal-400 font-bold text-teal-100">
+            <input type="text" id="player-name" placeholder="Your name" value="Fox" class="bg-slate-900 border border-slate-600 rounded-xl px-2 py-1 w-32 focus:outline-none focus:border-teal-400 font-bold text-teal-100">
         </div>
     </header>
 
@@ -100,7 +148,7 @@
     <div id="lobby-ui" class="flex flex-col md:flex-row gap-4 flex-none relative z-10">
         <div class="bg-slate-800/90 backdrop-blur p-5 rounded-2xl border border-slate-700 flex-1 card-glow">
             <h2 class="text-lg font-bold text-white mb-1">Host a Room</h2>
-            <p class="text-slate-400 text-xs mb-3">Create a bubbly new room and share the ID.</p>
+            <p class="text-slate-400 text-xs mb-3">Create a new room and share the ID.</p>
             <div class="flex gap-2">
                 <input type="text" id="host-id-input" class="bg-slate-900 border border-slate-600 rounded-xl px-3 py-2 w-full focus:outline-none focus:border-teal-400 font-mono text-sm">
                 <button id="btn-shuffle" title="New random name" class="btn-bouncy bg-slate-700 hover:bg-slate-600 text-white font-bold py-2 px-3 rounded-xl">↻</button>
@@ -113,7 +161,7 @@
             <h2 class="text-lg font-bold text-white mb-1">Join a Room</h2>
             <p class="text-slate-400 text-xs mb-3">Got an invite? Paste the room ID here.</p>
             <div class="flex gap-2">
-                <input type="text" id="join-id-input" placeholder="e.g. bubbies123" class="bg-slate-900 border border-slate-600 rounded-xl px-3 py-2 w-full focus:outline-none focus:border-blue-400 font-mono text-sm">
+                <input type="text" id="join-id-input" value="bubbies" placeholder="bubbies" class="bg-slate-900 border border-slate-600 rounded-xl px-3 py-2 w-full focus:outline-none focus:border-blue-400 font-mono text-sm">
                 <button id="btn-join" class="btn-bouncy bg-blue-500 hover:bg-blue-400 text-white font-extrabold py-2 px-5 rounded-xl">Connect</button>
             </div>
             <p id="join-status" class="text-blue-300 text-xs mt-2 font-mono hidden"></p>
@@ -121,7 +169,7 @@
     </div>
 
     <!-- Active Room UI -->
-    <div id="room-ui" class="hidden flex-col gap-4 flex-1 min-h-0 relative z-10">
+    <div id="room-ui" class="hidden flex-col gap-4 flex-1 relative z-10">
 
         <!-- Controls & Status -->
         <div class="flex flex-wrap justify-between items-center gap-3 bg-slate-800/90 backdrop-blur p-4 rounded-2xl border border-slate-700 flex-none card-glow pop-in">
@@ -132,8 +180,8 @@
                 </div>
                 <div class="border-l border-slate-600 pl-4 flex items-center gap-2">
                     <div>
-                        <span class="text-slate-400 text-xs block uppercase tracking-wide">Launch Game</span>
-                        <button id="btn-launch-warp" class="btn-bouncy bg-purple-500 hover:bg-purple-400 text-white text-sm font-bold py-1.5 px-4 rounded-xl mt-1">Warp Front</button>
+                        <span class="text-slate-400 text-xs block uppercase tracking-wide">Game</span>
+                        <button id="btn-launch-warp" class="btn-bouncy bg-purple-500 hover:bg-purple-400 text-white text-sm font-bold py-1.5 px-4 rounded-xl mt-1">Play Warp Front</button>
                     </div>
                 </div>
                 <span id="peer-status" class="text-xs font-mono px-2 py-1 rounded-full bg-amber-500/15 text-amber-300 border border-amber-500/30">waiting for peer…</span>
@@ -141,7 +189,13 @@
             <button id="btn-disconnect" class="btn-bouncy bg-red-500 hover:bg-red-400 text-white px-4 py-1.5 text-sm font-bold rounded-xl">Disconnect</button>
         </div>
 
-        <!-- Chat Container -->
+        <!-- Host invite: someone started Warp Front — prompt to open the table -->
+        <div id="warp-invite" class="hidden items-center justify-between gap-2 bg-purple-900/60 backdrop-blur px-4 py-2 rounded-2xl border border-purple-500/50 card-glow flex-none">
+            <span id="warp-invite-text" class="text-sm text-purple-100">Warp Front started.</span>
+            <button id="btn-warp-open" class="btn-bouncy bg-purple-500 hover:bg-purple-400 text-white text-sm font-bold py-1 px-4 rounded-xl flex-none">Show table</button>
+        </div>
+
+        <!-- Chat (shrinks while the game is open) -->
         <div id="chat-container" class="bg-slate-800/90 backdrop-blur rounded-2xl border border-slate-700 flex flex-col flex-none h-48 card-glow overflow-hidden">
             <div id="chat-box" class="flex-1 p-3 overflow-y-auto flex flex-col gap-1 text-sm"></div>
             <div class="p-2 border-t border-slate-700 flex gap-2 bg-slate-900/50">
@@ -150,20 +204,66 @@
             </div>
         </div>
 
-        <!-- The Game Iframe -->
-        <div id="game-container" class="hidden flex-1 min-h-0 bg-black rounded-2xl border border-slate-700 overflow-hidden relative" style="min-height:480px;">
-            <div class="absolute top-0 left-0 bg-slate-800/95 text-xs text-slate-300 px-3 py-1.5 rounded-br-xl z-10 border-b border-r border-slate-700 flex items-center gap-2">
-                <span id="game-title">Game Running</span>
-                <button id="btn-close-game" class="btn-bouncy ml-1 bg-red-500/20 hover:bg-red-500/40 text-red-300 hover:text-red-200 font-bold w-6 h-6 rounded-full leading-none">×</button>
+        <!-- Warp Front — inline, uses the room you're already in. No second join, no iframe. -->
+        <div id="warp-panel" class="hidden flex-col gap-3 bg-slate-800/90 backdrop-blur p-4 rounded-2xl border border-slate-700 card-glow pop-in">
+            <div class="flex flex-wrap items-center justify-between gap-2">
+                <div class="flex items-center gap-2">
+                    <span class="text-lg font-black tracking-widest" style="color:#00ffcc; font-family:monospace;">WARP FRONT</span>
+                    <span id="wf-who" class="text-[11px] font-mono text-slate-300"></span>
+                    <span id="warp-err" class="hidden text-[11px] font-mono text-red-300"></span>
+                </div>
+                <div class="flex items-center gap-2">
+                    <select id="warp-diff" class="bg-slate-900 border border-slate-600 rounded-xl px-2 py-1 text-xs font-mono w-auto">
+                        <option value="ensign">ENSIGN (hand 4)</option>
+                        <option value="standard" selected>STANDARD (hand 3)</option>
+                        <option value="solo">SOLO (hand 3, Borg +1)</option>
+                    </select>
+                    <button id="btn-warp-new" class="btn-bouncy bg-teal-500 hover:bg-teal-400 text-slate-950 text-xs font-bold py-1.5 px-3 rounded-xl">New battle</button>
+                    <button id="btn-warp-close" class="btn-bouncy bg-slate-700 hover:bg-slate-600 text-white text-xs font-bold py-1.5 px-3 rounded-xl">Hide</button>
+                </div>
             </div>
-            <iframe id="game-frame" class="w-full h-full border-none" style="min-height:480px;"></iframe>
+
+            <div>
+                <span class="wf-sub">FACTIONS — one player is Federation ♦, one is Klingons ♥, one is Ferengi ♣. With two players, one of you must take two. Click to claim:</span>
+                <div class="wf-frow" id="warp-claims"></div>
+            </div>
+
+            <div class="wf-hud">
+                <div class="wf-score"><span class="a" id="wf-score-a">ALLIANCE 0/5</span><br><span class="b" id="wf-score-b">BORG 0/5</span></div>
+                <div class="wf-sensor"><span>Sensor:<br><b id="wf-sensor" style="color:#fff">—</b></span><span style="text-align:right">Acting:<br><b id="wf-acting" style="color:#fff">—</b></span></div>
+            </div>
+            <div class="wf-seq">ORDER:
+                <span id="wf-seq-fed">FED ♦</span>→<span id="wf-seq-kli">KLI ♥</span>→<span id="wf-seq-fer">FER ♣</span>
+                <span id="wf-borg-note"></span>
+            </div>
+            <div id="wf-regroup" class="wf-banner hidden">No legal play — select one of your cards, then confirm regroup.
+                <button id="btn-wf-regroup" class="btn-bouncy bg-amber-500 hover:bg-amber-400 text-black text-xs font-bold py-1 px-3 rounded-xl ml-2" disabled>Confirm regroup</button>
+            </div>
+            <div id="wf-over" class="wf-over hidden"></div>
+
+            <div class="wf-panel" style="padding:10px;">
+                <span class="wf-sub">BATTLE GRID — play one card per faction turn beside a planet. Match exactly (home suit +1). Borg may overshoot. First to 5 planets wins.</span>
+                <div id="wf-board" class="wf-grid"></div>
+            </div>
+
+            <div>
+                <span class="wf-sub">COMMAND — your claimed factions are highlighted. Select a card, then click a planet.</span>
+                <div id="wf-hands" class="flex flex-col gap-2"></div>
+                <div id="wf-handinfo" class="text-[11px] font-mono text-slate-300 bg-black/60 border border-slate-700 rounded-xl px-3 py-2 mt-2">Press “New battle” to deploy.</div>
+            </div>
+
+            <div>
+                <span class="wf-sub">COMM LOG</span>
+                <div id="warp-log" class="wf-log"></div>
+            </div>
         </div>
 
     </div>
 
-    <footer class="text-center text-slate-500 text-xs pt-2 relative z-10">Bub Hub • click the Room ID to copy • be kind, have fun</footer>
+    <footer class="text-center text-slate-500 text-xs pt-2 relative z-10">Bub Hub v3 (inline Warp Front) • click the Room ID to copy • if a friend sees something different, both reload with Ctrl+Shift+R</footer>
 
     <script>
+        // ============ Hub / lobby / chat ============
         let peer = null;
         let connection = null;
         let isHost = false;
@@ -181,17 +281,22 @@
             chatBox: document.getElementById('chat-box'),
             chatInput: document.getElementById('chat-input'),
             nameInput: document.getElementById('player-name'),
-            gameContainer: document.getElementById('game-container'),
-            gameFrame: document.getElementById('game-frame'),
-            gameTitle: document.getElementById('game-title')
+            warpPanel: document.getElementById('warp-panel')
         };
 
         function randomRoomName() {
-            const n = Math.floor(100 + Math.random() * 900); // 100-999, always 3 digits
+            const n = Math.floor(100 + Math.random() * 900);
             return 'bubbies' + n;
         }
 
+        const ANIMAL_NAMES = ['Fox','Otter','Badger','Hawk','Wolf','Bear','Lynx','Mole','Frog','Rabbit','Deer','Owl','Seal','Crab','Falcon','Newt','Bat','Goat','Boar','Wren','Panda','Koala','Tiger','Whale'];
+        function randomAnimalName() {
+            return ANIMAL_NAMES[Math.floor(Math.random() * ANIMAL_NAMES.length)];
+        }
+
         ui.hostInput.value = randomRoomName();
+        ui.joinInput.value = 'bubbies';
+        ui.nameInput.value = randomAnimalName();
 
         document.getElementById('btn-shuffle').addEventListener('click', () => {
             ui.hostInput.value = randomRoomName();
@@ -199,6 +304,7 @@
         });
 
         function getName() { return ui.nameInput.value.trim() || 'Player'; }
+        function peerConnected() { return !!(connection && connection.open); }
 
         function setStatus(el, msg) {
             el.textContent = msg;
@@ -247,6 +353,7 @@
             ui.activeRoom.textContent = roomId;
             ui.chatBox.innerHTML = '';
             setPeerStatus(false);
+            hideWarp();
             logChat(`Welcome to ${roomId}! Share the Room ID to invite a friend.`, 'system', true);
         }
 
@@ -255,8 +362,8 @@
             ui.room.classList.remove('flex');
             ui.lobby.classList.remove('hidden');
             ui.lobby.classList.add('flex');
-            ui.gameContainer.classList.add('hidden');
-            ui.gameFrame.src = 'about:blank';
+            hideWarp();
+            hideWarpInvite();
         }
 
         function wireConnection(conn) {
@@ -264,27 +371,29 @@
             connection.on('open', () => {
                 setPeerStatus(true);
                 logChat('Peer connected!', 'system', true);
+                WF.onPeerOpen();
             });
             connection.on('data', (data) => {
-                if (data && data.type === 'chat') {
+                if (!data) return;
+                if (data.type === 'chat') {
                     logChat(data.text, data.name, false);
+                } else if (data.type === 'warp' || data.type === 'warp-state') {
+                    WF.onNet(data);
                 }
             });
             connection.on('close', () => {
                 setPeerStatus(false);
                 logChat('Peer disconnected.', 'system', true);
             });
-            connection.on('error', () => {
-                setPeerStatus(false);
-            });
+            connection.on('error', () => { setPeerStatus(false); });
         }
 
         function sendChat() {
             const text = ui.chatInput.value.trim();
             if (!text) return;
             logChat(text, getName(), false);
-            if (connection && connection.open) {
-                connection.send({ type: 'chat', name: getName(), text });
+            if (peerConnected()) {
+                try { connection.send({ type: 'chat', name: getName(), text }); } catch(e) {}
             }
             ui.chatInput.value = '';
             ui.chatInput.focus();
@@ -306,27 +415,18 @@
                 setStatus(ui.hostStatus, 'error: ' + err.message);
                 return;
             }
-            peer.on('open', () => {
-                showRoom(roomId);
-            });
-            peer.on('connection', (conn) => {
-                wireConnection(conn);
-            });
+            peer.on('open', () => { showRoom(roomId); });
+            peer.on('connection', (conn) => { wireConnection(conn); });
             peer.on('error', (err) => {
                 const msg = err && err.type ? err.type : err.message;
                 setStatus(ui.hostStatus, 'error: ' + msg);
-                if (String(msg).includes('taken')) {
-                    ui.hostInput.value = randomRoomName();
-                }
+                if (String(msg).includes('taken')) ui.hostInput.value = randomRoomName();
             });
         });
 
         document.getElementById('btn-join').addEventListener('click', () => {
             const roomId = ui.joinInput.value.trim();
-            if (!roomId) {
-                setStatus(ui.joinStatus, 'enter a Room ID first');
-                return;
-            }
+            if (!roomId) { setStatus(ui.joinStatus, 'enter a Room ID first'); return; }
             cleanup();
             isHost = false;
             setStatus(ui.joinStatus, 'connecting to ' + roomId + '…');
@@ -353,24 +453,9 @@
             const id = ui.activeRoom.textContent;
             try {
                 await navigator.clipboard.writeText(id);
-                const orig = id;
                 ui.activeRoom.textContent = 'copied!';
-                setTimeout(() => { ui.activeRoom.textContent = orig; }, 900);
+                setTimeout(() => { ui.activeRoom.textContent = id; }, 900);
             } catch {}
-        });
-
-        document.getElementById('btn-launch-warp').addEventListener('click', () => {
-            const roomId = ui.activeRoom.textContent;
-            ui.gameTitle.textContent = 'Warp Front — ' + roomId;
-            ui.gameContainer.classList.remove('hidden');
-            ui.gameFrame.src = 'warpfront.html?room=' + encodeURIComponent(roomId)
-                + '&name=' + encodeURIComponent(getName())
-                + '&host=' + (isHost ? '1' : '0');
-        });
-
-        document.getElementById('btn-close-game').addEventListener('click', () => {
-            ui.gameContainer.classList.add('hidden');
-            ui.gameFrame.src = 'about:blank';
         });
 
         function cleanup() {
@@ -378,9 +463,624 @@
             try { if (peer) peer.destroy(); } catch {}
             connection = null;
             peer = null;
+            WF.reset();
         }
 
         window.addEventListener('beforeunload', cleanup);
+
+        // Surface script errors in the warp header so a broken page tells you instead of going silent
+        window.addEventListener('error', (e) => {
+            try {
+                const el = document.getElementById('warp-err');
+                if (el){
+                    const where = e.lineno ? (' @' + e.lineno + ':' + (e.colno || 0)) : '';
+                    el.textContent = 'Error: ' + (e.message || 'script error') + where + ' — reload (Ctrl+Shift+R).';
+                    el.classList.remove('hidden');
+                }
+            } catch {}
+        });
+
+        // ============ Warp Front, inline (rules per WarpFrontRules.md) ============
+        // Factions: Federation ♦, Klingons ♥, Ferengi ♣. Borg is automated.
+        // Turn order: FED ♦ → Borg → KLI ♥ → Borg → FER ♣ → Borg.
+        // Multiplayer rides the room's existing chat connection: host is
+        // authoritative, guests send intents, host broadcasts full state.
+        const WF = (function(){
+            const FACTIONS = { '♦': 'Federation', '♥': 'Klingons', '♣': 'Ferengi' };
+            const ORDER = ['♦', 'borg', '♥', 'borg', '♣', 'borg'];
+            const WIN_SCORE = 5;
+
+            let S = null;               // authoritative game state (mirrored to guests)
+            let sel = null;             // local card selection {faction, idx}
+            let myClaim = { '♦': false, '♥': false, '♣': false };
+            let borgTimer = null;
+            let localSolo = false;      // guest fallback: no host answering, play locally
+            let soloFallbackT = null;
+
+            const $ = (id) => document.getElementById(id);
+            const boardEl = $('wf-board'), handsEl = $('wf-hands'), logEl = $('warp-log');
+
+            function shuffle(a){
+                for (let i = a.length - 1; i > 0; i--){
+                    const j = Math.floor(Math.random() * (i + 1));
+                    [a[i], a[j]] = [a[j], a[i]];
+                }
+                return a;
+            }
+            function rankVal(r){
+                if (r === 'A') return 1;
+                if (r === 'J' || r === 'Q' || r === 'K') return 10;
+                return parseInt(r, 10);
+            }
+            function planetDist(r){ return r === 'J' ? 11 : r === 'Q' ? 12 : 13; }
+            function playVal(card, planet){
+                let v = rankVal(card.rank);
+                if (card.suit !== '♠' && card.suit === planet.suit) v += 1;
+                return v;
+            }
+            function planetSpeed(p){
+                return p.pCards.reduce((s, c) => s + playVal(c, p), 0);
+            }
+            function borgSpeed(p){
+                return p.bCards.reduce((s, c) => s + rankVal(c.rank), 0);
+            }
+
+            function wlog(msg, cls){
+                if (!S) return;
+                S.log.unshift({ msg, cls: cls || '' });
+                while (S.log.length > 60) S.log.pop();
+                renderLog();
+            }
+
+            function renderLog(){
+                if (!S) return;
+                logEl.innerHTML = '';
+                S.log.forEach(e => {
+                    const d = document.createElement('div');
+                    if (e.cls) d.className = e.cls;
+                    d.textContent = '> ' + e.msg;
+                    logEl.appendChild(d);
+                });
+            }
+
+            function freshState(diff){
+                const handSize = diff === 'ensign' ? 4 : 3;
+                const headStart = diff === 'solo' ? 1 : 0;
+                const st = {
+                    diff, handSize, turnIndex: 0,
+                    planets: [], factions: {}, claims: { '♦': null, '♥': null, '♣': null },
+                    borg: { deck: [], discard: [], sensor: null, exhaust: 0 },
+                    scores: { players: 0, borg: headStart }, log: [],
+                    activeFaction: null, over: false, result: null
+                };
+                let pcs = [];
+                ['♦','♥','♣'].forEach(suit => {
+                    ['J','Q','K'].forEach(rank => pcs.push({ suit, rank, target: planetDist(rank), status: 'active', pCards: [], bCards: [] }));
+                });
+                shuffle(pcs);
+                if (headStart > 0) pcs[0].status = 'assimilated';
+                st.planets = pcs;
+                ['♦','♥','♣'].forEach(suit => {
+                    const deck = [];
+                    ['A','2','3','4','5','6','7','8','9','10'].forEach(rank => deck.push({ suit, rank }));
+                    shuffle(deck);
+                    st.factions[suit] = { deck, discard: [], hand: [] };
+                    for (let i = 0; i < handSize; i++) drawTo(st, suit);
+                });
+                ['A','2','3','4','5','6','7','8','9','10','J','Q','K'].forEach(rank => st.borg.deck.push({ suit: '♠', rank }));
+                shuffle(st.borg.deck);
+                st.borg.sensor = st.borg.deck.pop();
+                return st;
+            }
+
+            function drawTo(st, suit){
+                const f = st.factions[suit];
+                if (f.deck.length === 0){
+                    if (f.discard.length === 0) return;
+                    f.deck = shuffle(f.discard.splice(0));
+                }
+                f.hand.push(f.deck.pop());
+            }
+
+            function drawBorg(st){
+                if (st.borg.deck.length === 0){
+                    st.borg.exhaust++;
+                    if (st.borg.exhaust === 1){
+                        st.borg.deck = shuffle(st.borg.discard.splice(0));
+                        if (st.borg.deck.length === 0){ st.borg.exhaust = 2; return null; }
+                    } else {
+                        return null;
+                    }
+                }
+                return st.borg.deck.pop();
+            }
+
+            // ---- authority: only the host (or solo player) mutates S ----
+            function authority(){ return isHost || !peerConnected() || localSolo; }
+
+            function startLocal(note){
+                S = freshState($('warp-diff').value);
+                S.claims = { '♦': getName(), '♥': getName(), '♣': getName() };
+                sel = null;
+                logEl.innerHTML = '';
+                wlog(note);
+                beginTurn();
+                render();
+            }
+
+            function startBattle(diff){
+                clearTimeout(soloFallbackT);
+                clearTimeout(borgTimer);
+                if (authority() && !localSolo){
+                    S = freshState(diff || $('warp-diff').value);
+                    // host auto-claims Federation if nothing claimed
+                    if (!peerConnected()){
+                        S.claims = { '♦': getName(), '♥': getName(), '♣': getName() };
+                    } else if (!S.claims['♦'] && !S.claims['♥'] && !S.claims['♣']){
+                        S.claims['♦'] = getName();
+                    }
+                    sel = null;
+                    logEl.innerHTML = '';
+                    wlog(S.scores.borg === 0 ? 'Sector initialized. All systems nominal.' : 'Sector initialized. Borg holds 1 assimilated world.', S.scores.borg ? 'borg' : '');
+                    beginTurn();
+                    broadcast();
+                    // host starts it for everyone: prompt guests to open their table
+                    if (peerConnected()){
+                        try { connection.send({ type: 'warp-invite', v: 2, from: getName() }); } catch(e){}
+                    }
+                } else if (localSolo){
+                    startLocal('New local table dealt. You play all three.');
+                    broadcast();
+                } else if (!peerConnected()){
+                    // no live link: play locally instead of shouting into the void
+                    localSolo = true;
+                    startLocal('No link to host — local table started. You play all three.');
+                } else {
+                    send({ type: 'warp', action: 'newgame', diff: $('warp-diff').value, name: getName() });
+                    setInfo('Starting battle… (host is dealing)');
+                    // if nobody answers, fall back to a local table so the button always does something
+                    soloFallbackT = setTimeout(() => {
+                        if (!S){
+                            localSolo = true;
+                            startLocal('Host did not answer — local table started. If your friend is in this room, one of you has an old page: both reload with Ctrl+Shift+R.');
+                        }
+                    }, 2500);
+                }
+            }
+
+            function beginTurn(){
+                if (!S || S.over) return;
+                S.activeFaction = null;
+                const actor = ORDER[S.turnIndex];
+                if (actor === 'borg'){
+                    if (authority()){
+                        setInfo('Borg protocol executing…');
+                        render();
+                        clearTimeout(borgTimer);
+                        borgTimer = setTimeout(() => { borgTurn(); }, 900);
+                    } else {
+                        setInfo('Borg is acting… (watch the grid)');
+                        render();
+                    }
+                } else {
+                    S.activeFaction = actor;
+                    setInfo(`${FACTIONS[actor]} to move — select a card, then a planet.`);
+                    render();
+                }
+            }
+
+            function needsRegroup(suit){
+                const hand = S.factions[suit].hand;
+                const active = S.planets.filter(p => p.status === 'active');
+                if (!hand.length || !active.length) return false;
+                for (const c of hand)
+                    for (const p of active)
+                        if (planetSpeed(p) + playVal(c, p) <= p.target) return false;
+                return true;
+            }
+
+            function doPlay(suit, cardIdx, planetIdx){
+                const p = S.planets[planetIdx];
+                if (!p || p.status !== 'active') return 'That planet is already decided.';
+                const f = S.factions[suit];
+                const card = f.hand[cardIdx];
+                if (!card) return 'No such card.';
+                if (needsRegroup(suit)) return 'No legal play — you must Regroup.';
+                const cur = planetSpeed(p);
+                const v = playVal(card, p);
+                if (cur + v > p.target) return 'Overshoot! Alliance needs the exact sum (' + cur + '/' + p.target + ').';
+                f.hand.splice(cardIdx, 1);
+                p.pCards.push(card);
+                wlog(`${FACTIONS[suit]} played ${card.rank}${card.suit} on ${p.rank}${p.suit} (+${v}).`, 'player');
+                if (cur + v === p.target){
+                    p.status = 'claimed';
+                    S.scores.players++;
+                    wlog(`Alliance secured ${p.rank}${p.suit}! (${S.scores.players}/5)`, 'player');
+                    p.pCards.forEach(c => S.factions[c.suit].discard.push(c));
+                    p.bCards.forEach(c => S.borg.discard.push(c));
+                    p.pCards = []; p.bCards = [];
+                }
+                while (f.hand.length < S.handSize){
+                    if (f.deck.length === 0 && f.discard.length === 0) break;
+                    drawTo(S, suit);
+                }
+                if (!checkOver()) advance();
+                return null;
+            }
+
+            function doRegroup(suit, cardIdx){
+                const f = S.factions[suit];
+                const card = f.hand[cardIdx];
+                if (!card) return 'Select a card to regroup.';
+                f.hand.splice(cardIdx, 1);
+                f.discard.push(card);
+                wlog(`${FACTIONS[suit]} regrouped (discarded ${card.rank}${card.suit}).`);
+                drawTo(S, suit);
+                advance();
+                return null;
+            }
+
+            function borgTarget(){
+                const active = S.planets.filter(p => p.status === 'active');
+                if (!active.length) return null;
+                active.sort((a, b) => {
+                    const sa = planetSpeed(a), sb = planetSpeed(b);
+                    if (sa !== sb) return sb - sa;
+                    const ra = a.target - sa, rb = b.target - sb;
+                    if (ra !== rb) return ra - rb;
+                    return a.target - b.target;
+                });
+                return active[0];
+            }
+
+            function borgTurn(){
+                if (!S || S.over) return;
+                const t = borgTarget();
+                if (!t || !S.borg.sensor){ advance(); return; }
+                const played = S.borg.sensor;
+                t.bCards.push(played);
+                let msg = `Borg hits ${t.rank}${t.suit} with ${played.rank}♠.`;
+                if (played.rank === 'J' || played.rank === 'Q' || played.rank === 'K'){
+                    const bonus = drawBorg(S);
+                    if (bonus){ t.bCards.push(bonus); msg += ` BURST! Bonus ${bonus.rank}♠.`; }
+                }
+                wlog(msg, 'borg');
+                if (borgSpeed(t) >= t.target){
+                    t.status = 'assimilated';
+                    S.scores.borg++;
+                    wlog(`Borg assimilated ${t.rank}${t.suit}! (${S.scores.borg}/5)`, 'borg');
+                    t.pCards.forEach(c => S.factions[c.suit].discard.push(c));
+                    t.bCards.forEach(c => S.borg.discard.push(c));
+                    t.pCards = []; t.bCards = [];
+                }
+                S.borg.sensor = drawBorg(S);
+                if (S.borg.sensor === null && S.borg.exhaust >= 2){
+                    gameOverCount();
+                    broadcast();
+                    render();
+                    return;
+                }
+                if (!checkOver()) advance();
+                broadcast();
+                render();
+            }
+
+            function advance(){
+                if (checkOver()){ broadcast(); render(); return; }
+                S.turnIndex = (S.turnIndex + 1) % ORDER.length;
+                beginTurn();
+                broadcast();
+            }
+
+            function checkOver(){
+                if (!S || S.over) return true;
+                if (S.scores.players >= WIN_SCORE){ return gameOver('MISSION ACCOMPLISHED — Alliance secured 5 planets!', true); }
+                if (S.scores.borg >= WIN_SCORE){ return gameOver('SECTOR LOST — Borg assimilated 5 planets.', false); }
+                return false;
+            }
+            function gameOverCount(){
+                S.over = true;
+                if (S.scores.players > S.scores.borg) S.result = { win: true, text: `Time! Alliance holds majority ${S.scores.players}–${S.scores.borg}.` };
+                else S.result = { win: false, text: `Time! Borg holds the sector ${S.scores.borg}–${S.scores.players}.` };
+                wlog(S.result.text, S.result.win ? 'player' : 'borg');
+            }
+            function gameOver(text, win){
+                S.over = true;
+                S.result = { win, text };
+                wlog(text, win ? 'player' : 'borg');
+                return true;
+            }
+
+            // ---- networking ----
+            function send(o){ if (peerConnected()){ try { connection.send(Object.assign({ v: 2 }, o)); } catch(e){} } }
+            function broadcast(){
+                render();
+                if (!S) return;
+                if (peerConnected() && authority()){
+                    try { connection.send({ type: 'warp-state', v: 2, state: S, from: getName() }); } catch(e){}
+                }
+            }
+            function onNet(d){
+                if (d.type === 'warp-invite'){
+                    // host started a battle — prompt this player to open their table
+                    if (ui.warpPanel.classList.contains('hidden')) showWarpInvite(d.from);
+                    return;
+                }
+                if (d.type === 'warp-state'){
+                    if (!d.state) return;
+                    if (authority() && peerConnected() && !localSolo) return; // host ignores echoes
+                    localSolo = false;
+                    clearTimeout(soloFallbackT);
+                    S = d.state;
+                    sel = null;
+                    render();
+                    if (ui.warpPanel.classList.contains('hidden')) showWarpInvite(d.from);
+                    const cur = $('wf-handinfo').textContent;
+                    if (/Starting battle|Order sent|Regroup sent|Host did not answer|No link/.test(cur)) setInfo('');
+                    return;
+                }
+                if (d.type !== 'warp') return;
+                if (d.action === 'denied' && !authority()){
+                    setInfo(d.text || 'Host refused that move.');
+                    return;
+                }
+                if (!authority()) return;
+                if (!S && d.action !== 'newgame' && d.action !== 'sync'){
+                    send({ type: 'warp', action: 'denied', text: 'No battle on the host yet — ask the host to press New battle.' });
+                    return;
+                }
+                if (d.action === 'newgame'){ localSolo = false; startBattle(d.diff); }
+                else if (d.action === 'claim'){ S.claims[d.faction] = d.on ? d.name : null; broadcast(); }
+                else if (d.action === 'sync'){ broadcast(); }
+                else if (d.action === 'play'){
+                    const err = doPlay(d.faction, d.cardIdx, d.planetIdx);
+                    if (err) send({ type: 'warp', action: 'denied', text: err });
+                    else broadcast();
+                }
+                else if (d.action === 'regroup'){
+                    const err = doRegroup(d.faction, d.cardIdx);
+                    if (err) send({ type: 'warp', action: 'denied', text: err });
+                    else broadcast();
+                }
+            }
+            function onPeerOpen(){
+                if (!S) return;
+                if (authority()){
+                    // auto-claim a free faction for the guest's arrival is handled by guest; just sync
+                    broadcast();
+                } else {
+                    send({ type: 'warp', action: 'sync', name: getName() });
+                    // claim first free faction for seamless entry
+                    const free = ['♥','♣','♦'].find(f => !S.claims || !S.claims[f]);
+                    if (free) toggleClaim(free);
+                }
+            }
+
+            // ---- local input ----
+            function iControl(suit){
+                if (!S) return false;
+                if (!peerConnected()) return true;              // solo: play everything
+                const c = S.claims[suit];
+                return !c || c === getName();                   // unclaimed = anyone; claimed by me = mine
+            }
+            function toggleClaim(suit){
+                myClaim[suit] = !myClaim[suit];
+                const name = getName();
+                if (authority()){
+                    S.claims[suit] = myClaim[suit] ? name : null;
+                    broadcast();
+                } else {
+                    send({ type: 'warp', action: 'claim', faction: suit, on: myClaim[suit], name });
+                    // optimistic local mirror until host echoes
+                    if (S){ S.claims[suit] = myClaim[suit] ? name : S.claims[suit]; render(); }
+                }
+            }
+            function clickCard(suit, idx){
+                if (!S || S.over || S.activeFaction !== suit || !iControl(suit)) return;
+                sel = (sel && sel.faction === suit && sel.idx === idx) ? null : { faction: suit, idx };
+                render();
+            }
+            function clickPlanet(i){
+                if (!S || S.over || !S.activeFaction || !sel) return;
+                const suit = sel.faction, cardIdx = sel.idx;
+                if (suit !== S.activeFaction || !iControl(suit)) return;
+                if (authority()){
+                    const err = doPlay(suit, cardIdx, i);
+                    sel = null;
+                    if (err) setInfo(err); else setInfo('');
+                    broadcast();
+                } else {
+                    send({ type: 'warp', action: 'play', faction: suit, cardIdx, planetIdx: i, name: getName() });
+                    sel = null;
+                    setInfo('Order sent — host is resolving…');
+                }
+            }
+            function clickRegroup(){
+                if (!S || S.over || !S.activeFaction || !sel) return;
+                const suit = sel.faction, cardIdx = sel.idx;
+                if (authority()){
+                    const err = doRegroup(suit, cardIdx);
+                    sel = null;
+                    if (err) setInfo(err);
+                    broadcast();
+                } else {
+                    send({ type: 'warp', action: 'regroup', faction: suit, cardIdx, name: getName() });
+                    sel = null;
+                    setInfo('Regroup sent…');
+                }
+            }
+
+            function setInfo(t){ $('wf-handinfo').textContent = t || 'Select a card, then click a planet.'; }
+
+            // ---- rendering ----
+            function cardHTML(c, extra){
+                const red = c.suit === '♥' || c.suit === '♦';
+                return `<div class="wf-card ${red ? 'red' : ''} ${extra || ''}"><div>${c.rank}</div><div class="c">${c.suit}</div><div style="text-align:right">${c.rank}</div></div>`;
+            }
+            function render(){
+                if (!S){ return; }
+                $('wf-score-a').textContent = `ALLIANCE ${S.scores.players}/5`;
+                $('wf-score-b').textContent = `BORG ${S.scores.borg}/5`;
+                $('wf-sensor').textContent = S.borg.sensor ? (S.borg.sensor.rank + '♠') : '—';
+                const actor = ORDER[S.turnIndex];
+                $('wf-acting').textContent = S.over ? '—' : (actor === 'borg' ? 'BORG' : FACTIONS[actor]);
+                $('wf-seq-fed').className = actor === '♦' ? 'active' : '';
+                $('wf-seq-kli').className = actor === '♥' ? 'active' : '';
+                $('wf-seq-fer').className = actor === '♣' ? 'active' : '';
+                $('wf-borg-note').textContent = actor === 'borg' ? 'BORG acting…' : '';
+                $('wf-who').textContent = localSolo
+                    ? 'local table • host not answering'
+                    : peerConnected()
+                    ? (isHost ? 'host • you resolve Borg' : 'guest • host resolves')
+                    : 'solo • you play all three';
+
+                // claims pills
+                const cc = $('warp-claims');
+                cc.innerHTML = '';
+                ['♦','♥','♣'].forEach(f => {
+                    const b = document.createElement('button');
+                    const holder = S.claims[f];
+                    b.className = 'wf-pill' + (holder === getName() ? ' mine' : (holder ? ' theirs' : ''));
+                    b.textContent = `${FACTIONS[f]} ${f}` + (holder ? ` — ${holder}` : ' — open');
+                    if (!holder || holder === getName()) b.addEventListener('click', () => toggleClaim(f));
+                    cc.appendChild(b);
+                });
+
+                // regroup banner
+                const rg = $('wf-regroup');
+                if (!S.over && S.activeFaction && needsRegroup(S.activeFaction)){
+                    rg.classList.remove('hidden');
+                    $('btn-wf-regroup').disabled = !(sel && sel.faction === S.activeFaction);
+                } else rg.classList.add('hidden');
+
+                // game-over banner
+                const ov = $('wf-over');
+                if (S.over && S.result){
+                    ov.classList.remove('hidden');
+                    ov.classList.toggle('bad', !S.result.win);
+                    ov.textContent = S.result.text + ' Press “New battle”.';
+                } else ov.classList.add('hidden');
+
+                // board
+                boardEl.innerHTML = '';
+                S.planets.forEach((p, pi) => {
+                    const col = document.createElement('div');
+                    col.className = 'wf-col';
+                    if (p.status !== 'active'){
+                        const n = document.createElement('div');
+                        n.className = 'wf-node ' + (p.status === 'claimed' ? 'claimed' : 'assim');
+                        n.innerHTML = `<div class="r">${p.rank}</div><div class="s">${p.status === 'claimed' ? '✓' : 'BORG'}</div>`;
+                        col.appendChild(n);
+                        boardEl.appendChild(col);
+                        return;
+                    }
+                    const bz = document.createElement('div');
+                    bz.className = 'wf-bzone';
+                    p.bCards.forEach(c => {
+                        const d = document.createElement('div');
+                        d.className = 'wf-card mini stack';
+                        d.innerHTML = `<div>${c.rank}</div><div class="c">♠</div><div style="text-align:right">${c.rank}</div>`;
+                        bz.appendChild(d);
+                    });
+                    const node = document.createElement('div');
+                    const home = S.activeFaction && p.suit === S.activeFaction;
+                    node.className = 'wf-node' + ((p.suit === '♥' || p.suit === '♦') ? ' redp' : '');
+                    node.innerHTML = `${home ? '<div class="hb">+1 SPEED</div>' : ''}<div class="r">${p.rank}</div><div class="s">${p.suit}</div><div class="pg">${planetSpeed(p)}/${p.target}</div>`;
+                    node.addEventListener('click', () => clickPlanet(pi));
+                    const pz = document.createElement('div');
+                    pz.className = 'wf-pzone';
+                    p.pCards.forEach(c => {
+                        const d = document.createElement('div');
+                        const red = c.suit === '♥' || c.suit === '♦';
+                        d.className = 'wf-card mini stack' + (red ? ' red' : '');
+                        d.innerHTML = `<div>${c.rank}</div><div class="c">${c.suit}</div><div style="text-align:right">${c.rank}</div>`;
+                        pz.appendChild(d);
+                    });
+                    col.appendChild(bz);
+                    col.appendChild(node);
+                    col.appendChild(pz);
+                    boardEl.appendChild(col);
+                });
+
+                // hands
+                handsEl.innerHTML = '';
+                ['♦','♥','♣'].forEach(suit => {
+                    const f = S.factions[suit];
+                    const mine = iControl(suit);
+                    const active = S.activeFaction === suit && !S.over;
+                    const wrap = document.createElement('div');
+                    wrap.className = 'wf-panel';
+                    wrap.style.padding = '8px';
+                    wrap.style.borderColor = active ? '#00ffcc' : '#333';
+                    const holder = S.claims[suit];
+                    wrap.innerHTML = `<div class="wf-sub" style="margin-bottom:4px;">${FACTIONS[suit].toUpperCase()} ${suit} · deck ${f.deck.length} · ${holder ? escapeHtml(holder) : 'open'}${active ? ' · TO MOVE' : ''}${mine ? '' : ' · (theirs)'}</div>`;
+                    const row = document.createElement('div');
+                    row.className = 'wf-hand';
+                    f.hand.forEach((c, ci) => {
+                        const d = document.createElement('div');
+                        const isSel = sel && sel.faction === suit && sel.idx === ci;
+                        d.className = `wf-card${isSel ? ' sel' : ''}${(!mine || !active) ? ' locked' : ''}`;
+                        const red = c.suit === '♥' || c.suit === '♦';
+                        if (red) d.classList.add('red');
+                        d.innerHTML = `<div>${c.rank}</div><div class="c">${c.suit}</div><div style="text-align:right">${c.rank}</div>`;
+                        if (mine && active) d.addEventListener('click', () => clickCard(suit, ci));
+                        row.appendChild(d);
+                    });
+                    wrap.appendChild(row);
+                    handsEl.appendChild(wrap);
+                });
+                renderLog();
+            }
+
+            function reset(){ S = null; sel = null; clearTimeout(borgTimer); clearTimeout(soloFallbackT); localSolo = false; myClaim = { '♦': false, '♥': false, '♣': false }; }
+
+            return { startBattle, onNet, onPeerOpen, reset, clickRegroup,
+                get started(){ return !!S; } };
+        })();
+
+        // ============ Warp panel open/close (chat stays usable, no iframe) ============
+        const chatBox = ui.chatContainer;
+        function showWarpInvite(from){
+            const bar = document.getElementById('warp-invite');
+            document.getElementById('warp-invite-text').textContent =
+                (from ? from : 'Host') + ' started Warp Front — open your table to play.';
+            bar.classList.remove('hidden');
+            bar.classList.add('flex');
+        }
+        function hideWarpInvite(){
+            const bar = document.getElementById('warp-invite');
+            bar.classList.add('hidden');
+            bar.classList.remove('flex');
+        }
+        function showWarp(){
+            hideWarpInvite();
+            ui.warpPanel.classList.remove('hidden');
+            ui.warpPanel.classList.add('flex');
+            chatBox.classList.remove('h-48');
+            chatBox.style.height = '192px';   // readable chat while the game is on
+            document.getElementById('btn-launch-warp').textContent = 'Hide Warp Front';
+            if (!WF.started){
+                WF.startBattle(document.getElementById('warp-diff').value);
+            }
+        }
+        function hideWarp(){
+            ui.warpPanel.classList.add('hidden');
+            ui.warpPanel.classList.remove('flex');
+            chatBox.classList.add('h-48');
+            chatBox.style.height = '';
+            const b = document.getElementById('btn-launch-warp');
+            if (b) b.textContent = 'Play Warp Front';
+        }
+        document.getElementById('btn-launch-warp').addEventListener('click', () => {
+            if (ui.warpPanel.classList.contains('hidden')) showWarp();
+            else hideWarp();
+        });
+        document.getElementById('btn-warp-open').addEventListener('click', showWarp);
+        document.getElementById('btn-warp-close').addEventListener('click', hideWarp);
+        document.getElementById('btn-warp-new').addEventListener('click', () => {
+            WF.startBattle(document.getElementById('warp-diff').value);
+        });
+        document.getElementById('btn-wf-regroup').addEventListener('click', () => WF.clickRegroup());
     </script>
 </body>
 </html>
