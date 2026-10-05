@@ -1,0 +1,197 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Game Hub - P2P</title>
+    <script src="https://cdn.tailwindcss.com"></script>
+    <script src="https://unpkg.com/peerjs@1.5.2/dist/peerjs.min.js"></script>
+    <style>
+        body { background-color: #0f172a; color: #e2e8f0; }
+    </style>
+</head>
+<body class="p-6 max-w-3xl mx-auto flex flex-col gap-6">
+
+    <header class="border-b border-slate-700 pb-4">
+        <h1 class="text-3xl font-bold text-teal-400">GAME HUB</h1>
+        <p class="text-slate-400 text-sm">Direct WebRTC Connection</p>
+    </header>
+
+    <!-- Lobby UI -->
+    <div id="lobby-ui" class="flex flex-col gap-6">
+        <div class="bg-slate-800 p-6 rounded-lg border border-slate-700">
+            <h2 class="text-xl font-bold text-white mb-2">Host a Room</h2>
+            <p class="text-slate-400 mb-4 text-sm">Create a room ID and share it.</p>
+            <div class="flex gap-2">
+                <input type="text" id="host-id-input" class="bg-slate-900 border border-slate-600 rounded px-3 py-2 w-full focus:outline-none focus:border-teal-500 font-mono">
+                <button id="btn-host" class="bg-teal-600 hover:bg-teal-500 text-white font-bold py-2 px-6 rounded whitespace-nowrap">Create</button>
+            </div>
+            <p id="host-status" class="text-teal-400 text-sm mt-2 font-mono hidden"></p>
+        </div>
+
+        <div class="bg-slate-800 p-6 rounded-lg border border-slate-700">
+            <h2 class="text-xl font-bold text-white mb-2">Join a Room</h2>
+            <p class="text-slate-400 mb-4 text-sm">Enter the host's room ID to connect.</p>
+            <div class="flex gap-2">
+                <input type="text" id="join-id-input" placeholder="Room ID" class="bg-slate-900 border border-slate-600 rounded px-3 py-2 w-full focus:outline-none focus:border-teal-500 font-mono">
+                <button id="btn-join" class="bg-blue-600 hover:bg-blue-500 text-white font-bold py-2 px-6 rounded whitespace-nowrap">Connect</button>
+            </div>
+            <p id="join-status" class="text-blue-400 text-sm mt-2 font-mono hidden"></p>
+        </div>
+    </div>
+
+    <!-- Active Room / Chat UI -->
+    <div id="room-ui" class="hidden flex-col gap-4">
+        <div class="flex justify-between items-center bg-slate-800 p-4 rounded-lg border border-slate-700">
+            <div>
+                <span class="text-slate-400 text-sm block">Connected to Room:</span>
+                <span id="active-room-id" class="font-mono font-bold text-lg text-white"></span>
+            </div>
+            <button id="btn-disconnect" class="bg-red-900 hover:bg-red-800 text-red-100 px-4 py-2 rounded">Disconnect</button>
+        </div>
+
+        <div class="bg-slate-800 rounded-lg border border-slate-700 flex flex-col h-96">
+            <div id="chat-box" class="flex-1 p-4 overflow-y-auto flex flex-col gap-2 font-mono text-sm"></div>
+            <div class="p-4 border-t border-slate-700 flex gap-2">
+                <input type="text" id="chat-input" placeholder="Type a message..." class="bg-slate-900 border border-slate-600 rounded px-3 py-2 w-full focus:outline-none focus:border-teal-500">
+                <button id="btn-send" class="bg-teal-600 hover:bg-teal-500 text-white font-bold py-2 px-6 rounded">Send</button>
+            </div>
+        </div>
+    </div>
+
+    <script>
+        let peer = null;
+        let connection = null;
+
+        const ui = {
+            lobby: document.getElementById('lobby-ui'),
+            room: document.getElementById('room-ui'),
+            hostInput: document.getElementById('host-id-input'),
+            joinInput: document.getElementById('join-id-input'),
+            hostStatus: document.getElementById('host-status'),
+            joinStatus: document.getElementById('join-status'),
+            activeRoom: document.getElementById('active-room-id'),
+            chatBox: document.getElementById('chat-box'),
+            chatInput: document.getElementById('chat-input')
+        };
+
+        // Pre-fill a random readable room ID
+        ui.hostInput.value = 'room-' + Math.random().toString(36).substring(2, 6);
+
+        function logChat(msg, sender) {
+            const el = document.createElement('div');
+            el.className = 'p-2 rounded max-w-[80%] break-words';
+            if (sender === 'me') {
+                el.classList.add('bg-teal-900', 'text-teal-100', 'self-end');
+                el.innerText = 'You: ' + msg;
+            } else if (sender === 'system') {
+                el.classList.add('text-slate-400', 'self-center', 'text-xs');
+                el.innerText = msg;
+            } else {
+                el.classList.add('bg-slate-700', 'text-slate-100', 'self-start');
+                el.innerText = 'Friend: ' + msg;
+            }
+            ui.chatBox.appendChild(el);
+            ui.chatBox.scrollTop = ui.chatBox.scrollHeight;
+        }
+
+        function showRoom(roomId) {
+            ui.lobby.classList.add('hidden');
+            ui.room.classList.remove('hidden');
+            ui.room.classList.add('flex');
+            ui.activeRoom.innerText = roomId;
+            ui.chatBox.innerHTML = '';
+            logChat('Secure WebRTC data channel established.', 'system');
+        }
+
+        function bindConnectionEvents(conn) {
+            connection = conn;
+            
+            connection.on('open', () => {
+                showRoom(connection.peer);
+            });
+
+            connection.on('data', (data) => {
+                if (data.type === 'CHAT') logChat(data.text, 'them');
+            });
+
+            connection.on('close', () => {
+                logChat('Peer disconnected.', 'system');
+                connection = null;
+            });
+        }
+
+        // Host Logic
+        document.getElementById('btn-host').addEventListener('click', () => {
+            const roomId = ui.hostInput.value.trim();
+            if (!roomId) return;
+            
+            ui.hostStatus.innerText = 'Initializing...';
+            ui.hostStatus.classList.remove('hidden');
+
+            peer = new Peer(roomId);
+
+            peer.on('open', (id) => {
+                ui.hostStatus.innerText = `Waiting for connection on ID: ${id}`;
+            });
+
+            peer.on('connection', (conn) => {
+                bindConnectionEvents(conn);
+                showRoom(roomId);
+            });
+
+            peer.on('error', (err) => {
+                ui.hostStatus.innerText = 'Error: ' + err.message;
+            });
+        });
+
+        // Join Logic
+        document.getElementById('btn-join').addEventListener('click', () => {
+            const targetId = ui.joinInput.value.trim();
+            if (!targetId) return;
+
+            ui.joinStatus.innerText = 'Connecting...';
+            ui.joinStatus.classList.remove('hidden');
+
+            peer = new Peer(); 
+
+            peer.on('open', () => {
+                const conn = peer.connect(targetId);
+                bindConnectionEvents(conn);
+            });
+
+            peer.on('error', (err) => {
+                ui.joinStatus.innerText = 'Error: ' + err.message;
+            });
+        });
+
+        // Chat Handlers
+        function sendMessage() {
+            if (!connection || !connection.open) return;
+            const text = ui.chatInput.value.trim();
+            if (!text) return;
+
+            connection.send({ type: 'CHAT', text: text });
+            logChat(text, 'me');
+            ui.chatInput.value = '';
+        }
+
+        document.getElementById('btn-send').addEventListener('click', sendMessage);
+        ui.chatInput.addEventListener('keypress', (e) => {
+            if (e.key === 'Enter') sendMessage();
+        });
+
+        // Disconnect Handler
+        document.getElementById('btn-disconnect').addEventListener('click', () => {
+            if (connection) connection.close();
+            if (peer) peer.destroy();
+            
+            ui.room.classList.add('hidden');
+            ui.room.classList.remove('flex');
+            ui.lobby.classList.remove('hidden');
+            ui.hostStatus.classList.add('hidden');
+            ui.joinStatus.classList.add('hidden');
+        });
+    </script>
+</body>
+</html>
