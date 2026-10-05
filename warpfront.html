@@ -1,0 +1,81 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Warp Front - Multiplayer</title>
+<script src="https://unpkg.com/peerjs@1.5.2/dist/peerjs.min.js"></script>
+<style>
+:root{--bg:#0a0a0a;--panel:#111;--ink:#e0e0e0;--line:#333;--accent:#00ffcc;--good:#00ff00;--bad:#ff3333;--borg:#000;--sel1:#00aaff;}
+*{box-sizing:border-box} body{margin:0;background:var(--bg);color:var(--ink);font:15px/1.45 system-ui,sans-serif; overflow-x:hidden}
+button, select, input{cursor:pointer;border:1px solid #444;background:#1a1a1a;color:var(--ink);border-radius:4px;padding:10px 12px; transition:0.1s; font:inherit; width:100%; font-family:monospace; font-size:14px;}
+input { cursor:text; }
+button.primary{background:var(--accent);color:#000;border-color:var(--accent); font-weight:bold;}
+button:disabled{opacity:.45;cursor:not-allowed;box-shadow:none;} button:active{transform:scale(0.98)}
+
+/* Layout */
+header{background:#000;border-bottom:1px solid var(--accent);padding:8px;text-align:center; display:flex; justify-content:space-between; align-items:center;}
+h1{margin:0;font:700 18px monospace; color:var(--accent); letter-spacing:2px; text-transform:uppercase;}
+.player-id-badge { font-family: monospace; font-size: 12px; color: #aaa; background: #222; padding: 4px 8px; border-radius: 4px;}
+main{max-width:1100px;margin:0 auto;padding:8px; padding-bottom: 210px; display:flex; flex-direction:column; gap:8px;}
+.panel{background:var(--panel);border:1px solid var(--line);border-radius:6px;padding:12px;}
+.hidden{display:none!important}
+.sub{color:#aaa;font-size:12px; margin-bottom:8px; display:block; font-family:monospace;}
+
+/* Setup / Network UI */
+.network-grid { display: grid; grid-template-columns: 1fr 1fr; gap: 16px; margin-top: 16px; }
+.net-box { background: #050505; border: 1px solid #333; padding: 12px; border-radius: 6px; }
+#status-console { margin-top: 16px; padding: 8px; background: #000; border: 1px dashed var(--accent); color: var(--accent); font-family: monospace; font-size: 12px; min-height: 60px; white-space: pre-wrap;}
+
+/* HUD / Tactical Display */
+.hud-grid { display: grid; grid-template-columns: 1fr 1fr; gap: 8px; margin-bottom: 8px; align-items:stretch;}
+.score-box { background:#050505; padding:8px; border-radius:6px; border:1px solid var(--good); display:flex; flex-direction:column; justify-content:center;}
+.score-alliance { color:var(--good); font-family:monospace; font-size:13px; font-weight:bold; margin-bottom:4px;}
+.score-borg { color:var(--bad); font-family:monospace; font-size:13px; font-weight:bold;}
+.sensor-box { background:#050505; padding:6px 8px; border-radius:6px; border:1px solid var(--accent); display:flex; justify-content:space-between; align-items:center;}
+.sensor-title { font-size:11px; color:var(--accent); font-weight:bold; text-transform:uppercase; font-family:monospace; line-height:1.2;}
+
+/* Turn Sequence Indicator */
+.turn-sequence { text-align:center; font-family:monospace; font-size:12px; color:#888; margin-bottom: 8px; background:#050505; padding:8px; border:1px solid #222; border-radius:4px; letter-spacing:1px; display:flex; justify-content:center; align-items:center; gap:8px;}
+.turn-sequence span { opacity: 0.4; transition: 0.2s; padding: 2px 6px; border-radius:4px; }
+.turn-sequence span.active { opacity: 1; font-weight: bold; color: #000; background: var(--accent); box-shadow: 0 0 8px rgba(0,255,204,0.6); }
+
+/* Comm Log */
+.log-box { max-height: 90px; overflow-y: auto; font-size: 12px; border: 1px solid var(--line); background: #000; padding: 6px; font-family:monospace;}
+.log-item { margin-bottom: 4px; padding-bottom: 4px; border-bottom: 1px dashed #222;}
+.log-item:last-child { border-bottom: none; }
+.log-item.borg { color: var(--bad); }
+.log-item.player { color: var(--good); }
+
+/* Regular Cards (Base) */
+.card {background:#fff;border:1px solid #666;border-radius:4px;display:flex;flex-direction:column;justify-content:space-between;padding:2px;font-family:Georgia,serif;font-weight:bold;user-select:none;flex-shrink:0; cursor:pointer; transition: transform 0.1s; color:#000; box-shadow:0 2px 4px #000;}
+.card.red{color:#b4232b}.card.black{color:#222}
+.card .center{text-align:center;line-height:1}
+.card.face-down { background: #222; background-image: repeating-linear-gradient(45deg, transparent, transparent 8px, #111 8px, #111 16px); border-color: #000; color: transparent; cursor: default;}
+.card.unclickable { cursor: default; }
+.card.unclickable:hover { transform: none; }
+
+/* Planets Grid (Fluid Horizontal Wrapping) */
+.planet-grid { display: flex; flex-wrap: wrap; gap: 16px 20px; justify-content: center; align-items: flex-start; }
+.planet-col { display: flex; flex-direction: column; align-items: center; width: 64px; min-height: 140px;}
+.borg-zone, .player-zone { display:flex; flex-direction:column; align-items:center; min-height:35px;}
+.borg-zone { margin-bottom: 4px; justify-content:flex-end;}
+.player-zone { margin-top: 4px; justify-content:flex-start;}
+
+/* Planet Card Sizing */
+.planet-col .card { width: 36px; height: 50px; font-size: 11px; }
+.planet-col .card .center { font-size: 16px; }
+.planet-col .stacked-card { margin-bottom: -35px; position: relative; z-index:1; }
+.planet-col .player-zone .stacked-card { margin-bottom: 0; margin-top: -35px; }
+.planet-col .player-zone .stacked-card:first-child { margin-top: 0; }
+.planet-col .borg-zone .stacked-card:last-child { margin-bottom: 0; }
+
+/* The Planet Node */
+.planet-node { width: 64px; height: 64px; border-radius: 50%; background: #0a0a0a; border: 2px solid #555; display: flex; flex-direction: column; justify-content: center; align-items: center; position: relative; z-index: 5; box-shadow: inset 0 0 10px rgba(0,0,0,0.9), 0 3px 5px rgba(0,0,0,0.5); cursor:pointer;}
+.planet-node.red-planet { color: #ff4444; border-color: #882222; background: radial-gradient(circle at 30% 30%, #3a0000, #0a0a0a); }
+.planet-node.black-planet { color: #cccccc; border-color: #555; background: radial-gradient(circle at 30% 30%, #2a2a2a, #0a0a0a); }
+.planet-node .p-suit { font-size: 24px; line-height: 1; font-family: Georgia, serif; text-shadow: 0 0 4px rgba(0,0,0,0.8); }
+.planet-node .p-rank { font-size: 12px; font-weight: bold; position: absolute; top: 4px; font-family: monospace; color:#fff;}
+.planet-node .p-progress { font-size: 11px; font-weight: bold; background: #000; padding: 2px 5px; border-radius: 10px; border: 1px solid #666; position: absolute; bottom: -6px; color: #fff; font-family: monospace; white-space:nowrap;}
+.planet-node .p-progress.home-active { border-color: var(--accent); color: var(--accent); box-shadow: 0 0 6px rgba(0,255,204,0.4); }
+.home-badge { position: absolute; top: -12px; white-space: nowrap; background: var(--accent); color: #000; font-size: 9px; font-weight: bold; padding: 1px 4px; border-radius: 8px; font-family: monospace; z-index: 1
