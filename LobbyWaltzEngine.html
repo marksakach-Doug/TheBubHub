@@ -1,0 +1,409 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1, maximum-scale=1, user-scalable=no, viewport-fit=cover">
+<title>Waltz Engine</title>
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link href="https://fonts.googleapis.com/css2?family=Cormorant+Garamond:ital,wght@1,600;1,700&family=DM+Sans:wght@400;600&display=swap" rel="stylesheet">
+<style>
+:root{--floor:#14101f;--panel:#1d1630;--ivory:#f4ead7;--brass:#d9b26f;--rose:#e87a90;--mute:#a99bbd;color-scheme:dark;
+ --serif:"Cormorant Garamond",Georgia,serif;--sans:"DM Sans",system-ui,-apple-system,"Segoe UI",sans-serif}
+html,body{margin:0;width:100%;height:100%;background:var(--floor);color:var(--ivory);font-family:var(--sans);
+ overflow:hidden;touch-action:none;overscroll-behavior:none;position:fixed;inset:0;user-select:none;-webkit-user-select:none}
+#gameCanvas{display:block;width:100%;height:100%;cursor:crosshair}
+#uiLayer{position:absolute;inset:0;pointer-events:none;box-sizing:border-box;padding:calc(env(safe-area-inset-top,0px) + 14px) 22px 20px}
+.hud{display:flex;justify-content:space-between;align-items:flex-start;opacity:0;transition:opacity .4s}
+#timerDisplay,#scoreDisplay{font-family:var(--serif);font-style:italic;font-weight:700;font-size:38px;line-height:1}
+#scoreDisplay{text-align:right}
+#comboDisplay{display:block;font:600 13px var(--sans);color:var(--brass);margin-top:4px;min-height:16px}
+#mainMenu{position:absolute;inset:0;display:flex;align-items:center;justify-content:center;background:rgba(20,16,31,.82);
+ backdrop-filter:blur(6px);-webkit-backdrop-filter:blur(6px);pointer-events:auto;overflow-y:auto;padding:20px;box-sizing:border-box}
+.menu-box{width:100%;max-width:380px;margin:auto;padding:28px 26px;background:var(--panel);border:1px solid rgba(217,178,111,.35);border-radius:18px;text-align:center}
+h1{font:italic 700 52px/1 var(--serif);margin:0 0 6px;color:var(--ivory)}
+.tag{margin:0 0 4px;color:var(--mute);font-size:15px}
+#result{margin:14px 0 0;font:italic 700 26px var(--serif);color:var(--brass)}
+#help{margin:16px 0 0;font-size:14px;line-height:1.5;color:var(--ivory);text-align:left;background:rgba(255,255,255,.05);padding:12px 14px;border-radius:10px}
+.toggles{display:flex;flex-direction:column;gap:14px;margin-top:20px;text-align:left}
+.row{display:flex;align-items:center;justify-content:space-between;font-size:16px}
+.row.sub{font-size:13px;color:var(--mute);padding-left:12px}
+.sw{appearance:none;-webkit-appearance:none;width:44px;height:26px;margin:0;border-radius:13px;background:#3a2f4d;position:relative;cursor:pointer;transition:background .2s}
+.sw::after{content:"";position:absolute;top:3px;left:3px;width:20px;height:20px;border-radius:50%;background:var(--ivory);transition:transform .2s,background .2s}
+.sw:checked{background:var(--brass)}.sw:checked::after{transform:translateX(18px);background:var(--floor)}
+input[type=range]{width:120px;accent-color:var(--brass)}
+:focus-visible{outline:2px solid var(--brass);outline-offset:3px}
+#startBtn{width:100%;margin-top:22px;padding:15px;border:0;border-radius:12px;background:var(--brass);color:var(--floor);font:600 19px var(--sans);cursor:pointer}
+#startBtn:active{transform:scale(.98)}
+@media (prefers-reduced-motion:reduce){*{transition:none!important}}
+</style>
+</head>
+<body>
+<canvas id="gameCanvas"></canvas>
+<div id="uiLayer">
+  <div class="hud" id="hud">
+    <div id="timerDisplay">0:30</div>
+    <div><div id="scoreDisplay">0</div><span id="comboDisplay" style="text-align:right"></span></div>
+  </div>
+</div>
+
+<div id="mainMenu">
+  <div class="menu-box">
+    <h1>Waltz Engine</h1>
+    <p class="tag" id="highScoreDisplay">Best: 0</p>
+    <p id="result" hidden></p>
+    <p id="help"></p>
+    <div class="toggles">
+      <label class="row">Partner connection <input class="sw" type="checkbox" id="modPartner" checked></label>
+      <label class="row">Chaotic child <input class="sw" type="checkbox" id="modChild" checked></label>
+      <label class="row sub">Child skill <input type="range" id="childSkill" min="0" max="100" value="20"></label>
+      <label class="row">Partner leads <input class="sw" type="checkbox" id="modLead"></label>
+      <label class="row">Obstacles <input class="sw" type="checkbox" id="modObs" checked></label>
+    </div>
+    <button id="startBtn">Start dance</button>
+  </div>
+</div>
+
+<script>
+const $ = id => document.getElementById(id);
+const canvas = $('gameCanvas'), ctx = canvas.getContext('2d');
+const mainMenu = $('mainMenu'), hud = $('hud'), scoreDisp = $('scoreDisplay'), comboDisp = $('comboDisplay'), timerDisp = $('timerDisplay'), startBtn = $('startBtn');
+const modPartner = $('modPartner'), modChild = $('modChild'), childSkillSlider = $('childSkill'), modLead = $('modLead'), modObs = $('modObs');
+const SERIF = '"Cormorant Garamond", Georgia, serif';
+const coarse = matchMedia('(pointer: coarse)').matches;
+const calm = matchMedia('(prefers-reduced-motion: reduce)').matches;
+
+const BPM = 60, secPerBeat = 60 / BPM, SCHEDULE_AHEAD = 0.1, DURATION = 30, COUNT_IN = 3;
+const ARM_LENGTH = 50, FRICTION = 0.80;
+const LABELS = ['Swipe', 'Tap', 'Tap'];
+
+let audioCtx = null, startTime = 0, nextNoteTime = 0, scheduledBeat = 0, lastActiveBeat = -1;
+let isPlaying = false, score = 0, combo = 0, gameTimer = DURATION, lastTime = 0, shakeAmount = 0;
+let W = 0, H = 0, dpr = 1, lightsY = 0, arena = { l: 0, r: 0, t: 0, b: 0 };
+let player, partner, angularVelocity = 0, childJerkTimer = 0, lastCollisionTime = 0;
+let obstacles = [], floatingTexts = [], trailP = [], trailQ = [], drag = null;
+
+let highscore = 0;
+try { highscore = Number(localStorage.getItem('waltzHighScore')) || 0; } catch (e) {}
+$('highScoreDisplay').textContent = `Best: ${highscore}`;
+$('help').innerHTML = coarse
+  ? '<b>Swipe</b> on the first beat to step in any direction. <b>Tap</b> on the next two. Match the ticks.'
+  : '<b>Swipe</b> on beat one: drag the mouse or press an arrow key (or WASD). <b>Tap</b> on beats two and three: click or press Space.';
+
+function resize() {
+  dpr = Math.min(window.devicePixelRatio || 1, 2);
+  W = innerWidth; H = innerHeight;
+  canvas.width = W * dpr; canvas.height = H * dpr;
+  ctx.setTransform(dpr, 0, 0, dpr, 0, 0);
+  lightsY = hud.getBoundingClientRect().bottom + 62;
+  arena = { l: 44, r: W - 44, t: lightsY + 46, b: H - 60 };
+  if (player) clampToArena();
+  if (!isPlaying) drawFloor();
+}
+function clampToArena() {
+  player.x = Math.max(arena.l, Math.min(arena.r, player.x));
+  player.y = Math.max(arena.t, Math.min(arena.b, player.y));
+}
+
+function drawFloor() {
+  const g = ctx.createRadialGradient(W / 2, H * .55, 20, W / 2, H * .55, Math.max(W, H) * .7);
+  g.addColorStop(0, '#2d2042'); g.addColorStop(1, '#120e1c');
+  ctx.fillStyle = g; ctx.fillRect(0, 0, W, H);
+  const cx = W / 2, cy = (arena.t + arena.b) / 2, R = Math.max(40, Math.min(arena.r - arena.l, arena.b - arena.t) / 2);
+  ctx.strokeStyle = 'rgba(217,178,111,.12)'; ctx.lineWidth = 1.5;
+  for (let i = 1; i <= 3; i++) { ctx.beginPath(); ctx.arc(cx, cy, R * i / 3, 0, 7); ctx.stroke(); }
+}
+
+/* ---------- Input: touch, mouse and keyboard all feed _input ---------- */
+canvas.addEventListener('pointerdown', e => {
+  if (!isPlaying) return;
+  e.preventDefault(); canvas.setPointerCapture(e.pointerId);
+  drag = { x0: e.clientX, y0: e.clientY, x: e.clientX, y: e.clientY };
+});
+canvas.addEventListener('pointermove', e => { if (drag) { drag.x = e.clientX; drag.y = e.clientY; } });
+canvas.addEventListener('pointerup', e => {
+  if (!drag) return;
+  const dx = e.clientX - drag.x0, dy = e.clientY - drag.y0; drag = null;
+  const m = Math.hypot(dx, dy);
+  _input(m > 25 ? 'SWIPE' : 'TAP', dx, dy, m);
+});
+canvas.addEventListener('pointercancel', () => { drag = null; });
+
+const DIRS = { ArrowLeft: [-1, 0], a: [-1, 0], ArrowRight: [1, 0], d: [1, 0], ArrowUp: [0, -1], w: [0, -1], ArrowDown: [0, 1], s: [0, 1] };
+addEventListener('keydown', e => {
+  if (!isPlaying || e.repeat || e.metaKey || e.ctrlKey || e.altKey) return;
+  const k = e.key.length === 1 ? e.key.toLowerCase() : e.key;
+  const v = DIRS[k];
+  if (v) { e.preventDefault(); _input('SWIPE', v[0] * 45, v[1] * 45, 45); }
+  else if (k.length === 1 || k === 'Enter') { e.preventDefault(); _input('TAP', 0, 0, 0); }
+});
+
+/* ---------- Audio: a soft plucked waltz pulse ---------- */
+function playTick(time, isDownbeat) {
+  const osc = audioCtx.createOscillator(), gain = audioCtx.createGain();
+  osc.type = 'triangle';
+  osc.frequency.value = isDownbeat ? 196 : 392;
+  osc.connect(gain); gain.connect(audioCtx.destination);
+  gain.gain.setValueAtTime(isDownbeat ? 0.5 : 0.22, time);
+  gain.gain.exponentialRampToValueAtTime(0.001, time + (isDownbeat ? 0.35 : 0.18));
+  osc.start(time); osc.stop(time + 0.4);
+}
+
+startBtn.addEventListener('click', async () => {
+  if (!audioCtx) audioCtx = new (window.AudioContext || window.webkitAudioContext)();
+  if (audioCtx.state === 'suspended') await audioCtx.resume();
+  mainMenu.style.display = 'none';
+  hud.style.opacity = '1';
+  score = 0; combo = 0; gameTimer = DURATION; shakeAmount = 0;
+  const cx = (arena.l + arena.r) / 2, cy = (arena.t + arena.b) / 2;
+  player = { x: cx, y: cy, vx: 0, vy: 0, size: 30, mass: 2.0 };
+  partner = { x: cx, y: cy + ARM_LENGTH, vx: 0, vy: 0, size: 20, mass: 1.0 };
+  angularVelocity = 0; childJerkTimer = secPerBeat;
+  obstacles = []; floatingTexts = []; trailP = []; trailQ = []; drag = null; lastCollisionTime = 0;
+  if (modObs.checked) spawnObstacles();
+  updateHud();
+  isPlaying = true;
+  // One bar of count-in ticks, then the dance begins on a swipe beat.
+  startTime = audioCtx.currentTime + COUNT_IN * secPerBeat + 0.1;
+  nextNoteTime = startTime - COUNT_IN * secPerBeat;
+  scheduledBeat = -COUNT_IN; lastActiveBeat = -1;
+  lastTime = performance.now();
+  requestAnimationFrame(_process);
+});
+
+function _input(action, dx, dy, swipeMag) {
+  const songPos = audioCtx.currentTime - startTime;
+  if (songPos < -0.4 * secPerBeat) return; // still counting in
+  const exactBeat = songPos / secPerBeat, closestBeat = Math.round(exactBeat);
+  const diff = Math.abs(exactBeat - closestBeat);
+  const expected = (closestBeat % 3 === 0) ? 'SWIPE' : 'TAP';
+
+  if (diff >= 0.4) return registerHit('Miss', '#f87171');
+  if (action !== expected) return registerHit('Wrong move', '#f87171');
+
+  const timingQuality = 1 - diff / 0.4;
+  if (action === 'SWIPE') {
+    const dirX = dx / swipeMag, dirY = dy / swipeMag;
+    let stepForce = Math.min(swipeMag, 45) * (0.6 + timingQuality * 0.4);
+    const synergy = dirX * partner.vx + dirY * partner.vy;
+    if (synergy > 3) { stepForce *= 1.2; registerHit('Synergy!', '#c084fc'); }
+    else if (synergy < -3) { stepForce *= 0.8; registerHit('Resisted', '#fb923c'); }
+    else registerHit(timingQuality > 0.7 ? 'Perfect!' : 'Good', '#86efac');
+    const armX = partner.x - player.x, armY = partner.y - player.y;
+    angularVelocity -= (dirX * armY - dirY * armX) * stepForce * 0.0001;
+    player.vx += dirX * stepForce; player.vy += dirY * stepForce;
+  } else {
+    registerHit(timingQuality > 0.7 ? 'Perfect!' : 'Good', '#86efac');
+  }
+}
+
+function registerHit(msg, color) {
+  floatingTexts.push({ x: player.x, y: player.y - 40, text: msg, color, life: 1.6 });
+  if (['Perfect!', 'Good', 'Synergy!'].includes(msg)) {
+    score += 100 + combo * 10; combo++;
+    if (navigator.vibrate) navigator.vibrate(20);
+  } else combo = 0;
+  updateHud();
+}
+
+function updateHud() {
+  scoreDisp.textContent = score;
+  comboDisp.textContent = combo > 1 ? `${combo} in a row` : '';
+  const t = Math.ceil(gameTimer);
+  timerDisp.textContent = `${Math.floor(t / 60)}:${String(t % 60).padStart(2, '0')}`;
+}
+
+function spawnObstacles() {
+  const cx = (arena.l + arena.r) / 2, cy = (arena.t + arena.b) / 2;
+  while (obstacles.length < 6) {
+    const o = { x: arena.l + Math.random() * (arena.r - arena.l), y: arena.t + Math.random() * (arena.b - arena.t), size: 26 };
+    if (Math.hypot(o.x - cx, o.y - cy) > 100) obstacles.push(o);
+  }
+}
+
+function triggerShake(amt) {
+  if (!calm) shakeAmount = amt;
+  if (navigator.vibrate) navigator.vibrate(50);
+}
+
+/* ---------- Main loop ---------- */
+function _process(timestamp) {
+  if (!isPlaying) return;
+  const delta = Math.min((timestamp - lastTime) / 1000, 0.1);
+  lastTime = timestamp;
+  const f = delta * 60; // normalise physics to 60fps so 120Hz screens feel the same
+
+  while (nextNoteTime < audioCtx.currentTime + SCHEDULE_AHEAD) {
+    playTick(nextNoteTime, scheduledBeat % 3 === 0);
+    scheduledBeat++; nextNoteTime += secPerBeat;
+  }
+
+  const songPos = audioCtx.currentTime - startTime;
+  const activeBeat = Math.floor(songPos / secPerBeat);
+  if (activeBeat > lastActiveBeat && activeBeat >= 0) {
+    lastActiveBeat = activeBeat;
+    if (modLead.checked && activeBeat % 3 === 0) {
+      player.vx += (Math.random() - 0.5) * 35; player.vy += (Math.random() - 0.5) * 35;
+    }
+  }
+  gameTimer = Math.max(0, DURATION - Math.max(0, songPos));
+  if (gameTimer <= 0) { endGame(); return; }
+  updateHud();
+
+  if (modChild.checked && songPos > 0) {
+    childJerkTimer -= delta;
+    if (childJerkTimer <= 0) {
+      const skill = childSkillSlider.value / 100, variance = (1 - skill) * secPerBeat;
+      childJerkTimer = secPerBeat + (Math.random() * variance * 2 - variance);
+      const a = Math.random() * Math.PI * 2, force = 20 - skill * 15;
+      partner.vx += Math.cos(a) * force; partner.vy += Math.sin(a) * force;
+    }
+  }
+
+  angularVelocity *= Math.pow(0.90, f);
+  if (Math.abs(angularVelocity) > 0.005 && modPartner.checked) {
+    const s = Math.sin(angularVelocity * f), c = Math.cos(angularVelocity * f);
+    const px = partner.x - player.x, py = partner.y - player.y;
+    partner.x = px * c - py * s + player.x; partner.y = px * s + py * c + player.y;
+  }
+
+  const fr = Math.pow(FRICTION, f);
+  player.vx *= fr; player.vy *= fr;
+  player.x += player.vx * f; player.y += player.vy * f;
+  clampToArena();
+
+  if (modPartner.checked) {
+    partner.vx += player.vx * 0.1 * f; partner.vy += player.vy * 0.1 * f;
+    partner.vx *= fr; partner.vy *= fr;
+    partner.x += partner.vx * f; partner.y += partner.vy * f;
+    const pdx = partner.x - player.x, pdy = partner.y - player.y, dist = Math.hypot(pdx, pdy);
+    if (dist > ARM_LENGTH) {
+      const angle = Math.atan2(pdy, pdx), overlap = dist - ARM_LENGTH;
+      const pr = partner.mass / (player.mass + partner.mass), qr = player.mass / (player.mass + partner.mass);
+      player.x += Math.cos(angle) * overlap * pr * 0.5; player.y += Math.sin(angle) * overlap * pr * 0.5;
+      partner.x -= Math.cos(angle) * overlap * qr * 0.5; partner.y -= Math.sin(angle) * overlap * qr * 0.5;
+    }
+  }
+
+  if (modObs.checked && timestamp - lastCollisionTime > 500) {
+    for (const o of obstacles) {
+      const dx = player.x - o.x, dy = player.y - o.y;
+      if (Math.hypot(dx, dy) < player.size / 2 + o.size / 2) {
+        combo = 0; score = Math.max(0, score - 50); updateHud();
+        const a = Math.atan2(dy, dx);
+        player.vx = Math.cos(a) * 15; player.vy = Math.sin(a) * 15;
+        floatingTexts.push({ x: player.x, y: player.y - 40, text: 'Ouch!', color: '#fb7185', life: 1.6 });
+        triggerShake(10); lastCollisionTime = timestamp; break;
+      }
+    }
+  }
+
+  trailP.push({ x: player.x, y: player.y }); trailQ.push({ x: partner.x, y: partner.y });
+  if (trailP.length > 16) { trailP.shift(); trailQ.shift(); }
+
+  render(songPos, activeBeat, delta);
+  requestAnimationFrame(_process);
+}
+
+function render(songPos, activeBeat, delta) {
+  drawFloor();
+  ctx.save();
+  if (shakeAmount > 0) {
+    ctx.translate((Math.random() - .5) * shakeAmount, (Math.random() - .5) * shakeAmount);
+    shakeAmount *= 0.8; if (shakeAmount < 0.5) shakeAmount = 0;
+  }
+  const beatIdx = ((activeBeat % 3) + 3) % 3;
+  const beatProgress = (((songPos % secPerBeat) + secPerBeat) % secPerBeat) / secPerBeat;
+  const down = beatIdx === 0;
+
+  // beat ripple from the lead
+  ctx.strokeStyle = down ? 'rgba(217,178,111,.5)' : 'rgba(244,234,215,.22)';
+  ctx.globalAlpha = 1 - beatProgress; ctx.lineWidth = down ? 3 : 2;
+  ctx.beginPath(); ctx.arc(player.x, player.y, 22 + beatProgress * 70, 0, 7); ctx.stroke();
+  ctx.globalAlpha = 1;
+
+  // obstacles: brass-ringed pillars
+  obstacles.forEach(o => {
+    ctx.fillStyle = '#2a2040'; ctx.strokeStyle = '#d9b26f'; ctx.lineWidth = 3;
+    ctx.beginPath(); ctx.arc(o.x, o.y, o.size / 2, 0, 7); ctx.fill(); ctx.stroke();
+  });
+
+  // trails
+  const trail = (arr, color, r) => arr.forEach((p, i) => {
+    ctx.globalAlpha = (i / arr.length) * 0.28; ctx.fillStyle = color;
+    ctx.beginPath(); ctx.arc(p.x, p.y, r * (i / arr.length), 0, 7); ctx.fill();
+  });
+  trail(trailP, '#f4ead7', player.size / 2);
+  if (modPartner.checked) trail(trailQ, '#e87a90', partner.size / 2);
+  ctx.globalAlpha = 1;
+
+  const dancer = (d, fill, glow, r, dy) => {
+    ctx.shadowColor = glow; ctx.shadowBlur = 24; ctx.fillStyle = fill;
+    ctx.beginPath(); ctx.arc(d.x, d.y + dy, r, 0, 7); ctx.fill(); ctx.shadowBlur = 0;
+  };
+  if (modPartner.checked) {
+    ctx.strokeStyle = 'rgba(217,178,111,.7)'; ctx.lineWidth = 3;
+    ctx.beginPath(); ctx.moveTo(player.x, player.y); ctx.lineTo(partner.x, partner.y); ctx.stroke();
+    dancer(partner, '#e87a90', 'rgba(232,122,144,.8)', partner.size / 2, 0);
+  }
+  const bob = (!down && beatProgress < 0.3) ? -4 * Math.sin(beatProgress / 0.3 * Math.PI) : 0;
+  dancer(player, '#f4ead7', 'rgba(217,178,111,.9)', player.size / 2, bob);
+
+  // drag line (mouse or finger)
+  if (drag) {
+    ctx.strokeStyle = 'rgba(217,178,111,.6)'; ctx.lineWidth = 3; ctx.setLineDash([2, 8]); ctx.lineCap = 'round';
+    ctx.beginPath(); ctx.moveTo(drag.x0, drag.y0); ctx.lineTo(drag.x, drag.y); ctx.stroke();
+    ctx.setLineDash([]);
+  }
+
+  // beat lights with Swipe / Tap / Tap above them
+  const cx = W / 2, gap = Math.min(80, W / 4);
+  ctx.textAlign = 'center';
+  for (let i = 0; i < 3; i++) {
+    const x = cx + (i - 1) * gap, on = i === beatIdx;
+    ctx.font = `italic 700 ${on ? 28 : 24}px ${SERIF}`;
+    ctx.fillStyle = on ? '#d9b26f' : 'rgba(244,234,215,.5)';
+    ctx.fillText(LABELS[i], x, lightsY - 24);
+    ctx.shadowColor = '#d9b26f'; ctx.shadowBlur = on ? 22 : 0;
+    ctx.fillStyle = on ? '#d9b26f' : 'rgba(244,234,215,.14)';
+    ctx.beginPath(); ctx.arc(x, lightsY, on ? 13 : 10, 0, 7); ctx.fill(); ctx.shadowBlur = 0;
+    if (i === (beatIdx + 1) % 3) { // closing ring cues the next beat
+      ctx.strokeStyle = `rgba(244,234,215,${beatProgress * 0.8})`; ctx.lineWidth = 2;
+      ctx.beginPath(); ctx.arc(x, lightsY, 10 + (1 - beatProgress) * 20, 0, 7); ctx.stroke();
+    }
+  }
+
+  // floating feedback
+  ctx.font = `italic 700 28px ${SERIF}`; ctx.lineJoin = 'round'; ctx.lineWidth = 4; ctx.strokeStyle = 'rgba(20,16,31,.8)';
+  for (let i = floatingTexts.length - 1; i >= 0; i--) {
+    const t = floatingTexts[i];
+    ctx.globalAlpha = Math.max(0, Math.min(1, t.life));
+    ctx.strokeText(t.text, t.x, t.y); ctx.fillStyle = t.color; ctx.fillText(t.text, t.x, t.y);
+    t.y -= delta * 60 * 0.8; t.life -= delta;
+    if (t.life <= 0) floatingTexts.splice(i, 1);
+  }
+  ctx.globalAlpha = 1;
+  ctx.restore();
+}
+
+function endGame() {
+  isPlaying = false; drag = null;
+  hud.style.opacity = '0';
+  const best = score > highscore;
+  if (best) {
+    highscore = score;
+    try { localStorage.setItem('waltzHighScore', highscore); } catch (e) {}
+  }
+  $('highScoreDisplay').textContent = `Best: ${highscore}`;
+  const r = $('result'); r.hidden = false;
+  r.textContent = best ? `New best: ${score}` : `Final score: ${score}`;
+  startBtn.textContent = 'Dance again';
+  mainMenu.style.display = 'flex';
+  drawFloor();
+}
+
+addEventListener('resize', resize);
+resize();
+</script>
+</body>
+</html>

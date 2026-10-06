@@ -6,6 +6,7 @@
     <title>Bub Hub</title>
     <script src="https://cdn.tailwindcss.com"></script>
     <script src="https://unpkg.com/peerjs@1.5.2/dist/peerjs.min.js"></script>
+    <script src="games.js"></script>
     <style>
         body {
             background: radial-gradient(1200px 600px at 20% -10%, #134e4a 0%, transparent 60%),
@@ -14,8 +15,6 @@
             color: #e2e8f0;
             min-height: 100vh;
         }
-
-        /* Floating horse background */
         .horses { position: fixed; inset: 0; overflow: hidden; pointer-events: none; z-index: 0; }
         .horses img {
             position: absolute; bottom: -140px;
@@ -27,8 +26,6 @@
             from { transform: translateY(0) rotate(-2deg); }
             to { transform: translateY(-115vh) rotate(2deg); }
         }
-
-        /* Bouncy buttons */
         .btn-bouncy {
             transition: transform 0.22s cubic-bezier(0.34, 1.56, 0.64, 1),
                         box-shadow 0.22s ease,
@@ -50,77 +47,26 @@
             outline-offset: 2px;
         }
         .btn-bouncy:disabled { opacity: 0.45; transform: none; cursor: not-allowed; }
-
         @keyframes pop-in {
             0% { transform: scale(0.9); }
             60% { transform: scale(1.04); }
             100% { transform: scale(1); }
         }
         .pop-in { animation: pop-in 0.35s cubic-bezier(0.34,1.56,0.64,1); }
-
         .card-glow {
             box-shadow: 0 10px 30px rgba(0,0,0,0.35), inset 0 1px 0 rgba(255,255,255,0.06);
         }
-
         #chat-box::-webkit-scrollbar { width: 8px; }
         #chat-box::-webkit-scrollbar-thumb { background: #334155; border-radius: 8px; }
-
         .title-gradient {
             background: linear-gradient(90deg, #5eead4, #22d3ee 50%, #a5b4fc);
             -webkit-background-clip: text;
             background-clip: text;
             color: transparent;
         }
-
-        /* ---- Warp Front (inline, compact — no fixed/scroll boxes) ---- */
-        .wf-panel { background: #0a0a0a; border: 1px solid #333; border-radius: 12px; }
-        .wf-sub { color: #aaa; font-size: 11px; margin-bottom: 6px; display: block; font-family: monospace; }
-        .wf-hud { display: grid; grid-template-columns: 1fr 1fr; gap: 8px; margin-bottom: 8px; }
-        .wf-score { background: #050505; padding: 6px 8px; border-radius: 6px; border: 1px solid #00ff00; font-family: monospace; font-size: 12px; font-weight: bold; }
-        .wf-score .a { color: #00ff00; } .wf-score .b { color: #ff3333; }
-        .wf-sensor { background: #050505; padding: 6px 8px; border-radius: 6px; border: 1px solid #00ffcc; display: flex; justify-content: space-between; align-items: center; font-family: monospace; font-size: 11px; }
-        .wf-seq { text-align: center; font-family: monospace; font-size: 11px; color: #888; margin-bottom: 8px; background: #050505; padding: 6px; border: 1px solid #222; border-radius: 6px; display: flex; justify-content: center; align-items: center; gap: 6px; flex-wrap: wrap; }
-        .wf-seq span { opacity: 0.4; padding: 2px 6px; border-radius: 4px; }
-        .wf-seq span.active { opacity: 1; font-weight: bold; color: #000; background: #00ffcc; }
-        .wf-log { max-height: 72px; overflow-y: auto; font-size: 11px; border: 1px solid #333; background: #000; padding: 6px; font-family: monospace; border-radius: 6px; }
-        .wf-log .borg { color: #ff3333; } .wf-log .player { color: #00ff00; }
-        .wf-grid { display: flex; flex-wrap: wrap; gap: 10px 12px; justify-content: center; align-items: flex-start; }
-        .wf-col { display: flex; flex-direction: column; align-items: center; width: 60px; }
-        .wf-bzone, .wf-pzone { display: flex; flex-direction: column; align-items: center; min-height: 28px; }
-        .wf-bzone { margin-bottom: 2px; justify-content: flex-end; }
-        .wf-pzone { margin-top: 2px; justify-content: flex-start; }
-        .wf-card { background: #fff; border: 1px solid #666; border-radius: 4px; display: flex; flex-direction: column; justify-content: space-between; padding: 1px 2px; font-family: Georgia, serif; font-weight: bold; user-select: none; width: 32px; height: 44px; font-size: 10px; color: #222; cursor: pointer; }
-        .wf-card.red { color: #b4232b; }
-        .wf-card .c { text-align: center; line-height: 1; font-size: 14px; }
-        .wf-card.mini { width: 30px; height: 42px; cursor: default; }
-        .wf-card.stack { margin-bottom: -32px; position: relative; z-index: 1; cursor: default; }
-        .wf-pzone .wf-card.stack { margin-bottom: 0; margin-top: -32px; }
-        .wf-pzone .wf-card.stack:first-child { margin-top: 0; }
-        .wf-bzone .wf-card.stack:last-child { margin-bottom: 0; }
-        .wf-node { width: 58px; height: 58px; border-radius: 50%; background: #0a0a0a; border: 2px solid #555; display: flex; flex-direction: column; justify-content: center; align-items: center; position: relative; cursor: pointer; color: #ccc; }
-        .wf-node.redp { color: #ff4444; border-color: #882222; background: radial-gradient(circle at 30% 30%, #3a0000, #0a0a0a); }
-        .wf-node .s { font-size: 20px; line-height: 1; font-family: Georgia, serif; }
-        .wf-node .r { font-size: 11px; font-weight: bold; position: absolute; top: 3px; font-family: monospace; color: #fff; }
-        .wf-node .pg { font-size: 10px; font-weight: bold; background: #000; padding: 1px 5px; border-radius: 10px; border: 1px solid #666; position: absolute; bottom: -6px; color: #fff; font-family: monospace; white-space: nowrap; }
-        .wf-node .hb { position: absolute; top: -11px; white-space: nowrap; background: #00ffcc; color: #000; font-size: 8px; font-weight: bold; padding: 1px 4px; border-radius: 8px; font-family: monospace; }
-        .wf-node.claimed { border-color: #00ff00; cursor: default; }
-        .wf-node.claimed .s { color: #00ff00; }
-        .wf-node.assim { border-color: #ff3333; opacity: 0.65; cursor: default; }
-        .wf-hand { display: flex; gap: 8px; justify-content: center; min-height: 52px; flex-wrap: wrap; }
-        .wf-hand .wf-card { width: 40px; height: 58px; font-size: 12px; }
-        .wf-hand .wf-card .c { font-size: 18px; }
-        .wf-hand .wf-card.sel { outline: 3px solid #00aaff; transform: translateY(-5px); box-shadow: 0 0 10px rgba(0,170,255,0.8); }
-        .wf-hand .wf-card.locked { opacity: 0.45; cursor: not-allowed; }
-        .wf-card.facedown { background: #1c2333; background-image: repeating-linear-gradient(45deg, transparent, transparent 6px, #141a28 6px, #141a28 12px); border-color: rgba(0,255,204,0.35); color: #00ffcc; cursor: default; }
-        .wf-card.facedown .c { font-size: 15px; }
-        .wf-hand .wf-card.scanned { outline: 2px solid #c48a00; }
-        .wf-frow { display: flex; gap: 6px; flex-wrap: wrap; align-items: center; }
-        .wf-pill { font-family: monospace; font-size: 11px; padding: 4px 8px; border-radius: 999px; border: 1px solid #444; background: #1a1a1a; color: #ccc; cursor: pointer; }
-        .wf-pill.mine { border-color: #00ffcc; color: #00ffcc; background: rgba(0,255,204,0.08); }
-        .wf-pill.theirs { border-color: #554; color: #888; cursor: default; }
-        .wf-banner { background: #2a1a00; padding: 6px 8px; border: 1px solid #c48a00; border-radius: 8px; margin-bottom: 8px; text-align: center; font-family: monospace; font-size: 11px; color: #f5d76e; }
-        .wf-over { background: #04120e; border: 1px solid #00ff00; color: #00ff00; padding: 8px; border-radius: 8px; text-align: center; font-family: monospace; font-weight: bold; }
-        .wf-over.bad { background: #1a0505; border-color: #ff3333; color: #ff8888; }
+        /* Shared game stage: one borderless iframe per game, sized to its content. */
+        #game-stage iframe { width: 100%; border: 0; display: block; background: transparent; }
+        .gv-invite-btn { font-weight: 800; font-size: 13px; padding: 4px 16px; border-radius: 12px; flex: none; }
     </style>
 </head>
 <body class="p-4 max-w-4xl mx-auto flex flex-col gap-4 min-h-screen relative">
@@ -139,6 +85,7 @@
             <div>
                 <h1 class="text-4xl font-black tracking-tight title-gradient drop-shadow">BUB HUB</h1>
                 <p class="text-slate-400 text-sm mt-1">Peer-to-Peer Arcade</p>
+                <p id="hub-err" class="hidden text-[11px] font-mono text-red-300 mt-1"></p>
             </div>
         </div>
         <div class="flex items-center gap-2 bg-slate-800/80 backdrop-blur px-3 py-2 rounded-2xl border border-slate-700 card-glow">
@@ -169,6 +116,12 @@
             </div>
             <p id="join-status" class="text-blue-300 text-xs mt-2 font-mono hidden"></p>
         </div>
+
+        <div id="lobby-games-card" class="hidden bg-slate-800/90 backdrop-blur p-5 rounded-2xl border border-slate-700 flex-1 card-glow">
+            <h2 class="text-lg font-bold text-white mb-1">While you wait</h2>
+            <p class="text-slate-400 text-xs mb-3">Solo games. No room needed.</p>
+            <div id="lobby-game-buttons" class="flex flex-wrap gap-2"></div>
+        </div>
     </div>
 
     <!-- Active Room UI -->
@@ -183,22 +136,19 @@
                 </div>
                 <div class="border-l border-slate-600 pl-4 flex items-center gap-2">
                     <div>
-                        <span class="text-slate-400 text-xs block uppercase tracking-wide">Game</span>
-                        <button id="btn-launch-warp" class="btn-bouncy bg-purple-500 hover:bg-purple-400 text-white text-sm font-bold py-1.5 px-4 rounded-xl mt-1">Play Warp Front</button>
+                        <span class="text-slate-400 text-xs block uppercase tracking-wide">Games</span>
+                        <div id="game-buttons" class="flex flex-wrap gap-2 mt-1"></div>
                     </div>
                 </div>
-                <span id="peer-status" class="text-xs font-mono px-2 py-1 rounded-full bg-amber-500/15 text-amber-300 border border-amber-500/30">waiting for peer…</span>
+                <span id="peer-status" class="text-xs font-mono px-2 py-1 rounded-full bg-amber-500/15 text-amber-300 border border-amber-500/30">waiting for players…</span>
             </div>
             <button id="btn-disconnect" class="btn-bouncy bg-red-500 hover:bg-red-400 text-white px-4 py-1.5 text-sm font-bold rounded-xl">Disconnect</button>
         </div>
 
-        <!-- Host invite: someone started Warp Front — prompt to open the table -->
-        <div id="warp-invite" class="hidden items-center justify-between gap-2 bg-purple-900/60 backdrop-blur px-4 py-2 rounded-2xl border border-purple-500/50 card-glow flex-none">
-            <span id="warp-invite-text" class="text-sm text-purple-100">Warp Front started.</span>
-            <button id="btn-warp-open" class="btn-bouncy bg-purple-500 hover:bg-purple-400 text-white text-sm font-bold py-1 px-4 rounded-xl flex-none">Show table</button>
-        </div>
+        <!-- Game invites, one bar per game, created as needed -->
+        <div id="game-invites" class="flex flex-col gap-2"></div>
 
-        <!-- Chat (shrinks while the game is open) -->
+        <!-- Chat -->
         <div id="chat-container" class="bg-slate-800/90 backdrop-blur rounded-2xl border border-slate-700 flex flex-col flex-none h-48 card-glow overflow-hidden">
             <div id="chat-box" class="flex-1 p-3 overflow-y-auto flex flex-col gap-1 text-sm"></div>
             <div class="p-2 border-t border-slate-700 flex gap-2 bg-slate-900/50">
@@ -207,73 +157,26 @@
             </div>
         </div>
 
-        <!-- Warp Front — inline, uses the room you're already in. No second join, no iframe. -->
-        <div id="warp-panel" class="hidden flex-col gap-3 bg-slate-800/90 backdrop-blur p-4 rounded-2xl border border-slate-700 card-glow pop-in">
-            <div class="flex flex-wrap items-center justify-between gap-2">
-                <div class="flex items-center gap-2">
-                    <span class="text-lg font-black tracking-widest" style="color:#00ffcc; font-family:monospace;">WARP FRONT</span>
-                    <span id="wf-who" class="text-[11px] font-mono text-slate-300"></span>
-                    <span id="warp-err" class="hidden text-[11px] font-mono text-red-300"></span>
-                </div>
-                <div class="flex items-center gap-2">
-                    <select id="warp-diff" class="bg-slate-900 border border-slate-600 rounded-xl px-2 py-1 text-xs font-mono w-auto">
-                        <option value="ensign">ENSIGN (hand 4)</option>
-                        <option value="standard" selected>STANDARD (hand 3)</option>
-                        <option value="solo">SOLO (hand 3, Borg +1)</option>
-                    </select>
-                    <button id="btn-warp-new" class="btn-bouncy bg-teal-500 hover:bg-teal-400 text-slate-950 text-xs font-bold py-1.5 px-3 rounded-xl">New battle</button>
-                    <button id="btn-warp-close" class="btn-bouncy bg-slate-700 hover:bg-slate-600 text-white text-xs font-bold py-1.5 px-3 rounded-xl">Hide</button>
-                </div>
-            </div>
-
-            <div>
-                <span class="wf-sub">FACTIONS — claim yours. One player is Federation ♦, one Klingons ♥, one Ferengi ♣. With two players, one of you must take two. Unclaimed factions wait their turn:</span>
-                <div class="wf-frow" id="warp-claims"></div>
-            </div>
-
-            <div class="wf-hud">
-                <div class="wf-score"><span class="a" id="wf-score-a">ALLIANCE 0/5</span><br><span class="b" id="wf-score-b">BORG 0/5</span></div>
-                <div class="wf-sensor"><span>Sensor:<br><b id="wf-sensor" style="color:#fff">—</b></span><span style="text-align:right">Acting:<br><b id="wf-acting" style="color:#fff">—</b></span></div>
-            </div>
-            <div class="wf-seq">ORDER:
-                <span id="wf-seq-fed">FED ♦</span>→<span id="wf-seq-kli">KLI ♥</span>→<span id="wf-seq-fer">FER ♣</span>
-                <span id="wf-borg-note"></span>
-            </div>
-            <div id="wf-regroup" class="wf-banner hidden">No legal play — select one of your cards, then confirm regroup.
-                <button id="btn-wf-regroup" class="btn-bouncy bg-amber-500 hover:bg-amber-400 text-black text-xs font-bold py-1 px-3 rounded-xl ml-2" disabled>Confirm regroup</button>
-            </div>
-            <div id="wf-over" class="wf-over hidden"></div>
-            <div id="wf-wait" class="wf-banner hidden"></div>
-
-            <div class="wf-panel" style="padding:10px;">
-                <span class="wf-sub">BATTLE GRID — play one card per faction turn beside a planet. Match exactly (home suit +1). Borg may overshoot. First to 5 planets wins.</span>
-                <div id="wf-board" class="wf-grid"></div>
-            </div>
-
-            <div>
-                <span class="wf-sub">COMMAND — you see only your own cards; teammates' hands are face-down. Plan in chat, Scan to reveal a card to everyone. Talk rule: never name the rank of a face-down card.</span>
-                <div class="flex gap-2 mb-2">
-                    <button id="btn-wf-scan" class="btn-bouncy bg-amber-500 hover:bg-amber-400 text-black text-xs font-bold py-1.5 px-3 rounded-xl" disabled>Scan a card (reveal)</button>
-                </div>
-                <div id="wf-hands" class="flex flex-col gap-2"></div>
-                <div id="wf-handinfo" class="text-[11px] font-mono text-slate-300 bg-black/60 border border-slate-700 rounded-xl px-3 py-2 mt-2">Press “New battle” to deploy.</div>
-            </div>
-
-            <div>
-                <span class="wf-sub">COMM LOG</span>
-                <div id="warp-log" class="wf-log"></div>
-            </div>
-        </div>
-
     </div>
 
-    <footer class="text-center text-slate-500 text-xs pt-2 relative z-10">Bub Hub v3 (inline Warp Front) • click the Room ID to copy • if a friend sees something different, both reload with Ctrl+Shift+R</footer>
+    <!-- Shared game stage (top level so lobby solo games work too): one iframe
+         per game. Multiplayer games size to content; solo games use a fixed height. -->
+    <div id="game-stage" class="flex-col gap-4 relative z-10"></div>
+
+    <footer class="text-center text-slate-500 text-xs pt-2 relative z-10">Bub Hub v7 (modular games + waltz) • click the Room ID to copy • if a friend sees something different, both reload with Ctrl+Shift+R</footer>
 
     <script>
-        // ============ Hub / lobby / chat ============
+        // ============ Hub: multi-peer room + game broker ============
+        // The hub owns the room, the roster, chat, and all PeerJS traffic.
+        // Games live in their own files, render in stage iframes, and talk to
+        // the hub over postMessage. The hub relays bytes and never reads rules.
         let peer = null;
-        let connection = null;
         let isHost = false;
+        let inRoom = false;
+        let currentRoomId = '';
+        let myId = 'p-' + Math.random().toString(36).slice(2, 10);
+        const links = new Map(); // playerId -> { conn, name, host }
+        const GAMES = window.BUB_GAMES || [];
 
         const ui = {
             lobby: document.getElementById('lobby-ui'),
@@ -288,7 +191,11 @@
             chatBox: document.getElementById('chat-box'),
             chatInput: document.getElementById('chat-input'),
             nameInput: document.getElementById('player-name'),
-            warpPanel: document.getElementById('warp-panel')
+            gameButtons: document.getElementById('game-buttons'),
+            lobbyGamesCard: document.getElementById('lobby-games-card'),
+            lobbyGameButtons: document.getElementById('lobby-game-buttons'),
+            gameInvites: document.getElementById('game-invites'),
+            gameStage: document.getElementById('game-stage')
         };
 
         function randomRoomName() {
@@ -311,7 +218,31 @@
         });
 
         function getName() { return ui.nameInput.value.trim() || 'Player'; }
-        function peerConnected() { return !!(connection && connection.open); }
+        function openLinks() { return [...links.entries()].filter(([id, e]) => e.conn && e.conn.open); }
+        function peerCount() { return 1 + openLinks().length; }
+        function peerConnected() { return openLinks().length > 0; }
+        function hostLink() {
+            if (isHost) return null;
+            const found = [...links.values()].find(e => e.host && e.conn && e.conn.open);
+            return found || null;
+        }
+        function sendTo(entry, o) { try { entry.conn.send(o); } catch(e) {} }
+        function sendAll(o, exceptId) {
+            openLinks().forEach(([id, e]) => { if (id !== exceptId) sendTo(e, o); });
+        }
+        function idOfConn(conn) {
+            for (const [id, e] of links) if (e.conn === conn) return id;
+            return null;
+        }
+        function rosterList() {
+            const list = [{ id: myId, name: getName(), host: isHost }];
+            openLinks().forEach(([id, e]) => list.push({ id, name: e.name, host: !!e.host }));
+            return list;
+        }
+        function gameTitle(gameId) {
+            const g = GAMES.find(x => x.id === gameId);
+            return g ? g.title : gameId;
+        }
 
         function setStatus(el, msg) {
             el.textContent = msg;
@@ -341,67 +272,94 @@
             return String(s).replace(/[&<>"']/g, c => ({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;'}[c]));
         }
 
-        function setPeerStatus(connected) {
-            if (!ui.peerStatus) return;
-            if (connected) {
-                ui.peerStatus.textContent = '● connected';
-                ui.peerStatus.className = 'text-xs font-mono px-2 py-1 rounded-full bg-emerald-500/15 text-emerald-300 border border-emerald-500/30';
-            } else {
-                ui.peerStatus.textContent = 'waiting for peer…';
-                ui.peerStatus.className = 'text-xs font-mono px-2 py-1 rounded-full bg-amber-500/15 text-amber-300 border border-amber-500/30';
+        function refreshRoster() {
+            if (ui.peerStatus) {
+                const n = peerCount();
+                if (n <= 1) {
+                    ui.peerStatus.textContent = 'waiting for players…';
+                    ui.peerStatus.className = 'text-xs font-mono px-2 py-1 rounded-full bg-amber-500/15 text-amber-300 border border-amber-500/30';
+                } else {
+                    const names = [getName()].concat(openLinks().map(([id, e]) => e.name));
+                    ui.peerStatus.textContent = `● ${n} players: ${names.join(', ')}`;
+                    ui.peerStatus.className = 'text-xs font-mono px-2 py-1 rounded-full bg-emerald-500/15 text-emerald-300 border border-emerald-500/30';
+                }
             }
+            GB.pushRoster();
         }
 
         function showRoom(roomId) {
+            inRoom = true;
+            currentRoomId = roomId;
             ui.lobby.classList.add('hidden');
             ui.lobby.classList.remove('flex');
             ui.room.classList.remove('hidden');
             ui.room.classList.add('flex');
             ui.activeRoom.textContent = roomId;
             ui.chatBox.innerHTML = '';
-            setPeerStatus(false);
-            hideWarp();
-            logChat(`Welcome to ${roomId}! Share the Room ID to invite a friend.`, 'system', true);
+            refreshRoster();
+            GB.closeAll();
+            logChat(`Welcome to ${roomId}! Share the Room ID to invite friends.`, 'system', true);
         }
 
         function showLobby() {
+            inRoom = false;
+            currentRoomId = '';
             ui.room.classList.add('hidden');
             ui.room.classList.remove('flex');
             ui.lobby.classList.remove('hidden');
             ui.lobby.classList.add('flex');
-            hideWarp();
-            hideWarpInvite();
+            GB.closeAll();
+            clearInvites();
+        }
+
+        function routeMessage(conn, data) {
+            if (!data) return;
+            if (data.type === 'hello') {
+                links.set(data.id, { conn, name: data.name, host: !!data.host });
+                if (isHost && !data.host) {
+                    sendTo(links.get(data.id), { type: 'hello', id: myId, name: getName(), host: true });
+                }
+                logChat(`${data.name} joined.`, 'system', true);
+                refreshRoster();
+                return;
+            }
+            if (data.type === 'chat') {
+                logChat(data.text, data.name, false);
+                if (isHost) sendAll(data, data.id);
+                return;
+            }
+            if (data.type === 'say') {
+                logChat(data.text, data.name, false);
+                return;
+            }
+            if (data.type === 'game') {
+                routeGame(data);
+                return;
+            }
         }
 
         function wireConnection(conn) {
-            connection = conn;
-            connection.on('open', () => {
-                setPeerStatus(true);
-                logChat('Peer connected!', 'system', true);
-                WF.onPeerOpen();
+            conn.on('open', () => {
+                try { conn.send({ type: 'hello', id: myId, name: getName(), host: isHost }); } catch(e) {}
+                refreshRoster();
             });
-            connection.on('data', (data) => {
-                if (!data) return;
-                if (data.type === 'chat') {
-                    logChat(data.text, data.name, false);
-                } else if (data.type === 'warp' || data.type === 'warp-state') {
-                    WF.onNet(data);
-                }
+            conn.on('data', (data) => routeMessage(conn, data));
+            conn.on('close', () => {
+                const id = idOfConn(conn);
+                let nm = 'A player';
+                if (id && links.has(id)) { nm = links.get(id).name || nm; links.delete(id); }
+                logChat(`${nm} left.`, 'system', true);
+                refreshRoster();
             });
-            connection.on('close', () => {
-                setPeerStatus(false);
-                logChat('Peer disconnected.', 'system', true);
-            });
-            connection.on('error', () => { setPeerStatus(false); });
+            conn.on('error', () => {});
         }
 
         function sendChat() {
             const text = ui.chatInput.value.trim();
             if (!text) return;
+            const msg = { type: 'chat', id: myId, name: getName(), text };
             logChat(text, getName(), false);
-            if (peerConnected()) {
-                try { connection.send({ type: 'chat', name: getName(), text }); } catch(e) {}
-            }
+            sendAll(msg);
             ui.chatInput.value = '';
             ui.chatInput.focus();
         }
@@ -466,19 +424,18 @@
         });
 
         function cleanup() {
-            try { if (connection) connection.close(); } catch {}
+            links.forEach((e) => { try { e.conn.close(); } catch(err) {} });
+            links.clear();
             try { if (peer) peer.destroy(); } catch {}
-            connection = null;
             peer = null;
-            WF.reset();
+            GB.resetAll();
         }
 
         window.addEventListener('beforeunload', cleanup);
 
-        // Surface script errors in the warp header so a broken page tells you instead of going silent
         window.addEventListener('error', (e) => {
             try {
-                const el = document.getElementById('warp-err');
+                const el = document.getElementById('hub-err');
                 if (el){
                     const where = e.lineno ? (' @' + e.lineno + ':' + (e.colno || 0)) : '';
                     el.textContent = 'Error: ' + (e.message || 'script error') + where + ' — reload (Ctrl+Shift+R).';
@@ -487,709 +444,265 @@
             } catch {}
         });
 
-        // ============ Warp Front, inline (rules per WarpFrontRules.md) ============
-        // Factions: Federation ♦, Klingons ♥, Ferengi ♣. Borg is automated.
-        // Turn order: FED ♦ → Borg → KLI ♥ → Borg → FER ♣ → Borg.
-        // Multiplayer rides the room's existing chat connection: host is
-        // authoritative, guests send intents, host broadcasts full state.
-        const WF = (function(){
-            const FACTIONS = { '♦': 'Federation', '♥': 'Klingons', '♣': 'Ferengi' };
-            const ORDER = ['♦', 'borg', '♥', 'borg', '♣', 'borg'];
-            const WIN_SCORE = 5;
+        // ============ Game broker: registry buttons, stage iframes, relay ============
+        // Child contract (each game file implements this):
+        //   up:   { t:'gu', game, k:'hello'|'intent'|'say'|'invite'|'denied'|'height'|'close', p }
+        //   down: { t:'gd', game, k:'roster'|'state'|'invite'|'denied'|'reset', p }
+        // PeerJS envelope: { type:'game', game, k:'intent'|'state'|'say'|'invite', from:{id,name}, p }
+        const GB = {
+            frames: {},   // gameId -> { el, ready }
+            pending: {},  // gameId -> [down messages waiting for child hello]
 
-            let S = null;               // authoritative game state (mirrored to guests)
-            let sel = null;             // local card selection {faction, idx}
-            let myClaim = { '♦': false, '♥': false, '♣': false };
-            let borgTimer = null;
-            let localSolo = false;      // guest fallback: no host answering, play locally
-            let soloFallbackT = null;
-            let scanMode = false;       // local only: next own-card click scans instead of selecting
-
-            const $ = (id) => document.getElementById(id);
-            const boardEl = $('wf-board'), handsEl = $('wf-hands'), logEl = $('warp-log');
-
-            function shuffle(a){
-                for (let i = a.length - 1; i > 0; i--){
-                    const j = Math.floor(Math.random() * (i + 1));
-                    [a[i], a[j]] = [a[j], a[i]];
-                }
-                return a;
-            }
-            function rankVal(r){
-                if (r === 'A') return 1;
-                if (r === 'J' || r === 'Q' || r === 'K') return 10;
-                return parseInt(r, 10);
-            }
-            function planetDist(r){ return r === 'J' ? 11 : r === 'Q' ? 12 : 13; }
-            function playVal(card, planet){
-                let v = rankVal(card.rank);
-                if (card.suit !== '♠' && card.suit === planet.suit) v += 1;
-                return v;
-            }
-            function planetSpeed(p){
-                return p.pCards.reduce((s, c) => s + playVal(c, p), 0);
-            }
-            function borgSpeed(p){
-                return p.bCards.reduce((s, c) => s + rankVal(c.rank), 0);
-            }
-
-            function wlog(msg, cls){
-                if (!S) return;
-                S.log.unshift({ msg, cls: cls || '' });
-                while (S.log.length > 60) S.log.pop();
-                renderLog();
-            }
-
-            function renderLog(){
-                if (!S) return;
-                logEl.innerHTML = '';
-                S.log.forEach(e => {
-                    const d = document.createElement('div');
-                    if (e.cls) d.className = e.cls;
-                    d.textContent = '> ' + e.msg;
-                    logEl.appendChild(d);
-                });
-            }
-
-            function freshState(diff){
-                const handSize = diff === 'ensign' ? 4 : 3;
-                const headStart = diff === 'solo' ? 1 : 0;
-                const st = {
-                    diff, handSize, turnIndex: 0,
-                    planets: [], factions: {}, claims: { '♦': null, '♥': null, '♣': null },
-                    borg: { deck: [], discard: [], sensor: null, exhaust: 0 },
-                    scores: { players: 0, borg: headStart }, log: [],
-                    activeFaction: null, over: false, result: null
-                };
-                let pcs = [];
-                ['♦','♥','♣'].forEach(suit => {
-                    ['J','Q','K'].forEach(rank => pcs.push({ suit, rank, target: planetDist(rank), status: 'active', pCards: [], bCards: [] }));
-                });
-                shuffle(pcs);
-                if (headStart > 0) pcs[0].status = 'assimilated';
-                st.planets = pcs;
-                ['♦','♥','♣'].forEach(suit => {
-                    const deck = [];
-                    ['A','2','3','4','5','6','7','8','9','10'].forEach(rank => deck.push({ suit, rank, scanned: false }));
-                    shuffle(deck);
-                    st.factions[suit] = { deck, discard: [], hand: [] };
-                    for (let i = 0; i < handSize; i++) drawTo(st, suit);
-                });
-                ['A','2','3','4','5','6','7','8','9','10','J','Q','K'].forEach(rank => st.borg.deck.push({ suit: '♠', rank }));
-                shuffle(st.borg.deck);
-                st.borg.sensor = st.borg.deck.pop();
-                return st;
-            }
-
-            function drawTo(st, suit){
-                const f = st.factions[suit];
-                if (f.deck.length === 0){
-                    if (f.discard.length === 0) return;
-                    f.deck = shuffle(f.discard.splice(0));
-                }
-                const c = f.deck.pop();
-                c.scanned = false;   // a fresh draw is always hidden again
-                f.hand.push(c);
-            }
-
-            function drawBorg(st){
-                if (st.borg.deck.length === 0){
-                    st.borg.exhaust++;
-                    if (st.borg.exhaust === 1){
-                        st.borg.deck = shuffle(st.borg.discard.splice(0));
-                        if (st.borg.deck.length === 0){ st.borg.exhaust = 2; return null; }
-                    } else {
-                        return null;
-                    }
-                }
-                return st.borg.deck.pop();
-            }
-
-            // ---- authority: only the host (or solo player) mutates S ----
-            function authority(){ return isHost || !peerConnected() || localSolo; }
-
-            function startLocal(note){
-                S = freshState($('warp-diff').value);
-                S.claims = { '♦': getName(), '♥': getName(), '♣': getName() };
-                sel = null;
-                logEl.innerHTML = '';
-                wlog(note);
-                beginTurn();
-                render();
-            }
-
-            function startBattle(diff){
-                clearTimeout(soloFallbackT);
-                clearTimeout(borgTimer);
-                if (authority() && !localSolo){
-                    S = freshState(diff || $('warp-diff').value);
-                    // host auto-claims Federation if nothing claimed
-                    if (!peerConnected()){
-                        S.claims = { '♦': getName(), '♥': getName(), '♣': getName() };
-                    } else if (!S.claims['♦'] && !S.claims['♥'] && !S.claims['♣']){
-                        S.claims['♦'] = getName();
-                    }
-                    sel = null;
-                    logEl.innerHTML = '';
-                    wlog(S.scores.borg === 0 ? 'Sector initialized. All systems nominal.' : 'Sector initialized. Borg holds 1 assimilated world.', S.scores.borg ? 'borg' : '');
-                    beginTurn();
-                    broadcast();
-                    // host starts it for everyone: prompt guests to open their table
-                    if (peerConnected()){
-                        try { connection.send({ type: 'warp-invite', v: 2, from: getName() }); } catch(e){}
-                    }
-                } else if (localSolo){
-                    startLocal('New local table dealt. You play all three.');
-                    broadcast();
-                } else if (!peerConnected()){
-                    // no live link: play locally instead of shouting into the void
-                    localSolo = true;
-                    startLocal('No link to host — local table started. You play all three.');
-                } else {
-                    send({ type: 'warp', action: 'newgame', diff: $('warp-diff').value, name: getName() });
-                    setInfo('Starting battle… (host is dealing)');
-                    // if nobody answers, fall back to a local table so the button always does something
-                    soloFallbackT = setTimeout(() => {
-                        if (!S){
-                            localSolo = true;
-                            startLocal('Host did not answer — local table started. If your friend is in this room, one of you has an old page: both reload with Ctrl+Shift+R.');
-                        }
-                    }, 2500);
-                }
-            }
-
-            function beginTurn(){
-                if (!S || S.over) return;
-                S.activeFaction = null;
-                const actor = ORDER[S.turnIndex];
-                if (actor === 'borg'){
-                    if (authority()){
-                        setInfo('Borg protocol executing…');
-                        render();
-                        clearTimeout(borgTimer);
-                        borgTimer = setTimeout(() => { borgTurn(); }, 900);
-                    } else {
-                        setInfo('Borg is acting… (watch the grid)');
-                        render();
-                    }
-                } else {
-                    S.activeFaction = actor;
-                    setInfo(`${FACTIONS[actor]} to move — select a card, then a planet.`);
-                    render();
-                }
-            }
-
-            function needsRegroup(suit){
-                const hand = S.factions[suit].hand;
-                const active = S.planets.filter(p => p.status === 'active');
-                if (!hand.length || !active.length) return false;
-                for (const c of hand)
-                    for (const p of active)
-                        if (planetSpeed(p) + playVal(c, p) <= p.target) return false;
-                return true;
-            }
-
-            function doPlay(suit, cardIdx, planetIdx){
-                const p = S.planets[planetIdx];
-                if (!p || p.status !== 'active') return 'That planet is already decided.';
-                const f = S.factions[suit];
-                const card = f.hand[cardIdx];
-                if (!card) return 'No such card.';
-                if (needsRegroup(suit)) return 'No legal play — you must Regroup.';
-                const cur = planetSpeed(p);
-                const v = playVal(card, p);
-                if (cur + v > p.target) return 'Overshoot! Alliance needs the exact sum (' + cur + '/' + p.target + ').';
-                f.hand.splice(cardIdx, 1);
-                p.pCards.push(card);
-                wlog(`${FACTIONS[suit]} played ${card.rank}${card.suit} on ${p.rank}${p.suit} (+${v}).`, 'player');
-                if (cur + v === p.target){
-                    p.status = 'claimed';
-                    S.scores.players++;
-                    wlog(`Alliance secured ${p.rank}${p.suit}! (${S.scores.players}/5)`, 'player');
-                    p.pCards.forEach(c => S.factions[c.suit].discard.push(c));
-                    p.bCards.forEach(c => S.borg.discard.push(c));
-                    p.pCards = []; p.bCards = [];
-                }
-                while (f.hand.length < S.handSize){
-                    if (f.deck.length === 0 && f.discard.length === 0) break;
-                    drawTo(S, suit);
-                }
-                if (!checkOver()) advance();
-                return null;
-            }
-
-            function doRegroup(suit, cardIdx){
-                const f = S.factions[suit];
-                const card = f.hand[cardIdx];
-                if (!card) return 'Select a card to regroup.';
-                f.hand.splice(cardIdx, 1);
-                f.discard.push(card);
-                wlog(`${FACTIONS[suit]} regrouped (discarded ${card.rank}${card.suit}).`);
-                drawTo(S, suit);
-                advance();
-                return null;
-            }
-
-            // Scan: reveal one of your active-faction cards to the whole team (free action).
-            function doScan(suit, cardIdx, byName){
-                if (S.activeFaction !== suit) return 'Scan only on your faction’s turn.';
-                const f = S.factions[suit];
-                const card = f.hand[cardIdx];
-                if (!card) return 'No such card.';
-                if (card.scanned) return 'That card is already revealed.';
-                if (f.hand.some(c => c.scanned)) return 'You already show a card — play it first.';
-                card.scanned = true;
-                wlog(`${FACTIONS[suit]} (${byName}) scanned ${card.rank}${card.suit} — revealed to the team.`, 'player');
-                return null;
-            }
-
-            // True only if `name` is the assigned owner of the faction (solo: everyone).
-            function senderOwns(faction, name){
-                if (!S) return false;
-                if (!peerConnected()) return true;
-                return S.claims[faction] === name;
-            }
-
-            function borgTarget(){
-                const active = S.planets.filter(p => p.status === 'active');
-                if (!active.length) return null;
-                active.sort((a, b) => {
-                    const sa = planetSpeed(a), sb = planetSpeed(b);
-                    if (sa !== sb) return sb - sa;
-                    const ra = a.target - sa, rb = b.target - sb;
-                    if (ra !== rb) return ra - rb;
-                    return a.target - b.target;
-                });
-                return active[0];
-            }
-
-            function borgTurn(){
-                if (!S || S.over) return;
-                const t = borgTarget();
-                if (!t || !S.borg.sensor){ advance(); return; }
-                const played = S.borg.sensor;
-                t.bCards.push(played);
-                let msg = `Borg hits ${t.rank}${t.suit} with ${played.rank}♠.`;
-                if (played.rank === 'J' || played.rank === 'Q' || played.rank === 'K'){
-                    const bonus = drawBorg(S);
-                    if (bonus){ t.bCards.push(bonus); msg += ` BURST! Bonus ${bonus.rank}♠.`; }
-                }
-                wlog(msg, 'borg');
-                if (borgSpeed(t) >= t.target){
-                    t.status = 'assimilated';
-                    S.scores.borg++;
-                    wlog(`Borg assimilated ${t.rank}${t.suit}! (${S.scores.borg}/5)`, 'borg');
-                    t.pCards.forEach(c => S.factions[c.suit].discard.push(c));
-                    t.bCards.forEach(c => S.borg.discard.push(c));
-                    t.pCards = []; t.bCards = [];
-                }
-                S.borg.sensor = drawBorg(S);
-                if (S.borg.sensor === null && S.borg.exhaust >= 2){
-                    gameOverCount();
-                    broadcast();
-                    render();
-                    return;
-                }
-                if (!checkOver()) advance();
-                broadcast();
-                render();
-            }
-
-            function advance(){
-                if (checkOver()){ broadcast(); render(); return; }
-                S.turnIndex = (S.turnIndex + 1) % ORDER.length;
-                beginTurn();
-                broadcast();
-            }
-
-            function checkOver(){
-                if (!S || S.over) return true;
-                if (S.scores.players >= WIN_SCORE){ return gameOver('MISSION ACCOMPLISHED — Alliance secured 5 planets!', true); }
-                if (S.scores.borg >= WIN_SCORE){ return gameOver('SECTOR LOST — Borg assimilated 5 planets.', false); }
-                return false;
-            }
-            function gameOverCount(){
-                S.over = true;
-                if (S.scores.players > S.scores.borg) S.result = { win: true, text: `Time! Alliance holds majority ${S.scores.players}–${S.scores.borg}.` };
-                else S.result = { win: false, text: `Time! Borg holds the sector ${S.scores.borg}–${S.scores.players}.` };
-                wlog(S.result.text, S.result.win ? 'player' : 'borg');
-            }
-            function gameOver(text, win){
-                S.over = true;
-                S.result = { win, text };
-                wlog(text, win ? 'player' : 'borg');
-                return true;
-            }
-
-            // ---- networking ----
-            function send(o){ if (peerConnected()){ try { connection.send(Object.assign({ v: 2 }, o)); } catch(e){} } }
-            function broadcast(){
-                render();
-                if (!S) return;
-                if (peerConnected() && authority()){
-                    try { connection.send({ type: 'warp-state', v: 2, state: S, from: getName() }); } catch(e){}
-                }
-            }
-            function onNet(d){
-                if (d.type === 'warp-invite'){
-                    // host started a battle — prompt this player to open their table
-                    if (ui.warpPanel.classList.contains('hidden')) showWarpInvite(d.from);
-                    return;
-                }
-                if (d.type === 'warp-state'){
-                    if (!d.state) return;
-                    if (authority() && peerConnected() && !localSolo) return; // host ignores echoes
-                    localSolo = false;
-                    clearTimeout(soloFallbackT);
-                    S = d.state;
-                    sel = null;
-                    scanMode = false;
-                    render();
-                    // first sync and I hold nothing: take the first open faction so I can play
-                    if (!Object.values(S.claims).includes(getName())){
-                        const free = ['♥','♣','♦'].find(f => !S.claims[f]);
-                        if (free) claimSet(free, true);
-                    }
-                    if (ui.warpPanel.classList.contains('hidden')) showWarpInvite(d.from);
-                    const cur = $('wf-handinfo').textContent;
-                    if (/Starting battle|Order sent|Regroup sent|Host did not answer|No link/.test(cur)) setInfo('');
-                    return;
-                }
-                if (d.type !== 'warp') return;
-                if (d.action === 'denied' && !authority()){
-                    setInfo(d.text || 'Host refused that move.');
-                    return;
-                }
-                if (!authority()) return;
-                if (!S && d.action !== 'newgame' && d.action !== 'sync'){
-                    send({ type: 'warp', action: 'denied', text: 'No battle on the host yet — ask the host to press New battle.' });
-                    return;
-                }
-                if (d.action === 'newgame'){ localSolo = false; startBattle(d.diff); }
-                else if (d.action === 'claim'){ S.claims[d.faction] = d.on ? d.name : null; broadcast(); }
-                else if (d.action === 'sync'){ broadcast(); }
-                else if (d.action === 'play'){
-                    if (!senderOwns(d.faction, d.name)){ send({ type: 'warp', action: 'denied', text: `${FACTIONS[d.faction] || d.faction} is assigned to ${S.claims[d.faction] || 'nobody'} — claim it first.` }); }
-                    else {
-                        const err = doPlay(d.faction, d.cardIdx, d.planetIdx);
-                        if (err) send({ type: 'warp', action: 'denied', text: err });
-                        else broadcast();
-                    }
-                }
-                else if (d.action === 'regroup'){
-                    if (!senderOwns(d.faction, d.name)){ send({ type: 'warp', action: 'denied', text: `${FACTIONS[d.faction] || d.faction} is assigned to ${S.claims[d.faction] || 'nobody'} — claim it first.` }); }
-                    else {
-                        const err = doRegroup(d.faction, d.cardIdx);
-                        if (err) send({ type: 'warp', action: 'denied', text: err });
-                        else broadcast();
-                    }
-                }
-                else if (d.action === 'scan'){
-                    if (!senderOwns(d.faction, d.name)){ send({ type: 'warp', action: 'denied', text: `${FACTIONS[d.faction] || d.faction} is assigned to ${S.claims[d.faction] || 'nobody'} — claim it first.` }); }
-                    else {
-                        const err = doScan(d.faction, d.cardIdx, d.name);
-                        if (err) send({ type: 'warp', action: 'denied', text: err });
-                        else broadcast();
-                    }
-                }
-            }
-            function onPeerOpen(){
-                if (!S) return;
-                if (authority()){
-                    // fresh eyes joined: reopen factions held by anyone no longer here
-                    let cleared = false;
-                    ['♦','♥','♣'].forEach(f => {
-                        if (S.claims[f] && S.claims[f] !== getName()){ S.claims[f] = null; cleared = true; }
-                    });
-                    if (cleared) wlog('New link — factions reopened, claim yours.');
-                    broadcast();
-                } else {
-                    send({ type: 'warp', action: 'sync', name: getName() });
-                    // claim first free faction for seamless entry
-                    const free = ['♥','♣','♦'].find(f => !S.claims || !S.claims[f]);
-                    if (free) claimSet(free, true);
-                }
-            }
-
-            // ---- local input ----
-            // Strict roles: with a peer linked you may touch ONLY your claimed factions.
-            // Unclaimed factions wait until someone claims them. Solo: you play everything.
-            function iControl(suit){
-                if (!S) return false;
-                if (!peerConnected()) return true;
-                return S.claims[suit] === getName();
-            }
-            function claimSet(suit, on){
-                if (!S) return;
-                myClaim[suit] = on;
-                sel = null;
-                scanMode = false;
-                const name = getName();
-                if (authority()){
-                    S.claims[suit] = on ? name : null;
-                    broadcast();
-                } else {
-                    send({ type: 'warp', action: 'claim', faction: suit, on, name });
-                    // optimistic local mirror until host echoes
-                    S.claims[suit] = on ? name : S.claims[suit];
-                    render();
-                }
-            }
-            function toggleClaim(suit){
-                if (!S) return;
-                claimSet(suit, S.claims[suit] !== getName());
-            }
-            function clickScanBtn(){
-                if (!S || S.over || !S.activeFaction || !iControl(S.activeFaction)) return;
-                const hand = S.factions[S.activeFaction].hand;
-                if (!hand.length || hand.some(c => c.scanned)){ setInfo('Nothing to scan — you already show a card.'); return; }
-                scanMode = !scanMode;
-                setInfo(scanMode ? 'Scan mode: click one of YOUR cards to reveal it to the team.' : '');
-                render();
-            }
-            function clickCard(suit, idx){
-                if (!S || S.over || S.activeFaction !== suit || !iControl(suit)) return;
-                if (scanMode){
-                    scanMode = false;
-                    const c = S.factions[suit].hand[idx];
-                    if (!c || c.scanned){ render(); return; }
-                    if (authority()){
-                        const err = doScan(suit, idx, getName());
-                        if (err) setInfo(err);
-                        broadcast();
-                    } else {
-                        send({ type: 'warp', action: 'scan', faction: suit, cardIdx: idx, name: getName() });
-                        setInfo('Scan sent…');
-                    }
-                    return;
-                }
-                sel = (sel && sel.faction === suit && sel.idx === idx) ? null : { faction: suit, idx };
-                render();
-            }
-            function clickPlanet(i){
-                if (!S || S.over || !S.activeFaction || !sel) return;
-                const suit = sel.faction, cardIdx = sel.idx;
-                if (suit !== S.activeFaction || !iControl(suit)) return;
-                if (authority()){
-                    const err = doPlay(suit, cardIdx, i);
-                    sel = null;
-                    if (err) setInfo(err); else setInfo('');
-                    broadcast();
-                } else {
-                    send({ type: 'warp', action: 'play', faction: suit, cardIdx, planetIdx: i, name: getName() });
-                    sel = null;
-                    setInfo('Order sent — host is resolving…');
-                }
-            }
-            function clickRegroup(){
-                if (!S || S.over || !S.activeFaction || !sel) return;
-                const suit = sel.faction, cardIdx = sel.idx;
-                if (authority()){
-                    const err = doRegroup(suit, cardIdx);
-                    sel = null;
-                    if (err) setInfo(err);
-                    broadcast();
-                } else {
-                    send({ type: 'warp', action: 'regroup', faction: suit, cardIdx, name: getName() });
-                    sel = null;
-                    setInfo('Regroup sent…');
-                }
-            }
-
-            function setInfo(t){ $('wf-handinfo').textContent = t || 'Select a card, then click a planet.'; }
-
-            // ---- rendering ----
-            function cardHTML(c, extra){
-                const red = c.suit === '♥' || c.suit === '♦';
-                return `<div class="wf-card ${red ? 'red' : ''} ${extra || ''}"><div>${c.rank}</div><div class="c">${c.suit}</div><div style="text-align:right">${c.rank}</div></div>`;
-            }
-            function render(){
-                if (!S){ return; }
-                $('wf-score-a').textContent = `ALLIANCE ${S.scores.players}/5`;
-                $('wf-score-b').textContent = `BORG ${S.scores.borg}/5`;
-                $('wf-sensor').textContent = S.borg.sensor ? (S.borg.sensor.rank + '♠') : '—';
-                const actor = ORDER[S.turnIndex];
-                $('wf-acting').textContent = S.over ? '—' : (actor === 'borg' ? 'BORG' : FACTIONS[actor]);
-                $('wf-seq-fed').className = actor === '♦' ? 'active' : '';
-                $('wf-seq-kli').className = actor === '♥' ? 'active' : '';
-                $('wf-seq-fer').className = actor === '♣' ? 'active' : '';
-                $('wf-borg-note').textContent = actor === 'borg' ? 'BORG acting…' : '';
-                $('wf-who').textContent = localSolo
-                    ? 'local table • host not answering'
-                    : peerConnected()
-                    ? (isHost ? 'host • you resolve Borg' : 'guest • host resolves')
-                    : 'solo • you play all three';
-
-                // claims pills
-                const cc = $('warp-claims');
-                cc.innerHTML = '';
-                ['♦','♥','♣'].forEach(f => {
+            init(){
+                ui.gameButtons.innerHTML = '';
+                GAMES.forEach(g => {
                     const b = document.createElement('button');
-                    const holder = S.claims[f];
-                    b.className = 'wf-pill' + (holder === getName() ? ' mine' : (holder ? ' theirs' : ''));
-                    b.textContent = `${FACTIONS[f]} ${f}` + (holder ? ` — ${holder}` : ' — open');
-                    if (!holder || holder === getName()) b.addEventListener('click', () => toggleClaim(f));
-                    cc.appendChild(b);
+                    b.id = 'btn-play-' + g.id;
+                    b.className = 'btn-bouncy text-white text-sm font-bold py-1.5 px-4 rounded-xl mt-1';
+                    b.style.background = '#334155';
+                    b.textContent = 'Play ' + g.title;
+                    b.title = `${g.title} (${g.players} players)`;
+                    b.addEventListener('click', () => GB.toggle(g.id));
+                    ui.gameButtons.appendChild(b);
                 });
+                // Solo waiting-room games also get buttons in the lobby.
+                const lobbyGames = GAMES.filter(g => g.lobby);
+                if (ui.lobbyGamesCard) ui.lobbyGamesCard.classList.toggle('hidden', !lobbyGames.length);
+                if (ui.lobbyGameButtons){
+                    ui.lobbyGameButtons.innerHTML = '';
+                    lobbyGames.forEach(g => {
+                        const b = document.createElement('button');
+                        b.id = 'btn-lobby-' + g.id;
+                        b.className = 'btn-bouncy text-white text-sm font-bold py-2 px-4 rounded-xl';
+                        b.style.background = g.color || '#334155';
+                        b.style.color = '#0f172a';
+                        b.textContent = 'Play ' + g.title;
+                        b.title = `${g.title} (${g.players}) — no room needed`;
+                        b.addEventListener('click', () => GB.toggle(g.id));
+                        ui.lobbyGameButtons.appendChild(b);
+                    });
+                }
+                window.addEventListener('message', GB.onChild);
+                GB.updateButtons();
+            },
 
-                // regroup banner
-                const rg = $('wf-regroup');
-                if (!S.over && S.activeFaction && needsRegroup(S.activeFaction)){
-                    rg.classList.remove('hidden');
-                    $('btn-wf-regroup').disabled = !(sel && sel.faction === S.activeFaction);
-                } else rg.classList.add('hidden');
+            frame(game){
+                let f = this.frames[game];
+                if (!f){
+                    const g = GAMES.find(x => x.id === game);
+                    if (!g) return null;
+                    const el = document.createElement('iframe');
+                    el.id = 'frame-' + game;
+                    el.src = g.file;
+                    el.title = g.title;
+                    el.style.minHeight = '420px';
+                    if (g.height) el.style.height = g.height + 'px'; // solo games use a fixed stage
+                    el.classList.add('hidden');
+                    ui.gameStage.appendChild(el);
+                    f = this.frames[game] = { el, ready: false };
+                }
+                return f;
+            },
 
-                // waiting-for-player banner: active faction has no owner yet
-                const wt = $('wf-wait');
-                if (!S.over && S.activeFaction && !S.claims[S.activeFaction]){
-                    wt.textContent = `${FACTIONS[S.activeFaction]} ${S.activeFaction} is waiting for a player — claim it above to take this turn.`;
-                    wt.classList.remove('hidden');
-                } else wt.classList.add('hidden');
+            open(game){
+                Object.entries(this.frames).forEach(([gid, f]) => {
+                    if (gid !== game) f.el.classList.add('hidden');
+                });
+                const f = this.frame(game);
+                if (!f) return;
+                f.el.classList.remove('hidden');
+                hideInvite(game);
+                this.pushRoster(game);
+                this.flush(game);
+                this.updateButtons();
+                shrinkChat(true);
+            },
 
-                // scan button: only the active faction's owner, and only while nothing revealed
-                const scb = $('btn-wf-scan');
-                const af = S.activeFaction;
-                const canScan = !S.over && af && iControl(af) &&
-                    S.factions[af].hand.length > 0 &&
-                    !S.factions[af].hand.some(c => c.scanned);
-                scb.disabled = !canScan;
-                scb.textContent = scanMode ? 'Cancel scan' : 'Scan a card (reveal)';
+            close(game){
+                const f = this.frames[game];
+                if (f) f.el.classList.add('hidden');
+                this.updateButtons();
+                if (!Object.values(this.frames).some(x => !x.el.classList.contains('hidden'))) shrinkChat(false);
+            },
 
-                // game-over banner
-                const ov = $('wf-over');
-                if (S.over && S.result){
-                    ov.classList.remove('hidden');
-                    ov.classList.toggle('bad', !S.result.win);
-                    ov.textContent = S.result.text + ' Press “New battle”.';
-                } else ov.classList.add('hidden');
+            closeAll(){
+                Object.keys(this.frames).forEach(gid => this.frames[gid].el.classList.add('hidden'));
+                this.updateButtons();
+                shrinkChat(false);
+            },
 
-                // board
-                boardEl.innerHTML = '';
-                S.planets.forEach((p, pi) => {
-                    const col = document.createElement('div');
-                    col.className = 'wf-col';
-                    if (p.status !== 'active'){
-                        const n = document.createElement('div');
-                        n.className = 'wf-node ' + (p.status === 'claimed' ? 'claimed' : 'assim');
-                        n.innerHTML = `<div class="r">${p.rank}</div><div class="s">${p.status === 'claimed' ? '✓' : 'BORG'}</div>`;
-                        col.appendChild(n);
-                        boardEl.appendChild(col);
-                        return;
+            resetAll(){
+                Object.keys(this.frames).forEach(gid => {
+                    this.down(gid, { t: 'gd', game: gid, k: 'reset' });
+                    this.frames[gid].el.classList.add('hidden');
+                });
+                this.pending = {};
+                clearInvites();
+                this.updateButtons();
+                shrinkChat(false);
+            },
+
+            updateButtons(){
+                GAMES.forEach(g => {
+                    const f = this.frames[g.id];
+                    const open = f && !f.el.classList.contains('hidden');
+                    const b = document.getElementById('btn-play-' + g.id);
+                    if (b) b.textContent = (open ? 'Hide ' : 'Play ') + g.title;
+                    const lb = document.getElementById('btn-lobby-' + g.id);
+                    if (lb) lb.textContent = (open ? 'Hide ' : 'Play ') + g.title;
+                });
+            },
+
+            toggle(game){
+                const f = this.frames[game];
+                if (f && !f.el.classList.contains('hidden')) this.close(game);
+                else this.open(game);
+            },
+
+            down(game, msg){
+                const f = this.frames[game];
+                if (!f || !f.ready || !f.el.contentWindow){ (this.pending[game] = this.pending[game] || []).push(msg); return; }
+                try { f.el.contentWindow.postMessage(msg, '*'); } catch(e) {}
+            },
+
+            flush(game){
+                const q = this.pending[game];
+                if (!q || !q.length) return;
+                this.pending[game] = [];
+                q.forEach(m => this.down(game, m));
+            },
+
+            rosterMsg(game){
+                return { t: 'gd', game, k: 'roster', p: {
+                    you: { id: myId, name: getName(), isHost },
+                    room: currentRoomId,
+                    roster: rosterList()
+                }};
+            },
+
+            pushRoster(game){
+                if (game){ this.down(game, this.rosterMsg(game)); return; }
+                Object.keys(this.frames).forEach(gid => this.down(gid, this.rosterMsg(gid)));
+            },
+
+            onChild(e){
+                const m = e.data;
+                if (!m || m.t !== 'gu' || !m.game) return;
+                const game = m.game;
+                if (m.k === 'hello'){
+                    const f = GB.frames[game];
+                    if (f){ f.ready = true; GB.pushRoster(game); GB.flush(game); }
+                    return;
+                }
+                if (m.k === 'height'){
+                    const f = GB.frames[game];
+                    if (f && typeof m.p === 'number' && m.p > 0) f.el.style.height = Math.min(m.p, 4000) + 'px';
+                    return;
+                }
+                if (m.k === 'close'){ GB.close(game); return; }
+                if (m.k === 'say'){
+                    logChat(m.p, gameTitle(game), false);
+                    const msg = { type: 'game', game, k: 'say', from: { id: myId, name: gameTitle(game) }, p: { text: m.p } };
+                    if (isHost) sendAll(msg);
+                    else { const h = hostLink(); if (h) sendTo(h, msg); }
+                    return;
+                }
+                if (m.k === 'invite'){
+                    if (!isHost) return;
+                    sendAll({ type: 'game', game, k: 'invite', from: { id: myId, name: getName() } });
+                    return;
+                }
+                if (m.k === 'state'){
+                    if (!isHost) return;
+                    sendAll({ type: 'game', game, k: 'state', from: { id: myId, name: getName() }, p: m.p });
+                    return;
+                }
+                if (m.k === 'intent'){
+                    if (isHost){
+                        GB.down(game, { t: 'gd', game, k: 'intent', p: m.p, from: { id: myId, name: getName() } });
+                    } else {
+                        const h = hostLink();
+                        if (h) sendTo(h, { type: 'game', game, k: 'intent', from: { id: myId, name: getName() }, p: m.p });
                     }
-                    const bz = document.createElement('div');
-                    bz.className = 'wf-bzone';
-                    p.bCards.forEach(c => {
-                        const d = document.createElement('div');
-                        d.className = 'wf-card mini stack';
-                        d.innerHTML = `<div>${c.rank}</div><div class="c">♠</div><div style="text-align:right">${c.rank}</div>`;
-                        bz.appendChild(d);
-                    });
-                    const node = document.createElement('div');
-                    const home = S.activeFaction && p.suit === S.activeFaction;
-                    node.className = 'wf-node' + ((p.suit === '♥' || p.suit === '♦') ? ' redp' : '');
-                    node.innerHTML = `${home ? '<div class="hb">+1 SPEED</div>' : ''}<div class="r">${p.rank}</div><div class="s">${p.suit}</div><div class="pg">${planetSpeed(p)}/${p.target}</div>`;
-                    node.addEventListener('click', () => clickPlanet(pi));
-                    const pz = document.createElement('div');
-                    pz.className = 'wf-pzone';
-                    p.pCards.forEach(c => {
-                        const d = document.createElement('div');
-                        const red = c.suit === '♥' || c.suit === '♦';
-                        d.className = 'wf-card mini stack' + (red ? ' red' : '');
-                        d.innerHTML = `<div>${c.rank}</div><div class="c">${c.suit}</div><div style="text-align:right">${c.rank}</div>`;
-                        pz.appendChild(d);
-                    });
-                    col.appendChild(bz);
-                    col.appendChild(node);
-                    col.appendChild(pz);
-                    boardEl.appendChild(col);
-                });
-
-                // hands: you see ONLY your own cards; teammates' hands are face-down
-                // (scanned cards are public). Solo: you play everything, so all face-up.
-                handsEl.innerHTML = '';
-                ['♦','♥','♣'].forEach(suit => {
-                    const f = S.factions[suit];
-                    const mine = iControl(suit);
-                    const active = S.activeFaction === suit && !S.over;
-                    const wrap = document.createElement('div');
-                    wrap.className = 'wf-panel';
-                    wrap.style.padding = '8px';
-                    wrap.style.borderColor = active ? (S.claims[suit] ? '#00ffcc' : '#c48a00') : '#333';
-                    const holder = S.claims[suit];
-                    wrap.innerHTML = `<div class="wf-sub" style="margin-bottom:4px;">${FACTIONS[suit].toUpperCase()} ${suit} · deck ${f.deck.length} · ${holder ? escapeHtml(holder) : 'open'}${active ? ' · TO MOVE' : ''}${mine ? '' : ' · (hidden)'}</div>`;
-                    const row = document.createElement('div');
-                    row.className = 'wf-hand';
-                    f.hand.forEach((c, ci) => {
-                        const d = document.createElement('div');
-                        if (!mine && !c.scanned) {
-                            d.className = 'wf-card mini facedown';
-                            d.innerHTML = `<div>?</div><div class="c">?</div><div style="text-align:right">?</div>`;
-                        } else {
-                            const isSel = sel && sel.faction === suit && sel.idx === ci;
-                            d.className = `wf-card${isSel ? ' sel' : ''}${c.scanned ? ' scanned' : ''}${(!mine || !active) ? ' locked' : ''}`;
-                            const red = c.suit === '♥' || c.suit === '♦';
-                            if (red) d.classList.add('red');
-                            d.innerHTML = `<div>${c.rank}</div><div class="c">${c.suit}</div><div style="text-align:right">${c.rank}</div>`;
-                            if (mine && active) d.addEventListener('click', () => clickCard(suit, ci));
-                        }
-                        row.appendChild(d);
-                    });
-                    wrap.appendChild(row);
-                    handsEl.appendChild(wrap);
-                });
-                renderLog();
+                    return;
+                }
+                if (m.k === 'denied'){
+                    // from the host engine: route back to the sender's parent
+                    const target = links.get(m.p.to);
+                    if (target) sendTo(target, { type: 'game', game, k: 'denied', from: { id: myId, name: getName() }, p: { text: m.p.text } });
+                    return;
+                }
             }
+        };
 
-            function reset(){ S = null; sel = null; scanMode = false; clearTimeout(borgTimer); clearTimeout(soloFallbackT); localSolo = false; myClaim = { '♦': false, '♥': false, '♣': false }; }
+        function routeGame(m){
+            const game = m.game;
+            if (m.k === 'intent'){
+                if (isHost) GB.down(game, { t: 'gd', game, k: 'intent', p: m.p, from: m.from });
+                return;
+            }
+            if (m.k === 'state'){
+                if (!isHost) GB.down(game, { t: 'gd', game, k: 'state', p: m.p, from: m.from });
+                return;
+            }
+            if (m.k === 'say'){
+                logChat(m.p.text, gameTitle(game), false);
+                return;
+            }
+            if (m.k === 'denied'){
+                GB.down(game, { t: 'gd', game, k: 'denied', p: m.p });
+                return;
+            }
+            if (m.k === 'invite'){
+                showInvite(game, m.from && m.from.name);
+                return;
+            }
+        }
 
-            return { startBattle, onNet, onPeerOpen, reset, clickRegroup, clickScanBtn,
-                get started(){ return !!S; } };
-        })();
-
-        // ============ Warp panel open/close (chat stays usable, no iframe) ============
-        const chatBox = ui.chatContainer;
-        function showWarpInvite(from){
-            const bar = document.getElementById('warp-invite');
-            document.getElementById('warp-invite-text').textContent =
-                (from ? from : 'Host') + ' started Warp Front — open your table to play.';
+        function showInvite(game, from){
+            let bar = document.getElementById('inv-' + game);
+            if (!bar){
+                const g = GAMES.find(x => x.id === game);
+                bar = document.createElement('div');
+                bar.id = 'inv-' + game;
+                bar.className = 'items-center justify-between gap-2 backdrop-blur px-4 py-2 rounded-2xl border card-glow flex-none';
+                bar.style.background = 'rgba(40,30,70,.85)';
+                bar.style.borderColor = (g && g.color) || '#888';
+                bar.innerHTML = `<span class="text-sm text-slate-100"></span>`;
+                const btn = document.createElement('button');
+                btn.className = 'btn-bouncy gv-invite-btn text-white flex-none';
+                btn.style.background = (g && g.color) || '#555';
+                btn.style.color = '#0f172a';
+                btn.textContent = 'Show table';
+                btn.addEventListener('click', () => GB.open(game));
+                bar.appendChild(btn);
+                ui.gameInvites.appendChild(bar);
+            }
+            bar.querySelector('span').textContent = (from || 'Host') + ` started ${gameTitle(game)} — open your table to play.`;
             bar.classList.remove('hidden');
             bar.classList.add('flex');
         }
-        function hideWarpInvite(){
-            const bar = document.getElementById('warp-invite');
-            bar.classList.add('hidden');
-            bar.classList.remove('flex');
+
+        function hideInvite(game){
+            const bar = document.getElementById('inv-' + game);
+            if (bar){ bar.classList.add('hidden'); bar.classList.remove('flex'); }
         }
-        function showWarp(){
-            hideWarpInvite();
-            ui.warpPanel.classList.remove('hidden');
-            ui.warpPanel.classList.add('flex');
-            chatBox.classList.remove('h-48');
-            chatBox.style.height = '192px';   // readable chat while the game is on
-            document.getElementById('btn-launch-warp').textContent = 'Hide Warp Front';
-            if (!WF.started){
-                WF.startBattle(document.getElementById('warp-diff').value);
+
+        function clearInvites(){
+            ui.gameInvites.innerHTML = '';
+        }
+
+        function shrinkChat(on){
+            if (on){
+                ui.chatContainer.classList.remove('h-48');
+                ui.chatContainer.style.height = '192px';
+            } else {
+                ui.chatContainer.classList.add('h-48');
+                ui.chatContainer.style.height = '';
             }
         }
-        function hideWarp(){
-            ui.warpPanel.classList.add('hidden');
-            ui.warpPanel.classList.remove('flex');
-            chatBox.classList.add('h-48');
-            chatBox.style.height = '';
-            const b = document.getElementById('btn-launch-warp');
-            if (b) b.textContent = 'Play Warp Front';
-        }
-        document.getElementById('btn-launch-warp').addEventListener('click', () => {
-            if (ui.warpPanel.classList.contains('hidden')) showWarp();
-            else hideWarp();
-        });
-        document.getElementById('btn-warp-open').addEventListener('click', showWarp);
-        document.getElementById('btn-warp-close').addEventListener('click', hideWarp);
-        document.getElementById('btn-warp-new').addEventListener('click', () => {
-            WF.startBattle(document.getElementById('warp-diff').value);
-        });
-        document.getElementById('btn-wf-regroup').addEventListener('click', () => WF.clickRegroup());
-        document.getElementById('btn-wf-scan').addEventListener('click', () => WF.clickScanBtn());
+
+        GB.init();
     </script>
 </body>
 </html>

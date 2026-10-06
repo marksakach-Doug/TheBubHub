@@ -1,0 +1,664 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>LOTR Cards</title>
+<style>
+:root{--ink:#e4d8b8;--dim:#a7a58f;--gold:#d9b44a;--green:#9bb86a;--felt:#1c241b;}
+*{box-sizing:border-box}
+body{margin:0;background:var(--felt);color:var(--ink);font:15px/1.45 Georgia,serif;}
+#lotr-panel{max-width:960px;margin:0 auto;padding:12px;display:flex;flex-direction:column;gap:12px;}
+.lr-head{display:flex;flex-wrap:wrap;align-items:center;justify-content:space-between;gap:8px;}
+.lr-t{color:#b9c98a;font-weight:900;letter-spacing:.2em;font-size:20px}
+.lr-b{font:700 13px system-ui;padding:8px 16px;border-radius:12px;border:1px solid #4d4a3a;background:#4f6b3a;color:#f0f4e0;cursor:pointer;}
+.lr-b.k{background:#6b4a2b}
+.lr-b[disabled]{opacity:.4;cursor:not-allowed}
+#lr-err{font:11px monospace;color:#ff8888}
+#lr-status{background:rgba(0,0,0,.45);border:2px solid #6f8a4a;border-radius:14px;padding:14px 16px;font-size:19px;font-weight:700;text-align:center;color:#f2ecd8;box-shadow:0 4px 18px rgba(0,0,0,.5);min-height:70px;display:flex;flex-direction:column;justify-content:center;align-items:center}
+#lr-status small{display:block;font-size:12px;font-weight:400;color:var(--dim);margin-top:4px}
+.feed-item{background:rgba(20,26,18,.92);border:1px solid var(--gold);color:#f2ecd8;border-radius:12px;padding:8px 16px;font-size:14px;max-width:90%;text-align:center;box-shadow:0 4px 14px rgba(0,0,0,.55);position:absolute;top:50%;left:50%;transform:translate(-50%,-50%);z-index:100;white-space:nowrap;animation:feedPop .45s cubic-bezier(.34,1.56,.64,1) forwards, fadeOut 1s ease 3s forwards}
+.feed-item.pop{animation:feedPop .45s cubic-bezier(.34,1.56,.64,1), fadeOut 1s ease 3s forwards}
+.feed-item.big{border-width:2px;font-size:17px;font-weight:700}
+@keyframes feedPop{0%{transform:scale(.7) translateY(10px);opacity:0}60%{transform:scale(1.05)}100%{transform:scale(1);opacity:1}}
+@keyframes fadeOut{to{opacity:0;transform:translate(-50%,-60%);pointer-events:none}}
+#lr-tablewrap{position:relative;background:rgba(0,0,0,.28);border:1px solid #4d4a3a;border-radius:14px;padding:12px;display:flex;flex-direction:column;gap:12px;overflow:hidden}
+.lr-lbl{font:11px monospace;color:var(--dim);letter-spacing:.05em}
+.lr-deckrow{display:flex;gap:14px;align-items:stretch;justify-content:center;flex-wrap:wrap}
+.deck{background:rgba(0,0,0,.4);border:1px solid #4d4a3a;border-radius:12px;padding:10px 14px;display:flex;gap:10px;align-items:center;min-width:200px}
+.deck .stack{width:52px;height:74px;border-radius:8px;position:relative;flex:none;background:#222;box-shadow:3px 3px 0 #111,6px 6px 0 #0a0a0a;border:2px solid #888}
+.deck.red .stack{background:linear-gradient(135deg,#7a2d2d,#3b1414);border-color:#a47a4a}
+.deck.black .stack{background:linear-gradient(135deg,#2b3444,#0d1117);border-color:#dde1d6}
+.deck .n{font-size:26px;font-weight:900;color:#fff}
+.deck .cap{font-size:12px;font-weight:700}
+.deck .dim{font:11px monospace;color:var(--dim)}
+.deck .newcard{animation:dealPop .4s cubic-bezier(.34,1.56,.64,1)}
+@keyframes dealPop{0%{transform:translateY(-14px) scale(.8);opacity:0}100%{transform:none;opacity:1}}
+.lr-midrow{display:grid;grid-template-columns:220px 1fr 220px;gap:12px;align-items:start}
+@media(max-width:640px){.lr-midrow{grid-template-columns:1fr}}
+.lr-zone{background:rgba(0,0,0,.32);border:1px solid #4d4a3a;border-radius:12px;padding:10px;min-height:150px}
+.lr-zone.you{border-color:var(--green);box-shadow:0 0 12px rgba(155,184,106,.25)}
+.lr-cards{display:flex;gap:10px;flex-wrap:wrap;justify-content:center;min-height:108px;align-items:center}
+.lr-c{width:76px;height:108px;border-radius:9px;display:flex;flex-direction:column;align-items:center;justify-content:space-between;padding:6px 3px 5px;border:2px solid;position:relative;flex:none;user-select:none;background:#fff}
+.lr-c.m{background:linear-gradient(#6b4a2b,#3b2815);border-color:#a47a4a;color:#f0e2c4}
+.lr-c.w{background:linear-gradient(#b3b8ae,#6d746a);border-color:#dde1d6;color:#1b2218}
+.lr-c.leg{box-shadow:0 0 12px var(--gold)}
+.lr-c.big{width:88px;height:124px}
+.lr-c b{position:absolute;top:-9px;left:-9px;min-width:26px;height:26px;padding:0 4px;border-radius:13px;background:#2d3b24;border:2px solid #9bb86a;color:#e9f2d0;font:700 12px/22px system-ui;text-align:center}
+.lr-c i{font-style:normal;font-size:40px;line-height:1;margin-top:14px}
+.lr-c.big i{font-size:48px}
+.lr-c u{text-decoration:none;font-size:10px;font-weight:700;text-align:center;line-height:1.1}
+.lr-c[data-a]{cursor:pointer}
+.lr-c[data-a]:hover{transform:translateY(-3px)}
+.lr-c.flip{animation:flipIn .45s ease}
+@keyframes flipIn{0%{transform:rotateY(90deg) scale(.9);opacity:0}100%{transform:none;opacity:1}}
+.lr-tally{font-size:17px;font-weight:700;padding:4px 6px;text-align:center}
+.lr-tally small{font-size:11px;color:var(--dim)}
+.lr-meters{display:flex;gap:8px;flex-wrap:wrap}
+.lm{flex:1 1 150px;background:rgba(0,0,0,.35);border:1px solid #4d4a3a;border-radius:12px;padding:8px 10px}
+.lm.you{border-color:var(--green);box-shadow:0 0 10px rgba(155,184,106,.3)}
+.lm.on{border-color:var(--gold)}
+.lm-top{display:flex;justify-content:space-between;align-items:baseline;font-weight:700}
+.lm-top .lv{font-size:22px;color:#e9f2d0}
+.lm.you .lm-top .lv{font-size:28px}
+.lm-bar{position:relative;height:14px;background:#0a0d08;border:1px solid #4d4a3a;border-radius:7px;margin:6px 0;overflow:visible}
+.lm-fill{height:100%;border-radius:6px;background:#7a9b4f;transition:width .6s ease,background .6s ease}
+.lm .tick{position:absolute;top:-4px;width:2px;height:20px;background:#8a8870}
+.lm .tick span{position:absolute;top:-15px;left:-14px;font:9px monospace;color:var(--dim);white-space:nowrap}
+.lm-sub{font:10px monospace;color:var(--dim)}
+.lm.gone{opacity:.45}
+#lr-actions{display:flex;flex-direction:column;gap:10px}
+.lr-act{display:flex;gap:12px;align-items:center;width:100%;text-align:left;background:#33481f;border:2px solid #9bb86a;color:#f0f4e0;border-radius:14px;padding:14px 16px;cursor:pointer;min-height:64px}
+.lr-act:hover:not([disabled]){transform:translateY(-2px);box-shadow:0 6px 16px rgba(0,0,0,.5)}
+.lr-act:active:not([disabled]){transform:scale(.99)}
+.lr-act[disabled]{opacity:.45;cursor:not-allowed}
+.lr-act.k{background:#4a3418;border-color:#a47a4a}
+.lr-act .ic{font-size:30px;flex:none}
+.lr-act .tt{font-size:17px;font-weight:800}
+.lr-act .ss{font-size:12px;color:#d8cfae;font-weight:400}
+#lr-veil{position:absolute;inset:0;display:flex;align-items:center;justify-content:center;background:rgba(8,10,7,.55);backdrop-filter:blur(1px);pointer-events:none;border-radius:14px;z-index:5;transition:opacity .5s ease, visibility .5s ease}
+#lr-veil.hidden{opacity:0;visibility:hidden}
+#lr-veil .ribbon{background:rgba(20,26,18,.92);border:2px solid var(--gold);border-radius:14px;padding:14px 26px;font-size:19px;font-weight:800;text-align:center;box-shadow:0 6px 20px rgba(0,0,0,.6)}
+#lr-veil .ribbon small{display:block;font-size:12px;font-weight:400;color:var(--dim);margin-top:4px}
+.shake{animation:shakeA .4s}
+@keyframes shakeA{0%,100%{transform:none}25%{transform:translateX(-6px)}50%{transform:translateX(6px)}75%{transform:translateX(-3px)}}
+.pulse{animation:pulseA .8s}
+@keyframes pulseA{0%{transform:scale(1)}40%{transform:scale(1.12)}100%{transform:scale(1)}}
+#dragon-flash{position:fixed;inset:0;background:radial-gradient(circle,rgba(180,40,20,.55),transparent 70%);pointer-events:none;opacity:0;z-index:50}
+#dragon-flash.on{animation:dragonF 1.6s ease}
+@keyframes dragonF{0%{opacity:0}20%{opacity:1}70%{opacity:1}100%{opacity:0}}
+.hidden{display:none!important}
+.wf-setup{background:rgba(0,0,0,.4);border:1px solid #4d4a3a;border-radius:10px;padding:10px;display:flex;flex-direction:column;gap:8px}
+.wf-setup select{font:12px monospace;background:#1a1a1a;color:var(--ink);border:1px solid #444;border-radius:8px;padding:5px 8px}
+#standalone-note{max-width:520px;margin:60px auto;text-align:center}
+#standalone-note a{color:#b9c98a}
+@media (prefers-reduced-motion:reduce){*{animation:none!important;transition:none!important}}
+</style>
+</head>
+<body>
+<div id="lotr-panel">
+    <div class="lr-head" style="display:flex;flex-wrap:wrap;align-items:center;justify-content:space-between;gap:8px">
+        <div><span class="lr-t">LOTR CARDS</span> <span id="lr-err" style="font:11px monospace;color:#ff8888"></span></div>
+        <div style="display:flex;gap:8px">
+            <button id="btn-lr-new" class="lr-b hidden">New game</button>
+            <button id="btn-lr-close" class="lr-b k">Hide</button>
+        </div>
+    </div>
+    <div id="lr-status">Opening…</div>
+    <div id="lr-feed" style="position:absolute;inset:0;pointer-events:none;z-index:100"></div>
+    <div id="lr-setup" class="wf-setup hidden">
+        <span class="lr-lbl">HOST SETUP — everyone in the room plays (2–6). First to Level 15.</span>
+        <label class="lr-lbl" style="color:#e4d8b8"><input type="checkbox" id="lr-dread" checked style="width:auto"> Rising Dread — monsters hunt the leader: +1 Monster Total per level you lead the lowest player.</label>
+        <div style="display:flex;align-items:center;gap:8px"><button id="btn-lr-start" class="lr-b">Start game</button><span id="lr-setup-note" class="lr-lbl" style="color:#e0b070"></span></div>
+    </div>
+    <div id="lr-waiting" class="hidden lr-box lr-lbl" style="background:rgba(0,0,0,.28);border:1px solid #4d4a3a;border-radius:12px;padding:10px">Waiting for the host to start a game.</div>
+    <div id="lr-game" class="hidden" style="flex-direction:column;gap:12px">
+        <div id="lr-tablewrap" style="position:relative;background:rgba(0,0,0,.28);border:1px solid #4d4a3a;border-radius:14px;padding:12px;display:flex;flex-direction:column;gap:12px;overflow:hidden">
+            <div id="lr-veil" class="hidden"><div class="ribbon" id="lr-veil-text">Waiting…</div></div>
+            <div id="lr-topdeck"></div>
+            <div class="lr-midrow" id="lr-midrow"></div>
+            <div id="lr-arena"></div>
+            <div id="lr-meters" class="lr-meters"></div>
+        </div>
+        <div id="lr-actions"></div>
+        <div id="lr-note" style="font:11px monospace;color:#e0b070;min-height:14px"></div>
+    </div>
+</div>
+<div id="dragon-flash"></div>
+<div id="standalone-note" class="hidden">
+    <h1 style="color:#b9c98a;letter-spacing:.2em">LOTR CARDS</h1>
+    <p>LOTR Cards lives inside Bub Hub.<br>Open <a href="index.html">Bub Hub</a>, join a room, and press <b>Play LOTR Cards</b>.</p>
+</div>
+<script>
+(function(){
+'use strict';
+const GAME_ID = 'lotr';
+const $ = (id) => document.getElementById(id);
+const esc = (s) => String(s).replace(/[&<>"']/g, c => ({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;'}[c]));
+
+const Hub = {
+    me: null, roster: [], room: '',
+    up(k, p){ try { window.parent.postMessage({ t: 'gu', game: GAME_ID, k, p }, '*'); } catch(e) {} },
+    init(){
+        window.addEventListener('message', onDown);
+        this.up('hello');
+        setTimeout(() => {
+            if (!Hub.me){
+                $('lotr-panel').classList.add('hidden');
+                $('standalone-note').classList.remove('hidden');
+                reportHeight();
+            }
+        }, 1500);
+    }
+};
+let heightT = null;
+function reportHeight(){
+    clearTimeout(heightT);
+    heightT = setTimeout(() => {
+        const h = Math.max(document.body.scrollHeight, document.documentElement.scrollHeight);
+        Hub.up('height', h);
+    }, 60);
+}
+function onDown(e){
+    const m = e.data;
+    if (!m || m.t !== 'gd' || m.game !== GAME_ID) return;
+    if (m.k === 'roster'){ Hub.me = m.p.you; Hub.roster = m.p.roster; Hub.room = m.p.room; render(); return; }
+    if (m.k === 'state'){ if (m.p) { S = m.p; render(); } return; }
+    if (m.k === 'intent'){ onIntent(m.p, m.from); return; }
+    if (m.k === 'denied'){ toast(m.p.text); return; }
+    if (m.k === 'reset'){ S = null; render(); return; }
+}
+const myId = () => Hub.me && Hub.me.id;
+const myName = () => (Hub.me && Hub.me.name) || 'Player';
+const isHost = () => !!(Hub.me && Hub.me.isHost);
+const peerCount = () => Hub.roster.length;
+const hostPresent = () => Hub.roster.some(m => m.host);
+
+window.addEventListener('error', (e) => {
+    try {
+        const el = $('lr-err');
+        if (el){
+            const where = e.lineno ? (' @' + e.lineno + ':' + (e.colno || 0)) : '';
+            el.textContent = 'Error: ' + (e.message || 'script error') + where;
+        }
+    } catch(err) {}
+});
+
+const V = { J: 12, Q: 14, K: 16, A: 18 };
+const MON = { 2:['Bat','🦇'],3:['Crow','🐦'],4:['Goblin','👺'],5:['Giant Spider','🕷️'],6:['Angry Wood Elf','🧝'],7:['Warg','🐺'],8:['Orc','👹'],9:['Uruk-hai','🧟'],10:['Troll','🧌'],J:['Shelob','🕸️'],Q:['Balrog','🔥'],K:['Nazgûl','💀'],A:['Dragon','🐉'] };
+const WEP = { 2:['Rusty Dagger','🗡️'],3:['Hunting Knife','🔪'],4:['Sling','🪨'],5:['Short Bow','🏹'],6:['Hand Axe','🪓'],7:['Throwing Spear','🔱'],8:['Dwarven Axe','⚒️'],9:['Elven Longbow','🏹'],10:['Sting','🗡️','Glows when Orcs are near'],J:['Orcrist','⚔️','The Goblin-cleaver: Draw 2 Loot, keep 1'],Q:['Glamdring','🗡️','Foe-hammer: High power'],K:['Narsil','⚔️','The Blade that was Broken'],A:['Andúril','⚔️','Flame of the West: Ultimate Power'] };
+let S = null, remembered = { dread: true }, noteT = null, lastFeedN = 0, lastLvls = {};
+
+const val = (c, dr) => (c.r === 'A' && c.c === 'B') ? (dr ? 20 : 14) : (V[c.r] || +c.r);
+const isNum = (c) => !V[c.r];
+const isDragon = (c) => c.c === 'R' && c.r === 'A';
+const wname = (c) => (c.c === 'R' ? MON : WEP)[c.r][0];
+function shuffle(a){ for (let i = a.length - 1; i > 0; i--){ const j = Math.random() * (i + 1) | 0; [a[i], a[j]] = [a[j], a[i]]; } return a; }
+function deck(col){ const d = []; ['2','3','4','5','6','7','8','9','10','J','Q','K','A'].forEach(r => d.push({ r, c: col }, { r, c: col })); return shuffle(d); }
+function draw(k){
+    const d = k === 'L' ? S.loot : S.mon, x = k === 'L' ? S.lootD : S.monD;
+    if (!d.length) d.push(...shuffle(x.splice(0)));
+    return d.pop() || { r: '2', c: k === 'L' ? 'B' : 'R' };
+}
+
+const cur = () => S.pl[S.turn];
+const me = () => S && S.pl.find(p => p.id === myId());
+const cap = (p) => p.lvl >= 10 ? 2 : 1;
+const canEq = (p, c) => p.lvl >= 5 || isNum(c);
+const power = (p, dr) => p.eq.reduce((s, c) => s + val(c, dr), 0);
+function dread(p){
+    if (!S.cfg.dread) return 0;
+    return Math.max(0, p.lvl - Math.min(...S.pl.filter(x => !x.gone).map(x => x.lvl)));
+}
+function norm(p){
+    const bad = p.eq.filter(c => !canEq(p, c));
+    if (bad.length){
+        p.eq = p.eq.filter(c => canEq(p, c));
+        p.hand.push(...bad);
+        say(`${p.name}'s ${bad.map(wname).join(', ')} no longer legal at this level — moved to spare.`);
+    }
+    p.eq.sort((a, b) => val(b) - val(a));
+    while (p.eq.length < cap(p) && p.hand.length > 0) {
+        const next = p.hand.shift();
+        if (canEq(p, next)) {
+            p.eq.push(next);
+            say(`${p.name} automatically equips ${wname(next)}.`);
+        } else {
+            p.hand.unshift(next);
+            break;
+        }
+    }
+    while (p.eq.length > cap(p)) p.hand.push(p.eq.pop());
+    p.hand.sort((a, b) => val(b) - val(a));
+    while (p.hand.length > 1){
+        const d = p.hand.pop();
+        S.lootD.push(d);
+        say(`${p.name} must discard spare ${wname(d)} (1 spare max).`);
+    }
+}
+function give(p, c){
+    if (p.eq.length < cap(p) && canEq(p, c)){
+        p.eq.push(c);
+        say(`${p.name} takes ${wname(c)} — equipped.`);
+    } else {
+        p.hand.push(c);
+        say(`${p.name} takes ${wname(c)} as spare.`);
+    }
+    norm(p);
+}
+function dropOne(p){
+    let d = [...p.eq, ...p.hand].find(c => c.r === 'Q');
+    if (!d && p.eq.length){
+        const pool = p.eq.length > 1 ? p.eq.filter(c => c.r !== 'K') : p.eq;
+        d = pool.reduce((a, b) => val(b) < val(a) ? b : a);
+    }
+    if (!d) return null;
+    p.eq = p.eq.filter(c => c !== d); p.hand = p.hand.filter(c => c !== d);
+    S.lootD.push(d); return d;
+}
+const lose = (p) => { const d = dropOne(p); norm(p); if (d) say(`${p.name} loses ${wname(d)}.`); };
+
+function say(t){
+    S.feed.unshift({ n: ++S.feedN, t });
+    while (S.feed.length > 8) S.feed.pop();
+    Hub.up('say', t);
+}
+
+function fresh(dr){
+    const ps = [{ id: myId(), name: myName() }].concat(Hub.roster.filter(m => m.id !== myId()).map(m => ({ id: m.id, name: m.name })));
+    S = { cfg: { dread: dr }, pl: ps.map(x => ({ id: x.id, name: x.name, lvl: 1, eq: [], hand: [] })),
+          loot: deck('B'), lootD: [], mon: deck('R'), monD: [], turn: 0, phase: 'choose',
+          fight: null, pick: null, boss: null, win: null, feed: [], feedN: 0, msg: '' };
+    const aside = [];
+    S.pl.forEach(p => { let c; for (;;){ c = draw('L'); if (isNum(c)) break; aside.push(c); } p.eq = [c]; });
+    S.loot.push(...aside); shuffle(S.loot);
+}
+function startGame(dr){
+    if (!isHost()) return false;
+    if (dr === undefined) dr = remembered.dread;
+    remembered.dread = dr;
+    if (peerCount() < 2 || peerCount() > 6){ $('lr-setup-note').textContent = 'Need 2–6 players in the room.'; return false; }
+    fresh(dr);
+    say(`LOTR Cards begins — ${S.pl.length} players, Rising Dread ${dr ? 'ON' : 'off'}. ${cur().name} goes first.`);
+    S.msg = `${cur().name}'s turn.`;
+    broadcast();
+    Hub.up('invite');
+    return true;
+}
+const rematch = () => { if (isHost() && S) startGame(S.cfg.dread); };
+
+function endTurn(){
+    S.fight = null; S.pick = null; S.boss = null; S.q = [];
+    let k = 0;
+    do { S.turn = (S.turn + 1) % S.pl.length; k++; } while (cur().gone && k < S.pl.length);
+    S.phase = 'choose';
+    S.msg = `${cur().name}'s turn.`;
+}
+function chk(pw){
+    let c = S.pl.filter(p => p.lvl >= 15);
+    if (!c.length) return false;
+                if (c.length > 1){
+                    const pv = (p) => (pw && pw[p.id]) || 0, m = Math.max(...c.map(pv));
+                    c = c.filter(p => pv(p) === m);
+                    let guard = 0;
+                    while (c.length > 1 && guard++ < 20){
+                        const f = c.map(p => { const card = draw('M'); S.monD.push(card); return [p, val(card, true)]; }), m2 = Math.max(...f.map(x => x[1]));
+                        c = f.filter(x => x[1] === m2).map(x => x[0]);
+                    }
+                }
+    S.phase = 'over'; S.win = c[0].id; S.fight = null; S.boss = null; S.pick = null;
+    say(`🏆 ${c[0].name} reaches Level 15 and wins!`);
+    S.msg = `${c[0].name} wins the game!`;
+    return true;
+}
+const total = () => S.fight.mons.reduce((s, c) => s + val(c, true), 0) + dread(cur());
+function next(){
+    const s = S.q && S.q.shift();
+    if (s === 'h'){ S.phase = 'hreward'; S.msg = 'Helper: draw 1 Loot or gain 1 Level?'; return; }
+    if (s === 'o'){
+        S.pick = { who: cur().id, cards: [draw('L'), draw('L')], why: 'Orcrist' };
+        S.phase = 'pick'; S.msg = `${cur().name} wields Orcrist — draw 2 Loot, keep 1.`; return;
+    }
+    endTurn();
+}
+function resolve(){
+    const f = S.fight, p = cur(), h = f.helper && S.pl.find(x => x.id === f.helper);
+    const P = power(p) + (h ? power(h) : 0), T = total(), win = P >= T;
+    S.monD.push(...f.mons);
+    say(`${p.name}${h ? ' + ' + h.name : ''}: Power ${P} vs Monsters ${T} — ${win ? 'victory' : 'defeat'}.`);
+    S.q = [];
+    if (win){
+        const g = f.pushed ? 2 : 1;
+        if (!h){ p.lvl += g; say(`${p.name} gains ${g} Level${g > 1 ? 's' : ''} (now Lv ${p.lvl}).`); }
+        if (h) S.q.push('h');
+        if (p.eq.some(c => c.r === 'J')) S.q.push('o');
+        if (chk()) return;
+    } else {
+        lose(p);
+        if (f.pushed){ p.lvl = Math.max(1, p.lvl - 1); say(`${p.name} pushed and lost — drops to Lv ${p.lvl}.`); }
+        if (h) lose(h);
+    }
+    next();
+}
+const bossP = () => 14 + S.boss.ms.reduce((s, c) => s + val(c, true), 0);
+function startBoss(){
+    const n = S.pl.filter(p => !p.gone).length, ms = [];
+    for (let i = 0; i < n; i++) ms.push(draw('M'));
+    S.boss = { ms, ch: {} }; S.fight = null; S.phase = 'boss';
+    S.pl.forEach(p => { if (p.gone) S.boss.ch[p.id] = 'x'; });
+    say(`🐉 THE DRAGON! Boss Power ${bossP()}. Everyone: Join or Stay Out.`);
+    S.msg = 'The Dragon awakens — Join or Stay Out.';
+    const df = $('dragon-flash');
+    if (df){ df.classList.remove('on'); void df.offsetWidth; df.classList.add('on'); }
+}
+function resolveBoss(){
+    const B = S.boss, pw = {};
+    S.pl.filter(p => B.ch[p.id] === 'o').forEach(p => { say(`${p.name} flees.`); lose(p); });
+    const J = S.pl.filter(p => B.ch[p.id] === 'j');
+    J.forEach(p => { pw[p.id] = power(p, true); });
+    const team = Object.values(pw).reduce((a, b) => a + b, 0);
+    while (team === bossP()) B.ms.push(draw('M'));
+    const win = team > bossP();
+    say(`Team ${team} vs Dragon ${bossP()} — ${win ? 'the Dragon falls! +2 Levels' : 'the Dragon wins.'}`);
+    J.forEach(p => { if (win){ p.lvl += 2; say(`${p.name} rises to Lv ${p.lvl}.`); } else { lose(p); p.lvl = Math.max(1, p.lvl - 1); } norm(p); });
+    S.monD.push(...B.ms);
+    if (!chk(pw)) endTurn();
+}
+
+function handle(d){
+    const p = S.pl.find(x => x.id === d.pid), a = d.action;
+    if (!p || p.gone) return 'You are not seated in this game.';
+    if (S.phase === 'over') return 'The game is over.';
+    const mine = cur().id === d.pid, f = S.fight;
+    if (S.phase === 'boss'){
+        if (a !== 'bchoice') return 'Dragon! Choose Join or Stay Out.';
+        if (S.boss.ch[p.id]) return 'Already chosen.';
+        S.boss.ch[p.id] = d.j === 'j' ? 'j' : 'o';
+        if (S.pl.every(x => S.boss.ch[x.id])) resolveBoss();
+        else S.msg = `Dragon: ${Object.keys(S.boss.ch).length}/${S.pl.length} decided.`;
+        return null;
+    }
+    if (S.phase === 'pick'){
+        if (a !== 'keep' || S.pick.who !== d.pid) return 'Waiting for ' + S.pl.find(x => x.id === S.pick.who).name + ' to pick.';
+        const k = S.pick.cards[d.i]; if (!k) return null;
+        const other = S.pick.cards[1 - d.i];
+        S.lootD.push(other);
+        say(`${p.name} keeps ${wname(k)} (${other ? 'lets go ' + wname(other) : 'nothing else'}).`);
+        give(p, k); S.pick = null;
+        next(); return null;
+    }
+    if (S.phase === 'hreward'){
+        if (a !== 'hr' || f.helper !== d.pid) return 'Waiting for the helper to choose.';
+        if (d.j === 'lvl'){ p.lvl++; norm(p); say(`${p.name} takes 1 Level for helping (now Lv ${p.lvl}).`); if (chk()) return null; }
+        else { give(p, draw('L')); say(`${p.name} takes 1 Loot card for helping.`); }
+        next(); return null;
+    }
+    if (S.phase === 'fight' && a === 'help'){
+        if (mine) return 'You cannot help yourself.';
+        if (!f.ask) return 'No help requested.';
+        if (f.helper) return 'Someone already helps.';
+        if (!p.eq.length) return 'You need an equipped weapon to help.';
+        f.helper = p.id; say(`${p.name} helps ${cur().name} (+${power(p)}).`); return null;
+    }
+    if (!mine) return `It is ${cur().name}'s turn.`;
+    const c = cur();
+    if (S.phase === 'choose'){
+        if (a === 'gear'){
+            if (d.to === 'eq'){
+                const x = c.hand[0]; if (!x) return null;
+                if (!canEq(c, x)) return 'Face-card weapons unlock at Level 5.';
+                if (c.eq.length >= cap(c)){
+                    c.eq.sort((m, n) => val(m) - val(n));
+                    const out = c.eq.shift();
+                    c.hand = [out]; c.eq.push(x);
+                    say(`${c.name} equips ${wname(x)}, stashing ${wname(out)} as spare.`);
+                } else { c.hand = []; c.eq.push(x); say(`${c.name} equips ${wname(x)}.`); }
+            } else {
+                if (c.hand.length) return 'Your one spare slot is full.';
+                const m = c.eq[d.i];
+                if (m){ c.hand = c.eq.splice(d.i, 1); say(`${c.name} moves ${wname(m)} to spare.`); }
+            }
+            return null;
+        }
+        if (a === 'explore'){
+            S.q = []; S.pick = { who: c.id, cards: [draw('L'), draw('L')], why: 'Explore' };
+            S.phase = 'pick'; S.msg = `${c.name} explores — draw 2 Loot, keep 1.`; return null;
+        }
+        if (a === 'fight'){
+            if (!c.eq.length && !c.hand.length) return 'No weapons — you must Explore.';
+            const need = c.lvl >= 10 ? 2 : 1, ms = [];
+            for (let i = 0; i < need; i++) {
+                let m = draw('M');
+                if (i > 0 && isDragon(m) && ms.some(isDragon)) {
+                    S.monD.push(m);
+                    m = draw('M');
+                }
+                ms.push(m);
+            }
+            if (need === 2 && ms.every(isNum)) ms.push(draw('M'));
+            if (ms.some(isDragon)){ S.monD.push(...ms); startBoss(); return null; }
+            S.fight = { mons: ms, helper: null, ask: false, pushed: false };
+            S.phase = 'fight'; S.msg = `${c.name} fights! Ask for help, push your luck, or resolve.`; return null;
+        }
+        return 'Choose Explore or Fight.';
+    }
+    if (S.phase === 'fight'){
+        if (a === 'ask'){ f.ask = true; say(`${c.name} asks for help!`); return null; }
+        if (a === 'push'){
+            if (f.pushed) return 'Already pushed.';
+            if (f.ask) return 'You cannot push your luck if you asked for help.';
+            if (power(c) + (f.helper ? power(S.pl.find(x => x.id === f.helper)) : 0) < total()) return 'You are clearly losing — no pushing your luck!';
+            const m = draw('M');
+            if (isDragon(m)){ S.monD.push(m, ...f.mons); startBoss(); return null; }
+            f.mons.push(m); f.pushed = true; say(`${c.name} pushes their luck… (${wname(m)} joins the monsters)`); return null;
+        }
+        if (a === 'resolve'){ resolve(); return null; }
+    }
+    return 'Not now.';
+}
+
+function broadcast(){
+    render();
+    if (!S || !isHost()) return;
+    Hub.up('state', S);
+}
+function act(action, x){
+    const d = Object.assign({ action, pid: myId(), name: myName() }, x || {});
+    if (isHost()){
+        if (!S) return;
+        const e = handle(d); if (e) toast(e);
+        broadcast();
+    } else {
+        Hub.up('intent', d);
+    }
+}
+function toast(t){
+    const n = $('lr-note'); if (!n) return;
+    n.textContent = t; clearTimeout(noteT); noteT = setTimeout(() => { n.textContent = ''; }, 3500);
+}
+window.toast = toast;
+function onIntent(d, from){
+    if (!isHost()) return;
+    d.pid = from.id; d.name = from.name;
+    if (d.action === 'hello'){ if (S) broadcast(); return; }
+    if (!S) return;
+    const e = handle(d);
+    if (e) Hub.up('denied', { to: from.id, text: e });
+    broadcast();
+}
+function onPeerLeftReset(){ S = null; render(); }
+
+function card(c, attr, big){
+    const m = c.c === 'R', n = (m ? MON : WEP)[c.r];
+    const leg = 'JQKA'.includes(c.r) || (!m && c.r === '10');
+    const v = (!m && c.r === 'A') ? '14·20' : val(c, true);
+    let tooltip = '';
+    if (!m) {
+        if (n[2]) tooltip = `toast('${n[0]}: Power ${v} — ${n[2]}')`;
+        else if ('JQKA'.includes(c.r)) tooltip = `toast('${n[0]}: Power ${v}')`;
+    }
+    return `<div class="lr-c ${m ? 'm' : 'w'}${leg ? ' leg' : ''}${big ? ' big' : ''} flip" ${attr || ''} onclick="${tooltip}"><b>${v}</b><i>${n[1]}</i><u>${n[0]}</u></div>`;
+}
+function deckBox(kind, count, disc, label){
+    return `<div class="deck ${kind}"><div class="stack"></div><div><div class="n">${count}</div><div class="cap">${label}</div><div class="dim">discard ${disc}</div></div></div>`;
+}
+function meter(p, big, turn, you){
+    const pct = Math.min(100, Math.max(0, (p.lvl - 1) / 14 * 100));
+    const col = p.lvl >= 15 ? '#d9b44a' : p.lvl >= 10 ? '#b0523c' : p.lvl >= 5 ? '#b98a3c' : '#7a9b4f';
+    const sub = p.lvl >= 10 ? '2 equipped max · 2 monsters' : p.lvl >= 5 ? 'any weapon · 1 monster' : 'number weapons · 1 monster';
+    return `<div class="lm${you ? ' you' : ''}${turn ? ' on' : ''}${p.gone ? ' gone' : ''}">` +
+        `<div class="lm-top"><span>${esc(p.name)}${you ? ' (you)' : ''}</span><span class="lv">Lv ${p.lvl}</span></div>` +
+        `<div class="lm-bar"><div class="lm-fill" style="width:${pct}%;background:${col}"></div>` +
+        `<i class="tick" style="left:28.5%"><span>5 any</span></i><i class="tick" style="left:64.3%"><span>10 ×2</span></i><i class="tick" style="left:99%"><span>15</span></i></div>` +
+        `<div class="lm-sub">⚔ ${power(p)}${p.gone ? ' · out' : ''} · ${sub}</div></div>`;
+}
+function myAction(){
+    if (!S || S.over) return false;
+    const p = me();
+    if (!p || p.gone) return false;
+    const ph = S.phase, f = S.fight;
+    if (ph === 'choose' || ph === 'fight') return cur().id === myId() || (ph === 'fight' && f.ask && !f.helper && p.eq.length > 0);
+    if (ph === 'boss') return !S.boss.ch[myId()];
+    if (ph === 'pick') return S.pick.who === myId();
+    if (ph === 'hreward') return f.helper === myId();
+    return false;
+}
+function waitingText(){
+    const c = cur();
+    if (S.phase === 'boss'){
+        const done = Object.keys(S.boss.ch).length;
+        return [`Waiting on the Dragon — ${done}/${S.pl.length} decided`, 'Join the battle or stay out.'];
+    }
+    if (S.phase === 'pick') return [`Waiting for ${S.pl.find(x => x.id === S.pick.who).name} to keep a card`, 'Draw 2 Loot, keep 1.'];
+    if (S.phase === 'hreward') return [`Waiting for the helper to choose`, 'Draw 1 Loot or gain 1 Level.'];
+    if (S.phase === 'fight'){
+        const f = S.fight;
+        if (f.ask && !f.helper) return [`${c.name} asked for help`, 'Offer yours from the buttons below.'];
+        return [`${c.name} is fighting`, `Monsters vs Power — ask, push, or resolve.`];
+    }
+    return [`${c.name} is deciding`, 'Explore or Fight.'];
+}
+function render(){
+    const st = $('lr-status'); if (!st) return;
+    const sh = (id, on) => { const e = $(id); e.classList.toggle('hidden', !on); if (id === 'lr-game') e.style.display = on ? 'flex' : ''; else e.classList.toggle('flex', on); };
+    sh('lr-setup', isHost() && !S); sh('lr-waiting', !isHost() && !S); sh('lr-game', !!S);
+    $('btn-lr-new').classList.toggle('hidden', !(isHost() && S));
+    if (!S){
+        if (isHost()) $('lr-setup-note').textContent = `${peerCount()} in the room.`;
+        st.textContent = 'Fight beasts, claim weapons, reach Level 15.';
+        reportHeight();
+        return;
+    }
+    const p = me(), c = cur(), ph = S.phase, f = S.fight;
+    const mine = !!p && !p.gone && c.id === myId();
+    const paused = !isHost() && !hostPresent();
+
+    let big = S.msg, sub = '';
+    if (S.over){ big = S.msg; }
+    else if (paused){ big = 'Game paused — host disconnected.'; sub = 'It resumes when they return.'; }
+    else if (ph === 'fight'){
+        const h = f.helper && S.pl.find(x => x.id === f.helper), dr = dread(c);
+        big = `${mine ? 'Your fight' : c.name + ' fights'} — Power ${power(c) + (h ? power(h) : 0)} vs Monsters ${total()}`;
+        sub = `${mine ? 'Ask for help, push your luck, or resolve.' : 'Watch the tally. Offer help if asked.'}${dr ? ` Dread +${dr} hunts the leader.` : ''}`;
+    }
+    else if (ph === 'boss'){ big = `THE DRAGON — Boss Power ${bossP()}`; sub = 'Join the battle or stay out. Majority pain if you run: lose a weapon.'; }
+    else if (mine && ph === 'choose'){ big = 'Your turn.'; sub = 'Swap gear below if you like, then Explore or Fight.'; }
+    st.innerHTML = `${esc(big)}${sub ? `<small>${esc(sub)}</small>` : ''}`;
+
+    $('lr-feed').innerHTML = S.feed.slice(0, 1).map(e =>
+        `<div class="feed-item${e.n > lastFeedN ? ' pop' : ''}${/DRAGON|wins!|Level 15/.test(e.t) ? ' big' : ''}">${esc(e.t)}</div>`
+    ).join('');
+    if (S.feed.length) lastFeedN = Math.max(lastFeedN, S.feed[0].n);
+
+    S.pl.forEach(q => {
+        const before = lastLvls[q.id];
+        if (before !== undefined && q.lvl !== before){
+            const el = document.querySelector(`#lr-meters [data-pid="${q.id}"] .lm-bar`);
+            if (el) el.classList.add(q.lvl > before ? 'pulse' : 'shake');
+        }
+        lastLvls[q.id] = q.lvl;
+    });
+
+    $('lr-topdeck').innerHTML =
+        `<div class="lr-deckrow">${deckBox('red', S.mon.length, S.monD.length, 'MONSTERS')}` +
+        (f && (ph === 'fight' || ph === 'hreward') ? `<div class="lr-cards">${f.mons.map(x => card(x)).join('')}</div><div class="lr-tally">Monsters ${total()}${dread(c) ? ` <small>(incl. +${dread(c)} dread)</small>` : ''}</div>` : '') +
+        (ph === 'boss' ? `<div class="lr-cards">${S.boss.ms.map(x => card(x)).join('')} ${card({r:'A', c:'R'}, '', true)}</div><div class="lr-tally">Boss Power ${bossP()} <small>· ${Object.keys(S.boss.ch).length}/${S.pl.length} decided</small></div>` : '') +
+        `</div>`;
+
+    let mid = `<div>${deckBox('black', S.loot.length, S.lootD.length, 'LOOT')}</div>`;
+    if (p){
+        const can = mine && ph === 'choose' && !paused;
+        let gearBtn = '';
+        if (can && p.eq.length) gearBtn = `<button class="lr-act" data-a="fight" style="margin-top:10px; min-height:50px; padding:10px; font-size:14px"><span class="ic" style="font-size:20px">⚔️</span><span style="font-weight:800">Fight!</span></button>`;
+        if (ph === 'fight' && mine) {
+            gearBtn = `<button class="lr-act" data-a="resolve" style="margin-top:10px; min-height:50px; padding:10px; font-size:14px"><span class="ic" style="font-size:20px">⚖️</span><span style="font-weight:800">Resolve Fight</span></button>`;
+        }
+        mid += `<div class="lr-zone${mine ? ' you' : ''}"><span class="lr-lbl">EQUIPPED ${p.eq.length}/${cap(p)} (Power: ${power(p)})${p.lvl < 5 ? ' · Lv 1–4: number weapons only' : ''}${can ? ' · click to move' : ''}</span>` +
+            `<div class="lr-cards" style="min-height:124px">${p.eq.map((x, i) => card(x, can ? `data-a="gear" data-to="un" data-i="${i}"` : '', true)).join('') || '<span class="lr-lbl">none</span>'}</div>` +
+            gearBtn + `</div>`;
+        mid += `<div class="lr-zone"><span class="lr-lbl">SPARE (1 max)</span>` +
+            `<div class="lr-cards" style="min-height:124px">${p.hand.map(x => card(x, can ? 'data-a="gear" data-to="eq"' : '', true)).join('') || '<span class="lr-lbl">empty</span>'}</div></div>`;
+    } else {
+        mid += `<div class="lr-zone"><span class="lr-lbl">Watching — gear appears once the host seats you.</span></div><div class="lr-zone"></div>`;
+    }
+    $('lr-midrow').innerHTML = mid;
+
+    let ar = '';
+    if (ph === 'pick'){
+        const who = S.pl.find(x => x.id === S.pick.who);
+        ar = `<span class="lr-lbl">LOOT — ${esc(who.name)} keeps one (click a card)</span><div class="lr-cards">${S.pick.cards.map((x, i) => card(x, S.pick.who === myId() && !paused ? `data-a="keep" data-i="${i}"` : '')).join('')}</div>`;
+    } else if (ph === 'hreward'){
+        ar = `<span class="lr-lbl">HELPER REWARD — ${esc(S.pl.find(x => x.id === f.helper).name)} chooses below.</span>`;
+    } else if (ph === 'over'){
+        const w = S.pl.find(x => x.id === S.win);
+        ar = `<div class="lr-tally" style="font-size:20px">🏆 ${esc(w.name)} wins!</div>`;
+    }
+    $('lr-arena').innerHTML = ar;
+
+    $('lr-meters').innerHTML = S.pl.map(q =>
+        meter(q, false, S.turn === S.pl.indexOf(q) && ph !== 'over', q.id === myId()).replace('class="lm', `data-pid="${q.id}" class="lm`)
+    ).join('');
+
+    const veil = $('lr-veil');
+    if (!S.over && !myAction() && !paused){
+        const [t, s] = waitingText();
+        $('lr-veil-text').innerHTML = `${esc(t)}<small>${esc(s)}</small>`;
+        veil.classList.remove('hidden');
+    } else if (!S.over && paused){
+        $('lr-veil-text').innerHTML = `Paused<small>Host disconnected — it resumes when they return.</small>`;
+        veil.classList.remove('hidden');
+    } else veil.classList.add('hidden');
+
+    const bigBtn = (a, ic, t, s, o, x) => `<button class="lr-act ${o || ''}" data-a="${a}" ${x || ''}><span class="ic">${ic}</span><span><span class="tt">${t}</span><br><span class="ss">${s}</span></span></button>`;
+    let ac = '';
+    if (paused) ac = '';
+    else if (ph === 'choose' && mine) {
+        ac = bigBtn('explore', '🔍', 'Explore', 'Draw 2 Loot cards, keep 1. Safe and quiet.', 'k');
+    }
+    else if (ph === 'fight' && mine) {
+        const canPush = !f.pushed && !f.ask && (power(c) + (f.helper ? power(S.pl.find(x => x.id === f.helper)) : 0) >= total());
+        const fightButtons = (!f.ask ? bigBtn('ask', '📯', 'Ask for help', 'A teammate adds their weapon Power. They share the spoils.', 'k') : (f.helper ? '' : `<div class="lr-lbl">Waiting for a helper…</div>`)) + (canPush ? bigBtn('push', '🎲', 'Push your luck', 'Flip one more Monster beyond the requirement. Win counts double.', 'k') : '') + bigBtn('resolve', '⚖️', 'Resolve fight', `Power ${power(c) + (f.helper ? power(S.pl.find(x => x.id === f.helper)) : 0)} vs Monsters ${total()}. Exact ties win.`);
+        ac = `<div class="lr-cards" style="justify-content:center; gap:10px; margin-bottom:10px">${fightButtons}</div>`;
+    }
+    else if (ph === 'fight' && p && !p.gone && f.ask && !f.helper && p.eq.length) ac = bigBtn('help', '🤝', `Help ${c.name}`, `Add +${power(p)} Power. Win: draw 1 Loot or gain 1 Level. Lose: you discard too.`);
+    else if (ph === 'boss' && p && !p.gone && !S.boss.ch[myId()]) ac = bigBtn('bchoice', '⚔️', 'Join the battle', 'Your weapons count toward Team Power. Win: +2 Levels.', '', 'data-j="j"') + bigBtn('bchoice', '🏃', 'Stay out', 'Discard 1 equipped weapon. No reward, no risk beyond that.', 'k', 'data-j="o"');
+    else if (ph === 'hreward' && f.helper === myId()) ac = bigBtn('hr', '🃏', 'Draw 1 Loot', 'Take a card from the black deck into your gear.', '', 'data-j="loot"') + bigBtn('hr', '⬆️', 'Gain 1 Level', 'Closer to 15, right now.', 'k', 'data-j="lvl"');
+    $('lr-actions').innerHTML = ac;
+    reportHeight();
+}
+
+$('lotr-panel').addEventListener('click', (e) => {
+    const t = e.target.closest('[data-a]');
+    if (!t || t.disabled) return;
+    act(t.dataset.a, { i: +t.dataset.i, j: t.dataset.j, to: t.dataset.to });
+});
+$('btn-lr-start').addEventListener('click', () => startGame($('lr-dread').checked));
+$('btn-lr-new').addEventListener('click', () => rematch());
+$('btn-lr-close').addEventListener('click', () => Hub.up('close'));
+
+Hub.init();
+render();
+})();
+</script>
+</body>
+</html>
