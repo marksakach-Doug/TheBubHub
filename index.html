@@ -95,8 +95,8 @@
     </header>
 
     <!-- Lobby UI -->
-    <div id="lobby-ui" class="flex flex-col md:flex-row gap-4 flex-none relative z-10">
-        <div class="bg-slate-800/90 backdrop-blur p-5 rounded-2xl border border-slate-700 flex-1 card-glow">
+    <div id="lobby-ui" class="grid grid-cols-1 md:grid-cols-2 gap-4 flex-none relative z-10">
+        <div class="bg-slate-800/90 backdrop-blur p-5 rounded-2xl border border-slate-700 card-glow">
             <h2 class="text-lg font-bold text-white mb-1">Host a Room</h2>
             <p class="text-slate-400 text-xs mb-3">Create a new room and share the ID.</p>
             <div class="flex gap-2">
@@ -107,7 +107,7 @@
             <p id="host-status" class="text-teal-300 text-xs mt-2 font-mono hidden"></p>
         </div>
 
-        <div class="bg-slate-800/90 backdrop-blur p-5 rounded-2xl border border-slate-700 flex-1 card-glow">
+        <div class="bg-slate-800/90 backdrop-blur p-5 rounded-2xl border border-slate-700 card-glow">
             <h2 class="text-lg font-bold text-white mb-1">Join a Room</h2>
             <p class="text-slate-400 text-xs mb-3">Got an invite? Paste the room ID here.</p>
             <div class="flex gap-2">
@@ -117,7 +117,7 @@
             <p id="join-status" class="text-blue-300 text-xs mt-2 font-mono hidden"></p>
         </div>
 
-        <div id="lobby-games-card" class="hidden bg-slate-800/90 backdrop-blur p-5 rounded-2xl border border-slate-700 flex-1 card-glow">
+        <div id="lobby-games-card" class="hidden md:col-span-2 bg-slate-800/90 backdrop-blur p-5 rounded-2xl border border-slate-700 card-glow">
             <h2 class="text-lg font-bold text-white mb-1">While you wait</h2>
             <p class="text-slate-400 text-xs mb-3">Solo games. No room needed.</p>
             <div id="lobby-game-buttons" class="flex flex-wrap gap-2"></div>
