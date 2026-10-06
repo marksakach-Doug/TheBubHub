@@ -1,0 +1,749 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Discover the Grammar — Layer 1 Multiplayer</title>
+<style>
+:root{--bg:#f3f0e8;--panel:#fffdf7;--ink:#25231f;--muted:#706b62;--line:#d8d1c3;--accent:#2d5b83;--good:#2f7d4a;--bad:#9a3e3e;--gold:#b3872f;--sel1:#3b82f6;}
+*{box-sizing:border-box} body{margin:0;background:var(--bg);color:var(--ink);font:15px/1.45 system-ui,-apple-system,BlinkMacSystemFont,"Segoe UI",sans-serif;overflow-x:hidden}
+button,select,input{font:inherit} button{cursor:pointer;border:1px solid #aaa18f;background:#fff;border-radius:7px;padding:8px 12px;transition:.1s}button.primary{background:var(--accent);color:#fff;border-color:var(--accent)}button:disabled{opacity:.45;cursor:not-allowed}button:active{transform:scale(.98)}
+header{background:#24231f;color:#fff;padding:18px 24px;display:flex;justify-content:space-between;align-items:center;gap:16px;flex-wrap:wrap}
+h1{margin:0;font:700 24px Georgia,serif} header small{color:#d6d1c7}
+main{max-width:1400px;margin:20px auto;padding:0 16px}
+.grid{display:grid;grid-template-columns:1.5fr 1fr;gap:16px}
+.panel{background:var(--panel);border:1px solid var(--line);border-radius:12px;padding:16px;box-shadow:0 2px 7px #00000009}h2,h3{margin:0 0 10px;font-family:Georgia,serif}.sub{color:var(--muted);font-size:13px}.hidden{display:none!important}
+.row{display:flex;gap:10px;align-items:center;flex-wrap:wrap}.stack>*+*{margin-top:9px}
+.badge{display:inline-block;border:1px solid var(--line);border-radius:999px;padding:3px 8px;font-size:12px;background:#faf8f1;color:var(--ink)}.badge.blue{border-color:#9fb6ca;background:#edf4f9}.badge.gold{border-color:#d6bb73;background:#fbf5df}
+.card{width:76px;height:108px;background:#fff;border:1px solid #9d978b;border-radius:6px;box-shadow:0 3px 5px #0002;display:flex;flex-direction:column;justify-content:space-between;padding:6px;font-family:Georgia,serif;font-weight:bold;user-select:none;flex-shrink:0}
+.card.red{color:#b4232b}.card.black{color:#222}.card .center{font-size:30px;text-align:center;line-height:1}
+.setup{max-width:720px;margin:40px auto}
+.sentence-scroll{overflow-x:auto;padding-bottom:12px;margin-top:16px}
+.sentence{display:flex;gap:12px;width:max-content;align-items:center}
+.slot{width:104px;min-height:150px;padding-top:24px;border:2px dashed #c6beae;border-radius:10px;display:flex;align-items:center;justify-content:center;position:relative;background:#faf8f0;flex-shrink:0}
+.slot.solved{border-style:solid;border-color:#9fbba4;background:#f4faf5}
+.slot .num{position:absolute;top:8px;left:8px;color:#8a8378;font-size:12px;line-height:1;font-weight:bold}
+.table-responsive{overflow-x:auto;-webkit-overflow-scrolling:touch;width:100%}
+.evidence-table{width:100%;text-align:left;border-collapse:collapse;font-size:14px;margin-top:12px;min-width:300px;white-space:nowrap}
+.evidence-table th{font-weight:normal;color:var(--muted);border-bottom:1px solid var(--line);padding:6px}
+.evidence-table td{padding:8px 6px;border-bottom:1px solid #eae5d9}
+.evidence-table .match{color:var(--good);font-weight:bold}.evidence-table .no-match{color:var(--bad);font-weight:bold}
+.test-clause-group{margin-bottom:12px;border-left:3px solid var(--accent);padding:10px 10px 10px 12px;background:#f9f8f4;border-radius:0 8px 8px 0}
+.controls{background:#f0ece2;border:1px solid var(--line);border-radius:9px;padding:12px}.controls label{font-size:12px;color:var(--muted);display:block;margin-bottom:3px}.controls select{width:100%;padding:7px;border:1px solid #bbb2a2;border-radius:6px;background:#fff}.control-grid{display:grid;grid-template-columns:1fr 1fr;gap:12px}
+.good{color:var(--good)}.bad{color:var(--bad)}.danger-text{color:#b4232b;font-weight:bold;font-size:15px}
+.proposal-log-item{background:#fff;border:1px solid var(--line);border-radius:6px;padding:10px;margin-bottom:8px;font-size:13px}
+.chip-group{display:flex;flex-wrap:wrap;gap:6px;margin-top:8px}
+.chip{background:#fff;border:1px solid #c4bcae;border-radius:999px;padding:6px 12px;font-size:11.5px;cursor:pointer;color:var(--ink);user-select:none;transition:.1s;box-shadow:0 1px 2px #0000000a}
+.chip.proposed{background:#edf4f9;border:2px solid var(--sel1);padding:5px 11px;font-weight:bold;color:#1e4566;transform:scale(1.02)}
+.chip.eliminated{opacity:.4;text-decoration:line-through;background:#eae5d9;border-color:#d1c8b8;transform:scale(.98)}
+.chip.locked{cursor:default}
+@keyframes flashMatch{0%{background-color:#e5f5ea;box-shadow:0 0 15px rgba(47,125,74,.3);transform:scale(1.01)}100%{background-color:transparent;box-shadow:none;transform:scale(1)}}
+.flash-match{animation:flashMatch 1.2s ease-out;border-radius:12px}
+@keyframes pop{0%{transform:scale(.95);opacity:.5}50%{transform:scale(1.02)}100%{transform:scale(1);opacity:1}}
+.pop-anim{animation:pop .3s ease-out}
+/* multiplayer additions */
+.seats{display:flex;gap:8px;flex-wrap:wrap;margin-top:10px}
+.seat{border:2px solid var(--line);border-radius:10px;padding:8px 12px;background:#faf8f1;font-size:13px;min-width:130px}
+.seat .nm{font-weight:bold}
+.seat .role{display:inline-block;margin-top:4px;font-size:11px;font-weight:bold;border-radius:999px;padding:2px 8px;background:#e8e3d5;color:#5b564c}
+.seat.analyst{border-color:var(--gold);background:#fbf5df}
+.seat.analyst .role{background:var(--gold);color:#fff}
+.seat.turn{border-color:var(--sel1);box-shadow:0 0 0 2px #3b82f644}
+.seat .lives{color:var(--bad);font-size:12px;letter-spacing:1px}
+.vote-row{display:flex;gap:8px;align-items:center;flex-wrap:wrap;border:1px solid var(--line);border-radius:8px;padding:8px;margin-top:8px;background:#fff}
+#toast{position:fixed;left:50%;bottom:18px;transform:translateX(-50%);background:#24231f;color:#fff;padding:10px 18px;border-radius:10px;font-size:14px;display:none;z-index:99;max-width:90%}
+#toast.show{display:block}
+.turn-banner{background:#edf4f9;border:1px solid #9fb6ca;border-radius:8px;padding:8px 12px;font-size:14px;margin-top:12px}
+@media(max-width:850px){.grid{display:flex!important;flex-direction:column!important;gap:16px}.grid>aside{order:-1}.control-grid{grid-template-columns:1fr}}
+@media(max-width:600px){
+  body{font-size:14px}header{padding:10px 12px}h1{font-size:19px}main{margin:8px auto;padding:0 8px}.panel{padding:10px}
+  .card{width:48px;height:68px;padding:4px;font-size:11px}.card .center{font-size:20px}
+  .slot{width:68px;min-height:98px;padding-top:18px}.slot .num{top:6px;left:5px;font-size:10px}
+  .sentence{gap:6px}.sentence .card{width:48px;height:68px;padding:4px;font-size:11px}.sentence .card .center{font-size:20px}
+  .chip-group{display:grid;grid-template-columns:1fr 1fr;gap:6px}.chip{font-size:11px;padding:9px 7px;min-height:42px}
+  .setup{margin:12px auto}
+}
+</style>
+</head>
+<body>
+<header>
+  <div><h1>Discover the Grammar</h1><small>Layer 1: The Base Game — multiplayer (2–4)</small></div>
+  <div class="row"><span id="roundBadge" class="badge gold">Setup</span><span id="livesBadge" class="badge hidden"></span></div>
+</header>
+<main>
+  <div id="standalone-note" class="panel hidden" style="max-width:720px;margin:20px auto">Open this file inside <b>Bub Hub</b> (<i>index.html</i>) — it needs the hub bridge for rooms and multiplayer.</div>
+
+  <section id="setup" class="panel setup hidden">
+    <div id="hostSetup">
+      <h2>Start a game</h2>
+      <div class="controls" style="margin-bottom:20px">
+        <b>Layer 1 Principles: The Foundation</b>
+        <div class="sub" style="margin-top:6px;line-height:1.6">
+          1. A sentence consists of exactly <b>3 positions</b>.<br>
+          2. Position 1 is locked. The table experiments by placing cards in Positions 2 and 3.<br>
+          3. The Knower (computer) generates a grammar from <b>Features</b> (Suit, Parity, Size) and <b>Rules</b> (e.g. “Pos 1 &amp; 3 Match”).<br>
+          4. Players take turns asking the Knower. The <b>Analyst</b> proposes the grammar; <b>all Verifiers must approve</b> before it is graded.<br>
+          5. A failed round costs everyone a life. Three lives for the table — use them well.
+        </div>
+      </div>
+      <div class="stack">
+        <label style="margin-top:10px">Complexity Level</label>
+        <select id="startLevel">
+          <option value="1">Level 1 — 1 Active Feature</option>
+          <option value="2">Level 2 — 2 Active Features</option>
+          <option value="3">Level 3 — 3 Active Features</option>
+        </select>
+        <label class="row" style="gap:8px;margin-top:10px"><input type="checkbox" id="announceSetup" checked>
+          <span><b>Announce active features</b> <span class="sub">— Uncheck to guess what is active yourselves.</span></span></label>
+        <div id="setup-note" class="sub"></div>
+        <button class="primary" style="margin-top:16px;width:100%;padding:16px;font-size:20px;font-weight:bold" onclick="uiStartGame()">Start Game</button>
+      </div>
+    </div>
+    <div id="guestSetup" class="hidden"><h2>Waiting for the host…</h2><div class="sub">The host will start a Layer 1 round. Seats are taken in roster order.</div></div>
+  </section>
+
+  <section id="table" class="hidden">
+    <div class="panel">
+      <div class="row" style="justify-content:space-between"><div><span class="badge blue">The Table</span></div><div id="phaseBadge" class="badge"></div></div>
+      <div id="pausedNote" class="sub hidden" style="margin-top:8px">The host has left — the table is paused. Ask the host to rejoin or start a new room.</div>
+      <div id="seats" class="seats"></div>
+      <div id="hostBar" class="row hidden" style="margin-top:10px"></div>
+    </div>
+
+    <div class="grid" style="margin-top:16px;grid-template-columns:1fr 380px">
+      <div>
+        <div class="panel">
+          <div class="row" style="justify-content:space-between"><div><span class="badge blue">The Sentence Board</span></div></div>
+          <div style="background:#fcfbf8;border:1px solid #e4dfd3;border-radius:8px;padding:10px 14px;font-size:12.5px;color:var(--muted);margin-top:14px">
+            <div style="font-weight:bold;color:var(--ink);margin-bottom:6px">📊 Quick Reference</div>
+            <div style="display:flex;flex-wrap:wrap;gap:16px">
+              <div style="flex:1;min-width:180px"><b style="color:var(--ink)">Rank Hierarchy:</b> A(1) &lt; 2-10 &lt; J(11) &lt; Q(12) &lt; K(13)<br><span style="color:#8a4f4f"><i>*Aces are strictly 1 (Not 14, Not a Face card).</i></span></div>
+              <div style="flex:1;min-width:120px"><b style="color:var(--ink)">Size:</b><br><b>Low:</b> A,2,3,4,5,6<br><b>High:</b> 7,8,9,10,J,Q,K</div>
+              <div style="flex:1;min-width:120px"><b style="color:var(--ink)">Parity:</b><br><b>Odd:</b> A,3,5,7,9,J,K<br><b>Even:</b> 2,4,6,8,10,Q</div>
+            </div>
+          </div>
+          <div id="announceLine" style="margin-top:12px"></div>
+          <div id="sentenceWrapper" class="sentence-scroll"><div id="sentence" class="sentence"></div></div>
+        </div>
+
+        <div class="panel" style="margin-top:16px" id="askPanel">
+          <div style="display:flex;justify-content:space-between;align-items:flex-end">
+            <h3>Design an Experiment</h3>
+            <div id="testBudgetLine" class="sub" style="margin-bottom:10px"></div>
+          </div>
+          <div id="turnBanner" class="turn-banner"></div>
+          <div id="askInputs"></div>
+          <button class="primary" id="askKnowerBtn" style="margin-top:12px;width:100%" onclick="uiAsk()">Ask Knower</button>
+        </div>
+
+        <div class="panel hidden" id="votePanel" style="margin-top:16px"></div>
+        <div class="panel hidden" id="verifyPanel" style="margin-top:16px"></div>
+        <div class="panel hidden" id="endPanel" style="margin-top:16px"></div>
+        <div class="panel" id="evidencePanel" style="margin-top:16px"></div>
+      </div>
+
+      <aside class="panel">
+        <div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:12px"><h3 style="margin:0">Deduction Board</h3></div>
+        <div class="sub" id="boardHint" style="margin-bottom:12px;line-height:1.5"></div>
+        <div id="proposalRows"></div>
+        <button class="primary" id="proposalSubmitBtn" style="margin-top:16px;width:100%;font-weight:bold;font-size:15px;padding:12px" onclick="uiSubmitProposal()">Submit Proposed Chips</button>
+        <div id="proposalFeedback" style="margin-top:12px"></div>
+        <div id="proposalHistory" style="margin-top:12px;display:flex;flex-direction:column;gap:6px"></div>
+      </aside>
+    </div>
+  </section>
+</main>
+<div id="toast"></div>
+<div id="err" class="hidden" style="color:#b4232b;padding:10px"></div>
+
+<script>
+(function(){
+'use strict';
+/* ================= bridge to the hub ================= */
+const GAME_ID = 'grammar';
+const $ = (id) => document.getElementById(id);
+const esc = (s) => String(s).replace(/[&<>"']/g, c => ({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;'}[c]));
+const Hub = {
+  me: null, roster: [], room: '',
+  up(k, p){ try { window.parent.postMessage({ t: 'gu', game: GAME_ID, k, p }, '*'); } catch(e) {} },
+  init(){
+    window.addEventListener('message', onDown);
+    this.up('hello');
+    setTimeout(() => {
+      if (!Hub.me){ $('standalone-note').classList.remove('hidden'); $('setup').classList.add('hidden'); reportHeight(); }
+    }, 1500);
+  }
+};
+let heightT = null;
+function reportHeight(){
+  clearTimeout(heightT);
+  heightT = setTimeout(() => {
+    const h = Math.max(document.body.scrollHeight, document.documentElement.scrollHeight);
+    Hub.up('height', h);
+  }, 60);
+}
+window.addEventListener('resize', reportHeight);
+window.addEventListener('error', (e) => {
+  try { const el = $('err'); if (el){ el.textContent = 'Error: ' + (e.message || 'script error') + ' — reload (Ctrl+Shift+R).'; el.classList.remove('hidden'); } } catch(err) {}
+});
+function onDown(e){
+  const m = e.data;
+  if (!m || m.t !== 'gd' || m.game !== GAME_ID) return;
+  if (m.k === 'roster'){ Hub.me = m.p.you; Hub.roster = m.p.roster; Hub.room = m.p.room; onRoster(); return; }
+  if (m.k === 'state'){ onState(m.p); return; }
+  if (m.k === 'intent'){ onIntent(m.p, m.from); return; }
+  if (m.k === 'denied'){ toast(m.p.text); return; }
+  if (m.k === 'reset'){ S = null; sel = {}; render(); return; }
+}
+const myId = () => Hub.me && Hub.me.id;
+const myName = () => (Hub.me && Hub.me.name) || 'Player';
+const isHost = () => !!(Hub.me && Hub.me.isHost);
+const rosterHasHost = () => Hub.roster.some(m => m.host);
+const paused = () => !!S && !isHost() && !rosterHasHost();
+function toast(t){ const el = $('toast'); el.textContent = t; el.classList.add('show'); clearTimeout(el._t); el._t = setTimeout(() => el.classList.remove('show'), 3200); }
+function say(text){ Hub.up('say', text); }
+
+/* ================= shared grammar logic (Layer 1 & 2) ================= */
+const SUITS = ['♠','♥','♦','♣'];
+const RANKS = ['A','2','3','4','5','6','7','8','9','10','J','Q','K'];
+function getRankVal(rank){ if(rank==='A')return 1; if(rank==='J')return 11; if(rank==='Q')return 12; if(rank==='K')return 13; return parseInt(rank); }
+function getParity(card){ return (getRankVal(card.rank)%2===0)?'even':'odd'; }
+function getSize(card){ return (getRankVal(card.rank)>=7)?'high':'low'; }
+function mulberry32(seed){let a=seed>>>0;return()=>{a|=0;a=(a+0x6D2B79F5)|0;let t=Math.imul(a^(a>>>15),1|a);t=(t+Math.imul(t^(t>>>7),61|t))^t;return((t^(t>>>14))>>>0)/4294967296}}
+function shuffle(arr,rng){const a=arr.slice();for(let i=a.length-1;i>0;i--){const j=Math.floor(rng()*(i+1));[a[i],a[j]]=[a[j],a[i]]}return a}
+function pick(a,rng){return a[Math.floor(rng()*a.length)]}
+function cardHtml(c){let red=['♥','♦'].includes(c.suit);return `<div class="card ${red?'red':'black'}"><div>${esc(c.rank)}</div><div class="center">${esc(c.suit)}</div><div style="text-align:right">${esc(c.rank)}</div></div>`}
+function cardSpan(c){let red=['♥','♦'].includes(c.suit);return `<span style="color:${red?'#b4232b':'#222'};font-weight:bold;font-size:16px">${esc(c.rank)}${esc(c.suit)}</span>`}
+const rankOpts = `<option value="">--</option>` + RANKS.map(r=>`<option value="${r}">${r}</option>`).join('');
+const suitOpts = `<option value="">--</option>` + SUITS.map(s=>`<option value="${s}">${s}</option>`).join('');
+
+const L12_FEATURES = ['suit','parity','size'];
+const L12_FEATURE_LABEL = {suit:'Suit',parity:'Parity',size:'Size (High/Low)'};
+const L12_RULE_LABEL = {'13':'Pos 1 & 3 Match','12':'Pos 1 & 2 Match','23':'Pos 2 & 3 Match','all-match':'All 3 Match','all-differ':'All 3 Differ','exactly-two':'Exactly 2 Match'};
+function l12_featureValue(f,c){if(f==='suit')return c.suit;if(f==='parity')return getParity(c);if(f==='size')return getSize(c);throw Error('feature')}
+function l12_domainValues(f){if(f==='suit')return SUITS.slice();if(f==='parity')return ['odd','even'];if(f==='size')return ['high','low'];throw Error('feature')}
+function l12_validRulesFor(f){const a=['13','12','23','all-match','exactly-two'];if(l12_domainValues(f).length>=3)a.push('all-differ');return a}
+function l12_cardKey(c){return c.rank+c.suit}
+function l12_pickFeatureSet(pool,count,rng){return shuffle(pool,rng).slice(0,count);}
+function l12_isGrammarBeautiful(active, rules){
+  let allMatchCount = active.filter(f => rules[f]==='all-match').length;
+  return !(active.length>1 && allMatchCount===active.length);
+}
+function l12_pickRulesForFeatures(features, rng){
+  const rules = {};
+  for(let attempts=0; attempts<500; attempts++){
+    for(const f of features) rules[f]=pick(l12_validRulesFor(f),rng);
+    if(l12_isGrammarBeautiful(features,rules)) return rules;
+  }
+  throw Error('Failed to generate robust grammar. Try reloading.');
+}
+function l12_checkRuleValues(r,a,b,c){const e=(x,y)=>x===y;switch(r){case'13':return e(a,c);case'12':return e(a,b);case'23':return e(b,c);case'all-match':return e(a,b)&&e(b,c);case'all-differ':return a!==b&&b!==c&&a!==c;case'exactly-two':return[e(a,b),e(a,c),e(b,c)].filter(Boolean).length===1}}
+function l12_isConsistent(cards, activeFeatures, rules){
+  for(const f of activeFeatures){
+    if(!l12_checkRuleValues(rules[f], l12_featureValue(f,cards[1]), l12_featureValue(f,cards[2]), l12_featureValue(f,cards[3]))) return false;
+  }
+  return true;
+}
+function cardsAreUnique(cards){ const keys=cards.filter(Boolean).map(l12_cardKey); return new Set(keys).size===keys.length; }
+function generateSeed(active, rules, rng){
+  for(let attempt=0; attempt<2000; attempt++){
+    let cards={};
+    cards[1]={rank:pick(RANKS,rng),suit:pick(SUITS,rng)};
+    for(let a=0;a<100;a++){
+      let c2={rank:pick(RANKS,rng),suit:pick(SUITS,rng)};
+      let c3={rank:pick(RANKS,rng),suit:pick(SUITS,rng)};
+      if(l12_isConsistent({1:cards[1],2:c2,3:c3},active,rules)){
+        cards[2]=c2; cards[3]=c3;
+        let keys=Object.values(cards).map(l12_cardKey);
+        if(new Set(keys).size===keys.length) return cards;
+      }
+    }
+  }
+  throw Error('Failed to generate valid base game');
+}
+
+/* ================= multiplayer Layer 1 engine (host authoritative) ================= */
+let S = null;      // shared snapshot (host holds full truth incl. grammar + full seed)
+let sel = {};      // local chip selections, analyst only: {feature: rule|'not-active'}
+let askKey = '', chipKey = '', myPick = null;
+let remembered = { level: 1, announced: true };
+
+const amSeated = () => !!(S && myId() && S.seats.some(s=>s.id===myId()));
+const analyst = () => (S && S.seats[S.analystIdx]) || null;
+const iAmAnalyst = () => !!(S && analyst() && analyst().id===myId());
+const turnSeat = () => (S && S.seats[S.turnIndex]) || null;
+const iAmTurn = () => !!(S && turnSeat() && turnSeat().id===myId());
+const iAmVerifier = () => !!(S && amSeated() && !iAmAnalyst());
+const testLimit = () => (S.cfg.level===1 ? 10 : 15);
+const grammarText = (g) => L12_FEATURES.map(f => {
+  const r = g.active.includes(f) ? L12_RULE_LABEL[g.rules[f]] : 'Not Active';
+  return `<b>${L12_FEATURE_LABEL[f]}</b>: ${esc(r)}`;
+}).join('<br>');
+
+/* ---- host: setup ---- */
+function seatFromRoster(){
+  const ps = [{id:myId(),name:myName()}].concat(Hub.roster.filter(m=>m.id!==myId()).map(m=>({id:m.id,name:m.name})));
+  return ps.map(p=>({id:p.id,name:p.name,lives:3}));
+}
+function startGame(level, announced){
+  if(!isHost()) return;
+  const seats = seatFromRoster();
+  if(seats.length<2 || seats.length>4){ $('setup-note').textContent = `Need 2–4 players in the room (have ${seats.length}).`; return; }
+  remembered = { level, announced };
+  S = {cfg:{level,announced},round:1,phase:'play',seats,turnIndex:0,analystIdx:0};
+  Object.assign(S, newRoundState());
+  S.phase = 'play';
+  sel = {}; myPick = null;
+  say(`Discover the Grammar begins — ${seats.length} players, Level ${level}. ${analyst().name} is the first Analyst.`);
+  broadcast(); Hub.up('invite');
+}
+// Per-round Knower state (grammar + seed are host-only until revealed):
+function newRoundState(){
+  const rng = mulberry32((Date.now()^Math.floor(Math.random()*1e9))>>>0);
+  const active = l12_pickFeatureSet(L12_FEATURES.slice(), S.cfg.level, rng);
+  const rules = l12_pickRulesForFeatures(active, rng);
+  return {
+    grammar:{active,rules}, seed:generateSeed(active,rules,rng), revealed2:null,
+    evidence:[], testsUsed:0, proposalsUsed:0, pending:null, history:[], feedback:null,
+    boardLocked:false, verifyReq:null, picks:{}, pickOrder:[], votes:{}, verifyResult:null, over:null
+  };
+}
+function nextRound(){
+  if(!isHost() || !S) return;
+  if(S.phase!=='roundover' && S.phase!=='verifydone') return;
+  const n = S.seats.length;
+  S.round++;
+  S.analystIdx = (S.analystIdx+1)%n;
+  S.turnIndex = S.analystIdx;
+  Object.assign(S, newRoundState());
+  S.phase = 'play';
+  sel = {}; myPick = null;
+  say(`Round ${S.round} — ${analyst().name} is the Analyst.`);
+  broadcast();
+}
+
+/* ---- transport ---- */
+function redact(st){
+  const pub = JSON.parse(JSON.stringify(st));
+  if(pub.phase!=='roundover' && pub.phase!=='gameover'){
+    delete pub.grammar;
+    pub.seed = {1: pub.seed[1]};
+    if(pub.revealed2) pub.seed[2] = pub.revealed2;
+    pub.announce = st.cfg.announced ? st.grammar.active.slice() : null;
+    pub.announceCount = st.grammar.active.length;
+  } else {
+    pub.announce = st.grammar.active.slice();
+    pub.announceCount = st.grammar.active.length;
+  }
+  return pub;
+}
+function broadcast(){ render(); if(!S || !isHost()) return; Hub.up('state', redact(S)); }
+function deny(to, text){ Hub.up('denied', {to, text}); }
+function onState(state){ if(!state || isHost()) return; S = state; render(); }
+function onIntent(d, from){ if(!isHost() || !d) return; const err = handle(d, from); if(err) deny(from.id, err); else broadcast(); }
+function act(move){
+  if(isHost()){ const err = handle(move, {id:myId(),name:myName()}); if(err) toast(err); else broadcast(); }
+  else Hub.up('intent', move);
+}
+
+/* ---- host: intent handlers (pure validation → mutate; return err or null) ---- */
+function handle(d, from){
+  if(!S) return 'No active game.';
+  if(S.phase==='gameover') return 'The game is over.';
+  const seat = S.seats.find(s=>s.id===from.id);
+  if(!seat) return 'You are not seated in this game.';
+  if(paused()) return 'The table is paused (host left).';
+  switch(d.action){
+    case 'ask': return hAsk(d,from,seat);
+    case 'propose': return hPropose(d,from,seat);
+    case 'vote': return hVote(d,from,seat);
+    case 'pick': return hPick(d,from,seat);
+    case 'vvote': return hVVote(d,from,seat);
+    default: return 'Unknown action.';
+  }
+}
+function validCard(c){ return c && RANKS.includes(c.rank) && SUITS.includes(c.suit); }
+function hAsk(d, from, seat){
+  if(S.phase!=='play') return 'Not asking time right now.';
+  if(!turnSeat() || turnSeat().id!==from.id) return `It is ${turnSeat()?turnSeat().name:'?' }'s turn to ask.`;
+  if(S.testsUsed>=testLimit()) return 'No tests remaining.';
+  const c2=d.c2, c3=d.c3;
+  if(!validCard(c2)||!validCard(c3)) return 'Pick a rank and suit for both Position 2 and 3.';
+  if(!cardsAreUnique([S.seed[1],c2,c3])) return 'Those cards repeat a physical card already in the sentence — choose three distinct cards.';
+  const match = l12_isConsistent({1:S.seed[1],2:c2,3:c3}, S.grammar.active, S.grammar.rules);
+  S.evidence.push({cards:{1:S.seed[1],2:c2,3:c3},match});
+  S.testsUsed++;
+  S.turnIndex = (S.turnIndex+1)%S.seats.length;
+  say(`${from.name} asks the Knower — ${match?'MATCH':'NO'}. ${turnSeat().name}'s turn.`);
+  return null;
+}
+function hPropose(d, from){
+  if(S.phase!=='play') return 'Proposals are closed right now.';
+  if(!analyst() || analyst().id!==from.id) return `Only the Analyst (${analyst()?analyst().name:'?'}) can propose.`;
+  if(S.proposalsUsed>=3) return 'No proposal attempts remaining.';
+  if(!Array.isArray(d.rows)||d.rows.length!==3) return "Propose a rule (or 'Not Active') for every feature row.";
+  for(const r of d.rows){
+    if(!L12_FEATURES.includes(r.feature)) return 'Bad proposal row.';
+    if(r.rule!=='not-active' && !l12_validRulesFor(r.feature).includes(r.rule)) return 'Bad rule in proposal.';
+  }
+  if(new Set(d.rows.map(r=>r.feature)).size!==3) return "Propose exactly one rule per feature.";
+  S.pending = {rows:d.rows.map(r=>({feature:r.feature,rule:r.rule})), votes:{}};
+  S.phase = 'voting';
+  say(`${from.name} (Analyst) proposes — Verifiers, approve or reject.`);
+  return null;
+}
+function verifiers(){ return S.seats.filter(s=>s.id!==(analyst()&&analyst().id)); }
+function hVote(d, from){
+  if(S.phase!=='voting' || !S.pending) return 'No proposal on the table.';
+  if(!verifiers().some(s=>s.id===from.id)) return 'Only Verifiers vote (the Analyst cannot vote).';
+  if(d.v!=='yes' && d.v!=='no') return 'Bad vote.';
+  S.pending.votes[from.id]=d.v;
+  if(d.v==='no'){
+    S.pending=null; S.phase='play';
+    S.feedback={kind:'rejected', by:from.name};
+    say(`${from.name} rejects the proposal — no attempt burned. The Analyst may tweak and resubmit.`);
+    return null;
+  }
+  if(verifiers().every(s=>S.pending.votes[s.id]==='yes')) gradeProposal();
+  return null;
+}
+function gradeProposal(){
+  const rows = S.pending.rows;
+  S.proposalsUsed++;
+  let correctCount=0;
+  const results = rows.map(ans=>{
+    let ok=false;
+    if(ans.rule==='not-active') ok=!S.grammar.active.includes(ans.feature);
+    else ok=S.grammar.active.includes(ans.feature)&&S.grammar.rules[ans.feature]===ans.rule;
+    if(ok) correctCount++;
+    return {feature:ans.feature,rule:ans.rule,ok};
+  });
+  const solved = correctCount===3;
+  const title = solved?'Grammar Solved!':(correctCount>0?'Partial Match':'Incorrect Hypothesis');
+  S.history.unshift({attempt:S.proposalsUsed,title,results});
+  S.pending=null;
+  if(solved){
+    S.boardLocked=true; S.revealed2=S.seed[2];
+    const a=S.grammar.active;
+    let req={rank:a.includes('size')||a.includes('parity'), suit:a.includes('suit')};
+    if(!req.rank&&!req.suit){req={rank:true,suit:true};}
+    S.verifyReq=req; S.picks={}; S.pickOrder=[]; S.votes={}; S.verifyResult=null;
+    S.phase='predict';
+    S.feedback={kind:'solved'};
+    say(`Unanimous! The grammar is solved — ${correctCount}/3 rows. Everyone predicts Position 3.`);
+  } else if(S.proposalsUsed>=3){
+    loseRound();
+  } else {
+    S.phase='play';
+    S.feedback={kind:'partial',correct:correctCount};
+    say(`Graded: ${correctCount} of 3 rows correct. ${3-S.proposalsUsed} attempt(s) left.`);
+  }
+}
+function loseRound(){
+  S.seats.forEach(s=>{s.lives--;});
+  S.revealed2 = S.seed[2]; // reveal the sentence with the grammar
+  const dead = S.seats.some(s=>s.lives<=0);
+  S.phase = dead?'gameover':'roundover';
+  S.over = {win:false, grammar:S.grammar, seed:S.seed, dead};
+  S.feedback = {kind: dead?'gameover':'roundlost'};
+  say(dead
+    ? `GAME OVER — the table is out of lives. The grammar was: ${plainGrammar(S.grammar)}.`
+    : `Round ${S.round} lost — everyone loses a life. The grammar was: ${plainGrammar(S.grammar)}.`);
+}
+function plainGrammar(g){
+  return L12_FEATURES.map(f=>`${L12_FEATURE_LABEL[f]}: ${g.active.includes(f)?L12_RULE_LABEL[g.rules[f]]:'Not Active'}`).join('; ');
+}
+function hPick(d, from){
+  if(S.phase!=='predict') return 'Not prediction time right now.';
+  if(!S.verifyReq) return 'Verification is not ready.';
+  const pk={};
+  if(S.verifyReq.rank){ if(!RANKS.includes(d.rank)) return 'Pick a rank for Position 3.'; pk.rank=d.rank; }
+  else pk.rank=S.seed[3].rank;
+  if(S.verifyReq.suit){ if(!SUITS.includes(d.suit)) return 'Pick a suit for Position 3.'; pk.suit=d.suit; }
+  else pk.suit=S.seed[3].suit;
+  if(!S.pickOrder.includes(from.id)) S.pickOrder.push(from.id);
+  S.picks[from.id]=pk;
+  if(S.pickOrder.length>=S.seats.length){ S.phase='verifyvote'; say('All predictions are locked — vote for the one to stand behind.'); }
+  return null;
+}
+function hVVote(d, from){
+  if(S.phase!=='verifyvote') return 'Not voting time right now.';
+  if(!S.picks[d.for]) return 'That prediction is not on the table.';
+  S.votes[from.id]=d.for;
+  if(Object.keys(S.votes).length>=S.seats.length){
+    const tally={};
+    S.seats.forEach(s=>{ const t=S.votes[s.id]; if(t) tally[t]=(tally[t]||0)+1; });
+    let chosen=S.pickOrder[0], best=-1;
+    S.pickOrder.forEach(pid=>{ const v=tally[pid]||0; if(v>best){best=v;chosen=pid;} });
+    const pass=l12_isConsistent({1:S.seed[1],2:S.seed[2],3:S.picks[chosen]}, S.grammar.active, S.grammar.rules);
+    S.phase='verifydone';
+    S.verifyResult={pass,chosenBy:chosen,chosen:S.picks[chosen]};
+    say(pass?`Verified! The table's prediction satisfies the grammar.`:`Failed — the table's prediction violates the grammar.`);
+  }
+  return null;
+}
+
+/* ---- host: roster changes ---- */
+function onRoster(){
+  if(isHost() && S && S.phase!=='gameover'){
+    const have = new Set(Hub.roster.map(m=>m.id).concat([myId()]));
+    let changed=false;
+    // add newcomers
+    const minLives = Math.min(...S.seats.map(s=>s.lives));
+    Hub.roster.forEach(m=>{
+      if(!S.seats.some(s=>s.id===m.id)){ S.seats.push({id:m.id,name:m.name,lives:minLives}); changed=true; say(`${m.name} joins the table (waits for the next round to act).`); }
+    });
+    // remove leavers
+    const before=S.seats.length;
+    S.seats=S.seats.filter(s=>have.has(s.id));
+    if(S.seats.length!==before) changed=true;
+    if(!S.seats.length){ S=null; broadcast(); return; }
+    S.analystIdx%=S.seats.length; S.turnIndex%=S.seats.length;
+    if(S.pending){ S.pending=null; if(S.phase==='voting'){S.phase='play';S.feedback={kind:'rejected',by:'a departure'};} }
+    S.pickOrder=S.pickOrder.filter(id=>S.seats.some(s=>s.id===id));
+    Object.keys(S.picks).forEach(id=>{ if(!S.seats.some(s=>s.id===id)) delete S.picks[id]; });
+    Object.keys(S.votes).forEach(id=>{ if(!S.seats.some(s=>s.id===id)) delete S.votes[id]; });
+    if(S.phase==='predict' && S.pickOrder.length>=S.seats.length){ S.phase='verifyvote'; }
+    if(S.phase==='verifyvote' && Object.keys(S.votes).length>=S.seats.length){
+      const t={}; S.seats.forEach(s=>{const v=S.votes[s.id]; if(v)t[v]=(t[v]||0)+1;});
+      let chosen=S.pickOrder[0],best=-1; S.pickOrder.forEach(pid=>{const v=t[pid]||0;if(v>best){best=v;chosen=pid;}});
+      S.phase='verifydone';
+      S.verifyResult={pass:l12_isConsistent({1:S.seed[1],2:S.seed[2],3:S.picks[chosen]},S.grammar.active,S.grammar.rules),chosenBy:chosen,chosen:S.picks[chosen]};
+    }
+    if(changed) broadcast(); else render();
+  } else render();
+}
+
+/* ================= rendering ================= */
+function renderBoard(){
+  const c1=S.seed[1];
+  const show2=!!S.revealed2; // seed[2] stays hidden from everyone until the solve/reveal
+  let html='';
+  html+=`<div class="slot solved"><span class="num">Pos 1</span>${cardHtml(c1)}</div>`;
+  html+= show2
+    ? `<div class="slot solved"><span class="num">Pos 2</span>${cardHtml(S.revealed2)}</div>`
+    : `<div class="slot"><span class="num">Pos 2</span><span class="sub" style="font-size:11px">empty</span></div>`;
+  html+=`<div class="slot"><span class="num">Pos 3</span><span class="sub" style="font-size:11px">empty</span></div>`;
+  $('sentence').innerHTML=html;
+}
+function renderAnnounce(){
+  // Host holds S.grammar; guests get S.announce / S.announceCount via redact().
+  const list = S.grammar ? S.grammar.active : S.announce;
+  const count = S.grammar ? S.grammar.active.length : S.announceCount;
+  if(S.cfg.announced && list) $('announceLine').innerHTML=`<div class="sub">Active features announced:</div><div style="padding:8px;font-size:14px">${list.map(f=>esc(L12_FEATURE_LABEL[f])).join(' & ')}</div>`;
+  else $('announceLine').innerHTML=`<div class="sub" style="background:#fff9eb;padding:8px;border-radius:6px;border:1px solid #f2e3be"><b>Advanced Play.</b> ${count} active feature${count===1?'':'s'} to find.</div>`;
+}
+function renderSeats(){
+  $('seats').innerHTML=S.seats.map((s,i)=>{
+    const cls=['seat']; if(analyst()&&analyst().id===s.id)cls.push('analyst'); if(turnSeat()&&turnSeat().id===s.id&&S.phase==='play')cls.push('turn');
+    const role=analyst()&&analyst().id===s.id?'ANALYST':(s.id===myId()?'VERIFIER (you)':'VERIFIER');
+    const you=s.id===myId()?' • you':'';
+    return `<div class="${cls.join(' ')}"><div class="nm">${esc(s.name)}${you}</div><div class="lives">${'♥'.repeat(Math.max(0,s.lives))||'—'}</div><span class="role">${role}</span></div>`;
+  }).join('');
+}
+function renderAsk(){
+  const key=S.round+'|'+S.turnIndex+'|'+S.testsUsed+'|'+S.phase;
+  const canAsk=S.phase==='play'&&!S.boardLocked&&iAmTurn()&&S.testsUsed<testLimit()&&!paused();
+  if(key!==askKey){
+    askKey=key;
+    $('askInputs').innerHTML = S.phase==='play' ? `<div class="test-clause-group">
+      <div style="font-weight:bold;margin-bottom:6px;color:var(--accent);font-size:14px">Test Candidates</div>
+      <div class="control-grid">
+        <div><label>Position 2</label><div style="display:flex;gap:4px"><select id="t2r">${rankOpts}</select><select id="t2s">${suitOpts}</select></div></div>
+        <div><label>Position 3</label><div style="display:flex;gap:4px"><select id="t3r">${rankOpts}</select><select id="t3s">${suitOpts}</select></div></div>
+      </div></div>` : '';
+  }
+  const t=turnSeat();
+  $('turnBanner').innerHTML = S.phase!=='play' ? 'Asking is closed for now.'
+    : (t ? (iAmTurn()?`<b>Your turn</b> — ask the Knower.`:`<b>${esc(t.name)}'s turn</b> to ask the Knower.`) : '');
+  const rem=Math.max(0,testLimit()-S.testsUsed);
+  $('testBudgetLine').innerHTML = rem<=2?`<span class="danger-text">${rem} TESTS REMAINING</span>`:`${rem} tests remaining`;
+  $('askKnowerBtn').disabled=!canAsk;
+}
+function renderEvidence(){
+  const box=$('evidencePanel');
+  if(!S.evidence.length){box.innerHTML='<h3>Evidence Archive</h3><div class="sub">Test results will appear here.</div>';return;}
+  let html='<h3>Evidence Archive</h3><div class="table-responsive"><table class="evidence-table"><tr><th>Pos 1</th><th>Pos 2</th><th>Pos 3</th><th>Result</th></tr>';
+  for(let i=S.evidence.length-1;i>=0;i--){
+    const e=S.evidence[i];
+    const res=e.match?'<span class="match">MATCH</span>':'<span class="no-match">NO</span>';
+    html+=`<tr><td>${cardSpan(e.cards[1])}</td><td>${cardSpan(e.cards[2])}</td><td>${cardSpan(e.cards[3])}</td><td>${res}</td></tr>`;
+  }
+  box.innerHTML=html+'</table></div>';
+}
+function renderChips(){
+  const key=S.round+'|'+S.phase+'|'+S.analystIdx+'|'+(S.pending?1:0)+'|'+S.history.length+'|'+S.proposalsUsed+'|'+(S.feedback?S.feedback.kind+ (S.feedback.correct||''):'');
+  const interactive=iAmAnalyst()&&S.phase==='play'&&!S.boardLocked&&!paused();
+  $('proposalSubmitBtn').disabled=!interactive;
+  const left=3-S.proposalsUsed;
+  $('boardHint').innerHTML = S.boardLocked ? 'The grammar is solved — deduction is locked.'
+    : (iAmAnalyst() ? `You are the <b>Analyst</b>. Tap to propose${S.phase==='play'?' (long-press / right-click to cross out)':''}.<br>You have <b style="font-size:15px">${left}</b> attempt(s) remaining. ${S.phase==='voting'?'Awaiting verifier verdicts…':''}`
+    : `The Analyst is <b>${analyst()?esc(analyst().name):'?'}</b>. Only they can move chips.<br><b style="font-size:15px">${left}</b> attempt(s) remaining.`);
+  if(key!==chipKey){
+    chipKey=key;
+    let propHtml='';
+    for(const f of L12_FEATURES){
+      const cur=sel[f];
+      let chipHtml=`<button class="chip${cur==='not-active'?' proposed':''}${interactive?'':' locked'}" data-feature="${f}" data-val="not-active">Not Active</button>`;
+      for(const r of l12_validRulesFor(f)){
+        chipHtml+=`<button class="chip${cur===r?' proposed':''}${interactive?'':' locked'}" data-feature="${f}" data-val="${r}">${esc(L12_RULE_LABEL[r])}</button>`;
+      }
+      propHtml+=`<div class="controls" style="margin-bottom:8px"><b>${esc(L12_FEATURE_LABEL[f])} Rule</b><div class="chip-group">${chipHtml}</div></div>`;
+    }
+    $('proposalRows').innerHTML=propHtml;
+    bindChips(interactive);
+  }
+  const fb=$('proposalFeedback');
+  if(!S.feedback){fb.innerHTML='';}
+  else if(S.feedback.kind==='partial') fb.innerHTML=`<div class="pop-anim" style="background:#fff9eb;padding:8px;border:1px solid #f2e3be;border-radius:6px;font-weight:bold;text-align:center">${S.feedback.correct} of 3 rows are correct.</div>`;
+  else if(S.feedback.kind==='solved') fb.innerHTML=`<div class="pop-anim" style="background:#f4faf5;padding:12px;border:1px solid var(--good);border-radius:6px;color:var(--good);font-weight:bold;font-size:16px;text-align:center">RULES DEDUCED!</div>`;
+  else if(S.feedback.kind==='rejected') fb.innerHTML=`<div class="pop-anim" style="background:#fff9eb;padding:8px;border:1px solid #f2e3be;border-radius:6px;text-align:center"><b>${esc(S.feedback.by)}</b> rejected the proposal — no attempt burned.</div>`;
+  $('proposalHistory').innerHTML=S.history.map(h=>{
+    const bg=h.title==='Grammar Solved!'?'#f4faf5':(h.title==='Partial Match'?'#fdfdf9':'#fff9eb');
+    const rows=h.results.map(r=>`<div>${esc(L12_FEATURE_LABEL[r.feature])} → ${esc(r.rule==='not-active'?'Not Active':L12_RULE_LABEL[r.rule])} [ ${r.ok?'<span class="good">✓</span>':'<span class="bad">✗</span>'} ]</div>`).join('');
+    return `<div class="proposal-log-item" style="background:${bg}"><div style="font-weight:bold;margin-bottom:4px;border-bottom:1px solid #eee;padding-bottom:4px">Attempt ${h.attempt}: ${esc(h.title)}</div>${rows}</div>`;
+  }).join('');
+}
+let chipPressTimer=null, chipLong=false;
+function bindChips(interactive){
+  document.querySelectorAll('#proposalRows .chip').forEach(btn=>{
+    if(!interactive) return;
+    const f=btn.dataset.feature, v=btn.dataset.val;
+    const clear=()=>{if(chipPressTimer){clearTimeout(chipPressTimer);chipPressTimer=null;}};
+    btn.addEventListener('pointerdown',()=>{chipLong=false;clear();chipPressTimer=setTimeout(()=>{chipLong=true;btn.classList.toggle('eliminated');if(btn.classList.contains('eliminated'))delete sel[f];if(navigator.vibrate)navigator.vibrate(20);},400);},{passive:true});
+    btn.addEventListener('pointerup',(e)=>{const w=chipLong;clear();if(!w){sel[f]=(sel[f]===v)?undefined:v;chipKey='';renderChips();}e.preventDefault();});
+    btn.addEventListener('pointercancel',clear,{passive:true});
+    btn.addEventListener('pointerleave',clear,{passive:true});
+    btn.addEventListener('contextmenu',(e)=>{e.preventDefault();btn.classList.toggle('eliminated');if(btn.classList.contains('eliminated'))delete sel[f];});
+  });
+}
+function renderVote(){
+  const p=$('votePanel');
+  if(S.phase!=='voting'||!S.pending){p.classList.add('hidden');p.innerHTML='';return;}
+  p.classList.remove('hidden');
+  const rows=S.pending.rows.map(r=>`<div>${esc(L12_FEATURE_LABEL[r.feature])} → <b>${esc(r.rule==='not-active'?'Not Active':L12_RULE_LABEL[r.rule])}</b></div>`).join('');
+  const vs=verifiers();
+  const got=vs.filter(s=>S.pending.votes[s.id]);
+  let action='';
+  if(iAmVerifier()&&!S.pending.votes[myId()]&&!paused()){
+    action=`<div class="row" style="margin-top:8px"><button class="primary" onclick="uiVote('yes')">Approve</button><button onclick="uiVote('no')">Reject</button></div>`;
+  } else if(iAmAnalyst()){
+    action=`<div class="sub" style="margin-top:8px">Awaiting verdicts: ${got.length}/${vs.length} in. Unanimous approval needed.</div>`;
+  } else {
+    action=`<div class="sub" style="margin-top:8px">${got.length}/${vs.length} verdicts in${S.pending.votes[myId()]?' (you voted)':''}.</div>`;
+  }
+  p.innerHTML=`<h3>Proposal on the table — unanimous approval needed</h3>${rows}${action}`;
+}
+function renderVerify(){
+  const p=$('verifyPanel');
+  if(!['predict','verifyvote','verifydone'].includes(S.phase)){p.classList.add('hidden');p.innerHTML='';return;}
+  p.classList.remove('hidden');
+  if(S.phase==='predict'){
+    const mine=S.picks[myId()];
+    if(mine){ p.innerHTML=`<h3>Verification — prediction locked</h3><div class="sub">${Object.keys(S.picks).length}/${S.seats.length} predictions in. Picks are revealed once everyone has locked theirs.</div>`; }
+    else {
+      const req=S.verifyReq||{rank:true,suit:true};
+      p.innerHTML=`<h3>Verification — predict Position 3</h3><p class="sub">Prove your understanding. Predict the hidden card in Position 3. <i>(Any exact card that fits the deduced rules.)</i></p>
+      <div class="test-clause-group"><div class="control-grid">
+      ${req.rank?`<div><label>Rank</label><select id="v3r">${rankOpts}</select></div>`:''}
+      ${req.suit?`<div><label>Suit</label><select id="v3s">${suitOpts}</select></div>`:''}
+      </div></div>
+      <button class="primary" style="margin-top:8px" onclick="uiPick()" ${paused()?'disabled':''}>Lock Prediction</button>
+      <div class="sub" style="margin-top:6px">${Object.keys(S.picks).length}/${S.seats.length} predictions in.</div>`;
+    }
+  } else if(S.phase==='verifyvote'){
+    const voted=!!S.votes[myId()];
+    const rows=S.pickOrder.map(pid=>{
+      const s=S.seats.find(x=>x.id===pid); const c=S.picks[pid];
+      return `<div class="vote-row">${cardSpan(c)}<span class="sub">${esc(s?s.name:'?')}'s pick</span>${(!voted&&!paused())?`<button onclick="uiVVote('${esc(pid)}')">Vote</button>`:''}</div>`;
+    }).join('');
+    p.innerHTML=`<h3>Verification — vote for the prediction to stand behind</h3>${rows}<div class="sub" style="margin-top:6px">${Object.keys(S.votes).length}/${S.seats.length} votes in${voted?' (you voted)':''}.</div>`;
+  } else {
+    const r=S.verifyResult;
+    const s=S.seats.find(x=>x.id===r.chosenBy);
+    p.innerHTML = r.pass
+      ? `<h3>Verification</h3><div class="controls" style="background:#f4faf5"><span class="good"><b>Verified!</b></span> ${esc(s?s.name:'?')}'s prediction ${cardSpan(r.chosen)} satisfies the grammar.</div>`
+      : `<h3>Verification</h3><div class="controls" style="background:#fff9eb"><span class="bad"><b>Failed.</b></span> ${esc(s?s.name:'?')}'s prediction ${cardSpan(r.chosen)} violates the grammar.</div>`;
+  }
+}
+function renderEnd(){
+  const p=$('endPanel');
+  if(!['roundover','gameover'].includes(S.phase)){p.classList.add('hidden');p.innerHTML='';return;}
+  p.classList.remove('hidden');
+  const g=S.over.grammar;
+  const seedRow=[1,2,3].map(k=>`<div class="slot solved"><span class="num">Pos ${k}</span>${cardHtml(S.over.seed[k])}</div>`).join('');
+  const lives=S.seats.map(s=>`<div>${esc(s.name)}: ${'♥'.repeat(Math.max(0,s.lives))||'—'}</div>`).join('');
+  if(S.phase==='roundover'){
+    p.innerHTML=`<h3>Round ${S.round} lost</h3><div class="sub">Everyone loses a life. The grammar was:</div>
+    <div style="margin:8px 0">${grammarText(g)}</div>
+    <div class="sentence-scroll"><div class="sentence">${seedRow}</div></div>
+    <div class="sub" style="margin:8px 0">Lives:<br>${lives}</div>
+    ${isHost()?`<button class="primary" onclick="uiNextRound()">Next Round — ${S.seats[(S.analystIdx+1)%S.seats.length]?esc(S.seats[(S.analystIdx+1)%S.seats.length].name):''} analyzes</button>`:`<div class="sub">Waiting for the host to start the next round…</div>`}`;
+  } else {
+    p.innerHTML=`<h3>Game over — the table is out of lives</h3><div class="sub">The final grammar was:</div>
+    <div style="margin:8px 0">${grammarText(g)}</div>
+    <div class="sentence-scroll"><div class="sentence">${seedRow}</div></div>
+    <div class="sub" style="margin:8px 0">Lives:<br>${lives}</div>
+    ${isHost()?`<button class="primary" onclick="uiRematch()">New Game (same settings)</button>`:`<div class="sub">Waiting for the host…</div>`}`;
+  }
+}
+const PHASE_LABEL={play:'Ask the Knower',voting:'Voting on proposal',predict:'Predicting Position 3',verifyvote:'Voting on prediction',verifydone:'Verified',roundover:'Round lost',gameover:'Game over'};
+function render(){
+  const inGame=!!S;
+  $('setup').classList.toggle('hidden', inGame||!Hub.me);
+  if(Hub.me){ $('hostSetup').classList.toggle('hidden', !isHost()); $('guestSetup').classList.toggle('hidden', isHost()); }
+  if(!inGame){ $('table').classList.add('hidden'); $('roundBadge').textContent='Setup'; $('livesBadge').classList.add('hidden'); reportHeight(); return; }
+  $('table').classList.remove('hidden');
+  $('roundBadge').textContent=`Level ${S.cfg.level} · Round ${S.round}`;
+  const minLives=Math.min(...S.seats.map(s=>s.lives));
+  $('livesBadge').classList.remove('hidden');
+  $('livesBadge').textContent=`Table lives: ${minLives}`;
+  $('phaseBadge').textContent=PHASE_LABEL[S.phase]||S.phase;
+  $('pausedNote').classList.toggle('hidden', !paused());
+  const hb=$('hostBar');
+  const showHostBtns=isHost()&&(S.phase==='verifydone');
+  hb.classList.toggle('hidden', !showHostBtns);
+  if(showHostBtns) hb.innerHTML=`<button class="primary" onclick="uiNextRound()">Next Round — ${S.seats[(S.analystIdx+1)%S.seats.length]?esc(S.seats[(S.analystIdx+1)%S.seats.length].name):''} analyzes</button>`;
+  renderSeats(); renderAnnounce(); renderBoard(); renderAsk(); renderEvidence(); renderChips(); renderVote(); renderVerify(); renderEnd();
+  // flash MATCH on newest evidence
+  const last=S.evidence[S.evidence.length-1];
+  if(last&&last.match){ const w=$('sentenceWrapper'); w.classList.remove('flash-match'); void w.offsetWidth; w.classList.add('flash-match'); }
+  reportHeight();
+}
+
+/* ================= local input → intents ================= */
+window.uiStartGame=function(){
+  const level=+$('startLevel').value, announced=$('announceSetup').checked;
+  if(!isHost())return;
+  const n=1+Hub.roster.filter(m=>m.id!==(Hub.me&&Hub.me.id)).length;
+  if(n<2||n>4){$('setup-note').textContent=`Need 2–4 players in the room (have ${n}).`;return;}
+  startGame(level,announced);
+};
+window.uiRematch=function(){ if(isHost()&&S) startGame(S.cfg.level,S.cfg.announced); };
+window.uiNextRound=function(){ if(isHost()) nextRound(); };
+window.uiAsk=function(){
+  if(!S||S.phase!=='play')return;
+  const g=id=>{const el=$(id);return el?el.value:'';};
+  act({action:'ask',c2:{rank:g('t2r'),suit:g('t2s')},c3:{rank:g('t3r'),suit:g('t3s')}});
+};
+window.uiSubmitProposal=function(){
+  if(!S)return;
+  const rows=[];
+  for(const f of L12_FEATURES){ if(!sel[f]){toast("Propose a rule (or 'Not Active') for every feature row.");return;} rows.push({feature:f,rule:sel[f]}); }
+  sel={}; chipKey='';
+  act({action:'propose',rows});
+};
+window.uiVote=function(v){ act({action:'vote',v}); };
+window.uiPick=function(){
+  const r=$('v3r'), s=$('v3s');
+  myPick={rank:r?r.value:undefined, suit:s?s.value:undefined};
+  act({action:'pick',rank:myPick.rank,suit:myPick.suit});
+};
+window.uiVVote=function(pid){ act({action:'vvote',for:pid}); };
+
+Hub.init();
+render();
+})();
+</script>
+</body>
+</html>

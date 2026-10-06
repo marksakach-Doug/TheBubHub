@@ -1,0 +1,356 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Goldberg</title>
+    <script src="https://cdnjs.cloudflare.com/ajax/libs/matter-js/0.19.0/matter.min.js"></script>
+    <script src="https://cdnjs.cloudflare.com/ajax/libs/howler/2.2.3/howler.min.js"></script>
+    <style>
+        body {
+            margin: 0;
+            padding: 0;
+            overflow: hidden;
+            background-color: #d2c4b5; /* Earthy parchment */
+            font-family: 'Courier New', Courier, monospace;
+        }
+        canvas {
+            display: block;
+        }
+        #ui {
+            position: absolute;
+            top: 20px;
+            left: 20px;
+            pointer-events: none;
+            color: #4a3f35;
+        }
+        .instruction {
+            background: rgba(210, 196, 181, 0.8);
+            padding: 10px;
+            border-radius: 4px;
+            border: 2px solid #8b5a2b;
+            pointer-events: auto;
+        }
+        #start-overlay {
+            position: fixed;
+            inset: 0;
+            background: rgba(74, 63, 53, 0.9);
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            z-index: 100;
+            cursor: pointer;
+            color: #d2c4b5;
+            text-align: center;
+            font-size: 1.5rem;
+            transition: opacity 0.5s ease;
+        }
+        #host-controls {
+            position: absolute;
+            top: 20px;
+            right: 20px;
+            display: none;
+            flex-direction: column;
+            gap: 10px;
+            background: rgba(139, 90, 43, 0.2);
+            padding: 15px;
+            border: 2px solid #8b5a2b;
+            border-radius: 8px;
+            backdrop-filter: blur(5px);
+        }
+        .btn {
+            background: #8b5a2b;
+            color: white;
+            border: none;
+            padding: 8px 12px;
+            cursor: pointer;
+            font-family: inherit;
+            font-weight: bold;
+            border-radius: 4px;
+        }
+        .btn:hover { background: #a67c52; }
+        .btn.active { background: #4a3f35; outline: 2px solid white; }
+        #draw-canvas {
+            position: absolute;
+            top: 0;
+            left: 0;
+            pointer-events: none;
+            z-index: 10;
+        }
+    </style>
+</head>
+<body>
+    <div id="start-overlay">
+        <div>
+            <p>🛠️ Goldberg Workshop 🛠️</p>
+            <small>Click to Begin</small>
+        </div>
+    </div>
+    <div id="ui">
+        <div class="instruction">
+            <strong>Goldberg</strong><br>
+            Host: Draw custom paths or spawn parts. Lock ramps with 'L', rotate with 'R'.
+        </div>
+    </div>
+    <div id="host-controls">
+        <button class="btn" onclick="setMode('spawn-ball')">Spawn Ball</button>
+        <button class="btn" onclick="spawnPart('ramp')">Spawn Ramp</button>
+        <button class="btn" onclick="setMode('draw')">Draw Path</button>
+        <button class="btn" onclick="togglePhysics()">Play/Pause</button>
+        <button class="btn" onclick="clearWorld()">Clear All</button>
+    </div>
+    <canvas id="draw-canvas"></canvas>
+
+    <script>
+        const GAME_ID = 'goldberg';
+        const Hub = {
+            up(k, p) { try { window.parent.postMessage({ t: 'gu', game: GAME_ID, k, p }, '*'); } catch(e) {} },
+            on(e) {
+                const m = e.data;
+                if (!m || m.game !== GAME_ID) return;
+                if (m.t !== 'gd') return;
+                if (m.k === 'roster') onRoster(m.p);
+                if (m.k === 'state') onState(m.p, m.from);
+                if (m.k === 'intent') onIntent(m.p, m.from);
+                if (m.k === 'reset') reset();
+            }
+        };
+        window.addEventListener('message', Hub.on);
+
+        let isHost = false;
+        let engine, render, runner, mouseConstraint;
+        let currentMode = 'build'; 
+        let isSimulationRunning = true;
+        const bodies = {};
+        const earthTones = ['#8b5a2b', '#556b2f', '#a0522d', '#696969', '#bc8f8f'];
+
+        let isDrawing = false;
+        let drawPoints = [];
+        const drawCanvas = document.getElementById('draw-canvas');
+        const ctx = drawCanvas.getContext('2d');
+
+        function initPhysics() {
+            engine = Matter.Engine.create();
+            engine.world.gravity.y = 1.0;
+
+            render = Matter.Render.create({
+                element: document.body,
+                engine: engine,
+                options: {
+                    width: window.innerWidth,
+                    height: window.innerHeight,
+                    wireframes: false,
+                    background: 'transparent'
+                }
+            });
+
+            runner = Matter.Runner.create();
+            Matter.Runner.run(runner, engine);
+            Matter.Render.run(render);
+
+            const ground = Matter.Bodies.rectangle(window.innerWidth/2, window.innerHeight + 25, window.innerWidth, 50, { isStatic: true, render: { fillStyle: '#4a3f35' } });
+            Matter.World.add(engine.world, ground);
+
+            const mouse = Matter.Mouse.create(render.canvas);
+            mouseConstraint = Matter.MouseConstraint.create(engine, {
+                mouse: mouse,
+                constraint: { stiffness: 0.2, render: { visible: false } }
+            });
+            Matter.World.add(engine.world, mouseConstraint);
+
+            window.addEventListener('keydown', (e) => {
+                if (!isHost) return;
+                const selected = mouseConstraint.body;
+                if (!selected) return;
+
+                if (e.key === 'l') {
+                    Matter.Body.setStatic(selected, !selected.isStatic);
+                }
+                if (e.key === 'r') {
+                    Matter.Body.setAngle(selected, selected.angle + Math.PI/4);
+                }
+            });
+
+            window.addEventListener('mousedown', (e) => {
+                if (!isHost || currentMode !== 'draw') return;
+                isDrawing = true;
+                drawPoints = [{x: e.clientX, y: e.clientY}];
+                drawCanvas.width = window.innerWidth;
+                drawCanvas.height = window.innerHeight;
+            });
+
+            window.addEventListener('mousemove', (e) => {
+                if (!isDrawing) return;
+                drawPoints.push({x: e.clientX, y: e.clientY});
+                ctx.strokeStyle = '#8b5a2b';
+                ctx.lineWidth = 10;
+                ctx.lineCap = 'round';
+                ctx.beginPath();
+                ctx.moveTo(drawPoints[drawPoints.length-2].x, drawPoints[drawPoints.length-2].y);
+                ctx.lineTo(e.clientX, e.clientY);
+                ctx.stroke();
+            });
+
+            window.addEventListener('mouseup', () => {
+                if (!isDrawing) return;
+                isDrawing = false;
+                ctx.clearRect(0, 0, drawCanvas.width, drawCanvas.height);
+                createCustomPath(drawPoints);
+            });
+        }
+
+        function createCustomPath(points) {
+            if (points.length < 2) return;
+            const color = earthTones[Math.floor(Math.random()*earthTones.length)];
+            
+            for (let i = 0; i < points.length - 1; i++) {
+                const p1 = points[i];
+                const p2 = points[i+1];
+                const dist = Math.sqrt(Math.pow(p2.x - p1.x, 2) + Math.pow(p2.y - p1.y, 2));
+                const angle = Math.atan2(p2.y - p1.y, p2.x - p1.x);
+                const midX = (p1.x + p2.x) / 2;
+                const midY = (p1.y + p2.y) / 2;
+                
+                const id = Math.random().toString(36).substr(2, 9);
+                const body = Matter.Bodies.rectangle(midX, midY, dist, 10, { 
+                    isStatic: true, 
+                    angle: angle, 
+                    render: { fillStyle: color } 
+                });
+                body.gameId = id;
+                bodies[id] = body;
+                Matter.World.add(engine.world, body);
+            }
+        }
+
+        function onRoster(r) {
+            isHost = r.you.isHost;
+            if (isHost) {
+                initPhysics();
+                document.getElementById('host-controls').style.display = 'flex';
+                setInterval(broadcastState, 50);
+            } else {
+                initGuestVisuals();
+            }
+        }
+
+        function spawnPart(type, x = window.innerWidth/2, y = 100) {
+            const id = Math.random().toString(36).substr(2, 9);
+            let body;
+            const color = earthTones[Math.floor(Math.random()*earthTones.length)];
+
+            if (type === 'ramp') {
+                body = Matter.Bodies.rectangle(x, y, 200, 20, { angle: Math.PI/6, restitution: 0.1, friction: 0.5, render: { fillStyle: color } });
+            } else if (type === 'ball') {
+                body = Matter.Bodies.circle(x, y, 15, { restitution: 0.6, friction: 0.1, render: { fillStyle: color } });
+            } else {
+                body = Matter.Bodies.rectangle(x, y, 50, 50, { render: { fillStyle: color } });
+            }
+
+            body.gameId = id;
+            bodies[id] = body;
+            Matter.World.add(engine.world, body);
+        }
+
+        function broadcastState() {
+            const snapshot = Object.values(bodies).map(b => ({
+                id: b.gameId,
+                x: b.position.x,
+                y: b.position.y,
+                r: b.angle,
+                c: b.render.fillStyle,
+                isCircle: b.circleRadius !== undefined,
+                isStatic: b.isStatic,
+                w: b.bounds.max.x - b.bounds.min.x,
+                h: b.bounds.max.y - b.bounds.min.y
+            }));
+            Hub.up('state', snapshot);
+        }
+
+        function initGuestVisuals() {
+            engine = Matter.Engine.create();
+            render = Matter.Render.create({
+                element: document.body,
+                engine: engine,
+                options: {
+                    width: window.innerWidth,
+                    height: window.innerHeight,
+                    wireframes: false,
+                    background: 'transparent'
+                }
+            });
+            Matter.Render.run(render);
+        }
+
+        function onState(snapshot) {
+            snapshot.forEach(s => {
+                let b = bodies[s.id];
+                if (!b) {
+                    const newBody = s.isCircle 
+                        ? Matter.Bodies.circle(s.x, s.y, 15, { isStatic: true, render: { fillStyle: s.c } })
+                        : Matter.Bodies.rectangle(s.x, s.y, s.w, s.h, { isStatic: true, render: { fillStyle: s.c } });
+                    newBody.gameId = s.id;
+                    bodies[s.id] = newBody;
+                    Matter.World.add(engine.world, newBody); 
+                }
+                Matter.Body.setPosition(b, { x: s.x, y: s.y });
+                Matter.Body.setAngle(b, s.r);
+                Matter.Body.setStatic(b, s.isStatic);
+            });
+        }
+
+        function onIntent(p, from) {
+            if (!isHost) return;
+            if (p.type === 'drag') {
+                const b = bodies[p.id];
+                if (b) Matter.Body.setPosition(b, { x: p.x, y: p.y });
+            }
+        }
+
+        function setMode(mode) {
+            currentMode = mode;
+            document.querySelectorAll('.btn').forEach(b => b.classList.remove('active'));
+            event.target.classList.add('active');
+            
+            if (mode === 'spawn-ball') {
+                spawnPart('ball');
+            }
+        }
+
+        function togglePhysics() {
+            isSimulationRunning = !isSimulationRunning;
+            engine.world.gravity.y = isSimulationRunning ? 1.0 : 0;
+            if (!isSimulationRunning) {
+                Object.values(bodies).forEach(b => Matter.Body.setStatic(b, true));
+            }
+        }
+
+        function clearWorld() {
+            Object.values(bodies).forEach(b => Matter.World.remove(engine.world, b));
+            for (let id in bodies) delete bodies[id];
+        }
+
+        function reset() {
+            location.reload();
+        }
+
+        const bgMusic = new Howl({
+            src: ['assets/music/relaxing_track.mid'],
+            loop: true,
+            volume: 0.5
+        });
+
+        document.getElementById('start-overlay').onclick = function() {
+            this.style.opacity = '0';
+            setTimeout(() => this.remove(), 500);
+            bgMusic.play();
+            Hub.up('hello');
+            Hub.up('height', window.innerHeight);
+        };
+
+        window.onresize = () => {
+            Hub.up('height', window.innerHeight);
+        };
+    </script>
+</body>
+</html>

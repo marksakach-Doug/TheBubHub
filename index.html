@@ -64,8 +64,8 @@
             background-clip: text;
             color: transparent;
         }
-        /* Shared game stage: one borderless iframe per game, sized to its content. */
-        #game-stage iframe { width: 100%; border: 0; display: block; background: transparent; }
+        /* Shared game stage: one framed iframe per game, sized to its content. */
+        #game-stage iframe { width: 100%; border: 0; display: block; background: #0f172a; border-radius: 16px; border: 1px solid #334155; box-shadow: 0 10px 30px rgba(0,0,0,0.35); overflow: hidden; }
         .gv-invite-btn { font-weight: 800; font-size: 13px; padding: 4px 16px; border-radius: 12px; flex: none; }
     </style>
 </head>
@@ -94,6 +94,15 @@
         </div>
     </header>
 
+    <!-- Shared game stage (TOP LEVEL): Primary focus of the experience.
+         Games render here as iframes. Empty placeholder shows until a game opens. -->
+    <div id="game-stage" class="flex flex-col gap-4 relative z-10">
+        <div id="game-stage-empty" class="bg-slate-800/60 backdrop-blur px-5 py-6 rounded-2xl border border-dashed border-slate-600 text-center">
+            <p class="text-slate-300 text-sm font-bold">🎮 No game open yet</p>
+            <p class="text-slate-500 text-xs mt-1">Pick a solo game below, or join a room and launch a multiplayer game. It will appear here, above the chat.</p>
+        </div>
+    </div>
+
     <!-- Lobby UI -->
     <div id="lobby-ui" class="grid grid-cols-1 md:grid-cols-2 gap-4 flex-none relative z-10">
         <div class="bg-slate-800/90 backdrop-blur p-5 rounded-2xl border border-slate-700 card-glow">
@@ -118,32 +127,15 @@
         </div>
 
         <div id="lobby-games-card" class="hidden md:col-span-2 bg-slate-800/90 backdrop-blur p-5 rounded-2xl border border-slate-700 card-glow">
-            <h2 class="text-lg font-bold text-white mb-1">While you wait</h2>
+            <h2 class="text-lg font-bold text-white mb-1">🎯 Solo Corner — while you wait</h2>
             <p class="text-slate-400 text-xs mb-3">Solo games. No room needed.</p>
             <div id="lobby-game-buttons" class="flex flex-wrap gap-2"></div>
         </div>
     </div>
 
-    <!-- Active Room UI -->
+    <!-- Active Room UI. Order is deliberate: invites + chat first (right under the
+         game stage), room/game controls last. The game is the main thing. -->
     <div id="room-ui" class="hidden flex-col gap-4 flex-1 relative z-10">
-
-        <!-- Controls & Status -->
-        <div class="flex flex-wrap justify-between items-center gap-3 bg-slate-800/90 backdrop-blur p-4 rounded-2xl border border-slate-700 flex-none card-glow pop-in">
-            <div class="flex gap-4 items-center flex-wrap">
-                <div>
-                    <span class="text-slate-400 text-xs block uppercase tracking-wide">Room ID</span>
-                    <button id="active-room-id" title="Click to copy" class="font-mono font-bold text-white text-lg hover:text-teal-300 transition-colors"></button>
-                </div>
-                <div class="border-l border-slate-600 pl-4 flex items-center gap-2">
-                    <div>
-                        <span class="text-slate-400 text-xs block uppercase tracking-wide">Games</span>
-                        <div id="game-buttons" class="flex flex-wrap gap-2 mt-1"></div>
-                    </div>
-                </div>
-                <span id="peer-status" class="text-xs font-mono px-2 py-1 rounded-full bg-amber-500/15 text-amber-300 border border-amber-500/30">waiting for players…</span>
-            </div>
-            <button id="btn-disconnect" class="btn-bouncy bg-red-500 hover:bg-red-400 text-white px-4 py-1.5 text-sm font-bold rounded-xl">Disconnect</button>
-        </div>
 
         <!-- Game invites, one bar per game, created as needed -->
         <div id="game-invites" class="flex flex-col gap-2"></div>
@@ -157,13 +149,34 @@
             </div>
         </div>
 
+        <!-- Controls & Status -->
+        <div class="flex flex-wrap justify-between items-center gap-3 bg-slate-800/90 backdrop-blur p-4 rounded-2xl border border-slate-700 flex-none card-glow pop-in">
+            <div class="flex gap-4 items-center flex-wrap">
+                <div>
+                    <span class="text-slate-400 text-xs block uppercase tracking-wide">Room ID</span>
+                    <button id="active-room-id" title="Click to copy" class="font-mono font-bold text-white text-lg hover:text-teal-300 transition-colors"></button>
+                </div>
+                <div class="border-l border-slate-600 pl-4 flex items-center gap-2">
+                    <div class="flex flex-col gap-3">
+                        <div id="multiplayer-section">
+                            <span class="text-slate-400 text-xs block uppercase tracking-wide">🎲 Multiplayer Arcade</span>
+                            <div id="game-buttons" class="flex flex-wrap gap-2 mt-1"></div>
+                        </div>
+                        <div id="solo-section">
+                            <span class="text-slate-400 text-xs block uppercase tracking-wide">🎯 Solo Corner</span>
+                            <div id="solo-game-buttons" class="flex flex-wrap gap-2 mt-1"></div>
+                        </div>
+                    </div>
+                </div>
+                <span id="peer-status" class="text-xs font-mono px-2 py-1 rounded-full bg-amber-500/15 text-amber-300 border border-amber-500/30">waiting for players…</span>
+            </div>
+            <button id="btn-disconnect" class="btn-bouncy bg-red-500 hover:bg-red-400 text-white px-4 py-1.5 text-sm font-bold rounded-xl">Disconnect</button>
+        </div>
+
     </div>
 
-    <!-- Shared game stage (top level so lobby solo games work too): one iframe
-         per game. Multiplayer games size to content; solo games use a fixed height. -->
-    <div id="game-stage" class="flex-col gap-4 relative z-10"></div>
 
-    <footer class="text-center text-slate-500 text-xs pt-2 relative z-10">Bub Hub v7 (modular games + waltz) • click the Room ID to copy • if a friend sees something different, both reload with Ctrl+Shift+R</footer>
+    <footer class="text-center text-slate-500 text-xs pt-2 relative z-10">Bub Hub v8 (game-first stage + solo/multiplayer sections) • click the Room ID to copy • if a friend sees something different, both reload with Ctrl+Shift+R</footer>
 
     <script>
         // ============ Hub: multi-peer room + game broker ============
@@ -192,10 +205,12 @@
             chatInput: document.getElementById('chat-input'),
             nameInput: document.getElementById('player-name'),
             gameButtons: document.getElementById('game-buttons'),
+            soloGameButtons: document.getElementById('solo-game-buttons'),
             lobbyGamesCard: document.getElementById('lobby-games-card'),
             lobbyGameButtons: document.getElementById('lobby-game-buttons'),
             gameInvites: document.getElementById('game-invites'),
-            gameStage: document.getElementById('game-stage')
+            gameStage: document.getElementById('game-stage'),
+            stageEmpty: document.getElementById('game-stage-empty')
         };
 
         function randomRoomName() {
@@ -452,9 +467,11 @@
         const GB = {
             frames: {},   // gameId -> { el, ready }
             pending: {},  // gameId -> [down messages waiting for child hello]
+            states: {},   // gameId -> last known state
 
             init(){
                 ui.gameButtons.innerHTML = '';
+                ui.soloGameButtons.innerHTML = '';
                 GAMES.forEach(g => {
                     const b = document.createElement('button');
                     b.id = 'btn-play-' + g.id;
@@ -463,8 +480,21 @@
                     b.textContent = 'Play ' + g.title;
                     b.title = `${g.title} (${g.players} players)`;
                     b.addEventListener('click', () => GB.toggle(g.id));
-                    ui.gameButtons.appendChild(b);
+                    
+                    if (g.solo) {
+                        ui.soloGameButtons.appendChild(b);
+                    } else {
+                        ui.gameButtons.appendChild(b);
+                    }
                 });
+                // Hide a section entirely when the registry has no games for it.
+                // This keeps the hub modular: sections reflect games.js, not markup.
+                const hasMulti = GAMES.some(g => !g.solo);
+                const hasSoloInRoom = GAMES.some(g => g.solo);
+                const mpSec = document.getElementById('multiplayer-section');
+                const soloSec = document.getElementById('solo-section');
+                if (mpSec) mpSec.style.display = hasMulti ? '' : 'none';
+                if (soloSec) soloSec.style.display = hasSoloInRoom ? '' : 'none';
                 // Solo waiting-room games also get buttons in the lobby.
                 const lobbyGames = GAMES.filter(g => g.lobby);
                 if (ui.lobbyGamesCard) ui.lobbyGamesCard.classList.toggle('hidden', !lobbyGames.length);
@@ -484,6 +514,7 @@
                 }
                 window.addEventListener('message', GB.onChild);
                 GB.updateButtons();
+                GB.refreshStage();
             },
 
             frame(game){
@@ -514,20 +545,32 @@
                 hideInvite(game);
                 this.pushRoster(game);
                 this.flush(game);
+                if (this.states[game]) {
+                    this.down(game, { t: 'gd', game, k: 'state', p: this.states[game] });
+                }
                 this.updateButtons();
+                this.refreshStage();
                 shrinkChat(true);
+                try { f.el.scrollIntoView({ behavior: 'smooth', block: 'start' }); } catch(e) {}
             },
 
             close(game){
                 const f = this.frames[game];
                 if (f) f.el.classList.add('hidden');
                 this.updateButtons();
+                this.refreshStage();
                 if (!Object.values(this.frames).some(x => !x.el.classList.contains('hidden'))) shrinkChat(false);
+            },
+
+            refreshStage(){
+                const anyOpen = Object.values(this.frames).some(x => !x.el.classList.contains('hidden'));
+                if (ui.stageEmpty) ui.stageEmpty.classList.toggle('hidden', anyOpen);
             },
 
             closeAll(){
                 Object.keys(this.frames).forEach(gid => this.frames[gid].el.classList.add('hidden'));
                 this.updateButtons();
+                this.refreshStage();
                 shrinkChat(false);
             },
 
@@ -539,6 +582,7 @@
                 this.pending = {};
                 clearInvites();
                 this.updateButtons();
+                this.refreshStage();
                 shrinkChat(false);
             },
 
@@ -614,6 +658,7 @@
                 }
                 if (m.k === 'state'){
                     if (!isHost) return;
+                    GB.states[game] = m.p;
                     sendAll({ type: 'game', game, k: 'state', from: { id: myId, name: getName() }, p: m.p });
                     return;
                 }
