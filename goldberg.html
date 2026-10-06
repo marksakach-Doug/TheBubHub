@@ -1,356 +1,805 @@
-<!DOCTYPE html>
+<!doctype html>
 <html lang="en">
 <head>
-    <meta charset="UTF-8">
-    <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>Goldberg</title>
-    <script src="https://cdnjs.cloudflare.com/ajax/libs/matter-js/0.19.0/matter.min.js"></script>
-    <script src="https://cdnjs.cloudflare.com/ajax/libs/howler/2.2.3/howler.min.js"></script>
-    <style>
-        body {
-            margin: 0;
-            padding: 0;
-            overflow: hidden;
-            background-color: #d2c4b5; /* Earthy parchment */
-            font-family: 'Courier New', Courier, monospace;
-        }
-        canvas {
-            display: block;
-        }
-        #ui {
-            position: absolute;
-            top: 20px;
-            left: 20px;
-            pointer-events: none;
-            color: #4a3f35;
-        }
-        .instruction {
-            background: rgba(210, 196, 181, 0.8);
-            padding: 10px;
-            border-radius: 4px;
-            border: 2px solid #8b5a2b;
-            pointer-events: auto;
-        }
-        #start-overlay {
-            position: fixed;
-            inset: 0;
-            background: rgba(74, 63, 53, 0.9);
-            display: flex;
-            align-items: center;
-            justify-content: center;
-            z-index: 100;
-            cursor: pointer;
-            color: #d2c4b5;
-            text-align: center;
-            font-size: 1.5rem;
-            transition: opacity 0.5s ease;
-        }
-        #host-controls {
-            position: absolute;
-            top: 20px;
-            right: 20px;
-            display: none;
-            flex-direction: column;
-            gap: 10px;
-            background: rgba(139, 90, 43, 0.2);
-            padding: 15px;
-            border: 2px solid #8b5a2b;
-            border-radius: 8px;
-            backdrop-filter: blur(5px);
-        }
-        .btn {
-            background: #8b5a2b;
-            color: white;
-            border: none;
-            padding: 8px 12px;
-            cursor: pointer;
-            font-family: inherit;
-            font-weight: bold;
-            border-radius: 4px;
-        }
-        .btn:hover { background: #a67c52; }
-        .btn.active { background: #4a3f35; outline: 2px solid white; }
-        #draw-canvas {
-            position: absolute;
-            top: 0;
-            left: 0;
-            pointer-events: none;
-            z-index: 10;
-        }
-    </style>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Goldberg</title>
+<script src="https://cdnjs.cloudflare.com/ajax/libs/matter-js/0.19.0/matter.min.js"></script>
+<script src="https://cdnjs.cloudflare.com/ajax/libs/howler/2.2.4/howler.min.js"></script>
+<style>
+*{box-sizing:border-box}
+html,body{height:100%;overflow:hidden;}
+body{margin:0;background:#14100b;color:#f0e6d2;font:14px/1.45 system-ui,sans-serif;}
+#wrap{max-width:1000px;margin:0 auto;padding:10px;height:100dvh;display:flex;flex-direction:column;gap:8px;}
+#bar{display:flex;flex-wrap:wrap;gap:6px;align-items:center;background:#241b12;border:1px solid #4a3a26;border-radius:12px;padding:8px 10px;}
+#bar button,#bar input[type=range]{accent-color:#e6c280;}
+button.gb{font-size:12px;font-weight:800;padding:6px 12px;border-radius:10px;border:1px solid #6b5636;background:#332818;color:#f0e6d2;cursor:pointer;}
+button.gb.on{background:#e6c280;color:#241b12;border-color:#e6c280;}
+button.gb:disabled{opacity:.45;cursor:not-allowed;}
+#stage-wrap{position:relative;width:100%;flex:1;min-height:0;display:flex;align-items:center;justify-content:center;background:#0d0a06;border:1px solid #4a3a26;border-radius:12px;overflow:hidden;}
+#stage{display:block;max-width:100%;max-height:100%;width:auto;height:auto;aspect-ratio:3/2;background:#1c160e;touch-action:none;}
+#overlay{position:absolute;inset:0;display:flex;flex-direction:column;gap:10px;align-items:center;justify-content:center;background:rgba(10,7,4,.88);z-index:5;cursor:pointer;transition:opacity .35s ease;text-align:center;padding:20px;}
+#overlay.hide{opacity:0;pointer-events:none;}
+#overlay h1{margin:0;letter-spacing:3px;color:#e6c280;font-size:26px;}
+#overlay p{margin:0;max-width:520px;color:#d8c9a8;font-size:13px;}
+#meta{display:flex;gap:10px;flex-wrap:wrap;align-items:center;font-size:12px;color:#d8c9a8;font-family:monospace;}
+#denied{color:#ff9c9c;font-size:12px;min-height:16px;font-family:monospace;}
+#err{font-family:monospace;font-size:11px;color:#ff8888;min-height:14px;}
+#cursors{position:absolute;inset:0;pointer-events:none;z-index:3;}
+.cur{position:absolute;font-size:10px;font-family:monospace;background:rgba(0,0,0,.65);border:1px solid #e6c280;color:#ffe9bd;border-radius:8px;padding:1px 5px;transform:translate(-50%,-140%);white-space:nowrap;}
+</style>
 </head>
 <body>
-    <div id="start-overlay">
-        <div>
-            <p>🛠️ Goldberg Workshop 🛠️</p>
-            <small>Click to Begin</small>
-        </div>
-    </div>
-    <div id="ui">
-        <div class="instruction">
-            <strong>Goldberg</strong><br>
-            Host: Draw custom paths or spawn parts. Lock ramps with 'L', rotate with 'R'.
-        </div>
-    </div>
-    <div id="host-controls">
-        <button class="btn" onclick="setMode('spawn-ball')">Spawn Ball</button>
-        <button class="btn" onclick="spawnPart('ramp')">Spawn Ramp</button>
-        <button class="btn" onclick="setMode('draw')">Draw Path</button>
-        <button class="btn" onclick="togglePhysics()">Play/Pause</button>
-        <button class="btn" onclick="clearWorld()">Clear All</button>
-    </div>
-    <canvas id="draw-canvas"></canvas>
+<div id="wrap">
+  <div id="bar">
+    <button class="gb" data-add="ball">Ball</button>
+    <button class="gb" data-add="plank">Plank</button>
+    <button class="gb" data-add="ramp">Ramp</button>
+    <button class="gb" data-add="block">Block</button>
+    <button class="gb" id="btn-draw">Draw</button>
+    <button class="gb" id="btn-erase">Erase</button>
+    <label style="font-size:12px">Gravity <input type="range" id="grav" min="0" max="2" step="0.1" value="1" style="width:90px"></label>
+    <button class="gb" id="btn-sim">Pause</button>
+    <button class="gb" id="btn-clear">Clear</button>
+    <button class="gb" id="btn-music">Music: off</button>
+    <span id="role" style="font-family:monospace;font-size:11px;opacity:.8">connecting…</span>
+  </div>
+  <div id="stage-wrap">
+    <canvas id="stage" width="960" height="640"></canvas>
+    <div id="cursors"></div>
+    <div id="overlay"><h1>GOLDBERG</h1><p>Tap to enter the workshop. Build a chain-reaction machine with friends: drop parts, sketch tracks, tip the first ball.</p><p style="font-size:11px;opacity:.75">Click selects · drag moves · R rotates · L locks · Delete removes</p></div>
+  </div>
+  <div id="meta"><span id="sel">nothing selected</span><span id="hint"></span></div>
+  <div id="denied"></div>
+  <div id="err"></div>
+</div>
+<script>
+(function(){
+'use strict';
+const GAME_ID = 'goldberg';
+const W = 960, H = 640;
+const PALETTE = ['#8b5a2b','#556b2f','#a0522d','#696969','#bc8f8f','#4a3f35'];
+const $ = (id)=>document.getElementById(id);
+const canvas = $('stage'), ctx = canvas.getContext('2d');
+const overlay = $('overlay'), errEl = $('err'), deniedEl = $('denied');
+window.addEventListener('error', (e)=>{
+  try{
+    const where = e.lineno ? (' @'+e.lineno+':'+(e.colno||0)) : '';
+    errEl.textContent = 'Error: '+(e.message||'script error')+where;
+  }catch(err){}
+});
 
-    <script>
-        const GAME_ID = 'goldberg';
-        const Hub = {
-            up(k, p) { try { window.parent.postMessage({ t: 'gu', game: GAME_ID, k, p }, '*'); } catch(e) {} },
-            on(e) {
-                const m = e.data;
-                if (!m || m.game !== GAME_ID) return;
-                if (m.t !== 'gd') return;
-                if (m.k === 'roster') onRoster(m.p);
-                if (m.k === 'state') onState(m.p, m.from);
-                if (m.k === 'intent') onIntent(m.p, m.from);
-                if (m.k === 'reset') reset();
-            }
-        };
-        window.addEventListener('message', Hub.on);
+/* ---------- bridge ---------- */
+const Hub = {
+  me:null, roster:[], room:'',
+  up(k,p){ try{ window.parent.postMessage({t:'gu',game:GAME_ID,k,p},'*'); }catch(e){} },
+  init(){ window.addEventListener('message', onDown); this.up('hello'); }
+};
+let heightT=null;
+function reportHeight(){
+  // Fill game: the hub sizes the frame to the viewport, so report the
+  // viewport itself. No scrollHeight math — this document never scrolls.
+  clearTimeout(heightT);
+  heightT=setTimeout(()=>{
+    try{ Hub.up('height', Math.max(200, Math.round(window.innerHeight) || 640)); }catch(e){}
+  },60);
+}
+window.addEventListener('load',reportHeight);
+window.addEventListener('resize',reportHeight);
+if(window.ResizeObserver){ try{ new ResizeObserver(reportHeight).observe($('stage-wrap')); }catch(e){} }
 
-        let isHost = false;
-        let engine, render, runner, mouseConstraint;
-        let currentMode = 'build'; 
-        let isSimulationRunning = true;
-        const bodies = {};
-        const earthTones = ['#8b5a2b', '#556b2f', '#a0522d', '#696969', '#bc8f8f'];
+/* ---------- shared state ---------- */
+let isHost=false, booted=false, amSolo=false;
+let myId=null, myName='Player';
+let seq=0, isRunning=true, gravityY=1;
+let colorIdx=0;
+const nextColor=()=>PALETTE[(colorIdx++)%PALETTE.length];
+const uid=(p)=> (p||'o')+Date.now().toString(36)+Math.floor(Math.random()*1e6).toString(36);
+function onDown(e){
+  const m=e.data;
+  if(!m||m.t!=='gd'||m.game!==GAME_ID) return;
+  if(m.k==='roster'){ onRoster(m.p); return; }
+  if(m.k==='state'){ onState(m.p,m.from); return; }
+  if(m.k==='intent'){ onIntent(m.p,m.from); return; }
+  if(m.k==='denied'){ flashDenied(m.p&&m.p.text||'denied'); return; }
+  if(m.k==='reset'){ doReset(); return; }
+}
+function flashDenied(t){
+  deniedEl.textContent=t;
+  clearTimeout(flashDenied._t);
+  flashDenied._t=setTimeout(()=>{deniedEl.textContent='';},2200);
+}
 
-        let isDrawing = false;
-        let drawPoints = [];
-        const drawCanvas = document.getElementById('draw-canvas');
-        const ctx = drawCanvas.getContext('2d');
+/* ---------- local UI state (never synced) ---------- */
+let mode='select'; // select | draw | erase
+let selectedId=null;
+let draftPts=[]; // world-space while drawing
+let dragging=null; // {id, moved}
+let optimisticId=null;
+let remoteCursors={}; // peerId -> {x,y,name}
 
-        function initPhysics() {
-            engine = Matter.Engine.create();
-            engine.world.gravity.y = 1.0;
+/* ---------- records ---------- */
+const records=new Map(); // id -> record (both host visual + guest visual)
+const bodies=new Map();  // host only: id -> Matter.Body
+const draggedBy=new Map(); // id -> {by, until}
+const buckets=new Map(); // peerId -> {tokens,last}
+const pausedFrozen=new Set();
+const celebrated=new Set();
+let pendingSfx=[];
+let cursorsOut={};
 
-            render = Matter.Render.create({
-                element: document.body,
-                engine: engine,
-                options: {
-                    width: window.innerWidth,
-                    height: window.innerHeight,
-                    wireframes: false,
-                    background: 'transparent'
-                }
-            });
+function toWorld(e){
+  const r=canvas.getBoundingClientRect();
+  return { x:(e.clientX-r.left)*W/r.width, y:(e.clientY-r.top)*H/r.height };
+}
+function clampRec(r){
+  r.x=Math.max(20,Math.min(W-20,r.x));
+  r.y=Math.max(20,Math.min(H-20,r.y));
+  return r;
+}
+function makeRecord(kind,x,y,extra){
+  const rec=Object.assign({id:uid('o'),kind,x:Math.round(x),y:Math.round(y),angle:0,
+    color:nextColor(),locked:false},extra||{});
+  if(kind==='plank'){rec.w=240;rec.h=14;rec.angle=0;}
+  if(kind==='ramp'){rec.w=240;rec.h=14;rec.angle=-Math.PI/6;}
+  if(kind==='ball'){rec.r=14;}
+  if(kind==='block'){rec.w=48;rec.h=48;}
+  return clampRec(rec);
+}
 
-            runner = Matter.Runner.create();
-            Matter.Runner.run(runner, engine);
-            Matter.Render.run(render);
+/* ---------- RDP simplify ---------- */
+function rdp(pts,eps){
+  if(pts.length<3) return pts.slice();
+  const keep=new Array(pts.length).fill(false);
+  keep[0]=keep[pts.length-1]=true;
+  (function rec(a,b){
+    let dmax=0,idx=-1;
+    const ax=pts[a].x,ay=pts[a].y,bx=pts[b].x,by=pts[b].y;
+    const dx=bx-ax,dy=by-ay,len=Math.hypot(dx,dy)||1;
+    for(let i=a+1;i<b;i++){
+      const d=Math.abs((pts[i].x-ax)*dy-(pts[i].y-ay)*dx)/len;
+      if(d>dmax){dmax=d;idx=i;}
+    }
+    if(dmax>eps){keep[idx]=true;rec(a,idx);rec(idx,b);}
+  })(0,pts.length-1);
+  return pts.filter((_,i)=>keep[i]);
+}
 
-            const ground = Matter.Bodies.rectangle(window.innerWidth/2, window.innerHeight + 25, window.innerWidth, 50, { isStatic: true, render: { fillStyle: '#4a3f35' } });
-            Matter.World.add(engine.world, ground);
+/* ---------- host physics ---------- */
+let engine=null, lastBroadcast=0;
+function ensureEngine(){
+  if(engine||typeof Matter==='undefined') return;
+  engine=Matter.Engine.create();
+  engine.gravity.y=gravityY;
+  const opts={isStatic:true,friction:.5};
+  Matter.Composite.add(engine.world,[
+    Matter.Bodies.rectangle(W/2,H+30,W+300,60,opts),
+    Matter.Bodies.rectangle(-30,H/2,60,H+400,opts),
+    Matter.Bodies.rectangle(W+30,H/2,60,H+400,opts)
+  ]);
+  Matter.Events.on(engine,'collisionStart',(ev)=>{
+    for(const pair of ev.pairs){
+      const v=Math.hypot(pair.collision.depth||0,0);
+      const sp=Math.max(
+        Math.hypot(pair.bodyA.velocity.x,pair.bodyA.velocity.y),
+        Math.hypot(pair.bodyB.velocity.x,pair.bodyB.velocity.y));
+      if(sp>2.5){
+        const id=pair.bodyA._gid||pair.bodyB._gid;
+        if(id) pendingSfx.push({i:id,v:Math.min(1,sp/12)});
+      }
+    }
+  });
+}
+function bodyFor(rec){
+  if(typeof Matter==='undefined') return null;
+  const common={friction:.4,restitution:.05};
+  let b=null;
+  if(rec.kind==='ball') b=Matter.Bodies.circle(rec.x,rec.y,rec.r||14,{friction:.08,restitution:.45});
+  else if(rec.kind==='block') b=Matter.Bodies.rectangle(rec.x,rec.y,rec.w||48,rec.h||48,common);
+  else if(rec.kind==='plank'||rec.kind==='ramp') b=Matter.Bodies.rectangle(rec.x,rec.y,rec.w||240,rec.h||14,common);
+  else if(rec.kind==='drawn') b=compoundFromVerts(rec);
+  if(b){ b._gid=rec.id; }
+  return b;
+}
+function compoundFromVerts(rec){
+  const cx=rec.x, cy=rec.y, vs=rec.verts||[];
+  if(vs.length<2) return Matter.Bodies.circle(cx,cy,6,{isStatic:true});
+  const segs=[];
+  for(let i=0;i<vs.length-1;i++){
+    const ax=cx+vs[i].x, ay=cy+vs[i].y, bx=cx+vs[i+1].x, by=cy+vs[i+1].y;
+    const mx=(ax+bx)/2,my=(ay+by)/2,len=Math.hypot(bx-ax,by-ay);
+    if(len<2) continue;
+    const ang=Math.atan2(by-ay,bx-ax);
+    segs.push(Matter.Bodies.rectangle(mx,my,Math.max(len,4),8,{
+      angle:ang,friction:.35,chamfer:{radius:4}}));
+  }
+  if(!segs.length) return Matter.Bodies.circle(cx,cy,6,{isStatic:true});
+  const c=Matter.Body.create({parts:segs,friction:.35});
+  Matter.Body.setPosition(c,{x:cx,y:cy});
+  return c;
+}
+function hostAdd(rec){
+  records.set(rec.id,rec);
+  ensureEngine();
+  const b=bodyFor(rec);
+  if(b){
+    if(rec.locked||!isRunning) b.isStatic=true;
+    if(rec.kind==='drawn'){ b.isStatic=true; rec.locked=true; }
+    Matter.Composite.add(engine.world,b);
+    bodies.set(rec.id,b);
+  }
+  queueAdd(rec);
+  if(rec.kind==='ball') Hub.up('say',myName+' released a ball');
+}
+const pendingAdd=[], pendingDel=[];
+function queueAdd(r){ pendingAdd.push(r); }
+function queueDel(id){ pendingDel.push(id); }
+function hostMove(id,x,y){
+  const rec=records.get(id); const b=bodies.get(id);
+  if(!rec) return;
+  rec.x=Math.round(x); rec.y=Math.round(y);
+  if(b) Matter.Body.setPosition(b,{x:rec.x,y:rec.y});
+}
+function hostRot(id,angle){
+  const rec=records.get(id); const b=bodies.get(id);
+  if(!rec) return;
+  rec.angle=angle;
+  if(b) Matter.Body.setAngle(b,angle);
+}
+function hostLock(id,locked){
+  const rec=records.get(id); const b=bodies.get(id);
+  if(!rec) return;
+  rec.locked=!!locked;
+  if(b){
+    if(rec.locked) Matter.Body.setStatic(b,true);
+    else if(isRunning) Matter.Body.setStatic(b,false);
+  }
+}
+function hostDel(id){
+  const b=bodies.get(id);
+  if(b&&engine) Matter.Composite.remove(engine.world,b);
+  bodies.delete(id); records.delete(id);
+  draggedBy.delete(id); pausedFrozen.delete(id);
+  if(selectedId===id) selectedId=null;
+  queueDel(id);
+}
+function hostClear(){
+  if(engine){ for(const [,b] of bodies) Matter.Composite.remove(engine.world,b); }
+  const ids=[...records.keys()];
+  bodies.clear(); records.clear(); draggedBy.clear(); pausedFrozen.clear(); celebrated.clear();
+  selectedId=null;
+  ids.forEach(queueDel);
+}
+function applySim(running){
+  running=!!running;
+  if(running===isRunning) return;
+  isRunning=running;
+  $('btn-sim').textContent=isRunning?'Pause':'Play';
+  if(!isHost||!engine) return;
+  if(!isRunning){
+    pausedFrozen.clear();
+    for(const [id,b] of bodies){
+      const rec=records.get(id);
+      if(rec&&rec.locked) continue;
+      if(!b.isStatic){ pausedFrozen.add(id); Matter.Body.setStatic(b,true); }
+    }
+  }else{
+    for(const id of pausedFrozen){
+      const b=bodies.get(id); const rec=records.get(id);
+      if(b&&rec&&!rec.locked) Matter.Body.setStatic(b,false);
+    }
+    pausedFrozen.clear();
+  }
+}
+function applyGrav(y){
+  gravityY=Math.max(0,Math.min(2,y));
+  const g=$('grav'); if(document.activeElement!==g) g.value=String(gravityY);
+  if(engine) engine.gravity.y=gravityY;
+}
 
-            const mouse = Matter.Mouse.create(render.canvas);
-            mouseConstraint = Matter.MouseConstraint.create(engine, {
-                mouse: mouse,
-                constraint: { stiffness: 0.2, render: { visible: false } }
-            });
-            Matter.World.add(engine.world, mouseConstraint);
+/* ---------- host validation + intents ---------- */
+function allow(peerId){
+  const now=Date.now();
+  let bk=buckets.get(peerId);
+  if(!bk){bk={tokens:40,last:now};buckets.set(peerId,bk);}
+  const dt=(now-bk.last)/1000; bk.last=now;
+  bk.tokens=Math.min(40,bk.tokens+dt*20);
+  if(bk.tokens<1) return false;
+  bk.tokens-=1; return true;
+}
+function deny(from,text){
+  if(!from||!from.id) return;
+  if(from.id===myId){ flashDenied(text); return; }
+  Hub.up('denied',{to:from.id,text});
+}
+function onIntent(p,from){
+  if(!isHost) return; // guests never apply intents
+  from=from||{id:myId,name:myName};
+  const peerKey=from.id||'host';
+  if(!allow(peerKey)){ deny(from,'too fast — slow down'); return; }
+  const a=p&&p.a;
+  if(a==='add'){
+    const rec=p.rec; if(!rec||!rec.id||!rec.kind) return;
+    if(records.has(rec.id)) return;
+    clampRec(rec);
+    hostAdd(rec); return;
+  }
+  if(a==='move'){
+    const rec=records.get(p.id); if(!rec){deny(from,'part is gone');return;}
+    if(rec.locked){deny(from,'part is locked (L to unlock)');return;}
+    const own=draggedBy.get(p.id);
+    if(own&&own.by!==peerKey&&Date.now()<own.until){deny(from,'someone else is holding that part');return;}
+    draggedBy.set(p.id,{by:peerKey,until:Date.now()+(p.done?0:2000)});
+    if(p.done) setTimeout(()=>{const d=draggedBy.get(p.id);if(d&&d.by===peerKey)draggedBy.delete(p.id);},60);
+    hostMove(p.id,Math.max(0,Math.min(W,p.x)),Math.max(0,Math.min(H,p.y)));
+    return;
+  }
+  if(a==='rot'){
+    const rec=records.get(p.id); if(!rec){deny(from,'part is gone');return;}
+    hostRot(p.id,p.angle); return;
+  }
+  if(a==='lock'){
+    const rec=records.get(p.id); if(!rec){deny(from,'part is gone');return;}
+    hostLock(p.id,p.locked); return;
+  }
+  if(a==='del'){
+    if(!records.has(p.id)){deny(from,'part is gone');return;}
+    hostDel(p.id); return;
+  }
+  if(a==='sim'){ applySim(p.running); return; }
+  if(a==='grav'){ applyGrav(p.y); return; }
+  if(a==='clear'){ hostClear(); return; }
+  if(a==='cursor'){ cursorsOut[peerKey]={x:p.x,y:p.y,name:(from&&from.name)||'guest'}; return; }
+}
 
-            window.addEventListener('keydown', (e) => {
-                if (!isHost) return;
-                const selected = mouseConstraint.body;
-                if (!selected) return;
+/* ---------- guest state handling (visual only, no Matter) ---------- */
+const snaps=[]; // {rt, map:Map(id->{x,y,a,l})}
+function onState(p,from){
+  if(isHost) return;
+  if(!p) return;
+  if(typeof p.g==='number') applyGrav(p.g);
+  if(typeof p.sim==='boolean'&&p.sim!==isRunning){isRunning=p.sim;$('btn-sim').textContent=isRunning?'Pause':'Play';}
+  if(Array.isArray(p.add)){
+    for(const r of p.add){ if(r&&r.i&&!records.has(r.i)){
+      records.set(r.i,{id:r.i,kind:r.kind,x:r.x,y:r.y,angle:r.a||0,color:r.c||r.color||'#8b5a2b',
+        locked:!!r.l,w:r.w,h:r.h,r:r.r,verts:r.verts});
+    }}
+  }
+  if(Array.isArray(p.del)){
+    for(const id of p.del){ records.delete(id); if(selectedId===id)selectedId=null; }
+  }
+  if(p.addFull){ records.clear(); for(const r of (p.add||[])){
+    records.set(r.i,{id:r.i,kind:r.kind,x:r.x,y:r.y,angle:r.a||0,color:r.c||r.color||'#8b5a2b',locked:!!r.l,w:r.w,h:r.h,r:r.r,verts:r.verts});
+  }}
+  const map=new Map();
+  if(Array.isArray(p.obs)) for(const o of p.obs) map.set(o.i,{x:o.x,y:o.y,a:o.a,l:!!o.l});
+  snaps.push({rt:Date.now(),map,sfx:p.sfx||null,curs:p.curs||null});
+  if(snaps.length>40) snaps.splice(0,snaps.length-40);
+  if(p.curs) remoteCursors=remapCursors(p.curs);
+  if(Array.isArray(p.sfx)) for(const s of p.sfx) playClink(s.v);
+}
+function remapCursors(c){
+  const o={};
+  for(const k of Object.keys(c)){ if(k!==myId) o[k]=c[k]; }
+  return o;
+}
+function guestRenderAt(now){
+  const t=now-100;
+  // drop old
+  while(snaps.length>2&&snaps[1].rt<=t) snaps.shift();
+  if(!snaps.length) return;
+  const a=snaps[0], b=snaps[1];
+  if(!b){
+    // hold last, clamp extrapolation: just snap
+    for(const [id,v] of a.map){
+      if(id===optimisticId) continue;
+      const r=records.get(id); if(!r) continue;
+      r.x=v.x;r.y=v.y;r.angle=v.a;r.locked=v.l;
+    }
+    return;
+  }
+  const span=Math.max(1,b.rt-a.rt), f=Math.max(0,Math.min(1,(t-a.rt)/span));
+  const ids=new Set([...a.map.keys(),...b.map.keys()]);
+  for(const id of ids){
+    if(id===optimisticId) continue;
+    const r=records.get(id); if(!r) continue;
+    const va=a.map.get(id), vb=b.map.get(id);
+    if(va&&vb){
+      r.x=va.x+(vb.x-va.x)*f; r.y=va.y+(vb.y-va.y)*f;
+      let d=vb.a-va.a;
+      while(d>Math.PI)d-=2*Math.PI; while(d<-Math.PI)d+=2*Math.PI;
+      r.angle=va.a+d*f; r.locked=vb.l;
+    } else if(vb){ r.x=vb.x;r.y=vb.y;r.angle=vb.a;r.locked=vb.l; }
+  }
+}
 
-                if (e.key === 'l') {
-                    Matter.Body.setStatic(selected, !selected.isStatic);
-                }
-                if (e.key === 'r') {
-                    Matter.Body.setAngle(selected, selected.angle + Math.PI/4);
-                }
-            });
+/* ---------- roster / boot ---------- */
+function onRoster(p){
+  Hub.me=p.you; Hub.roster=p.roster||[]; Hub.room=p.room||'';
+  myId=Hub.me.id; myName=Hub.me.name||'Player';
+  isHost=!!Hub.me.isHost;
+  $('role').textContent=(isHost?'host':'guest')+' · '+myName+' · '+(Hub.roster.length)+' players';
+  if(!booted){ booted=true; bootAll(); }
+  if(isHost){
+    // bootstrap late joiners with the full world before the first tick
+    pendingAdd.length=0;
+    for(const r of records.values()) queueAdd(r);
+  }
+  reportHeight();
+}
+function bootAll(){
+  ensureEngineIfHost();
+  bindToolbar();
+  bindPointer();
+  bindKeys();
+  requestAnimationFrame(loop);
+  setInterval(broadcastTick,50);
+  reportHeight();
+}
+function ensureEngineIfHost(){ if(isHost||amSolo) ensureEngine(); }
 
-            window.addEventListener('mousedown', (e) => {
-                if (!isHost || currentMode !== 'draw') return;
-                isDrawing = true;
-                drawPoints = [{x: e.clientX, y: e.clientY}];
-                drawCanvas.width = window.innerWidth;
-                drawCanvas.height = window.innerHeight;
-            });
+/* solo fallback when opened outside the hub */
+setTimeout(()=>{ if(!booted){ amSolo=true; isHost=true; myId=myId||'solo'; booted=true; bootAll();
+  $('role').textContent='solo · local table'; } },1800);
 
-            window.addEventListener('mousemove', (e) => {
-                if (!isDrawing) return;
-                drawPoints.push({x: e.clientX, y: e.clientY});
-                ctx.strokeStyle = '#8b5a2b';
-                ctx.lineWidth = 10;
-                ctx.lineCap = 'round';
-                ctx.beginPath();
-                ctx.moveTo(drawPoints[drawPoints.length-2].x, drawPoints[drawPoints.length-2].y);
-                ctx.lineTo(e.clientX, e.clientY);
-                ctx.stroke();
-            });
+/* ---------- broadcast (host, 20 Hz) ---------- */
+function broadcastTick(){
+  if(!isHost||!booted||!engine) return;
+  const now=Date.now();
+  if(now-lastBroadcast<50) return;
+  lastBroadcast=now;
+  const obs=[];
+  for(const [id,b] of bodies){
+    const rec=records.get(id); if(!rec) continue;
+    rec.x=b.position.x; rec.y=b.position.y; rec.angle=b.angle;
+    // milestone: ball settled on the floor
+    if(rec.kind==='ball'&&!celebrated.has(id)&&rec.y>H-40&&Math.hypot(b.velocity.x,b.velocity.y)<0.6){
+      celebrated.add(id); Hub.up('say','machine completed — nice build '+myName+'!');
+    }
+    obs.push({i:id,x:Math.round(rec.x),y:Math.round(rec.y),a:+rec.angle.toFixed(3),l:rec.locked?1:0});
+  }
+  const add=pendingAdd.splice(0).map(r=>({i:r.id,kind:r.kind,x:Math.round(r.x),y:Math.round(r.y),
+    a:+((r.angle||0).toFixed(3)),c:r.color,l:r.locked?1:0,w:r.w,h:r.h,r:r.r,verts:r.verts}));
+  const del=pendingDel.splice(0);
+  const sfx=pendingSfx.splice(0);
+  // include remote cursors so guests see each other
+  const msg={sim:isRunning,seq:++seq,t:Date.now(),obs,add,del,g:gravityY};
+  if(sfx.length) msg.sfx=sfx;
+  const ck={}; for(const k of Object.keys(cursorsOut)) ck[k]=cursorsOut[k];
+  if(myCursor) ck[myId||'host']={x:Math.round(myCursor.x),y:Math.round(myCursor.y),name:myName};
+  if(Object.keys(ck).length) msg.curs=ck;
+  Hub.up('state',msg);
+  if(sfx.length) for(const s of sfx) playClink(s.v);
+}
 
-            window.addEventListener('mouseup', () => {
-                if (!isDrawing) return;
-                isDrawing = false;
-                ctx.clearRect(0, 0, drawCanvas.width, drawCanvas.height);
-                createCustomPath(drawPoints);
-            });
-        }
+/* ---------- render ---------- */
+function drawRecord(r){
+  ctx.save();
+  ctx.translate(r.x,r.y);
+  ctx.rotate(r.angle||0);
+  const sel=(r.id===selectedId);
+  ctx.fillStyle=r.color||'#8b5a2b';
+  ctx.strokeStyle=sel?'#ffe9a8':'rgba(0,0,0,.55)';
+  ctx.lineWidth=sel?3:1.5;
+  if(r.kind==='ball'){
+    ctx.beginPath();ctx.arc(0,0,r.r||14,0,7);ctx.fill();ctx.stroke();
+    ctx.strokeStyle='rgba(255,255,255,.5)';ctx.lineWidth=1;
+    ctx.beginPath();ctx.moveTo(0,0);ctx.lineTo(r.r||14,0);ctx.stroke();
+  }else if(r.kind==='block'){
+    const w=r.w||48,h=r.h||48;
+    ctx.fillRect(-w/2,-h/2,w,h);ctx.strokeRect(-w/2,-h/2,w,h);
+  }else if(r.kind==='plank'||r.kind==='ramp'){
+    const w=r.w||240,h=r.h||14;
+    ctx.fillRect(-w/2,-h/2,w,h);ctx.strokeRect(-w/2,-h/2,w,h);
+    ctx.fillStyle='rgba(0,0,0,.25)';
+    for(let x=-w/2+12;x<w/2;x+=24) ctx.fillRect(x,-h/2,3,h);
+  }else if(r.kind==='drawn'&&r.verts&&r.verts.length){
+    ctx.beginPath();
+    ctx.moveTo(r.verts[0].x,r.verts[0].y);
+    for(let i=1;i<r.verts.length;i++) ctx.lineTo(r.verts[i].x,r.verts[i].y);
+    ctx.lineWidth=Math.max(6,sel?9:7);ctx.lineCap='round';ctx.lineJoin='round';
+    ctx.strokeStyle=r.color||'#4a3f35';ctx.stroke();
+    if(sel){ctx.lineWidth=1.5;ctx.strokeStyle='#ffe9a8';ctx.stroke();}
+  }
+  ctx.restore();
+  if(r.locked){
+    ctx.save();ctx.translate(r.x,r.y);ctx.fillStyle='#ffe9a8';
+    ctx.font='bold 13px system-ui';ctx.textAlign='center';
+    ctx.fillText('🔒',0,-(r.r||r.h||20)-8);ctx.restore();
+  }
+}
+function render(){
+  ctx.clearRect(0,0,W,H);
+  // backdrop grid + floor
+  ctx.fillStyle='#1c160e';ctx.fillRect(0,0,W,H);
+  ctx.strokeStyle='rgba(230,194,128,.12)';ctx.lineWidth=1;
+  for(let x=0;x<=W;x+=40){ctx.beginPath();ctx.moveTo(x,0);ctx.lineTo(x,H);ctx.stroke();}
+  for(let y=0;y<=H;y+=40){ctx.beginPath();ctx.moveTo(0,y);ctx.lineTo(W,y);ctx.stroke();}
+  ctx.fillStyle='#3a2f1f';ctx.fillRect(0,H-6,W,6);
+  ctx.strokeStyle='#6b5636';ctx.lineWidth=2;ctx.strokeRect(1,1,W-2,H-2);
+  for(const r of records.values()) drawRecord(r);
+  // draft polyline
+  if(draftPts.length>1){
+    ctx.save();ctx.strokeStyle='#ffe9a8';ctx.lineWidth=7;ctx.lineCap='round';ctx.lineJoin='round';
+    ctx.beginPath();ctx.moveTo(draftPts[0].x,draftPts[0].y);
+    for(let i=1;i<draftPts.length;i++)ctx.lineTo(draftPts[i].x,draftPts[i].y);
+    ctx.stroke();ctx.restore();
+  }
+  renderCursors();
+}
+let myCursor=null;
+function renderCursors(){
+  const box=$('cursors'); const wrapR=$('stage-wrap').getBoundingClientRect();
+  const cr=canvas.getBoundingClientRect();
+  box.innerHTML='';
+  for(const k of Object.keys(remoteCursors)){
+    const c=remoteCursors[k]; if(!c) continue;
+    const d=document.createElement('div');d.className='cur';
+    d.style.left=((c.x/W)*cr.width)+'px';d.style.top=((c.y/H)*cr.height)+'px';
+    d.textContent='▸ '+(c.name||'guest');box.appendChild(d);
+  }
+}
 
-        function createCustomPath(points) {
-            if (points.length < 2) return;
-            const color = earthTones[Math.floor(Math.random()*earthTones.length)];
-            
-            for (let i = 0; i < points.length - 1; i++) {
-                const p1 = points[i];
-                const p2 = points[i+1];
-                const dist = Math.sqrt(Math.pow(p2.x - p1.x, 2) + Math.pow(p2.y - p1.y, 2));
-                const angle = Math.atan2(p2.y - p1.y, p2.x - p1.x);
-                const midX = (p1.x + p2.x) / 2;
-                const midY = (p1.y + p2.y) / 2;
-                
-                const id = Math.random().toString(36).substr(2, 9);
-                const body = Matter.Bodies.rectangle(midX, midY, dist, 10, { 
-                    isStatic: true, 
-                    angle: angle, 
-                    render: { fillStyle: color } 
-                });
-                body.gameId = id;
-                bodies[id] = body;
-                Matter.World.add(engine.world, body);
-            }
-        }
+/* ---------- loop ---------- */
+function loop(t){
+  requestAnimationFrame(loop);
+  if(!booted) return;
+  if(isHost&&engine&&isRunning){
+    try{ Matter.Engine.update(engine,1000/60); }catch(e){}
+    // celebrate check happens in broadcastTick
+  }
+  if(!isHost) guestRenderAt(Date.now());
+  render();
+}
 
-        function onRoster(r) {
-            isHost = r.you.isHost;
-            if (isHost) {
-                initPhysics();
-                document.getElementById('host-controls').style.display = 'flex';
-                setInterval(broadcastState, 50);
-            } else {
-                initGuestVisuals();
-            }
-        }
+/* ---------- hit testing (works for host + guest, no mouseConstraint) ---------- */
+function hitRecord(px,py){
+  const ids=[...records.keys()].reverse();
+  for(const id of ids){
+    const r=records.get(id); if(!r) continue;
+    const dx=px-r.x,dy=py-r.y;
+    const c=Math.cos(-(r.angle||0)),s=Math.sin(-(r.angle||0));
+    const lx=dx*c-dy*s,ly=dx*s+dy*c;
+    if(r.kind==='ball'){ if(Math.hypot(dx,dy)<=(r.r||14)+4) return r; }
+    else if(r.kind==='block'||r.kind==='plank'||r.kind==='ramp'){
+      if(Math.abs(lx)<=(r.w||48)/2+4&&Math.abs(ly)<=(r.h||14)/2+6) return r;
+    }else if(r.kind==='drawn'&&r.verts){
+      for(const v of r.verts){ if(Math.hypot(lx-v.x,ly-v.y)<10) return r; }
+    }
+  }
+  return null;
+}
 
-        function spawnPart(type, x = window.innerWidth/2, y = 100) {
-            const id = Math.random().toString(36).substr(2, 9);
-            let body;
-            const color = earthTones[Math.floor(Math.random()*earthTones.length)];
+/* ---------- mutations (route through host) ---------- */
+function doAdd(kind,x,y){
+  const rec=makeRecord(kind,x,y);
+  if(isHost) hostAdd(rec);
+  else Hub.up('intent',{a:'add',rec});
+}
+function doMove(id,x,y,done){
+  x=Math.max(0,Math.min(W,x));y=Math.max(0,Math.min(H,y));
+  if(isHost){
+    const rec=records.get(id);
+    if(rec&&!rec.locked) hostMove(id,x,y);
+  }else{
+    const r=records.get(id);
+    if(r){ r.x=x;r.y=y; optimisticId=done?null:id; }
+    Hub.up('intent',{a:'move',id,x:Math.round(x),y:Math.round(y),done:!!done});
+    if(done) optimisticId=null;
+  }
+}
+function doRot(id,delta){
+  const r=records.get(id); if(!r) return;
+  const na=(r.angle||0)+delta;
+  if(isHost) hostRot(id,na);
+  else{ r.angle=na; Hub.up('intent',{a:'rot',id,angle:na}); }
+  updateSel();
+}
+function doLock(id){
+  const r=records.get(id); if(!r) return;
+  if(isHost) hostLock(id,!r.locked);
+  else Hub.up('intent',{a:'lock',id,locked:!r.locked});
+}
+function doDel(id){
+  if(isHost) hostDel(id);
+  else Hub.up('intent',{a:'del',id});
+}
+function doReset(){
+  records.clear();bodies.clear();snaps.length=0;selectedId=null;draftPts=[];
+  if(engine){ try{Matter.Composite.clear(engine.world,false,true);}catch(e){} ensureEngine(); }
+  updateSel();reportHeight();
+}
 
-            if (type === 'ramp') {
-                body = Matter.Bodies.rectangle(x, y, 200, 20, { angle: Math.PI/6, restitution: 0.1, friction: 0.5, render: { fillStyle: color } });
-            } else if (type === 'ball') {
-                body = Matter.Bodies.circle(x, y, 15, { restitution: 0.6, friction: 0.1, render: { fillStyle: color } });
-            } else {
-                body = Matter.Bodies.rectangle(x, y, 50, 50, { render: { fillStyle: color } });
-            }
+/* ---------- pointer ---------- */
+let cursorT=0;
+function bindPointer(){
+  canvas.style.touchAction='none';
+  canvas.addEventListener('pointerdown',(e)=>{
+    Hub.up('hello');
+    unlockAudio();
+    const p=toWorld(e);
+    if(mode==='draw'){
+      draftPts=[p];
+      try{canvas.setPointerCapture(e.pointerId);}catch(err){}
+      dragging={draw:true};
+      return;
+    }
+    const hit=hitRecord(p.x,p.y);
+    if(mode==='erase'){
+      if(hit) doDel(hit.id);
+      return;
+    }
+    if(hit){
+      selectedId=hit.id;updateSel();
+      dragging={id:hit.id,moved:false};
+      try{canvas.setPointerCapture(e.pointerId);}catch(err){}
+      if(!isHost){ optimisticId=hit.id; }
+      else { draggedBy.set(hit.id,{by:myId||'host',until:Date.now()+2000}); }
+      doMove(hit.id,p.x,p.y,false);
+    }else{ selectedId=null;updateSel(); }
+  });
+  canvas.addEventListener('pointermove',(e)=>{
+    const p=toWorld(e);
+    myCursor=p;
+    const now=Date.now();
+    if(now-cursorT>120){cursorT=now;Hub.up('intent',{a:'cursor',x:Math.round(p.x),y:Math.round(p.y)});}
+    if(mode==='draw'&&dragging&&dragging.draw){
+      const last=draftPts[draftPts.length-1];
+      if(!last||Math.hypot(p.x-last.x,p.y-last.y)>=4) draftPts.push(p);
+      return;
+    }
+    if(dragging&&dragging.id){
+      dragging.moved=true;
+      doMove(dragging.id,p.x,p.y,false);
+      if(isHost) draggedBy.set(dragging.id,{by:myId||'host',until:Date.now()+2000});
+    }
+  });
+  const up=(e)=>{
+    if(mode==='draw'&&dragging&&dragging.draw){
+      finishDraw();
+      dragging=null;return;
+    }
+    if(dragging&&dragging.id){
+      const p=toWorld(e);
+      doMove(dragging.id,p.x,p.y,true);
+      if(isHost) draggedBy.delete(dragging.id);
+      dragging=null;optimisticId=null;
+    }
+  };
+  canvas.addEventListener('pointerup',up);
+  canvas.addEventListener('pointercancel',()=>{dragging=null;draftPts=[];optimisticId=null;});
+  overlay.addEventListener('click',()=>{
+    overlay.classList.add('hide');
+    unlockAudio();startMusic();
+    Hub.up('hello');
+  });
+  // first gesture anywhere re-hellos (hub only fires roster after hello)
+  window.addEventListener('pointerdown',function once(){
+    Hub.up('hello');unlockAudio();startMusic();
+  },{once:true});
+}
+function finishDraw(){
+  if(draftPts.length<2){draftPts=[];setMode('select');return;}
+  const simp=rdp(draftPts,3);
+  if(simp.length<2){draftPts=[];setMode('select');return;}
+  let cx=0,cy=0;
+  simp.forEach(p=>{cx+=p.x;cy+=p.y;});
+  cx/=simp.length;cy/=simp.length;
+  const verts=simp.map(p=>({x:+(p.x-cx).toFixed(1),y:+(p.y-cy).toFixed(1)}));
+  const rec={id:uid('o'),kind:'drawn',x:Math.round(cx),y:Math.round(cy),angle:0,
+    color:nextColor(),locked:true,verts};
+  draftPts=[];
+  setMode('select');
+  if(isHost) hostAdd(rec);
+  else Hub.up('intent',{a:'add',rec});
+}
+function setMode(m){
+  mode=m;
+  $('btn-draw').classList.toggle('on',m==='draw');
+  $('btn-erase').classList.toggle('on',m==='erase');
+  $('hint').textContent=m==='draw'?'draw a track — release to drop it':m==='erase'?'click a part to remove it':'';
+}
+function updateSel(){
+  const r=selectedId&&records.get(selectedId);
+  $('sel').textContent=r?('selected '+r.kind+' '+(r.locked?'🔒':'')+' '+r.id.slice(-4)):'nothing selected';
+}
 
-            body.gameId = id;
-            bodies[id] = body;
-            Matter.World.add(engine.world, body);
-        }
+/* ---------- toolbar + keys ---------- */
+let toolbarBound=false;
+function bindToolbar(){
+  if(toolbarBound) return; toolbarBound=true;
+  document.querySelectorAll('[data-add]').forEach(b=>b.addEventListener('click',()=>{
+    unlockAudio();
+    const kind=b.getAttribute('data-add');
+    const spots={ball:[W/2,80],plank:[W/2,300],ramp:[W/2,300],block:[W/2,200]};
+    const s=spots[kind]||[W/2,H/2];
+    doAdd(kind,s[0]+Math.random()*40-20,s[1]+Math.random()*20-10);
+  }));
+  $('btn-draw').addEventListener('click',()=>setMode(mode==='draw'?'select':'draw'));
+  $('btn-erase').addEventListener('click',()=>setMode(mode==='erase'?'select':'erase'));
+  $('grav').addEventListener('input',(e)=>{
+    const y=parseFloat(e.target.value);
+    if(isHost) applyGrav(y);
+    else Hub.up('intent',{a:'grav',y});
+  });
+  $('btn-sim').addEventListener('click',()=>{
+    if(isHost) applySim(!isRunning);
+    else Hub.up('intent',{a:'sim',running:!isRunning});
+  });
+  $('btn-clear').addEventListener('click',()=>{
+    if(isHost) hostClear();
+    else Hub.up('intent',{a:'clear'});
+  });
+  $('btn-music').addEventListener('click',toggleMusic);
+}
+function bindKeys(){
+  window.addEventListener('keydown',(e)=>{
+    if(e.target&&(e.target.tagName==='INPUT'||e.target.tagName==='SELECT')) return;
+    const k=e.key;
+    if((k==='r'||k==='R')&&selectedId){
+      doRot(selectedId,e.shiftKey?-Math.PI/12:Math.PI/12);
+    }else if(k==='l'||k==='L'){
+      if(selectedId) doLock(selectedId);
+    }else if((k==='Delete'||k==='Backspace')&&selectedId){
+      const id=selectedId;selectedId=null;updateSel();doDel(id);
+      e.preventDefault();
+    }
+  });
+}
 
-        function broadcastState() {
-            const snapshot = Object.values(bodies).map(b => ({
-                id: b.gameId,
-                x: b.position.x,
-                y: b.position.y,
-                r: b.angle,
-                c: b.render.fillStyle,
-                isCircle: b.circleRadius !== undefined,
-                isStatic: b.isStatic,
-                w: b.bounds.max.x - b.bounds.min.x,
-                h: b.bounds.max.y - b.bounds.min.y
-            }));
-            Hub.up('state', snapshot);
-        }
+/* ---------- audio ---------- */
+let music=null,musicOn=false,musicReady=false,audioCtx=null;
+function unlockAudio(){
+  try{
+    if(typeof Howl!=='undefined'&&Howler&&Howler.ctx&&Howler.ctx.state==='suspended') Howler.ctx.resume();
+  }catch(e){}
+  try{
+    if(!audioCtx) audioCtx=new (window.AudioContext||window.webkitAudioContext)();
+    if(audioCtx.state==='suspended') audioCtx.resume();
+  }catch(e){}
+}
+function ensureMusic(){
+  if(music||typeof Howl==='undefined') return music;
+  try{
+    music=new Howl({src:['assets/music/relaxing_track.mp3','assets/music/relaxing_track.ogg'],
+      loop:true,volume:0.25,
+      onloaderror:function(){musicReady=false;},
+      onplayerror:function(){musicReady=false;}});
+  }catch(e){ music=null; }
+  return music;
+}
+function startMusic(){ /* only via button; gesture unlocks ctx */ }
+function toggleMusic(){
+  unlockAudio();
+  const m=ensureMusic();
+  if(!m) return; // missing file or CDN: silent no-op
+  try{
+    if(!musicOn){
+      if(m.state()==='loaded'){ m.play(); musicOn=true; $('btn-music').textContent='Music: on'; }
+      else{
+        // not loaded (file absent) — fail silently per spec
+        m.once('load',()=>{ try{m.play();musicOn=true;$('btn-music').textContent='Music: on';}catch(e){} });
+      }
+    }else{ m.pause(); musicOn=false; $('btn-music').textContent='Music: off'; }
+  }catch(e){}
+}
+function playClink(v){
+  try{
+    if(!audioCtx) return;
+    const t0=audioCtx.currentTime;
+    const o=audioCtx.createOscillator(),g=audioCtx.createGain();
+    o.type='triangle';o.frequency.value=1400+Math.random()*800;
+    const vol=Math.max(0.001,Math.min(0.25,0.08*(v||0.4)));
+    g.gain.setValueAtTime(vol,t0);
+    g.gain.exponentialRampToValueAtTime(0.0001,t0+0.12);
+    o.connect(g);g.connect(audioCtx.destination);
+    o.start(t0);o.stop(t0+0.13);
+  }catch(e){}
+}
 
-        function initGuestVisuals() {
-            engine = Matter.Engine.create();
-            render = Matter.Render.create({
-                element: document.body,
-                engine: engine,
-                options: {
-                    width: window.innerWidth,
-                    height: window.innerHeight,
-                    wireframes: false,
-                    background: 'transparent'
-                }
-            });
-            Matter.Render.run(render);
-        }
-
-        function onState(snapshot) {
-            snapshot.forEach(s => {
-                let b = bodies[s.id];
-                if (!b) {
-                    const newBody = s.isCircle 
-                        ? Matter.Bodies.circle(s.x, s.y, 15, { isStatic: true, render: { fillStyle: s.c } })
-                        : Matter.Bodies.rectangle(s.x, s.y, s.w, s.h, { isStatic: true, render: { fillStyle: s.c } });
-                    newBody.gameId = s.id;
-                    bodies[s.id] = newBody;
-                    Matter.World.add(engine.world, newBody); 
-                }
-                Matter.Body.setPosition(b, { x: s.x, y: s.y });
-                Matter.Body.setAngle(b, s.r);
-                Matter.Body.setStatic(b, s.isStatic);
-            });
-        }
-
-        function onIntent(p, from) {
-            if (!isHost) return;
-            if (p.type === 'drag') {
-                const b = bodies[p.id];
-                if (b) Matter.Body.setPosition(b, { x: p.x, y: p.y });
-            }
-        }
-
-        function setMode(mode) {
-            currentMode = mode;
-            document.querySelectorAll('.btn').forEach(b => b.classList.remove('active'));
-            event.target.classList.add('active');
-            
-            if (mode === 'spawn-ball') {
-                spawnPart('ball');
-            }
-        }
-
-        function togglePhysics() {
-            isSimulationRunning = !isSimulationRunning;
-            engine.world.gravity.y = isSimulationRunning ? 1.0 : 0;
-            if (!isSimulationRunning) {
-                Object.values(bodies).forEach(b => Matter.Body.setStatic(b, true));
-            }
-        }
-
-        function clearWorld() {
-            Object.values(bodies).forEach(b => Matter.World.remove(engine.world, b));
-            for (let id in bodies) delete bodies[id];
-        }
-
-        function reset() {
-            location.reload();
-        }
-
-        const bgMusic = new Howl({
-            src: ['assets/music/relaxing_track.mid'],
-            loop: true,
-            volume: 0.5
-        });
-
-        document.getElementById('start-overlay').onclick = function() {
-            this.style.opacity = '0';
-            setTimeout(() => this.remove(), 500);
-            bgMusic.play();
-            Hub.up('hello');
-            Hub.up('height', window.innerHeight);
-        };
-
-        window.onresize = () => {
-            Hub.up('height', window.innerHeight);
-        };
-    </script>
+Hub.init();
+reportHeight();
+})();
+</script>
 </body>
 </html>

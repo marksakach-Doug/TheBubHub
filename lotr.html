@@ -17,11 +17,39 @@ body{margin:0;background:var(--felt);color:var(--ink);font:15px/1.45 Georgia,ser
 #lr-err{font:11px monospace;color:#ff8888}
 #lr-status{background:rgba(0,0,0,.45);border:2px solid #6f8a4a;border-radius:14px;padding:14px 16px;font-size:19px;font-weight:700;text-align:center;color:#f2ecd8;box-shadow:0 4px 18px rgba(0,0,0,.5);min-height:70px;display:flex;flex-direction:column;justify-content:center;align-items:center}
 #lr-status small{display:block;font-size:12px;font-weight:400;color:var(--dim);margin-top:4px}
-.feed-item{background:rgba(20,26,18,.92);border:1px solid var(--gold);color:#f2ecd8;border-radius:12px;padding:8px 16px;font-size:14px;max-width:90%;text-align:center;box-shadow:0 4px 14px rgba(0,0,0,.55);position:absolute;top:50%;left:50%;transform:translate(-50%,-50%);z-index:100;white-space:nowrap;animation:feedPop .45s cubic-bezier(.34,1.56,.64,1) forwards, fadeOut 1s ease 3s forwards}
-.feed-item.pop{animation:feedPop .45s cubic-bezier(.34,1.56,.64,1), fadeOut 1s ease 3s forwards}
+.feed-item{background:rgba(20,26,18,.92);border:1px solid var(--gold);color:#f2ecd8;border-radius:12px;padding:8px 16px;font-size:14px;max-width:92%;text-align:center;box-shadow:0 4px 14px rgba(0,0,0,.55);position:absolute;top:6%;left:50%;transform:translate(-50%,0);z-index:100;white-space:normal;animation:feedPop .45s cubic-bezier(.34,1.56,.64,1) forwards, fadeOut .7s ease 1.6s forwards}
+.feed-item.pop{animation:feedPop .45s cubic-bezier(.34,1.56,.64,1), fadeOut .7s ease 1.6s forwards}
 .feed-item.big{border-width:2px;font-size:17px;font-weight:700}
 @keyframes feedPop{0%{transform:scale(.7) translateY(10px);opacity:0}60%{transform:scale(1.05)}100%{transform:scale(1);opacity:1}}
-@keyframes fadeOut{to{opacity:0;transform:translate(-50%,-60%);pointer-events:none}}
+@keyframes fadeOut{to{opacity:0;transform:translate(-50%,-160%);pointer-events:none}}
+#lr-score{background:rgba(0,0,0,.5);border:2px solid var(--gold);border-radius:14px;padding:10px 12px;display:flex;flex-direction:column;gap:8px}
+.sc-vsrow{display:flex;align-items:center;justify-content:center;gap:14px}
+.sc-side{flex:1;text-align:center;min-width:0}
+.sc-cap{font:700 11px system-ui;letter-spacing:.15em;color:var(--dim)}
+.sc-side.you .sc-cap{color:#b9c98a}
+.sc-n{font-size:52px;font-weight:900;line-height:1.05;color:#f2ecd8;text-shadow:0 2px 10px rgba(0,0,0,.7)}
+.sc-side.mon .sc-n{color:#f0b6a0}
+.sc-side.win .sc-n{color:#ffd76a;text-shadow:0 0 18px rgba(217,180,74,.8)}
+.sc-sub{font-size:11px;color:var(--dim);min-height:14px;overflow:hidden;text-overflow:ellipsis;white-space:nowrap}
+.sc-vs{text-align:center;flex:none}
+.sc-vs .x{font-size:26px;font-weight:900;color:var(--gold)}
+.sc-verdict{margin-top:4px;font:800 12px system-ui;padding:3px 10px;border-radius:9px;border:1px solid #4d4a3a;color:#d8cfae}
+.sc-verdict.win{background:#3d5226;border-color:#9bb86a;color:#e9f2d0;animation:pulseA 1.2s infinite}
+.sc-verdict.lose{background:#4a2320;border-color:#a05a4a;color:#f0c8b8}
+.sc-verdict.boss{background:#4a3418;border-color:#d9b44a;color:#ffd76a;animation:pulseA 1.2s infinite}
+.sc-chips{display:flex;gap:6px;flex-wrap:wrap;justify-content:center}
+.sc-chip{font:700 11px system-ui;background:rgba(0,0,0,.45);border:1px solid #4d4a3a;border-radius:9px;padding:3px 9px;color:#d8cfae;white-space:nowrap}
+.sc-chip .pw{color:#fff;font-size:13px}
+.sc-chip.on{border-color:var(--gold);color:#fff;box-shadow:0 0 8px rgba(217,180,74,.5)}
+.sc-chip.you{border-color:var(--green)}
+.sc-chip.winner{border-color:var(--gold);background:rgba(217,180,74,.2);color:#ffd76a}
+#lr-confetti{position:absolute;inset:0;pointer-events:none;overflow:hidden;z-index:20;border-radius:14px}
+.cf{position:absolute;top:-14px;width:10px;height:14px;opacity:0;animation-name:cfFall;animation-timing-function:ease-in;animation-fill-mode:forwards}
+@keyframes cfFall{0%{opacity:1;transform:translateY(0) rotate(0)}100%{opacity:0;transform:translateY(420px) rotate(var(--r,720deg))}}
+#lr-status.winner{background:linear-gradient(135deg,#4a3a10,#2a2410);border:2px solid var(--gold);box-shadow:0 0 30px rgba(217,180,74,.6);animation:winGlow 1.4s infinite}
+@keyframes winGlow{0%,100%{box-shadow:0 0 18px rgba(217,180,74,.4)}50%{box-shadow:0 0 34px rgba(217,180,74,.8)}}
+#lr-status .win-big{font-size:30px;font-weight:900;color:#ffd76a;letter-spacing:.02em}
+#lr-status .win-sub{font-size:13px;color:#e4d8b8;font-weight:400;margin-top:4px}
 #lr-tablewrap{position:relative;background:rgba(0,0,0,.28);border:1px solid #4d4a3a;border-radius:14px;padding:12px;display:flex;flex-direction:column;gap:12px;overflow:hidden}
 .lr-lbl{font:11px monospace;color:var(--dim);letter-spacing:.05em}
 .lr-deckrow{display:flex;gap:14px;align-items:stretch;justify-content:center;flex-wrap:wrap}
@@ -115,7 +143,9 @@ body{margin:0;background:var(--felt);color:var(--ink);font:15px/1.45 Georgia,ser
     <div id="lr-game" class="hidden" style="flex-direction:column;gap:12px">
         <div id="lr-tablewrap" style="position:relative;background:rgba(0,0,0,.28);border:1px solid #4d4a3a;border-radius:14px;padding:12px;display:flex;flex-direction:column;gap:12px;overflow:hidden">
             <div id="lr-veil" class="hidden"><div class="ribbon" id="lr-veil-text">Waiting…</div></div>
+            <div id="lr-confetti"></div>
             <div id="lr-topdeck"></div>
+            <div id="lr-score"></div>
             <div class="lr-midrow" id="lr-midrow"></div>
             <div id="lr-arena"></div>
             <div id="lr-meters" class="lr-meters"></div>
@@ -162,17 +192,45 @@ function reportHeight(){
 function onDown(e){
     const m = e.data;
     if (!m || m.t !== 'gd' || m.game !== GAME_ID) return;
-    if (m.k === 'roster'){ Hub.me = m.p.you; Hub.roster = m.p.roster; Hub.room = m.p.room; render(); return; }
+    if (m.k === 'roster'){ Hub.me = m.p.you; Hub.roster = m.p.roster; Hub.room = m.p.room; Hub.names = rosterNames(); if (syncNames() && isHost() && S) broadcast(); else render(); return; }
     if (m.k === 'state'){ if (m.p) { S = m.p; render(); } return; }
     if (m.k === 'intent'){ onIntent(m.p, m.from); return; }
     if (m.k === 'denied'){ toast(m.p.text); return; }
     if (m.k === 'reset'){ S = null; render(); return; }
 }
 const myId = () => Hub.me && Hub.me.id;
-const myName = () => (Hub.me && Hub.me.name) || 'Player';
+const myName = () => (Hub.names && Hub.names[myId()]) || (Hub.me && cleanName(Hub.me.name)) || 'Player';
 const isHost = () => !!(Hub.me && Hub.me.isHost);
 const peerCount = () => Hub.roster.length;
 const hostPresent = () => Hub.roster.some(m => m.host);
+
+// ---- Name system: clean, unique, live-synced display names ----
+// Roster order differs per client (each hub lists itself first), so we sort
+// by id — the same on every client — before de-duplicating. Result: every
+// client computes identical display names like "Fox", "Fox 2".
+function cleanName(s){ return String(s == null ? '' : s).replace(/\s+/g, ' ').trim().slice(0, 14) || 'Player'; }
+function rosterNames(){
+    const seen = new Map(), out = {};
+    Hub.roster.slice().sort((a, b) => a.id < b.id ? -1 : (a.id > b.id ? 1 : 0)).forEach(m => {
+        const base = cleanName(m.name);
+        const n = (seen.get(base) || 0) + 1;
+        seen.set(base, n);
+        out[m.id] = n > 1 ? base + ' ' + n : base;
+    });
+    return out;
+}
+Hub.names = {};
+// Display name for a seated player — always from the synced state copy.
+const pn = (p) => (p && p.name) || 'Player';
+function syncNames(){
+    if (!S) return false;
+    let changed = false;
+    S.pl.forEach(p => {
+        const n = (Hub.names || {})[p.id];
+        if (n && n !== p.name){ p.name = n; changed = true; }
+    });
+    return changed;
+}
 
 window.addEventListener('error', (e) => {
     try {
@@ -187,7 +245,10 @@ window.addEventListener('error', (e) => {
 const V = { J: 12, Q: 14, K: 16, A: 18 };
 const MON = { 2:['Bat','🦇'],3:['Crow','🐦'],4:['Goblin','👺'],5:['Giant Spider','🕷️'],6:['Angry Wood Elf','🧝'],7:['Warg','🐺'],8:['Orc','👹'],9:['Uruk-hai','🧟'],10:['Troll','🧌'],J:['Shelob','🕸️'],Q:['Balrog','🔥'],K:['Nazgûl','💀'],A:['Dragon','🐉'] };
 const WEP = { 2:['Rusty Dagger','🗡️'],3:['Hunting Knife','🔪'],4:['Sling','🪨'],5:['Short Bow','🏹'],6:['Hand Axe','🪓'],7:['Throwing Spear','🔱'],8:['Dwarven Axe','⚒️'],9:['Elven Longbow','🏹'],10:['Sting','🗡️','Glows when Orcs are near'],J:['Orcrist','⚔️','The Goblin-cleaver: Draw 2 Loot, keep 1'],Q:['Glamdring','🗡️','Foe-hammer: High power'],K:['Narsil','⚔️','The Blade that was Broken'],A:['Andúril','⚔️','Flame of the West: Ultimate Power'] };
-let S = null, remembered = { dread: true }, noteT = null, lastFeedN = 0, lastLvls = {};
+let S = null, remembered = { dread: true }, noteT = null, lastFeedN = 0, lastLvls = {}, lastWinShown = null;
+// The game is over when the winner is decided (belt and braces: phase or flag,
+// since older in-flight states may only carry the phase).
+const isOver = () => !!(S && (S.over || S.phase === 'over'));
 
 const val = (c, dr) => (c.r === 'A' && c.c === 'B') ? (dr ? 20 : 14) : (V[c.r] || +c.r);
 const isNum = (c) => !V[c.r];
@@ -206,6 +267,9 @@ const me = () => S && S.pl.find(p => p.id === myId());
 const cap = (p) => p.lvl >= 10 ? 2 : 1;
 const canEq = (p, c) => p.lvl >= 5 || isNum(c);
 const power = (p, dr) => p.eq.reduce((s, c) => s + val(c, dr), 0);
+// Spare-slot worth: a weapon you cannot equip yet is worth far less than one
+// you can — a usable 9 beats an unusable 14 for a Lv 1–4 player.
+const spareVal = (p, c) => canEq(p, c) ? val(c) : val(c) - 100;
 function dread(p){
     if (!S.cfg.dread) return 0;
     return Math.max(0, p.lvl - Math.min(...S.pl.filter(x => !x.gone).map(x => x.lvl)));
@@ -215,14 +279,14 @@ function norm(p){
     if (bad.length){
         p.eq = p.eq.filter(c => canEq(p, c));
         p.hand.push(...bad);
-        say(`${p.name}'s ${bad.map(wname).join(', ')} no longer legal at this level — moved to spare.`);
+        say(`${pn(p)}'s ${bad.map(wname).join(', ')} no longer legal at this level — moved to spare.`);
     }
     p.eq.sort((a, b) => val(b) - val(a));
     while (p.eq.length < cap(p) && p.hand.length > 0) {
         const next = p.hand.shift();
         if (canEq(p, next)) {
             p.eq.push(next);
-            say(`${p.name} automatically equips ${wname(next)}.`);
+            say(`${pn(p)} automatically equips ${wname(next)}.`);
         } else {
             p.hand.unshift(next);
             break;
@@ -231,18 +295,35 @@ function norm(p){
     while (p.eq.length > cap(p)) p.hand.push(p.eq.pop());
     p.hand.sort((a, b) => val(b) - val(a));
     while (p.hand.length > 1){
-        const d = p.hand.pop();
+        let li = 0;
+        p.hand.forEach((x, i) => { if (spareVal(p, x) < spareVal(p, p.hand[li])) li = i; });
+        const d = p.hand.splice(li, 1)[0];
         S.lootD.push(d);
-        say(`${p.name} must discard spare ${wname(d)} (1 spare max).`);
+        say(`${pn(p)} must discard spare ${wname(d)} (1 spare max).`);
     }
 }
 function give(p, c){
-    if (p.eq.length < cap(p) && canEq(p, c)){
+    const can = canEq(p, c);
+    if (can && p.eq.length < cap(p)){
         p.eq.push(c);
-        say(`${p.name} takes ${wname(c)} — equipped.`);
+        say(`${pn(p)} takes ${wname(c)} — equipped.`);
+    } else if (can && !p.hand.length && p.eq.length){
+        // Gear full but spare empty: equip the new card, stash the weakest old one.
+        p.eq.sort((a, b) => val(a) - val(b));
+        const out = p.eq.shift();
+        p.eq.push(c); p.hand = [out];
+        say(`${pn(p)} takes ${wname(c)} — equipped, stashing spare ${wname(out)}.`);
+    } else if (p.hand.length){
+        // Spare full: the clicked card is always kept — the least useful old
+        // spare goes to the discard, named out loud so nothing vanishes.
+        const low = p.hand.reduce((a, b) => spareVal(p, b) < spareVal(p, a) ? b : a);
+        p.hand = p.hand.filter(x => x !== low);
+        p.hand.push(c);
+        S.lootD.push(low);
+        say(`${pn(p)} swaps spare ${wname(low)} for ${wname(c)}.`);
     } else {
         p.hand.push(c);
-        say(`${p.name} takes ${wname(c)} as spare.`);
+        say(`${pn(p)} takes ${wname(c)} as spare.`);
     }
     norm(p);
 }
@@ -256,7 +337,7 @@ function dropOne(p){
     p.eq = p.eq.filter(c => c !== d); p.hand = p.hand.filter(c => c !== d);
     S.lootD.push(d); return d;
 }
-const lose = (p) => { const d = dropOne(p); norm(p); if (d) say(`${p.name} loses ${wname(d)}.`); };
+const lose = (p) => { const d = dropOne(p); norm(p); if (d) say(`${pn(p)} loses ${wname(d)}.`); };
 
 function say(t){
     S.feed.unshift({ n: ++S.feedN, t });
@@ -265,9 +346,12 @@ function say(t){
 }
 
 function fresh(dr){
-    const ps = [{ id: myId(), name: myName() }].concat(Hub.roster.filter(m => m.id !== myId()).map(m => ({ id: m.id, name: m.name })));
+    const nm = rosterNames();
+    Hub.names = nm;
+    const ids = [myId()].concat(Hub.roster.filter(m => m.id !== myId()).map(m => m.id));
+    const ps = ids.map(id => ({ id, name: nm[id] || cleanName(id) }));
     S = { cfg: { dread: dr }, pl: ps.map(x => ({ id: x.id, name: x.name, lvl: 1, eq: [], hand: [] })),
-          loot: deck('B'), lootD: [], mon: deck('R'), monD: [], turn: 0, phase: 'choose',
+          loot: deck('B'), lootD: [], mon: deck('R'), monD: [], turn: 0, phase: 'choose', over: false,
           fight: null, pick: null, boss: null, win: null, feed: [], feedN: 0, msg: '' };
     const aside = [];
     S.pl.forEach(p => { let c; for (;;){ c = draw('L'); if (isNum(c)) break; aside.push(c); } p.eq = [c]; });
@@ -279,8 +363,8 @@ function startGame(dr){
     remembered.dread = dr;
     if (peerCount() < 2 || peerCount() > 6){ $('lr-setup-note').textContent = 'Need 2–6 players in the room.'; return false; }
     fresh(dr);
-    say(`LOTR Cards begins — ${S.pl.length} players, Rising Dread ${dr ? 'ON' : 'off'}. ${cur().name} goes first.`);
-    S.msg = `${cur().name}'s turn.`;
+    say(`LOTR Cards begins — ${S.pl.length} players, Rising Dread ${dr ? 'ON' : 'off'}. ${pn(cur())} goes first.`);
+    S.msg = `${pn(cur())}'s turn.`;
     broadcast();
     Hub.up('invite');
     return true;
@@ -292,7 +376,7 @@ function endTurn(){
     let k = 0;
     do { S.turn = (S.turn + 1) % S.pl.length; k++; } while (cur().gone && k < S.pl.length);
     S.phase = 'choose';
-    S.msg = `${cur().name}'s turn.`;
+    S.msg = `${pn(cur())}'s turn.`;
 }
 function chk(pw){
     let c = S.pl.filter(p => p.lvl >= 15);
@@ -306,9 +390,9 @@ function chk(pw){
                         c = f.filter(x => x[1] === m2).map(x => x[0]);
                     }
                 }
-    S.phase = 'over'; S.win = c[0].id; S.fight = null; S.boss = null; S.pick = null;
-    say(`🏆 ${c[0].name} reaches Level 15 and wins!`);
-    S.msg = `${c[0].name} wins the game!`;
+    S.phase = 'over'; S.over = true; S.win = c[0].id; S.fight = null; S.boss = null; S.pick = null;
+    say(`🏆 ${pn(c[0])} reaches Level 15 and wins!`);
+    S.msg = `🏆 ${pn(c[0])} wins the game!`;
     return true;
 }
 const total = () => S.fight.mons.reduce((s, c) => s + val(c, true), 0) + dread(cur());
@@ -317,7 +401,7 @@ function next(){
     if (s === 'h'){ S.phase = 'hreward'; S.msg = 'Helper: draw 1 Loot or gain 1 Level?'; return; }
     if (s === 'o'){
         S.pick = { who: cur().id, cards: [draw('L'), draw('L')], why: 'Orcrist' };
-        S.phase = 'pick'; S.msg = `${cur().name} wields Orcrist — draw 2 Loot, keep 1.`; return;
+        S.phase = 'pick'; S.msg = `${pn(cur())} wields Orcrist — draw 2 Loot, keep 1.`; return;
     }
     endTurn();
 }
@@ -325,17 +409,17 @@ function resolve(){
     const f = S.fight, p = cur(), h = f.helper && S.pl.find(x => x.id === f.helper);
     const P = power(p) + (h ? power(h) : 0), T = total(), win = P >= T;
     S.monD.push(...f.mons);
-    say(`${p.name}${h ? ' + ' + h.name : ''}: Power ${P} vs Monsters ${T} — ${win ? 'victory' : 'defeat'}.`);
+    say(`${pn(p)}${h ? ' + ' + pn(h) : ''}: Power ${P} vs Monsters ${T} — ${win ? 'victory' : 'defeat'}.`);
     S.q = [];
     if (win){
         const g = f.pushed ? 2 : 1;
-        if (!h){ p.lvl += g; say(`${p.name} gains ${g} Level${g > 1 ? 's' : ''} (now Lv ${p.lvl}).`); }
+        if (!h){ p.lvl += g; say(`${pn(p)} gains ${g} Level${g > 1 ? 's' : ''} (now Lv ${p.lvl}).`); }
         if (h) S.q.push('h');
         if (p.eq.some(c => c.r === 'J')) S.q.push('o');
         if (chk()) return;
     } else {
         lose(p);
-        if (f.pushed){ p.lvl = Math.max(1, p.lvl - 1); say(`${p.name} pushed and lost — drops to Lv ${p.lvl}.`); }
+        if (f.pushed){ p.lvl = Math.max(1, p.lvl - 1); say(`${pn(p)} pushed and lost — drops to Lv ${p.lvl}.`); }
         if (h) lose(h);
     }
     next();
@@ -353,14 +437,14 @@ function startBoss(){
 }
 function resolveBoss(){
     const B = S.boss, pw = {};
-    S.pl.filter(p => B.ch[p.id] === 'o').forEach(p => { say(`${p.name} flees.`); lose(p); });
+    S.pl.filter(p => B.ch[p.id] === 'o').forEach(p => { say(`${pn(p)} flees.`); lose(p); });
     const J = S.pl.filter(p => B.ch[p.id] === 'j');
     J.forEach(p => { pw[p.id] = power(p, true); });
     const team = Object.values(pw).reduce((a, b) => a + b, 0);
     while (team === bossP()) B.ms.push(draw('M'));
     const win = team > bossP();
     say(`Team ${team} vs Dragon ${bossP()} — ${win ? 'the Dragon falls! +2 Levels' : 'the Dragon wins.'}`);
-    J.forEach(p => { if (win){ p.lvl += 2; say(`${p.name} rises to Lv ${p.lvl}.`); } else { lose(p); p.lvl = Math.max(1, p.lvl - 1); } norm(p); });
+    J.forEach(p => { if (win){ p.lvl += 2; say(`${pn(p)} rises to Lv ${p.lvl}.`); } else { lose(p); p.lvl = Math.max(1, p.lvl - 1); } norm(p); });
     S.monD.push(...B.ms);
     if (!chk(pw)) endTurn();
 }
@@ -370,6 +454,28 @@ function handle(d){
     if (!p || p.gone) return 'You are not seated in this game.';
     if (S.phase === 'over') return 'The game is over.';
     const mine = cur().id === d.pid, f = S.fight;
+    // Gear is personal housekeeping: any seated player may swap weapons on
+    // anyone's turn (helpers especially need this). Blocked only while a
+    // keep/reward step is pending, so those flows stay clean.
+    if (a === 'gear'){
+        if (S.phase !== 'choose' && S.phase !== 'fight' && S.phase !== 'boss' && S.phase !== 'over') return 'Finish the current step first.';
+        if (d.to === 'eq'){
+            const x = p.hand[0]; if (!x) return null;
+            if (!canEq(p, x)) return 'Face-card weapons unlock at Level 5.';
+            if (p.eq.length >= cap(p)){
+                p.eq.sort((m, n) => val(m) - val(n));
+                const out = p.eq.shift();
+                p.hand = [out]; p.eq.push(x);
+                say(`${pn(p)} equips ${wname(x)}, stashing ${wname(out)} as spare.`);
+            } else { p.hand = []; p.eq.push(x); say(`${pn(p)} equips ${wname(x)}.`); }
+        } else {
+            if (p.eq.length <= 1) return 'Equip something else first — you need a weapon in hand.';
+            if (p.hand.length) return 'Your one spare slot is full.';
+            const m = p.eq[d.i];
+            if (m){ p.hand = p.eq.splice(d.i, 1); say(`${pn(p)} moves ${wname(m)} to spare.`); }
+        }
+        return null;
+    }
     if (S.phase === 'boss'){
         if (a !== 'bchoice') return 'Dragon! Choose Join or Stay Out.';
         if (S.boss.ch[p.id]) return 'Already chosen.';
@@ -383,14 +489,14 @@ function handle(d){
         const k = S.pick.cards[d.i]; if (!k) return null;
         const other = S.pick.cards[1 - d.i];
         S.lootD.push(other);
-        say(`${p.name} keeps ${wname(k)} (${other ? 'lets go ' + wname(other) : 'nothing else'}).`);
+        say(`${pn(p)} keeps ${wname(k)} (${other ? 'lets go ' + wname(other) : 'nothing else'}).`);
         give(p, k); S.pick = null;
         next(); return null;
     }
     if (S.phase === 'hreward'){
         if (a !== 'hr' || f.helper !== d.pid) return 'Waiting for the helper to choose.';
-        if (d.j === 'lvl'){ p.lvl++; norm(p); say(`${p.name} takes 1 Level for helping (now Lv ${p.lvl}).`); if (chk()) return null; }
-        else { give(p, draw('L')); say(`${p.name} takes 1 Loot card for helping.`); }
+        if (d.j === 'lvl'){ p.lvl++; norm(p); say(`${pn(p)} takes 1 Level for helping (now Lv ${p.lvl}).`); if (chk()) return null; }
+        else { give(p, draw('L')); say(`${pn(p)} takes 1 Loot card for helping.`); }
         next(); return null;
     }
     if (S.phase === 'fight' && a === 'help'){
@@ -398,31 +504,14 @@ function handle(d){
         if (!f.ask) return 'No help requested.';
         if (f.helper) return 'Someone already helps.';
         if (!p.eq.length) return 'You need an equipped weapon to help.';
-        f.helper = p.id; say(`${p.name} helps ${cur().name} (+${power(p)}).`); return null;
+        f.helper = p.id; say(`${pn(p)} helps ${pn(cur())} (+${power(p)}).`); return null;
     }
-    if (!mine) return `It is ${cur().name}'s turn.`;
+    if (!mine) return `It is ${pn(cur())}'s turn.`;
     const c = cur();
     if (S.phase === 'choose'){
-        if (a === 'gear'){
-            if (d.to === 'eq'){
-                const x = c.hand[0]; if (!x) return null;
-                if (!canEq(c, x)) return 'Face-card weapons unlock at Level 5.';
-                if (c.eq.length >= cap(c)){
-                    c.eq.sort((m, n) => val(m) - val(n));
-                    const out = c.eq.shift();
-                    c.hand = [out]; c.eq.push(x);
-                    say(`${c.name} equips ${wname(x)}, stashing ${wname(out)} as spare.`);
-                } else { c.hand = []; c.eq.push(x); say(`${c.name} equips ${wname(x)}.`); }
-            } else {
-                if (c.hand.length) return 'Your one spare slot is full.';
-                const m = c.eq[d.i];
-                if (m){ c.hand = c.eq.splice(d.i, 1); say(`${c.name} moves ${wname(m)} to spare.`); }
-            }
-            return null;
-        }
         if (a === 'explore'){
             S.q = []; S.pick = { who: c.id, cards: [draw('L'), draw('L')], why: 'Explore' };
-            S.phase = 'pick'; S.msg = `${c.name} explores — draw 2 Loot, keep 1.`; return null;
+            S.phase = 'pick'; S.msg = `${pn(c)} explores — draw 2 Loot, keep 1.`; return null;
         }
         if (a === 'fight'){
             if (!c.eq.length && !c.hand.length) return 'No weapons — you must Explore.';
@@ -438,19 +527,19 @@ function handle(d){
             if (need === 2 && ms.every(isNum)) ms.push(draw('M'));
             if (ms.some(isDragon)){ S.monD.push(...ms); startBoss(); return null; }
             S.fight = { mons: ms, helper: null, ask: false, pushed: false };
-            S.phase = 'fight'; S.msg = `${c.name} fights! Ask for help, push your luck, or resolve.`; return null;
+            S.phase = 'fight'; S.msg = `${pn(c)} fights! Ask for help, push your luck, or resolve.`; return null;
         }
         return 'Choose Explore or Fight.';
     }
     if (S.phase === 'fight'){
-        if (a === 'ask'){ f.ask = true; say(`${c.name} asks for help!`); return null; }
+        if (a === 'ask'){ f.ask = true; say(`${pn(c)} asks for help!`); return null; }
         if (a === 'push'){
             if (f.pushed) return 'Already pushed.';
             if (f.ask) return 'You cannot push your luck if you asked for help.';
             if (power(c) + (f.helper ? power(S.pl.find(x => x.id === f.helper)) : 0) < total()) return 'You are clearly losing — no pushing your luck!';
             const m = draw('M');
             if (isDragon(m)){ S.monD.push(m, ...f.mons); startBoss(); return null; }
-            f.mons.push(m); f.pushed = true; say(`${c.name} pushes their luck… (${wname(m)} joins the monsters)`); return null;
+            f.mons.push(m); f.pushed = true; say(`${pn(c)} pushes their luck… (${wname(m)} joins the monsters)`); return null;
         }
         if (a === 'resolve'){ resolve(); return null; }
     }
@@ -474,7 +563,24 @@ function act(action, x){
 }
 function toast(t){
     const n = $('lr-note'); if (!n) return;
-    n.textContent = t; clearTimeout(noteT); noteT = setTimeout(() => { n.textContent = ''; }, 3500);
+    n.textContent = t; clearTimeout(noteT); noteT = setTimeout(() => { n.textContent = ''; }, 2400);
+}
+function confettiBurst(){
+    const box = $('lr-confetti');
+    if (!box) return;
+    const cols = ['#d9b44a','#9bb86a','#b0523c','#5ec8d8','#c86ab0','#f2ecd8','#7ad97a'];
+    let html = '';
+    for (let i = 0; i < 70; i++){
+        const x = (Math.random() * 100).toFixed(1);
+        const d = (Math.random() * 0.9).toFixed(2);
+        const t = (2.2 + Math.random() * 1.4).toFixed(2);
+        const r = (360 + Math.random() * 720 | 0);
+        const c = cols[i % cols.length];
+        const w = (6 + Math.random() * 6 | 0);
+        html += `<i class="cf" style="left:${x}%;background:${c};width:${w}px;height:${w + 4}px;animation-delay:${d}s;animation-duration:${t}s;--r:${r}deg"></i>`;
+    }
+    box.innerHTML = html;
+    setTimeout(() => { if (box && lastWinShown) box.innerHTML = ''; }, 4600);
 }
 window.toast = toast;
 function onIntent(d, from){
@@ -482,6 +588,14 @@ function onIntent(d, from){
     d.pid = from.id; d.name = from.name;
     if (d.action === 'hello'){ if (S) broadcast(); return; }
     if (!S) return;
+    // Live name sync: a rename travels with every intent, so the seated
+    // player's display name updates even before the hub pushes a roster.
+    const sp = S.pl.find(x => x.id === d.pid);
+    const nm = cleanName(from && from.name);
+    if (sp && nm && sp.name !== nm){
+        const dupe = S.pl.some(x => x.id !== sp.id && cleanName(x.name) === nm);
+        sp.name = dupe ? nm + ' ' + (S.pl.indexOf(sp) + 1) : nm;
+    }
     const e = handle(d);
     if (e) Hub.up('denied', { to: from.id, text: e });
     broadcast();
@@ -513,7 +627,7 @@ function meter(p, big, turn, you){
         `<div class="lm-sub">⚔ ${power(p)}${p.gone ? ' · out' : ''} · ${sub}</div></div>`;
 }
 function myAction(){
-    if (!S || S.over) return false;
+    if (!S || isOver()) return false;
     const p = me();
     if (!p || p.gone) return false;
     const ph = S.phase, f = S.fight;
@@ -533,11 +647,55 @@ function waitingText(){
     if (S.phase === 'hreward') return [`Waiting for the helper to choose`, 'Draw 1 Loot or gain 1 Level.'];
     if (S.phase === 'fight'){
         const f = S.fight;
-        if (f.ask && !f.helper) return [`${c.name} asked for help`, 'Offer yours from the buttons below.'];
-        return [`${c.name} is fighting`, `Monsters vs Power — ask, push, or resolve.`];
+        if (f.ask && !f.helper) return [`${pn(c)} asked for help`, 'Offer yours from the buttons below.'];
+        return [`${pn(c)} is fighting`, `Monsters vs Power — ask, push, or resolve.`];
     }
-    return [`${c.name} is deciding`, 'Explore or Fight.'];
+    return [`${pn(c)} is deciding`, 'Explore or Fight.'];
 }
+function gearNames(p){ return p.eq.map(wname).join(' + ') || 'no weapons'; }
+function chip(q, turn, you, win){
+    return `<span class="sc-chip${turn ? ' on' : ''}${you ? ' you' : ''}${win ? ' winner' : ''}">${esc(pn(q))}${you ? ' (you)' : ''} <span class="pw">⚔${power(q)} · Lv ${q.lvl}</span></span>`;
+}
+// Big central scoreboard: current scores for the monster and the player(s).
+function scoreboard(){
+    const el = $('lr-score');
+    if (!el || !S) return;
+    const p = me(), c = cur(), ph = S.phase, f = S.fight;
+    const over = ph === 'over';
+    const w = over && S.pl.find(x => x.id === S.win);
+    let L, R, verdict = '', vcls = '';
+    if (ph === 'boss'){
+        const team = S.pl.filter(q => S.boss.ch[q.id] === 'j').reduce((s, q) => s + power(q, true), 0);
+        const bp = bossP();
+        L = { cap: 'TEAM POWER', n: team, sub: S.pl.filter(q => S.boss.ch[q.id] === 'j').map(pn).join(', ') || 'nobody joined yet', you: true, win: team > bp };
+        R = { cap: '🐉 DRAGON', n: bp, sub: S.boss.ms.map(wname).join(' + '), mon: true };
+        verdict = team > bp ? 'DRAGON FALLS' : (team < bp ? 'DRAGON WINS' : 'TIE — DRAGON HOLDS');
+        vcls = team > bp ? 'win' : (team < bp ? 'lose' : 'boss');
+    } else if ((ph === 'fight' || ph === 'hreward') && f){
+        const h = f.helper && S.pl.find(x => x.id === f.helper);
+        const P = power(c) + (h ? power(h) : 0), T = total();
+        L = { cap: (p && p.id === c.id ? 'YOUR POWER' : pn(c).toUpperCase() + "'S POWER"), n: P, sub: gearNames(c) + (h ? ' + ' + pn(h) : ''), you: !!(p && p.id === c.id), win: P >= T };
+        R = { cap: 'MONSTERS', n: T, sub: f.mons.map(wname).join(' + ') + (dread(c) ? ' + dread' : ''), mon: true };
+        verdict = P >= T ? 'WINNING' : 'LOSING';
+        vcls = P >= T ? 'win' : 'lose';
+    } else if (over && w){
+        L = { cap: '🏆 WINNER', n: 'Lv ' + w.lvl, sub: pn(w) + ' · ⚔' + power(w), you: w.id === myId(), win: true };
+        R = { cap: 'LEVEL GOAL', n: 15, sub: 'race to 15', mon: false };
+        verdict = pn(w).toUpperCase() + ' WINS';
+        vcls = 'win';
+    } else {
+        const need = c.lvl >= 10 ? (c.eq.length >= 2 ? '2–3 monsters' : '2 monsters') : '1 monster';
+        L = { cap: (p && p.id === c.id ? 'YOUR POWER' : pn(c).toUpperCase() + "'S POWER"), n: power(c), sub: gearNames(c), you: !!(p && p.id === c.id), win: false };
+        R = { cap: 'MONSTERS', n: '—', sub: ph === 'pick' ? 'drawing loot…' : (mineTurn() ? 'fight for ' + need : 'waiting on ' + pn(c)), mon: true };
+        verdict = ph === 'pick' ? 'DRAW 2, KEEP 1' : (ph === 'hreward' ? 'HELPER REWARD' : 'VS');
+        vcls = '';
+    }
+    const side = (s) => `<div class="sc-side${s.you ? ' you' : ''}${s.mon ? ' mon' : ''}${s.win ? ' win' : ''}">` +
+        `<div class="sc-cap">${esc(s.cap)}</div><div class="sc-n">${esc(String(s.n))}</div><div class="sc-sub" title="${esc(s.sub)}">${esc(s.sub)}</div></div>`;
+    el.innerHTML = `<div class="sc-vsrow">${side(L)}<div class="sc-vs"><div class="x">⚔</div><div class="sc-verdict ${vcls}">${esc(verdict)}</div></div>${side(R)}</div>` +
+        `<div class="sc-chips">${S.pl.map(q => chip(q, !over && S.turn === S.pl.indexOf(q), q.id === myId(), over && S.win === q.id)).join('')}</div>`;
+}
+const mineTurn = () => { const p = me(); return !!p && !p.gone && S && cur().id === myId(); };
 function render(){
     const st = $('lr-status'); if (!st) return;
     const sh = (id, on) => { const e = $(id); e.classList.toggle('hidden', !on); if (id === 'lr-game') e.style.display = on ? 'flex' : ''; else e.classList.toggle('flex', on); };
@@ -554,16 +712,24 @@ function render(){
     const paused = !isHost() && !hostPresent();
 
     let big = S.msg, sub = '';
-    if (S.over){ big = S.msg; }
-    else if (paused){ big = 'Game paused — host disconnected.'; sub = 'It resumes when they return.'; }
+    if (isOver()){
+        const w = S.pl.find(x => x.id === S.win);
+        st.classList.add('winner');
+        st.innerHTML = `<span class="win-big">🏆 ${esc(pn(w))} WINS!</span><span class="win-sub">reached Level ${w.lvl} — first to 15</span>`;
+        if (lastWinShown !== S.win){ lastWinShown = S.win; confettiBurst(); }
+    } else if (paused){ big = 'Game paused — host disconnected.'; sub = 'It resumes when they return.'; }
     else if (ph === 'fight'){
         const h = f.helper && S.pl.find(x => x.id === f.helper), dr = dread(c);
-        big = `${mine ? 'Your fight' : c.name + ' fights'} — Power ${power(c) + (h ? power(h) : 0)} vs Monsters ${total()}`;
+        big = `${mine ? 'Your fight' : pn(c) + ' fights'} — Power ${power(c) + (h ? power(h) : 0)} vs Monsters ${total()}`;
         sub = `${mine ? 'Ask for help, push your luck, or resolve.' : 'Watch the tally. Offer help if asked.'}${dr ? ` Dread +${dr} hunts the leader.` : ''}`;
     }
     else if (ph === 'boss'){ big = `THE DRAGON — Boss Power ${bossP()}`; sub = 'Join the battle or stay out. Majority pain if you run: lose a weapon.'; }
     else if (mine && ph === 'choose'){ big = 'Your turn.'; sub = 'Swap gear below if you like, then Explore or Fight.'; }
-    st.innerHTML = `${esc(big)}${sub ? `<small>${esc(sub)}</small>` : ''}`;
+    if (!isOver()){
+        st.classList.remove('winner');
+        st.innerHTML = `${esc(big)}${sub ? `<small>${esc(sub)}</small>` : ''}`;
+        if (lastWinShown){ lastWinShown = null; $('lr-confetti').innerHTML = ''; }
+    }
 
     $('lr-feed').innerHTML = S.feed.slice(0, 1).map(e =>
         `<div class="feed-item${e.n > lastFeedN ? ' pop' : ''}${/DRAGON|wins!|Level 15/.test(e.t) ? ' big' : ''}">${esc(e.t)}</div>`
@@ -585,19 +751,22 @@ function render(){
         (ph === 'boss' ? `<div class="lr-cards">${S.boss.ms.map(x => card(x)).join('')} ${card({r:'A', c:'R'}, '', true)}</div><div class="lr-tally">Boss Power ${bossP()} <small>· ${Object.keys(S.boss.ch).length}/${S.pl.length} decided</small></div>` : '') +
         `</div>`;
 
+    scoreboard();
+
     let mid = `<div>${deckBox('black', S.loot.length, S.lootD.length, 'LOOT')}</div>`;
     if (p){
+        const gearing = p && !p.gone && (ph === 'choose' || ph === 'fight' || ph === 'boss' || ph === 'over') && !paused;
         const can = mine && ph === 'choose' && !paused;
         let gearBtn = '';
         if (can && p.eq.length) gearBtn = `<button class="lr-act" data-a="fight" style="margin-top:10px; min-height:50px; padding:10px; font-size:14px"><span class="ic" style="font-size:20px">⚔️</span><span style="font-weight:800">Fight!</span></button>`;
         if (ph === 'fight' && mine) {
             gearBtn = `<button class="lr-act" data-a="resolve" style="margin-top:10px; min-height:50px; padding:10px; font-size:14px"><span class="ic" style="font-size:20px">⚖️</span><span style="font-weight:800">Resolve Fight</span></button>`;
         }
-        mid += `<div class="lr-zone${mine ? ' you' : ''}"><span class="lr-lbl">EQUIPPED ${p.eq.length}/${cap(p)} (Power: ${power(p)})${p.lvl < 5 ? ' · Lv 1–4: number weapons only' : ''}${can ? ' · click to move' : ''}</span>` +
-            `<div class="lr-cards" style="min-height:124px">${p.eq.map((x, i) => card(x, can ? `data-a="gear" data-to="un" data-i="${i}"` : '', true)).join('') || '<span class="lr-lbl">none</span>'}</div>` +
+        mid += `<div class="lr-zone${mine ? ' you' : ''}"><span class="lr-lbl">EQUIPPED ${p.eq.length}/${cap(p)} (Power: ${power(p)})${p.lvl < 5 ? ' · Lv 1–4: number weapons only' : ''}${gearing ? ' · click to move' : ''}</span>` +
+            `<div class="lr-cards" style="min-height:124px">${p.eq.map((x, i) => card(x, gearing ? `data-a="gear" data-to="un" data-i="${i}"` : '', true)).join('') || '<span class="lr-lbl">none</span>'}</div>` +
             gearBtn + `</div>`;
         mid += `<div class="lr-zone"><span class="lr-lbl">SPARE (1 max)</span>` +
-            `<div class="lr-cards" style="min-height:124px">${p.hand.map(x => card(x, can ? 'data-a="gear" data-to="eq"' : '', true)).join('') || '<span class="lr-lbl">empty</span>'}</div></div>`;
+            `<div class="lr-cards" style="min-height:124px">${p.hand.map(x => card(x, gearing ? 'data-a="gear" data-to="eq"' : '', true)).join('') || '<span class="lr-lbl">empty</span>'}</div></div>`;
     } else {
         mid += `<div class="lr-zone"><span class="lr-lbl">Watching — gear appears once the host seats you.</span></div><div class="lr-zone"></div>`;
     }
@@ -611,7 +780,10 @@ function render(){
         ar = `<span class="lr-lbl">HELPER REWARD — ${esc(S.pl.find(x => x.id === f.helper).name)} chooses below.</span>`;
     } else if (ph === 'over'){
         const w = S.pl.find(x => x.id === S.win);
-        ar = `<div class="lr-tally" style="font-size:20px">🏆 ${esc(w.name)} wins!</div>`;
+        const table = S.pl.slice().sort((a, b) => b.lvl - a.lvl || power(b) - power(a))
+            .map(q => chip(q, false, q.id === myId(), S.win === q.id)).join('');
+        ar = `<div class="lr-tally" style="font-size:22px">🏆 ${esc(pn(w))} wins the game!</div>` +
+            `<div class="sc-chips" style="margin-top:8px">${table}</div>`;
     }
     $('lr-arena').innerHTML = ar;
 
@@ -620,11 +792,11 @@ function render(){
     ).join('');
 
     const veil = $('lr-veil');
-    if (!S.over && !myAction() && !paused){
+    if (!isOver() && !myAction() && !paused){
         const [t, s] = waitingText();
         $('lr-veil-text').innerHTML = `${esc(t)}<small>${esc(s)}</small>`;
         veil.classList.remove('hidden');
-    } else if (!S.over && paused){
+    } else if (!isOver() && paused){
         $('lr-veil-text').innerHTML = `Paused<small>Host disconnected — it resumes when they return.</small>`;
         veil.classList.remove('hidden');
     } else veil.classList.add('hidden');
@@ -640,7 +812,7 @@ function render(){
         const fightButtons = (!f.ask ? bigBtn('ask', '📯', 'Ask for help', 'A teammate adds their weapon Power. They share the spoils.', 'k') : (f.helper ? '' : `<div class="lr-lbl">Waiting for a helper…</div>`)) + (canPush ? bigBtn('push', '🎲', 'Push your luck', 'Flip one more Monster beyond the requirement. Win counts double.', 'k') : '') + bigBtn('resolve', '⚖️', 'Resolve fight', `Power ${power(c) + (f.helper ? power(S.pl.find(x => x.id === f.helper)) : 0)} vs Monsters ${total()}. Exact ties win.`);
         ac = `<div class="lr-cards" style="justify-content:center; gap:10px; margin-bottom:10px">${fightButtons}</div>`;
     }
-    else if (ph === 'fight' && p && !p.gone && f.ask && !f.helper && p.eq.length) ac = bigBtn('help', '🤝', `Help ${c.name}`, `Add +${power(p)} Power. Win: draw 1 Loot or gain 1 Level. Lose: you discard too.`);
+    else if (ph === 'fight' && p && !p.gone && f.ask && !f.helper && p.eq.length) ac = bigBtn('help', '🤝', `Help ${pn(c)}`, `Add +${power(p)} Power. Win: draw 1 Loot or gain 1 Level. Lose: you discard too.`);
     else if (ph === 'boss' && p && !p.gone && !S.boss.ch[myId()]) ac = bigBtn('bchoice', '⚔️', 'Join the battle', 'Your weapons count toward Team Power. Win: +2 Levels.', '', 'data-j="j"') + bigBtn('bchoice', '🏃', 'Stay out', 'Discard 1 equipped weapon. No reward, no risk beyond that.', 'k', 'data-j="o"');
     else if (ph === 'hreward' && f.helper === myId()) ac = bigBtn('hr', '🃏', 'Draw 1 Loot', 'Take a card from the black deck into your gear.', '', 'data-j="loot"') + bigBtn('hr', '⬆️', 'Gain 1 Level', 'Closer to 15, right now.', 'k', 'data-j="lvl"');
     $('lr-actions').innerHTML = ac;

@@ -58,6 +58,24 @@
         }
         #chat-box::-webkit-scrollbar { width: 8px; }
         #chat-box::-webkit-scrollbar-thumb { background: #334155; border-radius: 8px; }
+        /* Name-confirm coach mark: bubble pointing up at the Display Name box. */
+        #name-nudge {
+            position: absolute; top: calc(100% + 10px); right: 0; z-index: 40;
+            background: #f59e0b; color: #0f172a; font-weight: 800; font-size: 13px;
+            padding: 8px 14px; border-radius: 12px; white-space: nowrap;
+            box-shadow: 0 8px 24px rgba(0,0,0,.45);
+            animation: nudgeBob 1.2s ease-in-out infinite;
+        }
+        #name-nudge::before {
+            content: ''; position: absolute; bottom: 100%; right: 34px;
+            border: 8px solid transparent; border-bottom-color: #f59e0b; border-top: 0;
+        }
+        @keyframes nudgeBob { 0%,100% { transform: translateY(0); } 50% { transform: translateY(-4px); } }
+        #name-box.needs-confirm { animation: nameGlow 1.6s ease-in-out infinite; }
+        @keyframes nameGlow {
+            0%,100% { box-shadow: 0 0 0 2px rgba(245,158,11,.95), 0 0 10px rgba(245,158,11,.35); }
+            50% { box-shadow: 0 0 0 2px rgba(245,158,11,.95), 0 0 24px rgba(245,158,11,.7); }
+        }
         .title-gradient {
             background: linear-gradient(90deg, #5eead4, #22d3ee 50%, #a5b4fc);
             -webkit-background-clip: text;
@@ -67,6 +85,25 @@
         /* Shared game stage: one framed iframe per game, sized to its content. */
         #game-stage iframe { width: 100%; border: 0; display: block; background: #0f172a; border-radius: 16px; border: 1px solid #334155; box-shadow: 0 10px 30px rgba(0,0,0,0.35); overflow: hidden; }
         .gv-invite-btn { font-weight: 800; font-size: 13px; padding: 4px 16px; border-radius: 12px; flex: none; }
+        /* ---- Focus mode: the open game owns the viewport; the hub page never scrolls. ---- */
+        #focus-bar { display: none; }
+        #chat-pill { display: none; }
+        body.focus-mode { margin: 0 !important; max-width: none !important; padding: 0 !important; display: block !important; overflow: hidden; height: 100dvh; }
+        body.focus-mode .horses { display: none; }
+        body.focus-mode > header { display: none; }
+        body.focus-mode > footer { display: none; }
+        body.focus-mode #lobby-ui { display: none !important; }
+        body.focus-mode #game-stage { position: fixed; inset: 44px 0 0 0; z-index: 20; margin: 0; padding: 0; gap: 0; }
+        body.focus-mode #game-stage-empty { display: none !important; }
+        body.focus-mode #game-stage iframe { height: 100% !important; min-height: 0; border-radius: 0; border-left: 0; border-right: 0; }
+        body.focus-mode #focus-bar { display: flex; position: fixed; top: 0; left: 0; right: 0; height: 44px; z-index: 40; align-items: center; gap: 10px; padding: 0 10px; background: rgba(15,23,42,.97); border-bottom: 1px solid #334155; }
+        #focus-title { font-weight: 800; font-size: 14px; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+        /* In focus mode the room UI becomes a right-side drawer, off-canvas until summoned. */
+        body.focus-mode #room-ui { position: fixed; top: 44px; right: 0; bottom: 0; width: min(360px, 92vw); z-index: 45; background: rgba(15,23,42,.98); border-left: 1px solid #334155; padding: 12px; margin: 0; overflow-y: auto; transform: translateX(105%); transition: transform .25s ease; }
+        body.focus-mode.drawer-open #room-ui { transform: none; }
+        body.focus-mode.in-room #chat-pill { display: block; position: fixed; right: 12px; bottom: 12px; z-index: 46; background: #0f766e; color: #fff; font-weight: 800; font-size: 16px; padding: 10px 14px; border-radius: 999px; border: 1px solid #5eead4; box-shadow: 0 8px 24px rgba(0,0,0,.5); cursor: pointer; }
+        body.focus-mode.drawer-open #chat-pill { display: none; }
+        #chat-unread { background: #f59e0b; color: #0f172a; font-size: 11px; font-weight: 800; border-radius: 999px; padding: 1px 7px; margin-left: 6px; }
     </style>
 </head>
 <body class="p-4 max-w-4xl mx-auto flex flex-col gap-4 min-h-screen relative">
@@ -79,7 +116,7 @@
         <img src="horse.jpg" alt="" style="left:90%; width:64px; animation-duration:24s; animation-delay:-9s;">
     </div>
 
-    <header class="border-b border-slate-700/70 pb-4 flex justify-between items-end flex-none relative z-10">
+    <header class="border-b border-slate-700/70 pb-4 flex justify-between items-end flex-none relative z-30">
         <div class="flex items-center gap-3">
             <img src="horse.jpg" alt="Horse" class="w-14 h-14 rounded-2xl object-cover border border-slate-600 shadow-lg">
             <div>
@@ -88,11 +125,22 @@
                 <p id="hub-err" class="hidden text-[11px] font-mono text-red-300 mt-1"></p>
             </div>
         </div>
-        <div class="flex items-center gap-2 bg-slate-800/80 backdrop-blur px-3 py-2 rounded-2xl border border-slate-700 card-glow">
+        <div id="name-box" class="relative flex items-center gap-2 bg-slate-800/80 backdrop-blur px-3 py-2 rounded-2xl border border-slate-700 card-glow">
             <label for="player-name" class="text-sm text-slate-400">Display Name:</label>
-            <input type="text" id="player-name" placeholder="Your name" value="Fox" class="bg-slate-900 border border-slate-600 rounded-xl px-2 py-1 w-32 focus:outline-none focus:border-teal-400 font-bold text-teal-100">
+            <input type="text" id="player-name" placeholder="Your name" value="Fox" maxlength="24" class="bg-slate-900 border border-slate-600 rounded-xl px-2 py-1 w-32 focus:outline-none focus:border-teal-400 font-bold text-teal-100">
+            <button id="btn-name-shuffle" title="Deal me another animal name" class="btn-bouncy bg-slate-700 hover:bg-slate-600 text-white font-bold px-2 py-1 rounded-xl">🎲</button>
+            <button id="btn-name-ok" title="Confirm this name" class="btn-bouncy bg-teal-600 hover:bg-teal-500 text-white font-extrabold px-2 py-1 rounded-xl">✓</button>
+            <span id="name-state" class="text-[11px] font-mono text-amber-300" title="Tap ✓ to play under this name">tap ✓ to confirm</span>
+            <div id="name-nudge" class="hidden" role="status">👆 Confirm username to continue</div>
         </div>
     </header>
+
+    <!-- Focus mode chrome: thin bar replaces the header while a game is open. -->
+    <div id="focus-bar">
+        <button id="btn-focus-exit" title="Leave the stage (Esc)" class="btn-bouncy bg-slate-700 hover:bg-slate-600 text-white text-sm font-bold py-1 px-3 rounded-xl">✕ Stage</button>
+        <span id="focus-title"></span>
+    </div>
+    <button id="chat-pill" class="btn-bouncy" title="Open chat">💬<span id="chat-unread" class="hidden"></span></button>
 
     <!-- Shared game stage (TOP LEVEL): Primary focus of the experience.
          Games render here as iframes. Empty placeholder shows until a game opens. -->
@@ -227,6 +275,53 @@
         ui.joinInput.value = 'bubbies';
         ui.nameInput.value = randomAnimalName();
 
+        // ---- Name approval: the autofilled animal name is only a suggestion.
+        // The player must tap ✓ (once per name) before Create/Connect unlock.
+        // In-room edits go live immediately and propagate to every peer.
+        let nameConfirmed = false;
+        function renderNameGate(){
+            const st = document.getElementById('name-state');
+            const ok = document.getElementById('btn-name-ok');
+            const nudge = document.getElementById('name-nudge');
+            const box = document.getElementById('name-box');
+            if (st) {
+                st.textContent = nameConfirmed ? ('✓ ' + getName()) : 'tap ✓ to confirm';
+                st.className = 'text-[11px] font-mono ' + (nameConfirmed ? 'text-emerald-300' : 'text-amber-300');
+            }
+            if (ok) ok.classList.toggle('opacity-40', nameConfirmed);
+            const gate = !nameConfirmed && !inRoom;
+            if (nudge) nudge.classList.toggle('hidden', !gate);
+            if (box) box.classList.toggle('needs-confirm', gate);
+            ['btn-host', 'btn-join'].forEach(id => {
+                const b = document.getElementById(id);
+                if (b) { b.disabled = gate; b.classList.toggle('opacity-40', gate); b.classList.toggle('cursor-not-allowed', gate); }
+            });
+        }
+        function broadcastRename(){
+            const msg = { type: 'rename', id: myId, name: getName(), host: isHost };
+            if (isHost) sendAll(msg);
+            else { const h = hostLink(); if (h) sendTo(h, msg); }
+            refreshRoster();
+        }
+        document.getElementById('btn-name-shuffle').addEventListener('click', () => {
+            ui.nameInput.value = randomAnimalName();
+            nameConfirmed = false;
+            renderNameGate();
+            ui.nameInput.focus();
+        });
+        document.getElementById('btn-name-ok').addEventListener('click', () => {
+            if (!getName()) { ui.nameInput.focus(); return; }
+            nameConfirmed = true;
+            renderNameGate();
+            if (inRoom) broadcastRename();
+        });
+        ui.nameInput.addEventListener('input', () => {
+            nameConfirmed = false;
+            renderNameGate();
+            if (inRoom) broadcastRename();
+        });
+        renderNameGate();
+
         document.getElementById('btn-shuffle').addEventListener('click', () => {
             ui.hostInput.value = randomRoomName();
             ui.hostInput.focus();
@@ -281,6 +376,12 @@
             }
             ui.chatBox.appendChild(el);
             ui.chatBox.scrollTop = ui.chatBox.scrollHeight;
+            // In focus mode with the drawer shut, count up so the pill can badge.
+            if (document.body.classList.contains('focus-mode') && inRoom &&
+                !document.body.classList.contains('drawer-open')) {
+                unread++;
+                renderPill();
+            }
         }
 
         function escapeHtml(s) {
@@ -300,10 +401,22 @@
                 }
             }
             GB.pushRoster();
+            // Keep the focus bar honest while a game owns the screen.
+            if (document.body.classList.contains('focus-mode')) {
+                const gid = openGameId();
+                const g = GAMES.find(x => x.id === gid);
+                const t = document.getElementById('focus-title');
+                if (t) {
+                    const n = peerCount();
+                    t.textContent = (g ? g.title : 'Bub Hub') + ' · ' + n + ' player' + (n === 1 ? '' : 's');
+                    t.style.color = (g && g.color) || '#e2e8f0';
+                }
+            }
         }
 
         function showRoom(roomId) {
             inRoom = true;
+            document.body.classList.add('in-room');
             currentRoomId = roomId;
             ui.lobby.classList.add('hidden');
             ui.lobby.classList.remove('flex');
@@ -312,12 +425,14 @@
             ui.activeRoom.textContent = roomId;
             ui.chatBox.innerHTML = '';
             refreshRoster();
+            renderNameGate();
             GB.closeAll();
             logChat(`Welcome to ${roomId}! Share the Room ID to invite friends.`, 'system', true);
         }
 
         function showLobby() {
             inRoom = false;
+            document.body.classList.remove('in-room');
             currentRoomId = '';
             ui.room.classList.add('hidden');
             ui.room.classList.remove('flex');
@@ -325,6 +440,7 @@
             ui.lobby.classList.add('flex');
             GB.closeAll();
             clearInvites();
+            renderNameGate();
         }
 
         function routeMessage(conn, data) {
@@ -341,6 +457,14 @@
             if (data.type === 'chat') {
                 logChat(data.text, data.name, false);
                 if (isHost) sendAll(data, data.id);
+                return;
+            }
+            if (data.type === 'rename') {
+                // Live rename: update without the "joined." chat spam.
+                const nm = String(data.name || '').slice(0, 24) || 'Player';
+                if (links.has(data.id)) links.set(data.id, { conn, name: nm, host: !!data.host });
+                if (isHost) sendAll({ type: 'rename', id: data.id, name: nm, host: !!data.host }, data.id);
+                refreshRoster();
                 return;
             }
             if (data.type === 'say') {
@@ -385,6 +509,7 @@
         });
 
         document.getElementById('btn-host').addEventListener('click', () => {
+            if (!nameConfirmed) { setStatus(ui.hostStatus, 'tap ✓ by your Display Name first'); return; }
             const roomId = ui.hostInput.value.trim() || randomRoomName();
             cleanup();
             isHost = true;
@@ -405,6 +530,7 @@
         });
 
         document.getElementById('btn-join').addEventListener('click', () => {
+            if (!nameConfirmed) { setStatus(ui.joinStatus, 'tap ✓ by your Display Name first'); return; }
             const roomId = ui.joinInput.value.trim();
             if (!roomId) { setStatus(ui.joinStatus, 'enter a Room ID first'); return; }
             cleanup();
@@ -513,6 +639,20 @@
                     });
                 }
                 window.addEventListener('message', GB.onChild);
+                const bexit = document.getElementById('btn-focus-exit');
+                if (bexit) bexit.addEventListener('click', () => { const gid = openGameId(); if (gid) GB.close(gid); });
+                const pill = document.getElementById('chat-pill');
+                if (pill) pill.addEventListener('click', openDrawer);
+                window.addEventListener('resize', () => {
+                    if (document.body.classList.contains('focus-mode')) sizeStageFrames();
+                });
+                window.addEventListener('keydown', (e) => {
+                    if (e.key !== 'Escape') return;
+                    if (e.target && /INPUT|TEXTAREA/.test(e.target.tagName)) return;
+                    if (document.body.classList.contains('drawer-open')) { closeDrawer(); return; }
+                    const gid = openGameId();
+                    if (document.body.classList.contains('focus-mode') && gid) GB.close(gid);
+                });
                 GB.updateButtons();
                 GB.refreshStage();
             },
@@ -551,7 +691,10 @@
                 this.updateButtons();
                 this.refreshStage();
                 shrinkChat(true);
-                try { f.el.scrollIntoView({ behavior: 'smooth', block: 'start' }); } catch(e) {}
+                enterFocus(game);
+                if (!document.body.classList.contains('focus-mode')) {
+                    try { f.el.scrollIntoView({ behavior: 'smooth', block: 'start' }); } catch(e) {}
+                }
             },
 
             close(game){
@@ -559,7 +702,13 @@
                 if (f) f.el.classList.add('hidden');
                 this.updateButtons();
                 this.refreshStage();
-                if (!Object.values(this.frames).some(x => !x.el.classList.contains('hidden'))) shrinkChat(false);
+                const stillOpen = openGameId();
+                if (!stillOpen) {
+                    shrinkChat(false);
+                    exitFocus();
+                } else {
+                    enterFocus(stillOpen);
+                }
             },
 
             refreshStage(){
@@ -572,6 +721,7 @@
                 this.updateButtons();
                 this.refreshStage();
                 shrinkChat(false);
+                exitFocus();
             },
 
             resetAll(){
@@ -584,6 +734,7 @@
                 this.updateButtons();
                 this.refreshStage();
                 shrinkChat(false);
+                exitFocus();
             },
 
             updateButtons(){
@@ -640,7 +791,18 @@
                 }
                 if (m.k === 'height'){
                     const f = GB.frames[game];
-                    if (f && typeof m.p === 'number' && m.p > 0) f.el.style.height = Math.min(m.p, 4000) + 'px';
+                    if (f && typeof m.p === 'number' && m.p > 0) {
+                        f.lastH = m.p;
+                        const g = GAMES.find(x => x.id === game);
+                        if (document.body.classList.contains('focus-mode')) {
+                            // A fill game owns the whole stage; anything else is
+                            // clamped to the viewport so the page never scrolls.
+                            if (g && g.fill) { f.el.style.height = ''; f.el.style.minHeight = '0px'; }
+                            else f.el.style.height = Math.min(m.p, Math.max(200, window.innerHeight - 44)) + 'px';
+                        } else {
+                            f.el.style.height = Math.min(m.p, 4000) + 'px';
+                        }
+                    }
                     return;
                 }
                 if (m.k === 'close'){ GB.close(game); return; }
@@ -745,6 +907,61 @@
                 ui.chatContainer.classList.add('h-48');
                 ui.chatContainer.style.height = '';
             }
+        }
+
+        // ============ Focus mode: one open game owns the viewport ============
+        // Entered automatically by GB.open, exited by GB.close/closeAll/resetAll.
+        // Purely per-client: no bridge or protocol change, guests unaffected.
+        let unread = 0;
+        function openGameId(){
+            const found = Object.entries(GB.frames).find(([gid, f]) => !f.el.classList.contains('hidden'));
+            return found ? found[0] : null;
+        }
+        function enterFocus(game){
+            document.body.classList.add('focus-mode');
+            const gid = game || openGameId();
+            const g = GAMES.find(x => x.id === gid);
+            const t = document.getElementById('focus-title');
+            if (t) {
+                const n = peerCount();
+                t.textContent = (g ? g.title : 'Bub Hub') + (inRoom ? ' · ' + n + ' player' + (n === 1 ? '' : 's') : '');
+                t.style.color = (g && g.color) || '#e2e8f0';
+            }
+            sizeStageFrames();
+        }
+        function exitFocus(){
+            if (!document.body.classList.contains('focus-mode')) return;
+            document.body.classList.remove('focus-mode');
+            closeDrawer();
+            Object.entries(GB.frames).forEach(([gid, f]) => {
+                const g = GAMES.find(x => x.id === gid);
+                f.el.style.minHeight = '420px';
+                if (f.lastH) f.el.style.height = Math.min(f.lastH, 4000) + 'px';
+                else if (g && g.height) f.el.style.height = g.height + 'px';
+                else f.el.style.height = '';
+            });
+        }
+        function sizeStageFrames(){
+            const focused = document.body.classList.contains('focus-mode');
+            Object.entries(GB.frames).forEach(([gid, f]) => {
+                if (f.el.classList.contains('hidden')) return;
+                const g = GAMES.find(x => x.id === gid);
+                if (focused && g && g.fill) { f.el.style.height = ''; f.el.style.minHeight = '0px'; }
+                else if (focused) {
+                    f.el.style.minHeight = '0px';
+                    if (f.lastH) f.el.style.height = Math.min(f.lastH, Math.max(200, window.innerHeight - 44)) + 'px';
+                }
+            });
+        }
+        function openDrawer(){ document.body.classList.add('drawer-open'); unread = 0; renderPill(); }
+        function closeDrawer(){ document.body.classList.remove('drawer-open'); renderPill(); }
+        function renderPill(){
+            const badge = document.getElementById('chat-unread');
+            if (!badge) return;
+            if (unread > 0) {
+                badge.textContent = unread > 99 ? '99+' : String(unread);
+                badge.classList.remove('hidden');
+            } else badge.classList.add('hidden');
         }
 
         GB.init();

@@ -66,6 +66,7 @@ window.BUB_GAMES = [
 | `solo` | – | `true` → Solo Corner instead of Multiplayer Arcade. Solo games skip the bridge. |
 | `lobby` | – | `true` → also listed in the pre-room lobby card. |
 | `height` | – | Fixed stage height (px). Solo games use this since they never report a height. |
+| `fill` | – | `true` → viewport-fill game. The hub sizes the frame to the stage (focus mode) instead of trusting the game's reported height. For canvas worlds (Goldberg, Waltz Engine). |
 
 ### Solo vs multiplayer criteria
 
@@ -165,5 +166,6 @@ function onIntent(move, from) { if (valid(move)) { applyMove(move); Hub.up('stat
 | `index.html` | Rarely | Hub shell: stage, lobby/room UI, PeerJS room, game broker. |
 | `games.js` | ✅ to add games | The registry. The only file you edit for a new game. |
 | `warpfront.html`, `lotr.html` | Reference | Multiplayer examples (host + guests, like-for-like pattern to copy). |
+| `goldberg.html` | Playable | Chain-reaction sandbox (host-authoritative physics, everyone builds). |
 | `LobbyWaltzEngine.html` | Reference | Solo example (`solo` + `lobby` + fixed `height`). |
 | `horse.jpg` | – | Mascot 🐴 |
