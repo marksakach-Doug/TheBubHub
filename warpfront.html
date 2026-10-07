@@ -193,7 +193,7 @@ const FACTIONS = { '♦': 'Federation', '♥': 'Klingons', '♣': 'Ferengi' };
 const ORDER = ['♦', 'borg', '♥', 'borg', '♣', 'borg'];
 const WIN_SCORE = 5;
 
-let S = null, sel = null, scanMode = false, borgTimer = null;
+let S = null, sel = null, scanMode = false, borgTimer = null, warpInst = 0;
 let remembered = { players: 2, diff: 'standard' };
 const boardEl = $('wf-board'), handsEl = $('wf-hands'), statusEl = $('wf-status');
 
@@ -281,6 +281,7 @@ function startBattle(diff, players){
     }
     clearTimeout(borgTimer);
     S = freshState(diff, players);
+    S.inst = ++warpInst;
     S.claims['♦'] = { id: myId(), name: myName() };
     seatGuests();
     sel = null; scanMode = false;
@@ -429,16 +430,24 @@ function checkOver(){
     if (S.scores.borg >= WIN_SCORE){ return gameOver('SECTOR LOST — Borg assimilated 5 planets.', false); }
     return false;
 }
+function warpCrew(){
+    const ids = [];
+    Object.values(S.claims || {}).forEach(c => { if (c && c.id && !ids.includes(c.id)) ids.push(c.id); });
+    if (!ids.length && myId()) ids.push(myId());
+    return ids;
+}
 function gameOverCount(){
     S.over = true;
     if (S.scores.players > S.scores.borg) S.result = { win: true, text: `Time! Alliance holds majority ${S.scores.players}–${S.scores.borg}.` };
     else S.result = { win: false, text: `Time! Borg holds the sector ${S.scores.borg}–${S.scores.players}.` };
     say(S.result.text + ' Final score in chat.');
+    if (isHost()) Hub.up('result', { inst: S.inst, win: !!S.result.win, ps: S.scores.players, bs: S.scores.borg, players: warpCrew() });
 }
 function gameOver(text, win){
     S.over = true;
     S.result = { win, text };
     say(text + ' Final score in chat.');
+    if (isHost()) Hub.up('result', { inst: S.inst, win: !!win, ps: S.scores.players, bs: S.scores.borg, players: warpCrew() });
     return true;
 }
 

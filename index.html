@@ -7,6 +7,7 @@
     <script src="https://cdn.tailwindcss.com"></script>
     <script src="https://unpkg.com/peerjs@1.5.2/dist/peerjs.min.js"></script>
     <script src="games.js"></script>
+    <script src="bub-record.js"></script>
     <style>
         body {
             background: radial-gradient(1200px 600px at 20% -10%, #134e4a 0%, transparent 60%),
@@ -84,6 +85,10 @@
         }
         /* Shared game stage: one framed iframe per game, sized to its content. */
         #game-stage iframe { width: 100%; border: 0; display: block; background: #0f172a; border-radius: 16px; border: 1px solid #334155; box-shadow: 0 10px 30px rgba(0,0,0,0.35); overflow: hidden; }
+        /* Play/Hide correctness: Tailwind's .hidden (0,1,0) loses to
+           "#game-stage iframe" (1,0,1), so a "hidden" frame would stay
+           on screen. This wins and makes GB.close() actually hide games. */
+        #game-stage iframe.hidden { display: none !important; }
         .gv-invite-btn { font-weight: 800; font-size: 13px; padding: 4px 16px; border-radius: 12px; flex: none; }
         /* ---- Focus mode: the open game owns the viewport; the hub page never scrolls. ---- */
         #focus-bar { display: none; }
@@ -102,8 +107,38 @@
         body.focus-mode #room-ui { position: fixed; top: 44px; right: 0; bottom: 0; width: min(360px, 92vw); z-index: 45; background: rgba(15,23,42,.98); border-left: 1px solid #334155; padding: 12px; margin: 0; overflow-y: auto; transform: translateX(105%); transition: transform .25s ease; }
         body.focus-mode.drawer-open #room-ui { transform: none; }
         body.focus-mode.in-room #chat-pill { display: block; position: fixed; right: 12px; bottom: 12px; z-index: 46; background: #0f766e; color: #fff; font-weight: 800; font-size: 16px; padding: 10px 14px; border-radius: 999px; border: 1px solid #5eead4; box-shadow: 0 8px 24px rgba(0,0,0,.5); cursor: pointer; }
-        body.focus-mode.drawer-open #chat-pill { display: none; }
-        #chat-unread { background: #f59e0b; color: #0f172a; font-size: 11px; font-weight: 800; border-radius: 999px; padding: 1px 7px; margin-left: 6px; }
+        body.focus-mode.in-room #chat-pill { display: block; position: fixed; right: 12px; bottom: 12px; z-index: 46; background: #0f766e; color: #fff; font-weight: 800; font-size: 16px; padding: 10px 14px; border-radius: 999px; border: 1px solid #5eead4; box-shadow: 0 8px 24px rgba(0,0,0,.5); cursor: pointer; }
+        body.focus-mode.in-room.drawer-open #chat-pill { opacity: .45; }
+        #chat-unread { color: #5eead4; font-size: 14px; font-weight: 800; margin-left: 4px; line-height: 1; }
+        /* Tiny last-message peek: shows above the chat box when the drawer is
+           shut, so you can tell a message arrived without opening chat. */
+        #chat-peek { font-size: 11px; color: #99b8c0; padding: 4px 12px; border-bottom: 1px solid #334155; background: rgba(15,23,42,.9); white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+        #chat-peek b { color: #7dd3fc; }
+        /* Drawer chrome: tap-anywhere scrim + a header with a real close button.
+           Without these the drawer can only be dismissed with the Esc key,
+           which a phone doesn't have. */
+        #drawer-scrim { display: none; }
+        body.focus-mode.drawer-open #drawer-scrim { display: block; position: fixed; inset: 44px 0 0 0; z-index: 44; background: rgba(2,6,23,.5); cursor: pointer; }
+        #drawer-head { display: none; }
+        body.focus-mode #drawer-head { display: flex; align-items: center; justify-content: space-between; gap: 8px; padding: 4px 2px 10px; border-bottom: 1px solid #334155; margin-bottom: 4px; }
+        #drawer-room { font-family: monospace; font-weight: 800; color: #fff; background: none; border: 0; padding: 0; font-size: 14px; cursor: pointer; }
+        #drawer-close { flex: none; }
+        /* Room chip in the focus bar: the room number stays visible while a
+           game owns the screen (the full room card lives in the drawer). */
+        #focus-room { display: none; }
+        body.focus-mode.in-room #focus-room { display: inline-flex; align-items: center; gap: 6px; font-family: monospace; font-size: 12px; font-weight: 800; color: #fff; background: rgba(51,65,85,.6); border: 1px solid #475569; border-radius: 10px; padding: 4px 10px; cursor: pointer; }
+        #focus-room:hover { border-color: #5eead4; color: #5eead4; }
+        /* Phone layout for the display-name box: stack it centered under the
+           title and let the confirm bubble take its own row in normal flow,
+           so it can never overlap the game stage. */
+        @media (max-width: 640px) {
+            body > header { flex-direction: column; align-items: center; gap: 10px; text-align: center; }
+            body > header > div:first-child { align-self: flex-start; }
+            #name-box { width: 100%; justify-content: center; flex-wrap: wrap; }
+            #name-box #name-state { display: none; }
+            #name-nudge { position: static; flex-basis: 100%; margin-top: 8px; white-space: normal; max-width: 100%; text-align: center; }
+            #name-nudge::before { display: none; }
+        }
     </style>
 </head>
 <body class="p-4 max-w-4xl mx-auto flex flex-col gap-4 min-h-screen relative">
@@ -139,7 +174,9 @@
     <div id="focus-bar">
         <button id="btn-focus-exit" title="Leave the stage (Esc)" class="btn-bouncy bg-slate-700 hover:bg-slate-600 text-white text-sm font-bold py-1 px-3 rounded-xl">✕ Stage</button>
         <span id="focus-title"></span>
+        <button id="focus-room" title="Room ID — click to copy"></button>
     </div>
+    <div id="drawer-scrim" title="Tap to close chat"></div>
     <button id="chat-pill" class="btn-bouncy" title="Open chat">💬<span id="chat-unread" class="hidden"></span></button>
 
     <!-- Shared game stage (TOP LEVEL): Primary focus of the experience.
@@ -153,6 +190,13 @@
 
     <!-- Lobby UI -->
     <div id="lobby-ui" class="grid grid-cols-1 md:grid-cols-2 gap-4 flex-none relative z-10">
+        <div id="resume-bar" class="hidden md:col-span-2 bg-amber-500/10 backdrop-blur px-4 py-3 rounded-2xl border border-amber-500/40 card-glow items-center justify-between gap-3">
+            <span id="resume-text" class="text-sm text-amber-100"></span>
+            <div class="flex gap-2 flex-none">
+                <button id="btn-resume-go" class="btn-bouncy bg-amber-500 hover:bg-amber-400 text-slate-950 text-sm font-extrabold py-1.5 px-4 rounded-xl">Rejoin</button>
+                <button id="btn-resume-forget" title="Forget this room" class="btn-bouncy bg-slate-700 hover:bg-slate-600 text-white text-sm font-bold py-1.5 px-3 rounded-xl">✕</button>
+            </div>
+        </div>
         <div class="bg-slate-800/90 backdrop-blur p-5 rounded-2xl border border-slate-700 card-glow">
             <h2 class="text-lg font-bold text-white mb-1">Host a Room</h2>
             <p class="text-slate-400 text-xs mb-3">Create a new room and share the ID.</p>
@@ -179,17 +223,32 @@
             <p class="text-slate-400 text-xs mb-3">Solo games. No room needed.</p>
             <div id="lobby-game-buttons" class="flex flex-wrap gap-2"></div>
         </div>
+
+        <div id="lobby-record-card" class="md:col-span-2 bg-slate-800/90 backdrop-blur p-5 rounded-2xl border border-slate-700 card-glow">
+            <h2 class="text-lg font-bold text-white mb-1">📜 BubHub Record</h2>
+            <p class="text-slate-400 text-xs mb-3">Every game played, newest first.</p>
+            <ul id="record-list-lobby" class="flex flex-col gap-1"></ul>
+            <button id="record-more-lobby" class="hidden text-teal-300 text-xs font-bold mt-2 hover:text-teal-200">Show all</button>
+            <p id="record-status-lobby" class="text-slate-500 text-[11px] font-mono mt-1"></p>
+        </div>
     </div>
 
     <!-- Active Room UI. Order is deliberate: invites + chat first (right under the
          game stage), room/game controls last. The game is the main thing. -->
     <div id="room-ui" class="hidden flex-col gap-4 flex-1 relative z-10">
 
+        <!-- Drawer header: only shown in focus mode; gives touch users a way out. -->
+        <div id="drawer-head">
+            <button id="drawer-room" title="Room ID — click to copy">Room —</button>
+            <button id="drawer-close" title="Close chat" class="btn-bouncy bg-slate-700 hover:bg-slate-600 text-white text-sm font-bold py-1 px-3 rounded-xl">✕</button>
+        </div>
+
         <!-- Game invites, one bar per game, created as needed -->
         <div id="game-invites" class="flex flex-col gap-2"></div>
 
         <!-- Chat -->
         <div id="chat-container" class="bg-slate-800/90 backdrop-blur rounded-2xl border border-slate-700 flex flex-col flex-none h-48 card-glow overflow-hidden">
+            <div id="chat-peek" class="hidden"></div>
             <div id="chat-box" class="flex-1 p-3 overflow-y-auto flex flex-col gap-1 text-sm"></div>
             <div class="p-2 border-t border-slate-700 flex gap-2 bg-slate-900/50">
                 <input type="text" id="chat-input" placeholder="Chat here..." class="bg-slate-900 border border-slate-600 rounded-xl px-3 py-1.5 w-full focus:outline-none focus:border-teal-400">
@@ -217,14 +276,23 @@
                     </div>
                 </div>
                 <span id="peer-status" class="text-xs font-mono px-2 py-1 rounded-full bg-amber-500/15 text-amber-300 border border-amber-500/30">waiting for players…</span>
+                <div id="roster-list" class="flex flex-wrap gap-1 mt-1 w-full"></div>
             </div>
             <button id="btn-disconnect" class="btn-bouncy bg-red-500 hover:bg-red-400 text-white px-4 py-1.5 text-sm font-bold rounded-xl">Disconnect</button>
+        </div>
+
+        <!-- BubHub Record: shared history of every game played, newest first. -->
+        <div id="room-record-card" class="bg-slate-800/90 backdrop-blur p-4 rounded-2xl border border-slate-700 flex-none card-glow">
+            <h2 class="text-base font-bold text-white mb-1">📜 BubHub Record</h2>
+            <ul id="record-list-room" class="flex flex-col gap-1"></ul>
+            <button id="record-more-room" class="hidden text-teal-300 text-xs font-bold mt-2 hover:text-teal-200">Show all</button>
+            <p id="record-status-room" class="text-slate-500 text-[11px] font-mono mt-1"></p>
         </div>
 
     </div>
 
 
-    <footer class="text-center text-slate-500 text-xs pt-2 relative z-10">Bub Hub v8 (game-first stage + solo/multiplayer sections) • click the Room ID to copy • if a friend sees something different, both reload with Ctrl+Shift+R</footer>
+    <footer class="text-center text-slate-500 text-xs pt-2 relative z-10">Bub Hub v9 (game-first stage + solo/multiplayer sections) • click the Room ID to copy • if a friend sees something different, both reload with Ctrl+Shift+R</footer>
 
     <script>
         // ============ Hub: multi-peer room + game broker ============
@@ -235,9 +303,16 @@
         let isHost = false;
         let inRoom = false;
         let currentRoomId = '';
-        let myId = 'p-' + Math.random().toString(36).slice(2, 10);
+        // Identity + session survive reloads: a player who gets kicked out keeps
+        // the same player id (games like LOTR seat players by id), and the
+        // lobby can offer "Rejoin <room> as host/guest".
+        const SKEY = 'bubhub.session';
+        function loadSession(){ try { return JSON.parse(sessionStorage.getItem(SKEY) || 'null'); } catch(e) { return null; } }
+        function saveSession(){ try { sessionStorage.setItem(SKEY, JSON.stringify({ room: currentRoomId, host: isHost, id: myId, name: getName() })); } catch(e) {} }
+        function clearSession(){ try { sessionStorage.removeItem(SKEY); } catch(e) {} }
+        let myId = (loadSession() || {}).id || ('p-' + Math.random().toString(36).slice(2, 10));
         const links = new Map(); // playerId -> { conn, name, host }
-        const GAMES = window.BUB_GAMES || [];
+        const GAMES = (window.BUB_GAMES || []).filter(g => !g.disabled);
 
         const ui = {
             lobby: document.getElementById('lobby-ui'),
@@ -273,12 +348,18 @@
 
         ui.hostInput.value = randomRoomName();
         ui.joinInput.value = 'bubbies';
-        ui.nameInput.value = randomAnimalName();
+        // Persistent name: localStorage survives browser restarts, so the
+        // animal-name gate only appears on first visit (or wiped storage).
+        const NAME_KEY = 'bubhub.name';
+        function loadSavedName(){ try { return (localStorage.getItem(NAME_KEY) || '').trim().slice(0, 24); } catch(e) { return ''; } }
+        function saveName(){ try { localStorage.setItem(NAME_KEY, getName()); } catch(e) {} }
+        ui.nameInput.value = loadSavedName() || randomAnimalName();
 
         // ---- Name approval: the autofilled animal name is only a suggestion.
         // The player must tap ✓ (once per name) before Create/Connect unlock.
         // In-room edits go live immediately and propagate to every peer.
-        let nameConfirmed = false;
+        // A previously saved name starts out confirmed: no gate on return visits.
+        let nameConfirmed = !!loadSavedName();
         function renderNameGate(){
             const st = document.getElementById('name-state');
             const ok = document.getElementById('btn-name-ok');
@@ -312,13 +393,14 @@
         document.getElementById('btn-name-ok').addEventListener('click', () => {
             if (!getName()) { ui.nameInput.focus(); return; }
             nameConfirmed = true;
+            saveName();
             renderNameGate();
             if (inRoom) broadcastRename();
         });
         ui.nameInput.addEventListener('input', () => {
             nameConfirmed = false;
             renderNameGate();
-            if (inRoom) broadcastRename();
+            if (inRoom) { saveName(); broadcastRename(); }
         });
         renderNameGate();
 
@@ -359,13 +441,14 @@
             el.classList.remove('hidden');
         }
 
-        function logChat(msg, senderName, isSystem = false) {
+        // Chat holds real player messages only. System/game notifications
+        // were dropped: they flooded the log and the count badge with it.
+        // New arrivals while the drawer is shut surface as a tiny peek
+        // above the chat box plus a dot on the pill — never a number.
+        function logChat(msg, senderName) {
             const el = document.createElement('div');
             el.className = 'p-1.5 px-2.5 rounded-xl max-w-[90%] break-words';
-            if (isSystem) {
-                el.classList.add('text-slate-400', 'self-center', 'text-xs', 'italic');
-                el.innerText = msg;
-            } else if (senderName === getName()) {
+            if (senderName === getName()) {
                 el.classList.add('bg-teal-500/15', 'text-teal-200', 'self-end', 'text-right', 'border', 'border-teal-500/20');
                 el.innerHTML = `<span class="font-bold opacity-60 mr-1">${escapeHtml(senderName)}:</span><span></span>`;
                 el.lastChild.textContent = msg;
@@ -376,31 +459,92 @@
             }
             ui.chatBox.appendChild(el);
             ui.chatBox.scrollTop = ui.chatBox.scrollHeight;
-            // In focus mode with the drawer shut, count up so the pill can badge.
             if (document.body.classList.contains('focus-mode') && inRoom &&
                 !document.body.classList.contains('drawer-open')) {
-                unread++;
-                renderPill();
+                showChatPeek(senderName, msg);
             }
+        }
+
+        let peekT = null;
+        function showChatPeek(name, msg) {
+            const peek = document.getElementById('chat-peek');
+            if (peek) {
+                peek.innerHTML = '';
+                const b = document.createElement('b');
+                b.textContent = name + ': ';
+                const s = document.createElement('span');
+                const t = String(msg);
+                s.textContent = t.length > 90 ? t.slice(0, 90) + '…' : t;
+                peek.appendChild(b);
+                peek.appendChild(s);
+                peek.classList.remove('hidden');
+                clearTimeout(peekT);
+                peekT = setTimeout(() => peek.classList.add('hidden'), 6000);
+            }
+            hasNewChat = true;
+            renderPill();
         }
 
         function escapeHtml(s) {
             return String(s).replace(/[&<>"']/g, c => ({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;'}[c]));
         }
 
+        // ============ BubHub Record (modular: see bub-record.js) ============
+        const Rec = window.BubRecord.create({
+          getName: () => getName(),
+          rosterList: () => rosterList(),
+          gameTitle: (g) => gameTitle(g),
+          isHost: () => isHost,
+          sendAll: (o) => sendAll(o),
+          games: () => GAMES
+        });
+        const recFmtDate = window.BubRecord.fmtDate;
+
+        // ============ Presence: where is everyone? ============
+        const presence = {};
+        function myGame(){ try { return openGameId(); } catch(e){ return null; } }
+        function broadcastPresence(){
+          if (!inRoom) return;
+          const msg = { type: 'presence', id: myId, name: getName(), game: myGame() };
+          presence[myId] = { name: getName(), game: myGame() };
+          sendAll(msg);
+          renderRosterList();
+        }
+        function renderRosterList(){
+          const box = document.getElementById('roster-list');
+          if (!box) return;
+          box.innerHTML = '';
+          const all = [{ id: myId, name: getName(), host: isHost, game: myGame() }];
+          openLinks().forEach(([id, e]) => {
+            const pr = presence[id] || {};
+            all.push({ id, name: e.name, host: !!e.host, game: pr.game || null });
+          });
+          try { all.forEach(m => Rec.remember(m.id, m.name)); } catch(e){}
+          all.forEach(m => {
+            const chip = document.createElement('span');
+            chip.className = 'inline-flex items-center gap-1 text-[11px] font-mono px-2 py-1 rounded-full border ' +
+              (m.host ? 'bg-amber-500/15 text-amber-200 border-amber-500/40' : 'bg-slate-700/60 text-slate-200 border-slate-600/60');
+            const dot = document.createElement('span');
+            dot.textContent = 'o';
+            dot.style.color = m.game ? '#34d399' : '#64748b';
+            chip.appendChild(dot);
+            const nm = document.createElement('span');
+            nm.textContent = m.name + (m.id === myId ? ' (you)' : '') + (m.host ? ' host' : '');
+            chip.appendChild(nm);
+            const g = document.createElement('span');
+            g.className = 'font-bold';
+            g.textContent = m.game ? ('in ' + gameTitle(m.game)) : 'in lobby';
+            chip.appendChild(g);
+            box.appendChild(chip);
+          });
+        }
+
+
         function refreshRoster() {
-            if (ui.peerStatus) {
-                const n = peerCount();
-                if (n <= 1) {
-                    ui.peerStatus.textContent = 'waiting for players…';
-                    ui.peerStatus.className = 'text-xs font-mono px-2 py-1 rounded-full bg-amber-500/15 text-amber-300 border border-amber-500/30';
-                } else {
-                    const names = [getName()].concat(openLinks().map(([id, e]) => e.name));
-                    ui.peerStatus.textContent = `● ${n} players: ${names.join(', ')}`;
-                    ui.peerStatus.className = 'text-xs font-mono px-2 py-1 rounded-full bg-emerald-500/15 text-emerald-300 border border-emerald-500/30';
-                }
-            }
+            renderPeerStatus();
+            try { renderRosterList(); } catch(e){}
             GB.pushRoster();
+            renderRoomChips();
             // Keep the focus bar honest while a game owns the screen.
             if (document.body.classList.contains('focus-mode')) {
                 const gid = openGameId();
@@ -425,9 +569,10 @@
             ui.activeRoom.textContent = roomId;
             ui.chatBox.innerHTML = '';
             refreshRoster();
+            renderRoomChips();
             renderNameGate();
+            saveSession();
             GB.closeAll();
-            logChat(`Welcome to ${roomId}! Share the Room ID to invite friends.`, 'system', true);
         }
 
         function showLobby() {
@@ -441,16 +586,27 @@
             GB.closeAll();
             clearInvites();
             renderNameGate();
+            renderResume();
         }
 
         function routeMessage(conn, data) {
             if (!data) return;
             if (data.type === 'hello') {
                 links.set(data.id, { conn, name: data.name, host: !!data.host });
+                if (data.game !== undefined) presence[data.id] = { name: data.name, game: data.game || null };
                 if (isHost && !data.host) {
-                    sendTo(links.get(data.id), { type: 'hello', id: myId, name: getName(), host: true });
+                    sendTo(links.get(data.id), { type: 'hello', id: myId, name: getName(), host: true, game: myGame() });
+                    // catch the newcomer up on where everyone is
+                    Object.entries(presence).forEach(([pid, pr]) => {
+                        if (pid !== data.id && pid !== myId) sendTo(links.get(data.id), { type: 'presence', id: pid, name: pr.name, game: pr.game });
+                    });
                 }
-                logChat(`${data.name} joined.`, 'system', true);
+                if (!isHost && data.host && expectReconnect && inRoom) {
+                    expectReconnect = false;
+                    reconnectDelay = 1500;
+                    clearTimeout(reconnectT);
+                    hostLostBanner(false);
+                }
                 refreshRoster();
                 return;
             }
@@ -471,26 +627,107 @@
                 logChat(data.text, data.name, false);
                 return;
             }
+            if (data.type === 'presence') {
+                presence[data.id] = { name: data.name, game: data.game || null };
+                try { Rec.remember(data.id, data.name); } catch(e){}
+                if (isHost) sendAll(data, data.id);
+                renderRosterList();
+                return;
+            }
             if (data.type === 'game') {
                 routeGame(data);
                 return;
             }
         }
 
+        // ---- Reconnect: guests keep dialing the room when the host link drops,
+        // and the host keeps its id (session) so games can resume in place.
+        let reconnectT = null, reconnectDelay = 1500, lastLostNote = 0;
+        let hostGone = false, expectReconnect = false;
+        function hostLostBanner(on) {
+            hostGone = !!on;
+            renderPeerStatus();
+        }
+        function renderPeerStatus() {
+            if (!ui.peerStatus) return;
+            if (hostGone && !isHost && inRoom) {
+                ui.peerStatus.textContent = 'host lost — reconnecting…';
+                ui.peerStatus.className = 'text-xs font-mono px-2 py-1 rounded-full bg-red-500/15 text-red-300 border border-red-500/40';
+                return;
+            }
+            const n = peerCount();
+            if (n <= 1) {
+                ui.peerStatus.textContent = 'waiting for players…';
+                ui.peerStatus.className = 'text-xs font-mono px-2 py-1 rounded-full bg-amber-500/15 text-amber-300 border border-amber-500/30';
+            } else {
+                const names = [getName()].concat(openLinks().map(([id, e]) => e.name));
+                ui.peerStatus.textContent = `● ${n} players: ${names.join(', ')}`;
+                ui.peerStatus.className = 'text-xs font-mono px-2 py-1 rounded-full bg-emerald-500/15 text-emerald-300 border border-emerald-500/30';
+            }
+            try { renderRosterList(); } catch(e){}
+        }
+        function scheduleReconnect() {
+            if (isHost || !inRoom || !currentRoomId) return;
+            if (hostLink()) return;
+            clearTimeout(reconnectT);
+            reconnectT = setTimeout(tryReconnect, reconnectDelay);
+            reconnectDelay = Math.min(5000, Math.floor(reconnectDelay * 1.4));
+        }
+        function tryReconnect() {
+            if (isHost || !inRoom || !currentRoomId) return;
+            if (hostLink()) return;
+            hostLostBanner(true);
+            if (!peer || peer.destroyed || peer.disconnected) {
+                try { if (peer && !peer.destroyed) peer.destroy(); } catch(e) {}
+                try {
+                    peer = new Peer();
+                    peer.on('open', () => { dialHost(); });
+                    peer.on('connection', (c) => { wireConnection(c); });
+                    peer.on('error', onGuestPeerErr);
+                } catch(e) { scheduleReconnect(); }
+                return;
+            }
+            dialHost();
+        }
+        function dialHost() {
+            if (isHost || !inRoom || !currentRoomId || !peer || peer.destroyed) return;
+            try {
+                const conn = peer.connect(currentRoomId, { reliable: true });
+                wireConnection(conn);
+            } catch(e) { scheduleReconnect(); }
+        }
+        function onGuestPeerErr(err) {
+            const t = (err && err.type) || '';
+            if (!inRoom || isHost) { setStatus(ui.joinStatus, 'error: ' + (t || (err && err.message))); return; }
+            if (t === 'peer-unavailable') {
+                setStatus(ui.joinStatus, `room “${currentRoomId}” has no host yet — retrying…`);
+                hostLostBanner(true);
+                scheduleReconnect();
+            } else {
+                scheduleReconnect();
+            }
+        }
+
         function wireConnection(conn) {
             conn.on('open', () => {
-                try { conn.send({ type: 'hello', id: myId, name: getName(), host: isHost }); } catch(e) {}
+                try { conn.send({ type: 'hello', id: myId, name: getName(), host: isHost, game: myGame() }); } catch(e) {}
+                try { broadcastPresence(); } catch(e){}
                 refreshRoster();
             });
             conn.on('data', (data) => routeMessage(conn, data));
             conn.on('close', () => {
                 const id = idOfConn(conn);
-                let nm = 'A player';
-                if (id && links.has(id)) { nm = links.get(id).name || nm; links.delete(id); }
-                logChat(`${nm} left.`, 'system', true);
+                let nm = 'A player', wasHost = false;
+                if (id && links.has(id)) { nm = links.get(id).name || nm; wasHost = !!links.get(id).host; links.delete(id); }
+                try { delete presence[id]; } catch(e){}
+                if (!isHost && wasHost && inRoom) {
+                    expectReconnect = true;
+                    hostLostBanner(true);
+                    scheduleReconnect();
+                }
                 refreshRoster();
             });
-            conn.on('error', () => {});
+            conn.on('error', () => { if (!isHost && inRoom && !hostLink()) scheduleReconnect(); });
         }
 
         function sendChat() {
@@ -508,25 +745,38 @@
             if (e.key === 'Enter') sendChat();
         });
 
-        document.getElementById('btn-host').addEventListener('click', () => {
-            if (!nameConfirmed) { setStatus(ui.hostStatus, 'tap ✓ by your Display Name first'); return; }
-            const roomId = ui.hostInput.value.trim() || randomRoomName();
+        // Host creation retries the same id: after a kick or a fast reload the
+        // PeerJS cloud may still hold the id for a few seconds ("taken" /
+        // "unavailable-id"). We never silently swap in a random room here.
+        function hostCreate(roomId, attempt) {
             cleanup();
             isHost = true;
-            setStatus(ui.hostStatus, 'creating room ' + roomId + '…');
+            reconnectDelay = 1500; hostGone = false; expectReconnect = false;
+            setStatus(ui.hostStatus, attempt ? `retrying room ${roomId}… (${attempt + 1}/6)` : 'creating room ' + roomId + '…');
             try {
                 peer = new Peer(roomId);
             } catch (err) {
                 setStatus(ui.hostStatus, 'error: ' + err.message);
                 return;
             }
-            peer.on('open', () => { showRoom(roomId); });
+            peer.on('open', () => { saveSession(); showRoom(roomId); });
             peer.on('connection', (conn) => { wireConnection(conn); });
             peer.on('error', (err) => {
-                const msg = err && err.type ? err.type : err.message;
+                const msg = err && err.type ? err.type : (err && err.message) || 'error';
+                if ((String(msg).includes('unavailable-id') || String(msg).includes('taken')) && attempt < 5 && !inRoom) {
+                    setStatus(ui.hostStatus, `room “${roomId}” still releasing — retry ${attempt + 1}/5…`);
+                    setTimeout(() => hostCreate(roomId, attempt + 1), 1200 * (attempt + 1));
+                    return;
+                }
                 setStatus(ui.hostStatus, 'error: ' + msg);
-                if (String(msg).includes('taken')) ui.hostInput.value = randomRoomName();
             });
+        }
+
+        document.getElementById('btn-host').addEventListener('click', () => {
+            if (!nameConfirmed) { setStatus(ui.hostStatus, 'tap ✓ by your Display Name first'); return; }
+            const roomId = ui.hostInput.value.trim() || randomRoomName();
+            ui.hostInput.value = roomId;
+            hostCreate(roomId, 0);
         });
 
         document.getElementById('btn-join').addEventListener('click', () => {
@@ -535,33 +785,78 @@
             if (!roomId) { setStatus(ui.joinStatus, 'enter a Room ID first'); return; }
             cleanup();
             isHost = false;
+            reconnectDelay = 1500; hostGone = false; expectReconnect = false;
             setStatus(ui.joinStatus, 'connecting to ' + roomId + '…');
             peer = new Peer();
             peer.on('open', () => {
                 const conn = peer.connect(roomId, { reliable: true });
                 wireConnection(conn);
+                saveSession();
                 showRoom(roomId);
                 setStatus(ui.joinStatus, 'connected!');
             });
-            peer.on('error', (err) => {
-                setStatus(ui.joinStatus, 'error: ' + (err.type || err.message));
-            });
+            peer.on('connection', (conn) => { wireConnection(conn); });
+            peer.on('error', onGuestPeerErr);
         });
 
         document.getElementById('btn-disconnect').addEventListener('click', () => {
             cleanup();
+            clearSession();
+            clearTimeout(reconnectT);
+            hostGone = false; expectReconnect = false;
             showLobby();
+            renderRoomChips();
             ui.hostStatus.classList.add('hidden');
             ui.joinStatus.classList.add('hidden');
         });
 
-        ui.activeRoom.addEventListener('click', async () => {
-            const id = ui.activeRoom.textContent;
+        async function copyId(el, text) {
             try {
-                await navigator.clipboard.writeText(id);
-                ui.activeRoom.textContent = 'copied!';
-                setTimeout(() => { ui.activeRoom.textContent = id; }, 900);
+                await navigator.clipboard.writeText(text);
+                const old = el.textContent;
+                el.textContent = 'copied!';
+                setTimeout(() => { renderRoomChips(); }, 900);
             } catch {}
+        }
+        function renderRoomChips() {
+            const id = currentRoomId;
+            const n = peerCount();
+            const label = id ? ('Room ' + id + ' · ' + n + ' player' + (n === 1 ? '' : 's')) : 'Room —';
+            const fr = document.getElementById('focus-room');
+            if (fr) fr.textContent = label;
+            const dr = document.getElementById('drawer-room');
+            if (dr) dr.textContent = id ? ('Room ' + id) : 'Room —';
+            if (inRoom) ui.activeRoom.textContent = id;
+        }
+        ui.activeRoom.addEventListener('click', () => copyId(ui.activeRoom, currentRoomId));
+        document.getElementById('focus-room').addEventListener('click', (e) => copyId(e.currentTarget, currentRoomId));
+        document.getElementById('drawer-room').addEventListener('click', (e) => copyId(e.currentTarget, currentRoomId));
+        document.getElementById('drawer-close').addEventListener('click', closeDrawer);
+        document.getElementById('drawer-scrim').addEventListener('click', closeDrawer);
+        function toggleDrawer(){
+            if (document.body.classList.contains('drawer-open')) closeDrawer();
+            else openDrawer();
+        }
+        function renderResume(){
+            const s = loadSession();
+            const bar = document.getElementById('resume-bar');
+            const txt = document.getElementById('resume-text');
+            if (!bar || !txt) return;
+            if (s && s.room && !inRoom){
+                txt.textContent = `You were in room “${s.room}”${s.host ? ' as host' : ''} — pick it back up?`;
+                bar.classList.remove('hidden');
+                bar.classList.add('flex');
+            } else {
+                bar.classList.add('hidden');
+                bar.classList.remove('flex');
+            }
+        }
+        document.getElementById('btn-resume-forget').addEventListener('click', () => { clearSession(); renderResume(); });
+        document.getElementById('btn-resume-go').addEventListener('click', () => {
+            const s = loadSession();
+            if (!s || !s.room) return;
+            if (s.host){ ui.hostInput.value = s.room; document.getElementById('btn-host').click(); }
+            else { ui.joinInput.value = s.room; document.getElementById('btn-join').click(); }
         });
 
         function cleanup() {
@@ -587,9 +882,9 @@
 
         // ============ Game broker: registry buttons, stage iframes, relay ============
         // Child contract (each game file implements this):
-        //   up:   { t:'gu', game, k:'hello'|'intent'|'say'|'invite'|'denied'|'height'|'close', p }
+        //   up:   { t:'gu', game, k:'hello'|'intent'|'say'|'result'|'invite'|'denied'|'height'|'close', p }
         //   down: { t:'gd', game, k:'roster'|'state'|'invite'|'denied'|'reset', p }
-        // PeerJS envelope: { type:'game', game, k:'intent'|'state'|'say'|'invite', from:{id,name}, p }
+        // PeerJS envelope: { type:'game', game, k:'intent'|'state'|'say'|'result'|'invite', from:{id,name}, p }
         const GB = {
             frames: {},   // gameId -> { el, ready }
             pending: {},  // gameId -> [down messages waiting for child hello]
@@ -639,10 +934,15 @@
                     });
                 }
                 window.addEventListener('message', GB.onChild);
+                ['lobby', 'room'].forEach(s => {
+                    const b = document.getElementById('record-more-' + s);
+                    if (b) b.addEventListener('click', () => { Rec.expanded = !Rec.expanded; Rec.render(); });
+                });
+                Rec.load();
                 const bexit = document.getElementById('btn-focus-exit');
                 if (bexit) bexit.addEventListener('click', () => { const gid = openGameId(); if (gid) GB.close(gid); });
                 const pill = document.getElementById('chat-pill');
-                if (pill) pill.addEventListener('click', openDrawer);
+                if (pill) pill.addEventListener('click', toggleDrawer);
                 window.addEventListener('resize', () => {
                     if (document.body.classList.contains('focus-mode')) sizeStageFrames();
                 });
@@ -676,8 +976,12 @@
             },
 
             open(game){
+                const already = this.frames[game];
+                if (already && !already.el.classList.contains('hidden')) return; // already open
+                if (game === 'goldberg') Rec.goldReset();
+                try { Rec.noteOpened(game); } catch(e){}
                 Object.entries(this.frames).forEach(([gid, f]) => {
-                    if (gid !== game) f.el.classList.add('hidden');
+                    if (gid !== game) { try { Rec.flushUsage(gid); } catch(e){} f.el.classList.add('hidden'); }
                 });
                 const f = this.frame(game);
                 if (!f) return;
@@ -685,6 +989,9 @@
                 hideInvite(game);
                 this.pushRoster(game);
                 this.flush(game);
+                // Let the game know it's visible again (Goldberg uses this
+                // to resume its render loop; music stays off until requested).
+                this.down(game, { t: 'gd', game, k: 'show' });
                 if (this.states[game]) {
                     this.down(game, { t: 'gd', game, k: 'state', p: this.states[game] });
                 }
@@ -692,6 +999,7 @@
                 this.refreshStage();
                 shrinkChat(true);
                 enterFocus(game);
+                try { broadcastPresence(); refreshRoster(); } catch(e){}
                 if (!document.body.classList.contains('focus-mode')) {
                     try { f.el.scrollIntoView({ behavior: 'smooth', block: 'start' }); } catch(e) {}
                 }
@@ -700,6 +1008,11 @@
             close(game){
                 const f = this.frames[game];
                 if (f) f.el.classList.add('hidden');
+                // Tell the game it was hidden (Goldberg fades its music out).
+                this.down(game, { t: 'gd', game, k: 'hide' });
+                if (game === 'goldberg') Rec.flushGoldberg();
+                try { Rec.flushUsage(game); } catch(e){}
+                try { broadcastPresence(); } catch(e){}
                 this.updateButtons();
                 this.refreshStage();
                 const stillOpen = openGameId();
@@ -717,7 +1030,11 @@
             },
 
             closeAll(){
-                Object.keys(this.frames).forEach(gid => this.frames[gid].el.classList.add('hidden'));
+                Object.keys(this.frames).forEach(gid => {
+                    this.frames[gid].el.classList.add('hidden');
+                    this.down(gid, { t: 'gd', game: gid, k: 'hide' });
+                });
+                Rec.flushGoldberg();
                 this.updateButtons();
                 this.refreshStage();
                 shrinkChat(false);
@@ -729,6 +1046,7 @@
                     this.down(gid, { t: 'gd', game: gid, k: 'reset' });
                     this.frames[gid].el.classList.add('hidden');
                 });
+                Rec.flushGoldberg();
                 this.pending = {};
                 clearInvites();
                 this.updateButtons();
@@ -806,11 +1124,13 @@
                     return;
                 }
                 if (m.k === 'close'){ GB.close(game); return; }
-                if (m.k === 'say'){
-                    logChat(m.p, gameTitle(game), false);
-                    const msg = { type: 'game', game, k: 'say', from: { id: myId, name: gameTitle(game) }, p: { text: m.p } };
-                    if (isHost) sendAll(msg);
-                    else { const h = hostLink(); if (h) sendTo(h, msg); }
+                // Game event chatter ('say') is dropped: notifications don't
+                // go in the chat log anymore. Kept on the wire for compat.
+                if (m.k === 'say'){ return; }
+                if (m.k === 'result'){
+                    // A game ended on this machine. Solo games always record
+                    // locally; multiplayer games record on the host only.
+                    Rec.fromGame(game, m.p);
                     return;
                 }
                 if (m.k === 'invite'){
@@ -825,6 +1145,7 @@
                     return;
                 }
                 if (m.k === 'intent'){
+                    if (game === 'goldberg' && isHost) Rec.touch(myId, getName());
                     if (isHost){
                         GB.down(game, { t: 'gd', game, k: 'intent', p: m.p, from: { id: myId, name: getName() } });
                     } else {
@@ -845,6 +1166,7 @@
         function routeGame(m){
             const game = m.game;
             if (m.k === 'intent'){
+                if (game === 'goldberg' && isHost && m.from && m.from.id) Rec.touch(m.from.id, m.from.name);
                 if (isHost) GB.down(game, { t: 'gd', game, k: 'intent', p: m.p, from: m.from });
                 return;
             }
@@ -853,7 +1175,13 @@
                 return;
             }
             if (m.k === 'say'){
-                logChat(m.p.text, gameTitle(game), false);
+                // Dropped: game notifications stay out of the chat log.
+                return;
+            }
+            if (m.k === 'result'){
+                // The host recorded a game; refresh so the new line appears.
+                if (m.p && m.p.entry) Rec.addLocal(m.p.entry);
+                Rec.load();
                 return;
             }
             if (m.k === 'denied'){
@@ -912,7 +1240,8 @@
         // ============ Focus mode: one open game owns the viewport ============
         // Entered automatically by GB.open, exited by GB.close/closeAll/resetAll.
         // Purely per-client: no bridge or protocol change, guests unaffected.
-        let unread = 0;
+        // Dot-only unread: the pill never shows a number.
+        let hasNewChat = false;
         function openGameId(){
             const found = Object.entries(GB.frames).find(([gid, f]) => !f.el.classList.contains('hidden'));
             return found ? found[0] : null;
@@ -953,18 +1282,28 @@
                 }
             });
         }
-        function openDrawer(){ document.body.classList.add('drawer-open'); unread = 0; renderPill(); }
+        function openDrawer(){ document.body.classList.add('drawer-open'); hasNewChat = false; renderPill(); const pk = document.getElementById('chat-peek'); if (pk) pk.classList.add('hidden'); }
         function closeDrawer(){ document.body.classList.remove('drawer-open'); renderPill(); }
         function renderPill(){
             const badge = document.getElementById('chat-unread');
             if (!badge) return;
-            if (unread > 0) {
-                badge.textContent = unread > 99 ? '99+' : String(unread);
-                badge.classList.remove('hidden');
-            } else badge.classList.add('hidden');
+            badge.textContent = '•';
+            badge.classList.toggle('hidden', !hasNewChat);
         }
 
         GB.init();
+        // Returning player: restore their last display name (already confirmed)
+        // and offer the room they were in.
+        (function () {
+            const s = loadSession();
+            if (s && s.name && ui.nameInput) {
+                ui.nameInput.value = String(s.name).slice(0, 24);
+                nameConfirmed = true;
+                renderNameGate();
+            }
+            renderResume();
+            renderRoomChips();
+        })();
     </script>
 </body>
 </html>

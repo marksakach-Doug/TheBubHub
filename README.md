@@ -1,4 +1,4 @@
-#  Bub Hub — Peer-to-Peer Arcade
+# 🫧 Bub Hub — Peer-to-Peer Arcade
 
 Bub Hub is a tiny, modular arcade for HTML games. The **hub** (`index.html`) owns rooms,
 chat, and networking. **Games** are plain `.html` files that render in a shared stage and
@@ -123,6 +123,8 @@ Hub.up('hello'); // 1. announce yourself; hub replies with roster
 | `intent` | `p` = guest action, `from` = `{ id, name }` | Host only. Validate, apply, then `state`. |
 | `denied` | `{ text }` | Your intent was rejected — show it. |
 | `reset` | – | Room tore down — reset to a fresh table. |
+| `hide` | – | Your stage frame was hidden — stop music, suspend your loop. |
+| `show` | – | Your stage frame is visible again — resume (music stays off until requested). |
 
 ### The golden rule (Warp Front / LOTR pattern)
 
@@ -150,6 +152,36 @@ function onIntent(move, from) { if (valid(move)) { applyMove(move); Hub.up('stat
   Chat and `say` follow the same path.
 - `Disconnect` / unload destroys the peer and resets all game frames.
 
+## Presence (who is where)
+
+- Every hub broadcasts `{ type: 'presence', id, name, game }` on open/close/hello.
+- The room controls render one chip per player (`#roster-list`): name + `in <game>` or `in lobby`, so you can tell which game everyone is in.
+
+## Sessions & reconnects (v9)
+
+- Your player id, display name, room, and role are kept in `sessionStorage`
+  (`bubhub.session`), so a reload offers **Rejoin `<room>` as host/guest** in the lobby
+  — and games that seat players by id (LOTR) keep your seat.
+- Hosting retries a just-released room id 5× with backoff (`unavailable-id`) instead
+  of silently minting a random room.
+- Guests whose host link drops show **host lost — reconnecting…** and keep dialing
+  the room with capped backoff until it answers.
+
+## Game chrome conventions
+
+- **Hide**: every game must be hideable — in-game `Hide`/`Close Game` button posting
+  `{ t:'gu', game, k:'close' }`, plus the hub's `✕ Stage` bar. (The hub guarantees
+  hidden iframes really disappear: `#game-stage iframe.hidden { display:none !important }`.)
+- **Room number**: always visible in the focus bar (`Room <id> · N players`, click to copy).
+- **Chat drawer**: dismissible via the 💬 pill toggle, the drawer ✕, or tapping the
+  backdrop — never Esc-only.
+- **LOTR swaps are player choices**: a full spare (`swap`), a full gear set (`stash`),
+  and a lost fight (`lose`) each open a tap-the-card decision; the engine never
+  silently picks your cards (Narsil/K is excluded unless it is your only weapon).
+- **Goldberg touch**: ⟲/⟳ rotate, 🔒 lock, 🗑 delete on the selection row; the 📍
+  spawn marker (tap Spawn mode, or drag the marker) is where new balls appear.
+  Plank and ramp are one part — angle comes from rotate.
+
 ## Run it
 
 1. Open `index.html` in a browser (double-click works — the registry loads via `<script>`, not `fetch`).
@@ -159,13 +191,30 @@ function onIntent(move, from) { if (valid(move)) { applyMove(move); Hub.up('stat
 > If two players see different things, both hard-reload (<kbd>Ctrl</kbd>+<kbd>Shift</kbd>+<kbd>R</kbd>)
 > — game files are cached aggressively by the browser.
 
+## BubHub Record
+
+Every finished game writes one line (e.g. `6 Oct 2026 Harry beat John at LOTR Cards`)
+to the shared Google Sheet behind `BUB_API` in `index.html` — the same sheet as the
+DalTadka leaderboard. BubHub rows carry `kind=bub` and the sentence in the `text`
+column, so DalTadka's board never shows them. The card at the bottom of the lobby
+(and room drawer) lists them newest-first, 5 then expandable.
+
+Games announce their ending over the bridge as `Hub.up('result', {...})` with player
+**ids**; the hub resolves names from its own roster and builds the sentence in one
+place (`Rec.sentence` in `index.html`). Only the host writes (solo games write from
+the local machine). Goldberg has no end state, so the hub notes everyone who sends
+a Goldberg intent and records the line when the panel closes.
+
 ## Files
 
 | File | Touch? | Purpose |
 |---|---|---|
 | `index.html` | Rarely | Hub shell: stage, lobby/room UI, PeerJS room, game broker. |
 | `games.js` | ✅ to add games | The registry. The only file you edit for a new game. |
+| `bub-record.js` | Rarely | Modular BubHub Record (loaded via script tag). Generic `played X` lines mean even a brand-new game with no `result` logic leaves a line on open/close. |
 | `warpfront.html`, `lotr.html` | Reference | Multiplayer examples (host + guests, like-for-like pattern to copy). |
 | `goldberg.html` | Playable | Chain-reaction sandbox (host-authoritative physics, everyone builds). |
+| `DrawDrive.html` | Playable | Draw and Drive (multiplayer: maze turn-taking drawer/driver + versus battle + off-rails). Tiny laser crumbs dissolve; cookie mode deleted. |
+| `eggs.html` | Playable | eggs sandbox (random worlds, splat decals, star every 5 min, secret `=` suplex mode, white/brown/baby-blue/easter). |
 | `LobbyWaltzEngine.html` | Reference | Solo example (`solo` + `lobby` + fixed `height`). |
 | `horse.jpg` | – | Mascot 🐴 |

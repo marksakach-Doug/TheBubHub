@@ -245,7 +245,7 @@ window.addEventListener('error', (e) => {
 const V = { J: 12, Q: 14, K: 16, A: 18 };
 const MON = { 2:['Bat','🦇'],3:['Crow','🐦'],4:['Goblin','👺'],5:['Giant Spider','🕷️'],6:['Angry Wood Elf','🧝'],7:['Warg','🐺'],8:['Orc','👹'],9:['Uruk-hai','🧟'],10:['Troll','🧌'],J:['Shelob','🕸️'],Q:['Balrog','🔥'],K:['Nazgûl','💀'],A:['Dragon','🐉'] };
 const WEP = { 2:['Rusty Dagger','🗡️'],3:['Hunting Knife','🔪'],4:['Sling','🪨'],5:['Short Bow','🏹'],6:['Hand Axe','🪓'],7:['Throwing Spear','🔱'],8:['Dwarven Axe','⚒️'],9:['Elven Longbow','🏹'],10:['Sting','🗡️','Glows when Orcs are near'],J:['Orcrist','⚔️','The Goblin-cleaver: Draw 2 Loot, keep 1'],Q:['Glamdring','🗡️','Foe-hammer: High power'],K:['Narsil','⚔️','The Blade that was Broken'],A:['Andúril','⚔️','Flame of the West: Ultimate Power'] };
-let S = null, remembered = { dread: true }, noteT = null, lastFeedN = 0, lastLvls = {}, lastWinShown = null;
+let S = null, remembered = { dread: true }, noteT = null, lastFeedN = 0, lastLvls = {}, lastWinShown = null, lotrInst = 0;
 // The game is over when the winner is decided (belt and braces: phase or flag,
 // since older in-flight states may only carry the phase).
 const isOver = () => !!(S && (S.over || S.phase === 'over'));
@@ -302,42 +302,106 @@ function norm(p){
         say(`${pn(p)} must discard spare ${wname(d)} (1 spare max).`);
     }
 }
+// ---- Player-chosen swaps -----------------------------------------------
+// Strategy means never letting the computer pick your cards. Whenever the
+// game would silently swap or drop one of your weapons it now opens a
+// decision instead (S.pend + phase 'decide') and waits for your tap.
+// give() returns true when it opens a decision — its caller must then NOT
+// call next(); the choice handler finishes the flow.
 function give(p, c){
     const can = canEq(p, c);
     if (can && p.eq.length < cap(p)){
         p.eq.push(c);
         say(`${pn(p)} takes ${wname(c)} — equipped.`);
     } else if (can && !p.hand.length && p.eq.length){
-        // Gear full but spare empty: equip the new card, stash the weakest old one.
-        p.eq.sort((a, b) => val(a) - val(b));
-        const out = p.eq.shift();
-        p.eq.push(c); p.hand = [out];
-        say(`${pn(p)} takes ${wname(c)} — equipped, stashing spare ${wname(out)}.`);
+        // Gear full but spare empty: the player picks which equipped weapon
+        // moves to the spare; the new card takes its slot.
+        const cands = stashCands(p);
+        if (cands.length <= 1){
+            p.eq.sort((a, b) => val(a) - val(b));
+            const out = p.eq.shift();
+            p.eq.push(c); p.hand = [out];
+            say(`${pn(p)} takes ${wname(c)} — equipped, stashing spare ${wname(out)}.`);
+        } else {
+            S.pend = { who: p.id, kind: 'stash', cards: cands, incoming: c,
+                       why: `${pn(p)}'s gear is full — choose a weapon to move to the spare.` };
+            S.phase = 'decide';
+            S.msg = S.pend.why;
+            return true;
+        }
     } else if (p.hand.length){
-        // Spare full: the clicked card is always kept — the least useful old
-        // spare goes to the discard, named out loud so nothing vanishes.
-        const low = p.hand.reduce((a, b) => spareVal(p, b) < spareVal(p, a) ? b : a);
-        p.hand = p.hand.filter(x => x !== low);
-        p.hand.push(c);
-        S.lootD.push(low);
-        say(`${pn(p)} swaps spare ${wname(low)} for ${wname(c)}.`);
+        // Spare full: the player picks one card to keep, the other is discarded.
+        S.pend = { who: p.id, kind: 'swap', cards: [p.hand[0], c], incoming: c,
+                   why: `${pn(p)}'s spare slot is full — choose which card to keep.` };
+        S.phase = 'decide';
+        S.msg = S.pend.why;
+        return true;
     } else {
         p.hand.push(c);
         say(`${pn(p)} takes ${wname(c)} as spare.`);
     }
     norm(p);
+    return false;
 }
-function dropOne(p){
-    let d = [...p.eq, ...p.hand].find(c => c.r === 'Q');
-    if (!d && p.eq.length){
-        const pool = p.eq.length > 1 ? p.eq.filter(c => c.r !== 'K') : p.eq;
-        d = pool.reduce((a, b) => val(b) < val(a) ? b : a);
+// Narsil (K) cannot be discarded or stashed while another weapon is equipped
+// (house rule) — so it only appears as a choice when it is the lone option.
+function stashCands(p){
+    const noK = p.eq.filter(c => c.r !== 'K');
+    return (p.eq.length > 1 && noK.length) ? noK : p.eq.slice();
+}
+// Weapon losses (fight defeats, Dragon flees/falls) queue up so every player
+// with more than one candidate chooses their own discard, one at a time.
+function queueLose(p){ if (p && !p.gone) S.lossQ.push(p.id); }
+function pumpLose(){
+    while (S.lossQ.length){
+        const p = S.pl.find(x => x.id === S.lossQ[0]);
+        if (!p || p.gone || !p.eq.length){ S.lossQ.shift(); continue; }
+        const cands = stashCands(p);
+        if (cands.length <= 1){
+            const d = cands[0] || p.eq[0];
+            if (d){
+                p.eq = p.eq.filter(c => c !== d); p.hand = p.hand.filter(c => c !== d);
+                S.lootD.push(d);
+                say(`${pn(p)} loses ${wname(d)}.`);
+            }
+            S.lossQ.shift(); continue;
+        }
+        S.pend = { who: p.id, kind: 'lose', cards: cands,
+                   why: `${pn(p)} lost the fight — choose which weapon to discard.` };
+        S.phase = 'decide';
+        S.msg = S.pend.why;
+        return true;
     }
-    if (!d) return null;
-    p.eq = p.eq.filter(c => c !== d); p.hand = p.hand.filter(c => c !== d);
-    S.lootD.push(d); return d;
+    return false;
 }
-const lose = (p) => { const d = dropOne(p); norm(p); if (d) say(`${pn(p)} loses ${wname(d)}.`); };
+function resolveDecision(i){
+    const pd = S.pend;
+    const p = pd && S.pl.find(x => x.id === pd.who);
+    if (!pd || !p || !pd.cards[i]) return null;
+    const pick = pd.cards[i];
+    if (pd.kind === 'swap'){
+        const other = pd.cards[1 - i];
+        p.hand = [pick];
+        S.lootD.push(other);
+        say(`${pn(p)} keeps ${wname(pick)} as spare (${wname(other)} is discarded).`);
+    } else if (pd.kind === 'stash'){
+        p.eq = p.eq.filter(c => c !== pick);
+        p.hand = [pick];
+        p.eq.push(pd.incoming);
+        say(`${pn(p)} moves ${wname(pick)} to the spare and equips ${wname(pd.incoming)}.`);
+    } else if (pd.kind === 'lose'){
+        p.eq = p.eq.filter(c => c !== pick); p.hand = p.hand.filter(c => c !== pick);
+        S.lootD.push(pick);
+        say(`${pn(p)} discards ${wname(pick)}.`);
+        S.lossQ.shift();
+    }
+    S.pend = null;
+    norm(p);
+    if (pumpLose()) return null;
+    if (S.after === 'bosschk'){ S.after = null; const pw = S.afterPw; S.afterPw = null; if (!chk(pw)) endTurn(); }
+    else next();
+    return null;
+}
 
 function say(t){
     S.feed.unshift({ n: ++S.feedN, t });
@@ -352,7 +416,8 @@ function fresh(dr){
     const ps = ids.map(id => ({ id, name: nm[id] || cleanName(id) }));
     S = { cfg: { dread: dr }, pl: ps.map(x => ({ id: x.id, name: x.name, lvl: 1, eq: [], hand: [] })),
           loot: deck('B'), lootD: [], mon: deck('R'), monD: [], turn: 0, phase: 'choose', over: false,
-          fight: null, pick: null, boss: null, win: null, feed: [], feedN: 0, msg: '' };
+          fight: null, pick: null, boss: null, win: null, feed: [], feedN: 0, msg: '',
+          pend: null, lossQ: [], after: null, afterPw: null, inst: ++lotrInst };
     const aside = [];
     S.pl.forEach(p => { let c; for (;;){ c = draw('L'); if (isNum(c)) break; aside.push(c); } p.eq = [c]; });
     S.loot.push(...aside); shuffle(S.loot);
@@ -373,6 +438,7 @@ const rematch = () => { if (isHost() && S) startGame(S.cfg.dread); };
 
 function endTurn(){
     S.fight = null; S.pick = null; S.boss = null; S.q = [];
+    S.pend = null; S.lossQ = []; S.after = null; S.afterPw = null;
     let k = 0;
     do { S.turn = (S.turn + 1) % S.pl.length; k++; } while (cur().gone && k < S.pl.length);
     S.phase = 'choose';
@@ -391,8 +457,10 @@ function chk(pw){
                     }
                 }
     S.phase = 'over'; S.over = true; S.win = c[0].id; S.fight = null; S.boss = null; S.pick = null;
+    S.pend = null; S.lossQ = []; S.after = null; S.afterPw = null;
     say(`🏆 ${pn(c[0])} reaches Level 15 and wins!`);
     S.msg = `🏆 ${pn(c[0])} wins the game!`;
+    if (isHost()) Hub.up('result', { inst: S.inst, win: c[0].id, players: S.pl.map(p => p.id) });
     return true;
 }
 const total = () => S.fight.mons.reduce((s, c) => s + val(c, true), 0) + dread(cur());
@@ -418,11 +486,13 @@ function resolve(){
         if (p.eq.some(c => c.r === 'J')) S.q.push('o');
         if (chk()) return;
     } else {
-        lose(p);
+        S.lossQ = [];
+        queueLose(p);
         if (f.pushed){ p.lvl = Math.max(1, p.lvl - 1); say(`${pn(p)} pushed and lost — drops to Lv ${p.lvl}.`); }
-        if (h) lose(h);
+        if (h && h.id !== p.id) queueLose(h);
+        norm(p); if (h) norm(h);
     }
-    next();
+    if (!pumpLose()) next();
 }
 const bossP = () => 14 + S.boss.ms.reduce((s, c) => s + val(c, true), 0);
 function startBoss(){
@@ -437,15 +507,17 @@ function startBoss(){
 }
 function resolveBoss(){
     const B = S.boss, pw = {};
-    S.pl.filter(p => B.ch[p.id] === 'o').forEach(p => { say(`${pn(p)} flees.`); lose(p); });
+    S.lossQ = [];
+    S.pl.filter(p => B.ch[p.id] === 'o').forEach(p => { say(`${pn(p)} flees.`); queueLose(p); });
     const J = S.pl.filter(p => B.ch[p.id] === 'j');
     J.forEach(p => { pw[p.id] = power(p, true); });
     const team = Object.values(pw).reduce((a, b) => a + b, 0);
     while (team === bossP()) B.ms.push(draw('M'));
     const win = team > bossP();
     say(`Team ${team} vs Dragon ${bossP()} — ${win ? 'the Dragon falls! +2 Levels' : 'the Dragon wins.'}`);
-    J.forEach(p => { if (win){ p.lvl += 2; say(`${pn(p)} rises to Lv ${p.lvl}.`); } else { lose(p); p.lvl = Math.max(1, p.lvl - 1); } norm(p); });
+    J.forEach(p => { if (win){ p.lvl += 2; say(`${pn(p)} rises to Lv ${p.lvl}.`); } else { queueLose(p); p.lvl = Math.max(1, p.lvl - 1); say(`${pn(p)} drops to Lv ${p.lvl}.`); } norm(p); });
     S.monD.push(...B.ms);
+    if (pumpLose()){ S.after = 'bosschk'; S.afterPw = pw; return; }
     if (!chk(pw)) endTurn();
 }
 
@@ -476,6 +548,14 @@ function handle(d){
         }
         return null;
     }
+    if (S.phase === 'decide'){
+        if (a !== 'decide' || !S.pend || S.pend.who !== d.pid){
+            const w = S.pend && S.pl.find(x => x.id === S.pend.who);
+            return 'Waiting for ' + (w ? pn(w) : 'someone') + ' to choose a card.';
+        }
+        if (d.i == null || !S.pend.cards[d.i]) return 'Tap one of the highlighted cards.';
+        return resolveDecision(d.i);
+    }
     if (S.phase === 'boss'){
         if (a !== 'bchoice') return 'Dragon! Choose Join or Stay Out.';
         if (S.boss.ch[p.id]) return 'Already chosen.';
@@ -490,14 +570,16 @@ function handle(d){
         const other = S.pick.cards[1 - d.i];
         S.lootD.push(other);
         say(`${pn(p)} keeps ${wname(k)} (${other ? 'lets go ' + wname(other) : 'nothing else'}).`);
-        give(p, k); S.pick = null;
-        next(); return null;
+        S.pick = null;
+        if (!give(p, k)) next();
+        return null;
     }
     if (S.phase === 'hreward'){
         if (a !== 'hr' || f.helper !== d.pid) return 'Waiting for the helper to choose.';
         if (d.j === 'lvl'){ p.lvl++; norm(p); say(`${pn(p)} takes 1 Level for helping (now Lv ${p.lvl}).`); if (chk()) return null; }
-        else { give(p, draw('L')); say(`${pn(p)} takes 1 Loot card for helping.`); }
-        next(); return null;
+        else { if (!give(p, draw('L'))) say(`${pn(p)} takes 1 Loot card for helping.`); }
+        if (!S.pend) next();
+        return null;
     }
     if (S.phase === 'fight' && a === 'help'){
         if (mine) return 'You cannot help yourself.';
@@ -635,10 +717,15 @@ function myAction(){
     if (ph === 'boss') return !S.boss.ch[myId()];
     if (ph === 'pick') return S.pick.who === myId();
     if (ph === 'hreward') return f.helper === myId();
+    if (ph === 'decide') return !!(S.pend && S.pend.who === myId());
     return false;
 }
 function waitingText(){
     const c = cur();
+    if (S.phase === 'decide' && S.pend){
+        const w = S.pl.find(x => x.id === S.pend.who);
+        return [`Waiting for ${w ? pn(w) : 'someone'} to choose`, S.pend.why || 'Tap a highlighted card.'];
+    }
     if (S.phase === 'boss'){
         const done = Object.keys(S.boss.ch).length;
         return [`Waiting on the Dragon — ${done}/${S.pl.length} decided`, 'Join the battle or stay out.'];
@@ -724,6 +811,11 @@ function render(){
         sub = `${mine ? 'Ask for help, push your luck, or resolve.' : 'Watch the tally. Offer help if asked.'}${dr ? ` Dread +${dr} hunts the leader.` : ''}`;
     }
     else if (ph === 'boss'){ big = `THE DRAGON — Boss Power ${bossP()}`; sub = 'Join the battle or stay out. Majority pain if you run: lose a weapon.'; }
+    else if (ph === 'decide' && S.pend){
+        const w = S.pl.find(x => x.id === S.pend.who);
+        big = (S.pend.who === myId()) ? 'Your choice.' : `${w ? pn(w) : 'Someone'} chooses.`;
+        sub = S.pend.why || 'Tap a highlighted card below.';
+    }
     else if (mine && ph === 'choose'){ big = 'Your turn.'; sub = 'Swap gear below if you like, then Explore or Fight.'; }
     if (!isOver()){
         st.classList.remove('winner');
@@ -778,6 +870,12 @@ function render(){
         ar = `<span class="lr-lbl">LOOT — ${esc(who.name)} keeps one (click a card)</span><div class="lr-cards">${S.pick.cards.map((x, i) => card(x, S.pick.who === myId() && !paused ? `data-a="keep" data-i="${i}"` : '')).join('')}</div>`;
     } else if (ph === 'hreward'){
         ar = `<span class="lr-lbl">HELPER REWARD — ${esc(S.pl.find(x => x.id === f.helper).name)} chooses below.</span>`;
+    } else if (ph === 'decide' && S.pend){
+        const pd = S.pend, who = S.pl.find(x => x.id === pd.who);
+        const minePd = pd.who === myId() && !paused;
+        const tag = pd.kind === 'lose' ? 'DISCARD ONE' : (pd.kind === 'stash' ? `GEAR FULL — new card: ${wname(pd.incoming)}` : 'SPARE FULL — keep 1');
+        const verb = pd.kind === 'lose' ? 'tap the card to DISCARD' : (pd.kind === 'stash' ? 'tap a weapon to move to the spare' : 'tap the card to KEEP');
+        ar = `<span class="lr-lbl">${esc(tag)} — ${esc(who ? pn(who) : 'choosing')} (${verb})</span><div class="lr-cards">${pd.cards.map((x, i) => card(x, minePd ? `data-a="decide" data-i="${i}"` : '', true)).join('')}</div>`;
     } else if (ph === 'over'){
         const w = S.pl.find(x => x.id === S.win);
         const table = S.pl.slice().sort((a, b) => b.lvl - a.lvl || power(b) - power(a))

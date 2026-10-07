@@ -265,7 +265,7 @@ function generateSeed(active, rules, rng){
 /* ================= multiplayer Layer 1 engine (host authoritative) ================= */
 let S = null;      // shared snapshot (host holds full truth incl. grammar + full seed)
 let sel = {};      // local chip selections, analyst only: {feature: rule|'not-active'}
-let askKey = '', chipKey = '', myPick = null;
+let askKey = '', chipKey = '', myPick = null, gramInst = 0;
 let remembered = { level: 1, announced: true };
 
 const amSeated = () => !!(S && myId() && S.seats.some(s=>s.id===myId()));
@@ -290,7 +290,7 @@ function startGame(level, announced){
   const seats = seatFromRoster();
   if(seats.length<2 || seats.length>4){ $('setup-note').textContent = `Need 2–4 players in the room (have ${seats.length}).`; return; }
   remembered = { level, announced };
-  S = {cfg:{level,announced},round:1,phase:'play',seats,turnIndex:0,analystIdx:0};
+  S = {cfg:{level,announced},round:1,phase:'play',seats,turnIndex:0,analystIdx:0,inst:++gramInst};
   Object.assign(S, newRoundState());
   S.phase = 'play';
   sel = {}; myPick = null;
@@ -449,6 +449,7 @@ function loseRound(){
   say(dead
     ? `GAME OVER — the table is out of lives. The grammar was: ${plainGrammar(S.grammar)}.`
     : `Round ${S.round} lost — everyone loses a life. The grammar was: ${plainGrammar(S.grammar)}.`);
+  if (dead && isHost()) Hub.up('result', { inst: S.inst, lost: true, players: S.seats.map(s => s.id) });
 }
 function plainGrammar(g){
   return L12_FEATURES.map(f=>`${L12_FEATURE_LABEL[f]}: ${g.active.includes(f)?L12_RULE_LABEL[g.rules[f]]:'Not Active'}`).join('; ');

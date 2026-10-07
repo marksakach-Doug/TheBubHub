@@ -1,0 +1,1020 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Wordwright</title>
+<style>
+html,body{margin:0;padding:0;background:#fff;color:#000;}
+body{font:14px/1.45 "Courier New",Courier,monospace;}
+.hidden{display:none!important}
+#ww-panel{max-width:780px;margin:0 auto;padding:8px 12px 24px;}
+.ww-box{border:1px solid #000;padding:8px 10px;margin:8px 0;background:#fff;}
+.ww-head{display:flex;justify-content:space-between;align-items:center;gap:8px;flex-wrap:wrap;}
+.ww-title{font-weight:bold;letter-spacing:1px;}
+button.ww-b, input.ww-b{font:inherit;background:#fff;color:#000;border:1px solid #000;padding:6px 12px;cursor:pointer;border-radius:0;}
+button.ww-b:hover:not([disabled]){background:#000;color:#fff;}
+button.ww-b:active:not([disabled]){transform:translateY(2px);}
+button.ww-b[disabled]{opacity:.4;cursor:not-allowed;}
+input[type=text].ww-in{font:inherit;background:#fff;color:#000;border:1px solid #000;padding:6px 8px;width:100%;box-sizing:border-box;border-radius:0;}
+input[type=text].ww-in:focus{outline:2px solid #000;outline-offset:0;}
+#ww-canvas{display:block;width:100%;aspect-ratio:3/2;background:#000;touch-action:none;cursor:crosshair;}
+#ww-status{min-height:1.4em;white-space:pre-wrap;}
+#ww-feed{white-space:pre-wrap;}
+#ww-err{border:1px solid #000;padding:6px 8px;margin:8px 0;font-weight:bold;}
+.ww-row{display:flex;gap:8px;flex-wrap:wrap;align-items:center;}
+.ww-votes{display:flex;gap:8px;flex-wrap:wrap;margin-top:6px;}
+pre.ww-pre{margin:0;white-space:pre-wrap;font:inherit;}
+details.ww-det{margin-top:4px;}
+summary.ww-sum{cursor:pointer;}
+@media (prefers-reduced-motion:reduce){*{animation:none!important;transition:none!important}}
+</style>
+</head>
+<body>
+<div id="ww-panel">
+  <div id="ww-err" class="hidden"></div>
+  <div id="standalone-note" class="hidden">
+    <div class="ww-box"><pre class="ww-pre">WORDWRIGHT
+lives inside Bub Hub.
+Open <a href="index.html">Bub Hub</a>, join a room, and press [ Play Wordwright ].</pre></div>
+  </div>
+  <div id="ww-main">
+    <div class="ww-box">
+      <div class="ww-head">
+        <span class="ww-title">C:\BUBHUB\WORDWRIGHT&gt;_</span>
+        <span class="ww-row">
+          <button id="btn-ww-new" class="ww-b">[ NEW GAME ]</button>
+          <button id="btn-ww-invite" class="ww-b">[ SHOW TABLE ]</button>
+          <button id="btn-ww-sync" class="ww-b">[ SYNC ]</button>
+          <button id="btn-ww-hide" class="ww-b">[ HIDE ]</button>
+        </span>
+      </div>
+      <div id="ww-room">ROOM: - | YOU: -</div>
+    </div>
+    <div class="ww-box"><div>&gt; GOAL: the artist draws the word from its definition alone. Name it before confidence runs out. Anyone may CHALLENGE a drawing as the wrong sense.</div></div>
+    <div class="ww-box"><div id="ww-word"><pre class="ww-pre">&gt; no word yet. host presses [ NEW GAME ].</pre></div></div>
+    <div class="ww-box">
+      <canvas id="ww-canvas" width="720" height="480"></canvas>
+      <div id="ww-tool">&gt; -</div>
+      <div class="ww-row" style="margin-top:6px">
+        <button id="btn-ww-undo" class="ww-b">[ UNDO ]</button>
+        <button id="btn-ww-clear" class="ww-b">[ CLEAR ]</button>
+        <button id="btn-ww-hint" class="ww-b">[ HINT -1 ]</button>
+      </div>
+    </div>
+    <div class="ww-box"><div id="ww-status">&gt; waiting for host...</div></div>
+    <div class="ww-box">
+      <div>&gt; GUESS the word (or CHALLENGE the drawing as the wrong sense):</div>
+      <input id="ww-pitch-text" type="text" class="ww-in" maxlength="40" placeholder="type word here, then [ GUESS ] or [ CHALLENGE ]">
+      <div class="ww-row" style="margin-top:6px">
+        <button id="btn-ww-submit" class="ww-b">[ GUESS ]</button>
+        <button id="btn-ww-chal" class="ww-b">[ CHALLENGE ]</button>
+      </div>
+      <div id="ww-why"></div>
+    </div>
+    <div class="ww-box" id="ww-votebox"><div id="ww-vote"><pre class="ww-pre">&gt; no challenge on the table.</pre></div></div>
+    <div class="ww-box"><div id="ww-moves">CONF: -</div><div id="ww-turn">TURN: -</div></div>
+    <div class="ww-box"><div id="ww-roster">PLAYERS: -</div></div>
+    <div class="ww-box"><div id="ww-feed"></div></div>
+  </div>
+</div>
+<script>
+(function(){
+'use strict';
+var GAME_ID = 'wordwright';
+function $(id){ return document.getElementById(id); }
+function esc(s){ return String(s).replace(/[&<>"']/g, function(c){ return {'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;'}[c]; }); }
+
+// ---------- bridge to the hub (warpfront pattern) ----------
+var Hub = {
+    me: null, roster: [], room: '',
+    up: function(k, p){ try { window.parent.postMessage({ t: 'gu', game: GAME_ID, k: k, p: p }, '*'); } catch(e) {} },
+    init: function(){
+        window.addEventListener('message', onDown);
+        this.up('hello');
+        setTimeout(function(){
+            if (!Hub.me){
+                $('ww-main').classList.add('hidden');
+                $('standalone-note').classList.remove('hidden');
+                reportHeight();
+            }
+        }, 1500);
+    }
+};
+var heightT = null;
+function reportHeight(){
+    clearTimeout(heightT);
+    heightT = setTimeout(function(){
+        var h = Math.max(document.body.scrollHeight, document.documentElement.scrollHeight);
+        Hub.up('height', h);
+    }, 60);
+}
+function onDown(e){
+    var m = e.data;
+    if (!m || m.t !== 'gd' || m.game !== GAME_ID) return;
+    if (m.k === 'roster'){
+        Hub.me = m.p.you; Hub.roster = m.p.roster || []; Hub.room = m.p.room;
+        onRoster();
+        return;
+    }
+    if (m.k === 'state'){ onState(m.p); return; }
+    if (m.k === 'intent'){ onIntent(m.p, m.from); return; }
+    if (m.k === 'denied'){ onDenied(m.p && m.p.text); return; }
+    if (m.k === 'reset'){ doReset(); return; }
+}
+function onDenied(text){
+    if (!text) return;
+    if (text.indexOf('WWBRIEF|') === 0){
+        var w = text.slice(8);
+        if (w && S && iAmArtist()){ brief = { inst: S.inst, round: S.round, word: w }; render(); toast('Brief received.'); }
+        return;
+    }
+    toast(text);
+}
+function myId(){ return Hub.me && Hub.me.id; }
+function myName(){ return (Hub.me && Hub.me.name) || 'Player'; }
+function isHost(){ return !!(Hub.me && Hub.me.isHost); }
+function hostPresent(){ return Hub.roster.some(function(m){ return m.host; }); }
+function paused(){ return !!S && !isHost() && !hostPresent(); }
+function nameOf(id){
+    for (var i = 0; i < Hub.roster.length; i++) if (Hub.roster[i].id === id) return Hub.roster[i].name;
+    return '???';
+}
+window.addEventListener('error', function(e){
+    try {
+        var el = $('ww-err');
+        if (el){
+            var where = e.lineno ? (' @' + e.lineno + ':' + (e.colno || 0)) : '';
+            el.textContent = 'Error: ' + (e.message || 'script error') + where;
+            el.classList.remove('hidden');
+        }
+    } catch(err) {}
+});
+
+// ---------- constants ----------
+var W = 720, H = 480;
+var CONF0 = 5, MAX_ROUNDS = 12, ROUND_MS = 90000, VOTE_MS = 25000;
+var MAXPTS = 60, MAXSTROKES = 120, MAXGUESS = 40, MAXCHAL = 140;
+
+// Word pools by frequency band (f: tag). All pre-verified: clean noun>=2 AND verb>=2.
+var POOL_EASY = "walk set light fire water place point drive drop press charge bridge".split(" ");
+var POOL_MID = "swing wheel hook drain lever pitch roll panel pilot ridge plank ramp latch cradle dock drum".split(" ");
+var POOL_HARD = "sled sluice winch gambol squib kedge wamble cwtch skive spile".split(" ");
+var JUNK = ["surname","parish","community in","village","habitational","occupational","district,","county","township",
+"obsolete:","offensive:","offensive ","slang","dated","video games","wallhack","wallbang","chess","cricket","dance",
+"card game","music","programming","computing","electronics","cardiology","botany","zoology","geology","sex)","politics)",
+"election","punish","teenager","lifestyle","jitterbug","ride on a swing"];
+function cleanDefs(defs, tag){
+    var out = [];
+    for (var i = 0; i < defs.length; i++){
+        var d = defs[i];
+        if (d.indexOf(tag + "\t") !== 0) continue;
+        var t = d.slice(tag.length + 1).trim();
+        if (t.length < 14) continue;
+        var low = t.toLowerCase(), bad = false;
+        for (var j = 0; j < JUNK.length; j++) if (low.indexOf(JUNK[j]) !== -1){ bad = true; break; }
+        if (!bad) out.push(t);
+    }
+    return out;
+}
+// Hand-curated offline fallback (verbatim datamuse).
+var FALLBACK = [
+{ w: "bridge", src: "fallback", f: "31.2", n: [
+  "A construction or natural feature that spans a divide.",
+  "A construction spanning a waterway, ravine, or valley from a height, allowing for the passage of vehicles, pedestrians, trains, etc.",
+  "(dentistry) A prosthesis replacing one or several adjacent teeth."
+], v: [
+  "To be or make a bridge over something.",
+  "To span as if with a bridge.",
+  "(roller derby) To employ the bridge tactic. (See Noun section.)"
+] },
+{ w: "wall", src: "fallback", f: "75.8", n: [
+  "A rampart of earth, stones etc. built up for defensive purposes.",
+  "A structure built for defense surrounding a city, castle etc.",
+  "Each of the substantial structures acting either as the exterior of or divisions within a structure."
+], v: [
+  "To enclose with, or as if with, a wall or walls.",
+  "To well, as water; spring.",
+  "(transitive, nautical) To make a wall knot on the end of (a rope)."
+] },
+{ w: "lever", src: "fallback", f: "4.3", n: [
+  "(mechanics) A rigid piece which is capable of turning about one point, or axis (fulcrum), and in which are two or more other points where forces are applied.",
+  "A small such piece to trigger or control a mechanical device (like a switch or a button).",
+  "(mechanics) A bar, as a capstan bar, applied to a rotatory piece to turn it."
+], v: [
+  "(transitive) To move with a lever.",
+  "(figuratively, transitive) To use, operate or move (something) like a lever (physically).",
+  "(figuratively, transitive) To use (something) like a lever (in an abstract sense)."
+] },
+{ w: "hook", src: "fallback", f: "7.5", n: [
+  "A rod bent into a curved shape, typically with one end free and the other end secured to a rope or other attachment.",
+  "A barbed metal hook used for fishing; a fishhook.",
+  "Any of various hook-shaped agricultural implements such as a billhook."
+], v: [
+  "(transitive) To attach a hook to.",
+  "(intransitive) To become attached, as by a hook.",
+  "(transitive) To catch with a hook (hook a fish)."
+] },
+{ w: "gate", src: "fallback", f: "22.4", n: [
+  "A doorway, opening, or passage in a fence or wall.",
+  "A movable barrier.",
+  "A doorlike structure outside a house."
+], v: [
+  "(transitive) To keep something inside by means of a closed gate.",
+  "(transitive) To selectively regulate or restrict (access to something).",
+  "(transitive) To furnish with a gate."
+] },
+{ w: "drain", src: "fallback", f: "8.5", n: [
+  "(chiefly US, Canada) A conduit allowing liquid to flow out of an otherwise contained volume; a plughole (UK)",
+  "A natural or artificial watercourse which drains a tract of land.",
+  "Something consuming resources and providing nothing in return."
+], v: [
+  "(transitive, ergative) To cause liquid to flow out of.",
+  "(intransitive) To flow gradually.",
+  "(intransitive) To lose liquid."
+] },
+{ w: "swing", src: "fallback", f: "8.7", n: [
+  "The act, or an instance, of swinging.",
+  "A hanging seat that can swing back and forth, in a children's playground, for acrobats in a circus, or on a porch for relaxing.",
+  "A line, cord, or other thing suspended and hanging loose, upon which anything may swing."
+], v: [
+  "(intransitive) To rotate about an off-centre fixed point.",
+  "(transitive) To move (an object) backward and forward; to wave.",
+  "(intransitive) To fluctuate or change."
+] },
+{ w: "wheel", src: "fallback", f: "16.0", n: [
+  "A circular device capable of rotating on its axis, facilitating movement or transportation or performing labour in machines.",
+  "(informal, with \u201cthe\u201d) A steering wheel and its implied control of a vehicle.",
+  "(nautical) The instrument attached to the rudder by which a vessel is steered."
+], v: [
+  "(transitive) To roll along on wheels.",
+  "(transitive) To transport something or someone using any wheeled mechanism, such as a wheelchair.",
+  "(intransitive) To change direction quickly, turn, pivot, whirl, wheel around."
+] }
+];
+function shuffle(a){
+    for (var i = a.length - 1; i > 0; i--){
+        var j = Math.floor(Math.random() * (i + 1));
+        var t = a[i]; a[i] = a[j]; a[j] = t;
+    }
+    return a;
+}
+var usedWords = [];
+function fetchWord(band){
+    var pool = band === 'easy' ? POOL_EASY.slice() : band === 'mid' ? POOL_MID.slice() : POOL_HARD.slice();
+    shuffle(pool);
+    var seeds = [];
+    pool.forEach(function(w){ if (usedWords.indexOf(w) === -1 && seeds.length < 4) seeds.push(w); });
+    if (!seeds.length) seeds = pool.slice(0, 4);
+    var chain = Promise.resolve(null);
+    seeds.forEach(function(w){
+        chain = chain.then(function(found){
+            if (found) return found;
+            usedWords.push(w);
+            return tryWord(w, 6000).then(function(r){ return r; }, function(){ return null; });
+        });
+    });
+    return chain.then(function(found){
+        if (found) return found;
+        var f = FALLBACK[Math.floor(Math.random() * FALLBACK.length)];
+        return { w: f.w, n: f.n.slice(), v: f.v.slice(), src: 'fallback', f: f.f };
+    });
+}
+function tryWord(w, ms){
+    return new Promise(function(resolve, reject){
+        var ctrl = null, timer = null;
+        try { ctrl = new AbortController(); } catch(e) {}
+        if (ctrl) timer = setTimeout(function(){ try { ctrl.abort(); } catch(e) {} }, ms);
+        var url = 'https://api.datamuse.com/words?sp=' + encodeURIComponent(w) + '&md=fdp&max=1';
+        fetch(url, ctrl ? { signal: ctrl.signal } : {}).then(function(r){
+            if (timer) clearTimeout(timer);
+            if (!r.ok) throw new Error('http ' + r.status);
+            return r.json();
+        }).then(function(b){
+            if (!b || !b.length || b[0].word !== w) throw new Error('no-entry');
+            var defs = b[0].defs || [];
+            var n = cleanDefs(defs, 'n'), v = cleanDefs(defs, 'v');
+            if (n.length < 2 || v.length < 2) throw new Error('pos-miss');
+            shuffle(n); shuffle(v);
+            var fq = '?', tags = b[0].tags || [];
+            for (var i = 0; i < tags.length; i++) if (tags[i].indexOf('f:') === 0) fq = tags[i].slice(2);
+            resolve({ w: w, n: n.slice(0, 3), v: v.slice(0, 3), src: 'live', f: fq });
+        }).catch(reject);
+    });
+}
+function norm(s){ return String(s || '').toLowerCase().trim().replace(/[^a-z]/g, ''); }
+function matchGuess(g, w){
+    var a = norm(g), b = norm(w);
+    if (!a || !b) return false;
+    if (a === b) return true;
+    if (a === b + 's') return true;
+    if (b.slice(-1) === 's' && a === b.slice(0, -1)) return true;
+    return false;
+}
+
+// ---------- state ----------
+var S = null, draft = null, drawing = false;
+var seenSeq = 0, animT0 = 0, voteTimer = null, roundTimer = null, noteT = null, lastTurnKey = '';
+var statusSticky = '';
+var brief = null, lastBriefReq = 0;
+
+function artistId(){ return S ? S.order[S.turnIdx % S.order.length] : null; }
+function iAmArtist(){ return !!S && myId() === artistId(); }
+function liveIds(){ return S ? S.order.filter(function(id){ return S.out.indexOf(id) === -1; }) : []; }
+function guessers(){ var a = artistId(); return liveIds().filter(function(id){ return id !== a; }); }
+function curGuesser(){ var g = guessers(); return g.length ? g[S.gturn % g.length] : null; }
+function iAmGuesser(){ return !!S && myId() === curGuesser(); }
+function myConf(){ return (S && S.conf && S.conf[myId()] !== undefined) ? S.conf[myId()] : null; }
+function maxHint(){ return S && S.word ? Math.max(1, Math.min(3, S.word.w.length - 2)) : 1; }
+function feed(st, line){ st.feed.unshift(line); while (st.feed.length > 8) st.feed.pop(); }
+function broadcast(){
+    render();
+    if (!S || !isHost()) return;
+    Hub.up('state', S);
+}
+function deny(to, text){ Hub.up('denied', { to: to, text: text }); }
+function sendBrief(to){
+    if (!S || !S.word) return;
+    if (to === myId()){ onDenied('WWBRIEF|' + S.word.w); return; }
+    deny(to, 'WWBRIEF|' + S.word.w);
+}
+function redact(s, w){
+    var clean = String(w || '').toLowerCase().replace(/[^a-z]/g, '');
+    if (!clean) return s;
+    try {
+        return String(s).replace(new RegExp('\\b' + clean + 's?\\b', 'gi'), '____');
+    } catch(e){ return s; }
+}
+function pitchWhy(){
+    if (!S) return '> no game yet. host presses [ NEW GAME ].';
+    if (S.over) return '> game over. host presses [ NEW GAME ].';
+    if (S.phase === 'vote') return '> voting now. guess box closed.';
+    if (S.phase !== 'draw') return '> waiting...';
+    if (paused()) return '> HOST LOST - reconnecting...';
+    if (!liveIds().some(function(id){ return id === myId(); })) return '> you are out.';
+    if (!iAmGuesser()) return '> wait: ' + nameOf(curGuesser()) + ' is guessing.';
+    return '';
+}
+
+// ---------- host actions ----------
+function onRoster(){
+    if (isHost()){
+        if (S && (S.phase === 'draw' || S.phase === 'vote')) syncTable();
+        broadcast();
+    } else {
+        render();
+        if (iAmArtist() && S && S.word && (!brief || brief.inst !== S.inst || brief.round !== S.round))
+            Hub.up('intent', { a: 'brief' });
+        else Hub.up('intent', { a: 'hello' });
+    }
+}
+function syncTable(){
+    var ids = Hub.roster.map(function(m){ return m.id; });
+    var changed = false;
+    ids.forEach(function(id){
+        if (S.order.indexOf(id) === -1){
+            S.order.push(id);
+            S.conf[id] = CONF0;
+            feed(S, nameOf(id) + ' sat down (' + CONF0 + ' conf).');
+            changed = true;
+        }
+    });
+    var kept = S.order.filter(function(id){ return ids.indexOf(id) !== -1; });
+    if (kept.length !== S.order.length){
+        var act = artistId();
+        S.order = kept;
+        for (var vid in S.votes) if (ids.indexOf(vid) === -1) delete S.votes[vid];
+        for (var cid in S.conf) if (ids.indexOf(cid) === -1) delete S.conf[cid];
+        S.out = S.out.filter(function(id){ return ids.indexOf(id) !== -1; });
+        if (!S.order.length){ doReset(); return true; }
+        var ai = S.order.indexOf(act);
+        S.turnIdx = ai !== -1 ? ai : (S.turnIdx % S.order.length);
+        feed(S, 'Table synced (' + S.order.length + ' seated).');
+        changed = true;
+        if (S.phase === 'vote' && S.pitch && S.order.indexOf(S.pitch.byId) === -1){
+            feed(S, 'Challenger left - vote void.');
+            S.phase = 'draw'; S.pitch = null; S.votes = {}; S.deadline = 0;
+        } else if (artistGone()){
+            endRound('artist left');
+            return true;
+        } else if (S.phase === 'vote' && quorate()) resolveVote('sync');
+    }
+    return changed;
+}
+function artistGone(){ return S && S.out.indexOf(artistId()) !== -1; }
+function quorate(){
+    var need = eligibleVoters().length;
+    return Object.keys(S.votes).length >= Math.max(1, need);
+}
+function eligibleVoters(){
+    var ch = S.pitch ? S.pitch.byId : null;
+    var a = artistId();
+    return S.order.filter(function(id){
+        return S.out.indexOf(id) === -1 && id !== a && id !== ch &&
+            Hub.roster.some(function(m){ return m.id === id; });
+    });
+}
+function onState(state){
+    if (!state || isHost()) return;
+    S = state;
+    var tk = S.phase + ':' + (S.pitch ? S.pitch.seq : 0) + ':' + S.turnIdx + ':' + S.round + ':' + S.canvas.length;
+    if (tk !== lastTurnKey){ draft = null; lastTurnKey = tk; }
+    if (S.pitch && S.pitch.seq !== seenSeq){ seenSeq = S.pitch.seq; animT0 = Date.now(); playAnim(); }
+    render();
+    if (iAmArtist() && S.word && (!brief || brief.inst !== S.inst || brief.round !== S.round)){
+        var now = Date.now();
+        if (now - lastBriefReq > 3000){ lastBriefReq = now; Hub.up('intent', { a: 'brief' }); }
+    }
+}
+function onIntent(d, from){
+    if (!isHost() || !d) return;
+    if (d.a === 'hello'){ if (S) broadcast(); return; }
+    d.pid = from.id; d.name = from.name;
+    var err = null;
+    if (d.a === 'brief'){ if (S && S.word && from.id === artistId()) sendBrief(from.id); return; }
+    if (d.a === 'stroke') err = handleStroke(d, from);
+    else if (d.a === 'undo') err = handleUndo(d, from);
+    else if (d.a === 'clear') err = handleClear(d, from);
+    else if (d.a === 'hint') err = handleHint(d, from);
+    else if (d.a === 'guess') err = handleGuess(d, from);
+    else if (d.a === 'challenge') err = handleChallenge(d, from);
+    else if (d.a === 'vote') err = handleVote(d, from);
+    else return;
+    if (err){
+        deny(from.id, err);
+        if ((d.a === 'guess' || d.a === 'challenge') && S && !S.over){
+            var line = 'Rejected (' + (from.name || from.id) + '): ' + err;
+            if (S.feed[0] !== line){ feed(S, line); broadcast(); }
+        }
+    }
+}
+function needArtist(from){
+    if (!S || S.over || S.phase !== 'draw') return 'Not drawing right now.';
+    if (from.id !== artistId()) return 'Only the artist draws.';
+    if (S.out.indexOf(from.id) !== -1) return 'You are out.';
+    return null;
+}
+function handleStroke(d, from){
+    var e = needArtist(from);
+    if (e) return e;
+    var p = d.pts;
+    if (!p || p.length < 2) return 'Empty stroke.';
+    if (p.length > MAXPTS) return 'Stroke too long.';
+    if (S.canvas.length >= MAXSTROKES) return 'Canvas full - CLEAR first.';
+    var clean = [];
+    for (var i = 0; i < p.length; i++){
+        var x = Math.round(+p[i].x), y = Math.round(+p[i].y);
+        if (!(x >= 0 && x <= W && y >= 0 && y <= H)) return 'Stroke must stay on the board.';
+        clean.push({ x: x, y: y });
+    }
+    S.canvas.push(clean);
+    broadcast();
+    return null;
+}
+function handleUndo(d, from){
+    var e = needArtist(from);
+    if (e) return e;
+    if (!S.canvas.length) return 'Nothing to undo.';
+    S.canvas.pop();
+    broadcast();
+    return null;
+}
+function handleClear(d, from){
+    var e = needArtist(from);
+    if (e) return e;
+    S.canvas = [];
+    broadcast();
+    return null;
+}
+function handleHint(d, from){
+    var e = needArtist(from);
+    if (e) return e;
+    if (S.hint >= maxHint()) return 'No hints left.';
+    S.hint += 1;
+    S.hintStr = S.word.w.slice(0, S.hint);
+    S.conf[from.id] -= 1;
+    feed(S, nameOf(from.id) + ' took a hint (-1 conf): ' + blanks());
+    var r = checkElim();
+    if (r === 'over') gameOverLive('last one drawing');
+    else if (r === 'artistOut') endRound('artist out');
+    else broadcast();
+    return null;
+}
+function blanks(){
+    if (!S || !S.word) return '';
+    var out = [];
+    for (var i = 0; i < S.word.w.length; i++)
+        out.push(i < S.hintStr.length ? S.hintStr[i] : '_');
+    return out.join(' ');
+}
+function handleGuess(d, from){
+    if (!S || S.over || S.phase !== 'draw') return 'No guessing right now.';
+    if (from.id !== curGuesser()) return 'Wait your turn - ' + nameOf(curGuesser()) + ' is guessing.';
+    if (S.out.indexOf(from.id) !== -1) return 'You are out.';
+    var text = String(d.text || '').trim();
+    if (!text) return 'Type a word first.';
+    if (text.length > MAXGUESS) return 'Guess too long.';
+    if (matchGuess(text, S.word.w)){
+        S.guesses.push({ by: from.id, text: text.trim(), ok: true });
+        S.conf[from.id] = (S.conf[from.id] || 0) + 2;
+        S.conf[artistId()] = (S.conf[artistId()] || 0) + 1;
+        feed(S, nameOf(from.id) + ' nailed "' + S.word.w + '"! +2. Artist +1.');
+        endRound('guessed');
+    } else {
+        S.guesses.push({ by: from.id, text: text.trim(), ok: false });
+        S.conf[from.id] -= 1;
+        S.gturn += 1;
+        feed(S, nameOf(from.id) + ' guessed "' + text.trim() + '" - wrong (-1).');
+        if (S.guesses.filter(function(g){ return !g.ok; }).length >= 3){
+            feed(S, 'Three strikes - the word was "' + S.word.w + '".');
+            S.conf[artistId()] -= 1;
+            endRound('strikes');
+        } else {
+            var r = checkElim();
+            if (r === 'over') gameOverLive('last one standing');
+            else broadcast();
+        }
+    }
+    return null;
+}
+function handleChallenge(d, from){
+    if (!S || S.over || S.phase !== 'draw') return 'No challenging right now.';
+    if (from.id !== curGuesser()) return 'Wait your turn - ' + nameOf(curGuesser()) + ' is guessing.';
+    if (S.out.indexOf(from.id) !== -1) return 'You are out.';
+    var text = String(d.text || '').trim();
+    if (!text) return 'Type your challenge first.';
+    if (text.length > MAXCHAL) return 'Challenge too long.';
+    S.pitch = { byId: from.id, text: text, kind: 'challenge', seq: S.seq + 1 };
+    S.seq += 1;
+    var judges = S.order.filter(function(id){
+        return S.out.indexOf(id) === -1 && id !== artistId() && id !== from.id &&
+            Hub.roster.some(function(m){ return m.id === id; });
+    });
+    if (!judges.length){
+        S.pitch = null;
+        S.conf[from.id] -= 1;
+        S.gturn += 1;
+        feed(S, 'No table to judge - challenge fails (' + nameOf(from.id) + ' -1).');
+        var rj = checkElim();
+        if (rj === 'over') gameOverLive('last one standing');
+        else broadcast();
+        return null;
+    }
+    seenSeq = S.seq; animT0 = Date.now();
+    S.phase = 'vote'; S.votes = {}; S.deadline = Date.now() + VOTE_MS;
+    feed(S, nameOf(from.id) + ' CHALLENGES: "' + text + '"');
+    clearTimeout(voteTimer);
+    voteTimer = setTimeout(function(){ if (isHost() && S && S.phase === 'vote') resolveVote('timeout'); }, VOTE_MS + 400);
+    broadcast(); playAnim();
+    return null;
+}
+function handleVote(d, from){
+    if (!S || S.over || S.phase !== 'vote') return 'No vote running.';
+    if (eligibleVoters().indexOf(from.id) === -1) return 'You cannot vote on this.';
+    if (['fit','stretch','veto'].indexOf(d.choice) === -1) return 'Bad vote.';
+    S.votes[from.id] = d.choice;
+    broadcast();
+    if (quorate()) resolveVote('all-in');
+    return null;
+}
+function resolveVote(why){
+    if (!S || S.phase !== 'vote') return;
+    clearTimeout(voteTimer);
+    var fit = 0, stretch = 0, veto = 0, k;
+    for (k in S.votes){
+        if (S.votes[k] === 'fit') fit++;
+        else if (S.votes[k] === 'stretch') stretch++;
+        else veto++;
+    }
+    var cast = fit + stretch + veto;
+    var who = nameOf(S.pitch.byId);
+    var top = Math.max(fit, stretch, veto);
+    var winners = (fit === top ? 1 : 0) + (stretch === top ? 1 : 0) + (veto === top ? 1 : 0);
+    if (cast < 1 || winners > 1 || veto === top){
+        feed(S, 'Challenge thrown out ' + fit + '/' + stretch + '/' + veto + ' (' + who + ' -1).');
+        S.conf[S.pitch.byId] -= 1;
+    } else {
+        feed(S, 'Challenge STANDS ' + fit + '/' + stretch + '/' + veto + ' (artist -1).');
+        S.conf[artistId()] -= 1;
+    }
+    S.gturn += 1;
+    S.phase = 'draw'; S.pitch = null; S.votes = {}; S.deadline = 0;
+    var r = checkElim();
+    if (r === 'over') gameOverLive('last one standing');
+    else if (r === 'artistOut') endRound('artist out');
+    else broadcast();
+}
+function checkElim(){
+    var id;
+    for (id in S.conf){
+        if (S.conf[id] <= 0 && S.out.indexOf(id) === -1){
+            S.out.push(id);
+            feed(S, nameOf(id) + ' is OUT.');
+        }
+    }
+    var live = liveIds();
+    if (live.length <= 1) return 'over';
+    return 'ok';
+}
+function nextLive(fromIdx){
+    for (var i = 1; i <= S.order.length; i++){
+        var id = S.order[(fromIdx + i) % S.order.length];
+        if (S.out.indexOf(id) === -1) return (fromIdx + i) % S.order.length;
+    }
+    return fromIdx;
+}
+function endRound(why){
+    clearTimeout(roundTimer); clearTimeout(voteTimer);
+    if (!S) return;
+    var r = checkElim();
+    if (r === 'over'){ gameOverLive(why); return; }
+    if (S.round + 1 > MAX_ROUNDS){
+        var best = -1e9, win = [], id;
+        for (id in S.conf){ if (S.conf[id] > best){ best = S.conf[id]; win = [id]; } else if (S.conf[id] === best) win.push(id); }
+        var names = win.map(nameOf).join(', ');
+        feed(S, 'Final word. ' + names + ' take(s) it at ' + best + ' conf.');
+        gameOver(win, 'final word');
+        return;
+    }
+    S.turnIdx = nextLive(S.turnIdx);
+    startRound();
+}
+function gameOverLive(why){
+    var live = liveIds();
+    var win = live.length ? live : Object.keys(S.conf);
+    feed(S, 'Game over (' + why + '). ' + win.map(nameOf).join(', ') + ' win(s).');
+    gameOver(win, why);
+}
+function gameOver(winIds, why){
+    clearTimeout(roundTimer); clearTimeout(voteTimer);
+    S.over = 'done'; S.phase = 'over';
+    statusSticky = '';
+    try { Hub.up('say', 'Wordwright: ' + winIds.map(nameOf).join(', ') + ' won (' + why + ').'); } catch(e) {}
+    try { Hub.up('result', { inst: S.inst, players: S.order.slice(), win: winIds }); } catch(e) {}
+    broadcast();
+}
+function bandFor(round){ return round <= 4 ? 'easy' : round <= 8 ? 'mid' : 'hard'; }
+function startRound(){
+    clearTimeout(roundTimer); clearTimeout(voteTimer);
+    S.round += 1;
+    S.phase = 'brief'; S.word = null; S.sense = null;
+    S.canvas = []; S.guesses = []; S.gturn = 0; S.hint = 0; S.hintStr = '';
+    S.pitch = null; S.votes = {}; S.deadline = 0; S.roundEnd = 0;
+    setStatus('> fetching word ' + S.round + '/' + MAX_ROUNDS + ' (' + bandFor(S.round) + ')...');
+    render();
+    var band = bandFor(S.round);
+    fetchWord(band).then(function(word){
+        if (!isHost() || !S) return;
+        S.word = word;
+        statusSticky = '';
+        var pos = Math.random() < 0.5 ? 'n' : 'v';
+        S.sense = { pos: pos, idx: Math.floor(Math.random() * 3) };
+        S.phase = 'draw';
+        S.roundEnd = Date.now() + ROUND_MS;
+        feed(S, 'Word ' + S.round + '/' + MAX_ROUNDS + ' [' + band + ', f:' + word.f + ']. ' + nameOf(artistId()) + ' draws.');
+        clearTimeout(roundTimer);
+        roundTimer = setTimeout(function(){ if (isHost() && S && S.phase === 'draw') onRoundTimeout(); }, ROUND_MS + 400);
+        sendBrief(artistId());
+        broadcast();
+    }, function(){
+        if (!isHost() || !S) return;
+        var f = FALLBACK[Math.floor(Math.random() * FALLBACK.length)];
+        S.word = { w: f.w, n: f.n.slice(), v: f.v.slice(), src: 'fallback', f: f.f };
+        S.sense = { pos: 'n', idx: 0 };
+        statusSticky = '';
+        S.phase = 'draw';
+        S.roundEnd = Date.now() + ROUND_MS;
+        feed(S, 'Dictionary unreachable - fallback word. ' + nameOf(artistId()) + ' draws.');
+        clearTimeout(roundTimer);
+        roundTimer = setTimeout(function(){ if (isHost() && S && S.phase === 'draw') onRoundTimeout(); }, ROUND_MS + 400);
+        sendBrief(artistId());
+        broadcast();
+    });
+}
+function onRoundTimeout(){
+    if (!S || S.phase !== 'draw') return;
+    feed(S, 'Time! The word was "' + (S.word ? S.word.w : '?') + '".');
+    S.conf[artistId()] -= 1;
+    endRound('timeout');
+}
+function newGame(){
+    if (!isHost()) return;
+    if (Hub.roster.length < 2){ toast('Need at least 2 players.'); return; }
+    clearTimeout(roundTimer); clearTimeout(voteTimer);
+    usedWords = [];
+    var order = Hub.roster.map(function(m){ return m.id; }).sort();
+    var conf = {};
+    order.forEach(function(id){ conf[id] = CONF0; });
+    S = { phase: 'brief', over: null, inst: Date.now() + '-' + Math.floor(Math.random() * 1e6),
+        round: 0, word: null, sense: null, assign: null,
+        order: order, turnIdx: 0, conf: conf, out: [],
+        canvas: [], guesses: [], gturn: 0, hint: 0, hintStr: '',
+        pitch: null, seq: 0, deadline: 0, roundEnd: 0, votes: {}, feed: [] };
+    statusSticky = '';
+    brief = null;
+    feed(S, 'New table. ' + CONF0 + ' conf each, ' + MAX_ROUNDS + ' words. Good luck.');
+    startRound();
+}
+
+// ---------- guest/host shared actions ----------
+function actStroke(pts){
+    if (isHost()){
+        var err = handleStroke({ pts: pts }, { id: myId(), name: myName() });
+        if (err) toast(err);
+        else draft = null;
+    } else {
+        draft = null;
+        Hub.up('intent', { a: 'stroke', pts: pts });
+    }
+}
+function actGuess(kind){
+    var text = $('ww-pitch-text').value;
+    if (!S || S.over){ toast('No game running.'); return; }
+    if (paused()){ toast('Host lost. Waiting...'); return; }
+    if (S.phase !== 'draw'){ toast('Not guessing right now.'); return; }
+    if (!iAmGuesser()){ toast('Wait your turn.'); return; }
+    if (!text.trim()){ toast(kind === 'challenge' ? 'Type your challenge first.' : 'Type a word first.'); return; }
+    var d = kind === 'challenge' ? { a: 'challenge', text: text } : { a: 'guess', text: text };
+    if (isHost()){
+        var err = kind === 'challenge'
+            ? handleChallenge(d, { id: myId(), name: myName() })
+            : handleGuess(d, { id: myId(), name: myName() });
+        if (err) toast(err);
+        else $('ww-pitch-text').value = '';
+    } else {
+        Hub.up('intent', d);
+    }
+}
+function actVote(choice){
+    if (!S || S.phase !== 'vote'){ toast('No vote running.'); return; }
+    if (paused()){ toast('Host lost. Waiting...'); return; }
+    if (!eligibleVoters().some(function(id){ return id === myId(); })){ toast('You cannot vote on this.'); return; }
+    var d = { a: 'vote', choice: choice };
+    if (isHost()){
+        var err = handleVote(d, { id: myId(), name: myName() });
+        if (err) toast(err);
+    } else {
+        Hub.up('intent', d);
+    }
+}
+function actArtist(kind){
+    if (!S || S.over){ toast('No game running.'); return; }
+    if (paused()){ toast('Host lost. Waiting...'); return; }
+    if (!iAmArtist()){ toast('Only the artist.'); return; }
+    if (S.phase !== 'draw'){ toast('Not drawing right now.'); return; }
+    if (kind === 'hint'){
+        var d = { a: 'hint' };
+        if (isHost()){
+            var err = handleHint(d, { id: myId(), name: myName() });
+            if (err) toast(err);
+        } else Hub.up('intent', d);
+    } else {
+        var dd = { a: kind };
+        if (isHost()){
+            var e2 = kind === 'undo' ? handleUndo(dd, { id: myId(), name: myName() }) : handleClear(dd, { id: myId(), name: myName() });
+            if (e2) toast(e2);
+        } else Hub.up('intent', dd);
+    }
+}
+
+// ---------- canvas ----------
+var canvas = null, ctx = null;
+function toWorld(e){
+    var r = canvas.getBoundingClientRect();
+    return { x: (e.clientX - r.left) * W / r.width, y: (e.clientY - r.top) * H / r.height };
+}
+function bindPointer(){
+    canvas = $('ww-canvas'); ctx = canvas.getContext('2d');
+    canvas.addEventListener('pointerdown', function(e){
+        Hub.up('hello');
+        if (!S || S.over || S.phase !== 'draw' || !iAmArtist() || paused()) return;
+        var p = toWorld(e);
+        if (p.x < 0 || p.x > W || p.y < 0 || p.y > H) return;
+        try { canvas.setPointerCapture(e.pointerId); } catch(err) {}
+        drawing = true;
+        draft = { kind: 'stroke', pts: [{ x: Math.round(p.x), y: Math.round(p.y) }] };
+        drawBoard(1);
+        e.preventDefault();
+    });
+    canvas.addEventListener('pointermove', function(e){
+        if (!drawing || !draft) return;
+        var p = toWorld(e);
+        p.x = Math.max(0, Math.min(W, p.x)); p.y = Math.max(0, Math.min(H, p.y));
+        var last = draft.pts[draft.pts.length - 1];
+        var dx = p.x - last.x, dy = p.y - last.y;
+        if (dx * dx + dy * dy > 64 && draft.pts.length < MAXPTS)
+            draft.pts.push({ x: Math.round(p.x), y: Math.round(p.y) });
+        drawBoard(1);
+    });
+    function endDraw(){
+        if (!drawing) return;
+        drawing = false;
+        if (draft && draft.pts && draft.pts.length >= 2) actStroke(draft.pts.slice());
+        drawBoard(1);
+    }
+    canvas.addEventListener('pointerup', endDraw);
+    canvas.addEventListener('pointercancel', function(){ drawing = false; drawBoard(1); });
+}
+function drawBoard(prog){
+    if (!ctx) return;
+    var i, j;
+    ctx.fillStyle = '#000'; ctx.fillRect(0, 0, W, H);
+    ctx.strokeStyle = '#fff'; ctx.lineWidth = 2;
+    function strokePath(pts, dash){
+        if (!pts || pts.length < 2) return;
+        ctx.save();
+        if (dash) ctx.setLineDash([6, 4]);
+        ctx.beginPath();
+        ctx.moveTo(pts[0].x, pts[0].y);
+        for (var k = 1; k < pts.length; k++) ctx.lineTo(pts[k].x, pts[k].y);
+        ctx.stroke();
+        ctx.restore();
+    }
+    if (S) for (i = 0; i < S.canvas.length; i++) strokePath(S.canvas[i], false);
+    if (draft && draft.pts) strokePath(draft.pts, true);
+    if (!S || !S.pitch) return;
+    void prog;
+}
+function playAnim(){ drawBoard(1); }
+
+// ---------- render ----------
+function setStatus(t){ statusSticky = t; $('ww-status').textContent = t; }
+function toast(t){
+    if (!t) return;
+    setStatus('> ' + t);
+    clearTimeout(noteT);
+    noteT = setTimeout(function(){ statusSticky = ''; noteT = null; render(); }, 2400);
+}
+function clueText(){
+    if (!S || !S.word || !S.sense) return '';
+    var list = S.sense.pos === 'n' ? S.word.n : S.word.v;
+    var raw = list[S.sense.idx % list.length] || '';
+    var label = S.sense.pos === 'n' ? '[noun] ' : '[verb] ';
+    return label + redact(raw, S.word.w);
+}
+function render(){
+    if (!Hub.me){ reportHeight(); return; }
+    $('ww-room').textContent = 'ROOM: ' + (Hub.room || '-') + ' | YOU: ' + myName() +
+        (isHost() ? ' (HOST)' : '') + ' | ' + Hub.roster.length + ' players';
+    var st = statusSticky;
+    if (paused()) st = '> HOST LOST - reconnecting...';
+    else if (!S) st = st || '> waiting for host. host presses [ NEW GAME ].';
+    else if (S.over) st = '> GAME OVER. ' + (S.feed[0] || '');
+    else if (S.phase === 'brief') st = st || '> fetching word...';
+    else if (S.phase === 'vote' && S.pitch) st = '> voting: "' + S.pitch.text + '"';
+    else if (S.phase === 'draw'){
+        if (iAmArtist()) st = (!brief || brief.round !== S.round || brief.inst !== S.inst)
+            ? '> waiting for your brief... (press SYNC)'
+            : '> YOUR WORD: ' + brief.word + ' - draw it.';
+        else st = '> ' + nameOf(artistId()) + ' is drawing...';
+    }
+    if (!statusSticky) $('ww-status').textContent = st;
+    // word box
+    var wh = '';
+    if (S && S.word){
+        wh += '<pre class="ww-pre">ROUND: ' + S.round + '/' + MAX_ROUNDS + '  [' + S.word.src + (S.word.f ? ', f:' + S.word.f : '') + ']\n';
+        wh += 'CLUE: ' + esc(clueText()) + '\n';
+        wh += 'WORD: ' + blanksFor(S.word.w.length, S.hintStr) + '\n';
+        wh += '</pre>';
+        wh += '<details class="ww-det"><summary class="ww-sum">[ FULL ENTRY ]</summary><pre class="ww-pre">N:';
+        wh += S.word.n.map(function(d, i){ return '\n  [' + (i + 1) + '] ' + esc(redact(d, S.word.w)); }).join('');
+        wh += '\nV:';
+        wh += S.word.v.map(function(d, i){ return '\n  [' + (i + 1) + '] ' + esc(redact(d, S.word.w)); }).join('');
+        wh += '</pre></details>';
+    } else {
+        wh = '<pre class="ww-pre">&gt; no word yet. host presses [ NEW GAME ].</pre>';
+    }
+    $('ww-word').innerHTML = wh;
+    // tool hint
+    var th = '> -';
+    if (S && !S.over && S.phase === 'draw' && iAmArtist())
+        th = '> ARTIST: draw freely. [ UNDO ] [ CLEAR ] [ HINT -1 ]. One stroke = one send.';
+    else if (S && S.phase === 'draw' && iAmGuesser())
+        th = '> YOUR GUESS: type the word, [ GUESS ]. Or [ CHALLENGE ] the drawing.';
+    else if (S && S.phase === 'vote') th = '> vote on the challenge.';
+    $('ww-tool').textContent = th;
+    // vote box
+    var vh = '';
+    if (S && S.phase === 'vote' && S.pitch){
+        var fit = 0, stretch = 0, veto = 0, k;
+        for (k in S.votes){
+            if (S.votes[k] === 'fit') fit++;
+            else if (S.votes[k] === 'stretch') stretch++;
+            else veto++;
+        }
+        vh += '<pre class="ww-pre">CHALLENGE by ' + esc(nameOf(S.pitch.byId)) + ': "' + esc(S.pitch.text) + '"\n';
+        vh += 'FIT(stands) x' + fit + ' / STRETCH(stands!) x' + stretch + ' / VETO(out) x' + veto;
+        vh += '\nTIME LEFT: <span id="ww-vote-timer">--</span>s</pre>';
+        if (eligibleVoters().some(function(id){ return id === myId(); }) && !S.votes[myId()]){
+            vh += '<div class="ww-votes">'
+                + '<button class="ww-b" data-v="fit">[ FIT ]</button>'
+                + '<button class="ww-b" data-v="stretch">[ STRETCH ]</button>'
+                + '<button class="ww-b" data-v="veto">[ VETO ]</button>'
+                + '</div>';
+        } else {
+            vh += '<pre class="ww-pre">&gt; ' + (S.votes[myId()] ? 'vote locked: ' + esc(S.votes[myId()].toUpperCase()) : 'you do not vote on this.') + '</pre>';
+        }
+    } else {
+        vh = '<pre class="ww-pre">&gt; no challenge on the table.</pre>';
+    }
+    $('ww-vote').innerHTML = vh;
+    var vb = $('ww-votebox').querySelectorAll('[data-v]');
+    for (var vi = 0; vi < vb.length; vi++){
+        (function(btn){
+            btn.addEventListener('click', function(){ actVote(btn.getAttribute('data-v')); });
+        })(vb[vi]);
+    }
+    // conf / turn / roster / feed
+    var cf = 'CONF: ';
+    if (S) cf += S.order.map(function(id){
+        var c = (S.conf[id] !== undefined ? S.conf[id] : '-');
+        var o = S.out.indexOf(id) !== -1 ? ' OUT' : '';
+        return nameOf(id) + '(' + c + o + ')';
+    }).join(', ');
+    else cf += '-';
+    $('ww-moves').textContent = cf;
+    var tu = 'TURN: ';
+    if (S && !S.over && S.order.length){
+        tu += 'artist ' + nameOf(artistId());
+        if (S.phase === 'draw') tu += ' | guessing: ' + (curGuesser() ? nameOf(curGuesser()) : '-');
+        tu += ' [' + S.phase + '] round ' + S.round + '/' + MAX_ROUNDS;
+        if (S.phase === 'draw' && S.roundEnd) tu += ' | <span id="ww-round-timer">--</span>s';
+    } else tu += '-';
+    $('ww-turn').innerHTML = tu;
+    $('ww-roster').textContent = 'PLAYERS: ' + (Hub.roster.length ? Hub.roster.map(function(m){
+        return m.name + (m.host ? '(HOST)' : '');
+    }).join(', ') : '-');
+    $('ww-feed').innerHTML = S && S.feed.length
+        ? '<pre class="ww-pre">' + S.feed.map(function(l){ return '&gt; ' + esc(l); }).join('\n') + '</pre>'
+        : '';
+    // buttons
+    $('btn-ww-new').disabled = !isHost();
+    $('btn-ww-invite').disabled = !isHost();
+    var canGuess = !!(S && !S.over && S.phase === 'draw' && iAmGuesser() && !paused());
+    $('btn-ww-submit').disabled = !canGuess;
+    var wl = document.getElementById('btn-ww-chal');
+    if (wl) wl.disabled = !canGuess;
+    var canArt = !!(S && !S.over && S.phase === 'draw' && iAmArtist() && !paused());
+    $('btn-ww-undo').disabled = !canArt;
+    $('btn-ww-clear').disabled = !canArt;
+    $('btn-ww-hint').disabled = !canArt;
+    var why = '';
+    if (!canGuess){
+        if (!S) why = '> no game yet. host presses [ NEW GAME ].';
+        else if (S.over) why = '> game over. host presses [ NEW GAME ].';
+        else if (S.phase === 'vote') why = '> voting now. guess box closed.';
+        else if (S.phase !== 'draw') why = '> waiting...';
+        else if (paused()) why = '> HOST LOST - reconnecting...';
+        else if (liveIds().indexOf(myId()) === -1) why = '> you are out.';
+        else if (!iAmGuesser()) why = '> wait: ' + nameOf(curGuesser()) + ' is guessing.';
+    }
+    $('ww-why').textContent = why;
+    drawBoard(1);
+    tickTimer();
+    reportHeight();
+}
+function blanksFor(len, hintStr){
+    var out = [];
+    for (var i = 0; i < len; i++) out.push(i < hintStr.length ? hintStr[i] : '_');
+    return out.join(' ');
+}
+function tickTimer(){
+    var now = Date.now(), el;
+    el = $('ww-vote-timer');
+    if (el && S && S.phase === 'vote' && S.deadline) el.textContent = Math.max(0, Math.ceil((S.deadline - now) / 1000));
+    el = $('ww-round-timer');
+    if (el && S && S.phase === 'draw' && S.roundEnd) el.textContent = Math.max(0, Math.ceil((S.roundEnd - now) / 1000));
+}
+setInterval(tickTimer, 500);
+
+function doReset(){
+    S = null; draft = null; drawing = false; seenSeq = 0; lastTurnKey = '';
+    statusSticky = ''; brief = null;
+    clearTimeout(voteTimer); clearTimeout(roundTimer);
+    try { $('ww-pitch-text').value = ''; } catch(e) {}
+    render();
+}
+
+// ---------- wire up ----------
+$('btn-ww-hide').addEventListener('click', function(){ Hub.up('close'); });
+$('btn-ww-new').addEventListener('click', function(){ newGame(); });
+$('btn-ww-invite').addEventListener('click', function(){ Hub.up('invite'); });
+$('btn-ww-submit').addEventListener('click', function(){ actGuess('guess'); });
+$('btn-ww-chal').addEventListener('click', function(){ actGuess('challenge'); });
+$('btn-ww-clear').addEventListener('click', function(){ actArtist('clear'); });
+$('btn-ww-undo').addEventListener('click', function(){ actArtist('undo'); });
+$('btn-ww-hint').addEventListener('click', function(){ actArtist('hint'); });
+$('btn-ww-sync').addEventListener('click', function(){
+    if (iAmArtist() && S && S.word && (!brief || brief.inst !== S.inst || brief.round !== S.round))
+        Hub.up('intent', { a: 'brief' });
+    else Hub.up('intent', { a: 'hello' });
+    toast('Sync requested.');
+});
+
+bindPointer();
+Hub.init();
+render();
+})();
+</script>
+</body>
+</html>

@@ -1,0 +1,878 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>eggs</title>
+<style>
+*{box-sizing:border-box}
+html,body{height:100%;overflow:hidden}
+body{margin:0;background:#14100b;color:#f0e6d2;font:14px/1.45 system-ui,sans-serif}
+#wrap{max-width:100%;margin:0 auto;padding:10px;height:100dvh;display:flex;flex-direction:column;gap:8px}
+#bar{display:flex;flex-wrap:wrap;gap:6px;align-items:center;background:#241b12;border:1px solid #4a3a26;border-radius:12px;padding:8px 10px}
+button.eg{font-size:12px;font-weight:800;padding:6px 12px;border-radius:10px;border:1px solid #6b5636;background:#332818;color:#f0e6d2;cursor:pointer}
+button.eg.on{background:#ffd23f;color:#241b12;border-color:#ffd23f}
+#stage-wrap{position:relative;width:100%;flex:1;min-height:0;display:flex;align-items:center;justify-content:center;background:#0d0a06;border:1px solid #4a3a26;border-radius:12px;overflow:hidden}
+#cv{display:block;max-width:100%;max-height:100%;width:auto;height:auto;aspect-ratio:14/9;background:#1c160e;touch-action:none}
+#overlay{position:absolute;inset:0;display:flex;flex-direction:column;gap:10px;align-items:center;justify-content:center;background:rgba(10,7,4,.88);z-index:5;cursor:pointer;text-align:center;padding:20px}
+#overlay.hide{opacity:0;pointer-events:none}
+#overlay h1{margin:0;letter-spacing:6px;color:#ffd23f;font-size:30px}
+ #meta{display:flex;gap:10px;flex-wrap:wrap;align-items:center;font-size:12px;color:#d8c9a8;font-family:monospace}
+ #err{font-family:monospace;font-size:11px;color:#ff8888;min-height:14px}
+ #shoutbar{display:flex;gap:6px;align-items:center}
+ #shout-input{flex:1;background:#0d0a06;border:1px solid #6b5636;border-radius:10px;padding:6px 12px;color:#f0e6d2;font:inherit}
+ #shout-input:focus{outline:none;border-color:#ffd23f}
+ .hint{color:#8a7a5c;font-size:12px;margin:0}
+</style>
+</head>
+<body>
+<div id="wrap">
+  <div id="bar">
+    <button class="eg" id="btn-world">New world</button>
+    <button class="eg" id="btn-star">Star now</button>
+    <button class="eg" id="btn-hide">Hide</button>
+    <span id="role" style="font-family:monospace;font-size:11px;opacity:.85">connecting…</span>
+  </div>
+  <div id="stage-wrap">
+    <canvas id="cv" width="1400" height="900"></canvas>
+    <div id="overlay"><h1>eggs</h1><p>A sandbox for eggs. Bounce around, splat, respawn. Jump twice for a double jump. Ride the teal elevator around its loop — hold up/down to drive it. Hop on the skateboard: tap jump for a flipping ollie (the board jumps too), hold jump to bail, mind the peg. One star every 5 minutes makes you invincible, and a bean makes you a big egg. Shout at each other below. There is a secret key…</p><p style="font-size:11px;opacity:.75">Arrows / WASD move · Space jumps (twice!) · brake hops off the board · you are the egg with your name on it</p></div>
+  </div>
+  <div id="meta"><span id="stat">tap to enter the nest</span></div>
+  <div id="shoutbar">
+    <input id="shout-input" maxlength="40" placeholder="Shout something at the eggs..." autocomplete="off">
+    <button class="eg" id="btn-shout">Shout</button>
+  </div>
+  <p class="hint">white, brown, baby-blue, easter. splat = white puddle, yellow middle. star = wrecking ball. bean = big egg. board = ride it, tap jump = flip-ollie (it jumps too), hold jump = bail, peg = wipeout. mover = ride it, hold up/down to drive. suplex (= key) = lift &amp; throw. double jump included. respawns are free.</p>
+  <div id="err"></div>
+</div>
+<script>
+(function(){
+'use strict';
+var GAME_ID='eggs';
+ var W=1400,H=900,GRAV=1700;
+var cv=document.getElementById('cv'),ctx=cv.getContext('2d');
+var errEl=document.getElementById('err'),overlay=document.getElementById('overlay');
+window.addEventListener('error',function(e){try{errEl.textContent='Error: '+(e.message||'error');}catch(x){}});
+var Hub={me:null,roster:[],room:'',up:function(k,p){try{window.parent.postMessage({t:'gu',game:GAME_ID,k:k,p:p},'*');}catch(e){}},init:function(){window.addEventListener('message',onDown);this.up('hello');}};
+var heightT=null;
+function reportHeight(){clearTimeout(heightT);heightT=setTimeout(function(){try{Hub.up('height',Math.max(200,Math.round(window.innerHeight)||900));}catch(e){}},60);}
+window.addEventListener('load',reportHeight);window.addEventListener('resize',reportHeight);
+
+var isHost=false,booted=false,amSolo=false,myId='solo',myName='Player',roster=[];
+function onDown(e){var m=e.data;if(!m||m.t!=='gd'||m.game!==GAME_ID)return;
+ if(m.k==='roster')onRoster(m.p);
+ else if(m.k==='state')onState(m.p,m.from);
+ else if(m.k==='intent')onIntent(m.p,m.from);
+ else if(m.k==='reset')resetLocal();}
+function onRoster(p){Hub.me=p.you;Hub.roster=p.roster||[];Hub.room=p.room||'';
+ myId=Hub.me.id;myName=Hub.me.name||'Player';isHost=!!Hub.me.isHost;roster=Hub.roster.slice();
+ if(!booted){booted=true;bootAll();}renderRole();reportHeight();}
+setTimeout(function(){if(!booted){amSolo=true;isHost=true;booted=true;bootAll();
+ document.getElementById('role').textContent='solo · local nest';}},1800);
+
+var COLORS=[
+ {name:'white',shell:'#f8fafc',spot:'#cbd5e1'},
+ {name:'brown',shell:'#a16207',spot:'#713f12'},
+ {name:'baby blue',shell:'#bae6fd',spot:'#38bdf8'},
+ {name:'easter',shell:'#f0abfc',spot:'#4ade80'}];
+function rosterPlusMe(){var a=[{id:myId,name:myName,host:isHost}];roster.forEach(function(m){if(m.id!==myId)a.push(m);});return a.slice(0,4);}
+// seats(): the multiplayer seat order, sorted by player id so the host and
+// every guest build the IDENTICAL egg order. Seating by roster position
+// crosses identities (your egg shows another player's game), so never do that.
+function seats(){
+ var a=[{id:myId,name:myName,host:isHost}];
+ roster.forEach(function(m){if(m.id!==myId)a.push({id:m.id,name:m.name,host:!!m.host});});
+ a.sort(function(x,y){return x.id<y.id?-1:(x.id>y.id?1:0);});
+ return a.slice(0,4);
+}
+function colorOf(idx){return COLORS[idx%COLORS.length];}
+
+var plats=[],eggs=[],decals=[],parts=[],star=null,lastStarAt=0,levelName='',inputs={},fxT=0;
+var bean=null,lastBeanAt=0,beanEver=false; // bean power-up: eat it, become a big egg
+// The mover: one platform per level looping a rectangle — up the left,
+// across the top, down the right, back across the bottom. Host drives it,
+// guests adopt its position from snapshots.
+var mover={x:100,y:H-170,w:150,h:16,dx:0,dy:0,sp:45,by:''},moverD=0,moverSpeed=45,mdriver='';
+var MOVER_PTS=[[100,H-170],[100,150],[W-100,150],[W-100,H-170]];
+// base putter 45 + rider steer via up/down (see step())
+// base putter 40 + rider steer ±120 along the loop (see step())
+var moverPerim=(function(){var L=0;for(var i=0;i<MOVER_PTS.length;i++){
+ var a=MOVER_PTS[i],b=MOVER_PTS[(i+1)%MOVER_PTS.length];
+ L+=Math.hypot(b[0]-a[0],b[1]-a[1]);}return L;})();
+function sampleMover(d){
+ d=((d%moverPerim)+moverPerim)%moverPerim;
+ for(var i=0;i<MOVER_PTS.length;i++){
+  var a=MOVER_PTS[i],b=MOVER_PTS[(i+1)%MOVER_PTS.length];
+  var L=Math.hypot(b[0]-a[0],b[1]-a[1]);
+  if(d<=L)return{x:a[0]+(b[0]-a[0])*(d/L),y:a[1]+(b[1]-a[1])*(d/L)};
+  d-=L;
+ }
+ return{x:MOVER_PTS[0][0],y:MOVER_PTS[0][1]};
+}
+function syncSize(g){g.r=g.bigT>0?26:17;}
+// Skateboard: one per level, rolls along the floor. Land on it to ride,
+// steer it, jump for an ollie, brake to hop off. Riding kills suplex.
+// The peg is a visible floor hazard: clip it and you get launched.
+var board=null,peg=null;
+// Shouts: giant egg-anchored yells. Host validates + broadcasts via snapshot.
+var shouts=[],lastShout={};
+function doShout(text,fromId){
+  var now=performance.now();
+  if(lastShout[fromId]&&now-lastShout[fromId]<2000)return; // one yell per 2s
+  var t=String(text||'').trim().slice(0,40);
+  if(!t)return;
+  var g=eggs.filter(function(e){return e.id===fromId;})[0];
+  if(!g)return;
+  lastShout[fromId]=now;
+  shouts.push({i:g.idx,text:t,t:0});
+  if(shouts.length>3)shouts.splice(0,shouts.length-3);
+}
+function sendShout(){
+  var inp=document.getElementById('shout-input');
+  if(!inp||!inp.value.trim())return;
+  var t=inp.value.trim().slice(0,40);
+  inp.value='';
+  if(isHost||amSolo)doShout(t,myId);
+  else Hub.up('intent',{a:'shout',text:t});
+  if(document.activeElement)document.activeElement.blur();
+}
+var keys={};
+window.addEventListener('keydown',function(e){
+ // typing in the shout box must never drive your egg
+ if(e.target&&(e.target.tagName==='INPUT'||e.target.tagName==='TEXTAREA'))return;
+ keys[e.code]=true;
+ if(['ArrowUp','ArrowDown','ArrowLeft','ArrowRight','Space'].indexOf(e.code)>=0)e.preventDefault();
+ if(e.code==='Equal'||e.code==='NumpadEqual'){toggleSuplex();}
+ if(e.code==='KeyN'&&(isHost||amSolo))newWorld();});
+window.addEventListener('keyup',function(e){keys[e.code]=false;});
+
+function rnd(a,b){return a+Math.random()*(b-a);}
+function newWorld(){
+  plats=[];
+  plats.push({x:W/2,y:H-16,w:W,h:64});
+  var y=160;
+  plats.push({x:W/2,y:100,w:300,h:18});
+  while(y<H-160){
+   var cx=rnd(160,W-160),w=rnd(170,300),tilt=rnd(-0.25,0.25);
+   plats.push({x:cx,y:y,w:w,h:16,a:tilt});
+   if(Math.random()<0.3)plats.push({x:rnd(130,W-130),y:y-56,w:rnd(100,170),h:14,a:rnd(-0.3,0.3)});
+   y+=rnd(100,150);
+  }
+  levelName='world '+Math.floor(Math.random()*9000+1000);
+  lastStarAt=performance.now();star=null;
+  lastBeanAt=performance.now();bean=null;beanEver=false;
+  moverD=0;moverSpeed=45;mdriver='';var mp0=sampleMover(0);mover.x=mp0.x;mover.y=mp0.y;mover.dx=0;mover.dy=0;mover.sp=45;mover.by='';
+  peg={x:rnd(150,W-150)};
+  // board starts still, parked far from the peg
+  board={x:(peg.x<W/2?W-150:150),y:H-63,w:90,h:10,vx:0,vy:0,ground:true,rider:-1,stuck:0,flip:0,air:0};
+  decals=[];parts=[];shouts=[];
+  eggs.forEach(function(g,i){respawn(g,true);});
+ if(isHost&&!amSolo)Hub.up('state',snapshot());
+ renderRole();
+}
+function spawnEgg(idx,pid,pname){
+ var e={idx:idx,id:pid,name:pname,x:W/2+(idx-1.5)*60,y:60,vx:0,vy:0,r:17,ground:false,dead:0,deadT:0,
+  inv:0,starT:0,bigT:0,suplex:false,cracks:0,splats:0,kills:0,face:1,
+  holding:-1,heldBy:-1,holdT:0,throwCD:0,thrownT:0,thrownBy:null,
+  jumps:0,prevJump:false,jumpBuf:0,riding:false,sq:0,onMover:false,lastInp:null,jumpHold:0,noBoard:0};
+ return e;
+}
+function releaseHold(g){
+ if(g.holding>=0){var v=eggs[g.holding];if(v&&v.heldBy===g.idx){v.heldBy=-1;v.vx=g.vx;v.vy=g.vy;}g.holding=-1;g.holdT=0;}
+ if(g.heldBy>=0){var h=eggs[g.heldBy];if(h&&h.holding===g.idx){h.holding=-1;h.holdT=0;}g.heldBy=-1;}
+}
+function respawn(g,quiet){
+ releaseHold(g);
+ if(board&&board.rider===g.idx)board.rider=-1;
+ g.x=rnd(160,W-160);g.y=50;g.vx=rnd(-80,80);g.vy=0;g.dead=0;g.inv=1.5;g.starT=Math.max(g.starT,0);
+ g.bigT=0;g.r=17;g.holding=-1;g.heldBy=-1;g.holdT=0;g.thrownT=0;g.thrownBy=null;
+  g.jumps=0;g.prevJump=false;g.jumpBuf=0;g.riding=false;g.sq=0;g.jumpHold=0;g.noBoard=0;
+ if(!quiet)burst(g.x,g.y,10,60,220,.5,3,['#fff','#fde68a'],0);
+}
+function ensureEggs(){
+ var m=rosterPlusMe();if(amSolo&&!m.length)m=[{id:myId,name:myName}];
+ if(amSolo||m.length===1){
+  // solo (or alone in a room): you plus one idle dummy to suplex around.
+  // single client, so positional seating is fine here.
+  var want=amSolo?2:Math.max(1,m.length);
+  while(eggs.length<want){var i=eggs.length,mm=m[i]||{id:'solo'+i,name:'Egg '+(i+1)};eggs.push(spawnEgg(i,mm.id,mm.name));}
+  eggs.length=want;
+  eggs.forEach(function(g,i){var mm2=m[i];if(mm2){g.id=mm2.id;g.name=mm2.name;}});
+  return;
+ }
+ // multiplayer: seat by player id in deterministic order (see seats()).
+ // Never re-label by position: that shows you someone else's egg.
+ var sm=seats();
+ eggs=eggs.filter(function(g){return sm.some(function(mm){return mm.id===g.id;});});
+ sm.forEach(function(mm,mi){
+  var g=null;
+  for(var k=0;k<eggs.length;k++)if(eggs[k].id===mm.id){g=eggs[k];break;}
+  if(!g){g=spawnEgg(mi,mm.id,mm.name);respawn(g,true);eggs.push(g);}
+  g.idx=mi;g.id=mm.id;g.name=mm.name;
+ });
+ eggs.sort(function(a,b){return a.idx-b.idx;});
+ // a roster change may have scrambled grab/board refs: drop dangling ones
+ eggs.forEach(function(g){
+  if(g.holding>=0&&(!eggs[g.holding]||eggs[g.holding].heldBy!==g.idx)){g.holding=-1;g.holdT=0;}
+  if(g.heldBy>=0&&(!eggs[g.heldBy]||eggs[g.heldBy].holding!==g.idx)){g.heldBy=-1;}
+ });
+ if(board&&board.rider>=0&&(!eggs[board.rider]||!eggs[board.rider].riding))board.rider=-1;
+}
+ function snapshot(){return{plats:plats,level:levelName,
+  eggs:eggs.map(function(g){return{i:g.idx,x:Math.round(g.x),y:Math.round(g.y),vx:Math.round(g.vx),vy:Math.round(g.vy),dead:g.dead?1:0,inv:+g.inv.toFixed(2),starT:+g.starT.toFixed(2),big:+g.bigT.toFixed(2),sup:g.suplex?1:0,splats:g.splats,kills:g.kills,name:g.name,id:g.id,hold:g.holding,held:g.heldBy,thr:g.thrownT>0?1:0,ride:g.riding?1:0,sq:+g.sq.toFixed(2)}}),
+  decals:decals.slice(-24),star:star?{x:Math.round(star.x),y:Math.round(star.y)}:null,
+  bean:bean?{x:Math.round(bean.x),y:Math.round(bean.y)}:null,
+  bd:board?{x:Math.round(board.x),y:Math.round(board.y),r:board.rider,st:+board.stuck.toFixed(2),fl:+board.flip.toFixed(2)}:null,
+  pg:peg?{x:Math.round(peg.x)}:null,
+  sh:shouts.map(function(s){return{i:s.i,tx:s.text,t:+s.t.toFixed(2)}}),
+  mv:{x:Math.round(mover.x),y:Math.round(mover.y),sp:Math.round(moverSpeed),by:mdriver},t:Date.now()};}
+function onState(p,from){if(isHost||amSolo)return;if(!p)return;
+ if(p.plats){plats=p.plats;levelName=p.level||levelName;}
+ if(p.eggs){ensureEggs();
+  p.eggs.forEach(function(s){var g=eggs[s.i];if(!g)return;
+   g.x=s.x;g.y=s.y;g.vx=s.vx;g.vy=s.vy;g.dead=s.dead;g.inv=s.inv;g.starT=s.starT;g.bigT=(typeof s.big==='number'?s.big:0);syncSize(g);g.suplex=!!s.sup;g.splats=s.splats;g.kills=s.kills;g.name=s.name||g.name;g.id=s.id||g.id;g.holding=(typeof s.hold==='number'?s.hold:-1);g.heldBy=(typeof s.held==='number'?s.held:-1);g.thrownT=s.thr?1:0;g.riding=!!s.ride;g.sq=(typeof s.sq==='number'?s.sq:0);});}
+  if(p.decals)decals=p.decals;
+  star=p.star||null;
+  bean=p.bean||null;
+  if(p.bd){if(!board)board={x:p.bd.x,y:(typeof p.bd.y==='number'?p.bd.y:H-63),w:90,h:10,vx:0,vy:0,ground:true,rider:-1,stuck:0,flip:0,air:0};else{board.x=p.bd.x;if(typeof p.bd.y==='number')board.y=p.bd.y;board.rider=p.bd.r;board.stuck=p.bd.st||0;board.flip=p.bd.fl||0;}}
+  if(p.pg){if(!peg)peg={x:p.pg.x};else peg.x=p.pg.x;}
+  if(p.sh)shouts=p.sh.map(function(s){return{i:s.i,text:String(s.tx||'').slice(0,40),t:s.t||0};});
+  if(p.mv){mover.dx=p.mv.x-mover.x;mover.dy=p.mv.y-mover.y;mover.x=p.mv.x;mover.y=p.mv.y;if(typeof p.mv.sp==='number'){mover.sp=p.mv.sp;mover.by=String(p.mv.by||'');}}
+  renderRole();}
+function onIntent(p,from){if(!isHost)return;from=from||{id:myId};
+ if(!p)return;
+ if(p.a==='input'){inputs[from.id]=p.v;return;}
+ if(p.a==='suplex'){var g=eggs.filter(function(e){return e.id===from.id;})[0];if(g){if(g.riding)return;g.suplex=!g.suplex;if(!g.suplex)releaseHold(g);}Hub.up('state',snapshot());return;}
+ if(p.a==='shout'){doShout(p.text,from.id);Hub.up('state',snapshot());return;}
+ if(p.a==='world'){newWorld();return;}}
+function toggleSuplex(){
+ var me=eggs.filter(function(g){return g.id===myId;})[0];
+ if(isHost||amSolo){if(me){if(me.riding){flash('No suplex on a board!');return;}me.suplex=!me.suplex;if(!me.suplex)releaseHold(me);flash(me.suplex?'SUPLEX MODE: touch someone to lift':'normal egg');}}
+ else Hub.up('intent',{a:'suplex'});
+}
+function flash(t){var s=document.getElementById('stat');if(s)s.textContent=t;}
+
+/* physics: circle vs (possibly rotated) rect. Transform into platform-local
+   space so tilted platforms collide exactly where they're drawn.
+   Motion is substepped so fast falls can't tunnel through floors. */
+function circleRect(x,y,r,p){
+ var a=p.a||0,c=Math.cos(a),s=Math.sin(a);
+ var dx=x-p.x,dy=y-p.y;
+ var lx=dx*c+dy*s, ly=-dx*s+dy*c;
+ var hw=p.w/2,hh=p.h/2;
+ var cx=Math.max(-hw,Math.min(lx,hw)),cy=Math.max(-hh,Math.min(ly,hh));
+ var ddx=lx-cx,ddy=ly-cy,d=Math.hypot(ddx,ddy);
+ if(d>=r)return null;
+ var nx,ny;
+ if(d>0.01){nx=ddx/d;ny=ddy/d;}else{nx=0;ny=-1;}
+ // rotate the local normal back to world space
+ return{nx:nx*c-ny*s,ny:nx*s+ny*c,pen:r-d};
+}
+function hitRect(g,p,inp){
+ var h=circleRect(g.x,g.y,g.r,p);
+ if(!h)return false;
+ g.x+=h.nx*h.pen;g.y+=h.ny*h.pen;
+ var vn=g.vx*h.nx+g.vy*h.ny;
+ if(vn<0){
+  // thrown eggs splat easier: hurling someone into a wall should finish them.
+  // big eggs are sturdy: they shrug off hits that would crack a normal egg.
+  var lethal=950, side=800;
+  if(g.thrownT>0){lethal=550;side=500;}
+  if(g.bigT>0){lethal=1250;side=1050;}
+  var attacker=(g.thrownT>0&&g.thrownBy)?g.thrownBy:null;
+  // invincible eggs (star / spawn protection) skip ONLY the death —
+  // the bounce below always runs, so they can never get pinned.
+  var kill=!attacker&&(g.inv>0||g.starT>0)?false:true;
+  if(h.ny<-0.5){g.ground=true;g.jumps=0;
+   if(vn<-lethal&&kill){splat(g,'SPLAT!',attacker||undefined);return true;}
+   else if(vn<-650){g.cracks++;g.sq=1;burst(g.x,g.y,6,40,160,.4,2,['#fff'],0);}
+   g.vy*=-0.35;g.vx*=0.85;
+   if(g.jumpBuf>0){g.jumpBuf=0;g.vy=-660;g.vx+=inp.ax*120;g.ground=false;g.jumps=1;}
+  }else{g.vx-=1.7*vn*h.nx;g.vy-=1.7*vn*h.ny;
+   if(Math.abs(vn)>side&&kill){splat(g,'SPLAT!',attacker||undefined);return true;}}
+ } else if(h.ny<-0.5){g.ground=true;g.jumps=0;
+  if(g.jumpBuf>0){g.jumpBuf=0;g.vy=-660;g.vx+=inp.ax*120;g.ground=false;g.jumps=1;}}
+ return false;
+}
+function collidePlats(g,inp){
+ for(var i=0;i<plats.length;i++){if(hitRect(g,plats[i],inp))return;}
+ if(mover)hitRect(g,mover,inp);
+}
+// board-vs-platform test: 3 sample points along the deck underside,
+// rotation-aware via circleRect so tilted platforms catch it right.
+function boardGround(){
+ var pts=[board.x-board.w/2+8,board.x,board.x+board.w/2-8],best=null;
+ for(var k=0;k<3;k++)for(var i=0;i<plats.length;i++){
+  var h=circleRect(pts[k],board.y+board.h/2,6,plats[i]);
+  if(h&&(!best||h.pen>best.pen))best=h;
+ }
+ return best;
+}
+// the board is a real body now: it falls, lands on platforms, and flips.
+// runs on the host; guests adopt x/y/flip from snapshots.
+function stepBoard(dt){
+ if(!board)return;
+ // stale rider refs can't drive a ghost board (roster shrank, etc.)
+ if(board.rider>=0&&(!eggs[board.rider]||!eggs[board.rider].riding))board.rider=-1;
+ if(board.stuck>0){
+  board.stuck-=dt;board.vx=0;board.vy=0;
+  if(board.stuck<=0&&board.rider<0){
+   // unstuck with nobody aboard: respawn far from the peg, still
+   board.x=peg&&peg.x<W/2?W-150:150;
+   board.y=H-63;board.flip=0;board.air=0;board.ground=true;
+  }
+  return;
+ }
+ var ridden=board.rider>=0;
+ if(!ridden){board.vx=0;} // nobody aboard: dead still
+ board.x+=board.vx*dt;
+ board.vy=Math.min(board.vy+GRAV*dt,1500);
+ board.y+=board.vy*dt;
+ if(board.x<80){board.x=80;board.vx=Math.abs(board.vx);}
+ if(board.x>W-80){board.x=W-80;board.vx=-Math.abs(board.vx);}
+ board.ground=false;
+ var h=boardGround();
+ if(h){
+  board.x+=h.nx*h.pen;board.y+=h.ny*h.pen;
+  if(h.ny<-0.5){
+   board.vy=0;board.ground=true;board.flip=0;board.air=0;
+  }else{
+   var vd=board.vx*h.nx+board.vy*h.ny;
+   if(vd<0){board.vx-=vd*h.nx;board.vy-=vd*h.ny;}
+  }
+ }else{board.air+=dt;}
+ // one full flip per 0.75s of air, then hold the landing pose
+ if(!board.ground)board.flip=Math.min(board.air,0.75)/0.75*Math.PI*2;
+ // the peg only threatens a low board: clip it and it stops dead,
+ // rider goes flying
+ if(ridden&&peg&&board.y>H-110&&Math.abs(board.x-peg.x)<24){
+  var bv=board.vx;
+  board.stuck=2;board.vx=0;board.vy=0;
+  var ri=board.rider,rider=ri>=0?eggs[ri]:null;
+  if(rider&&!rider.dead){
+   rider.riding=false;board.rider=-1;
+   rider.vx=bv*1.5+(rider.x>=peg.x?380:-380);rider.vy=-720;
+   rider.inv=0;rider.thrownT=1.2;rider.thrownBy=null;rider.jumps=1;
+   popText(rider.x,rider.y-30,'WIPEOUT!');
+   burst(rider.x,rider.y,14,80,320,.6,3,['#fff','#d6a05c','#e0432f'],0);
+  }else{
+   popText(board.x,board.y-30,'CLUNK!');
+   burst(board.x,board.y,8,40,160,.4,2,['#d6a05c','#fff'],0);
+  }
+ }
+}
+function collideEgg(g,dt){
+ if(g.heldBy>=0)return; // carried overhead by the holder, positioned in step()
+ var inp={ax:0,jump:false,brake:false};
+ if(isHost||amSolo){
+  if(amSolo)inp=(g.idx===0?localInput():{ax:0,jump:false,brake:false});
+  else{var m=seats(),slot=g.idx;var pid=(m[slot]||{}).id;inp=(pid&&inputs[pid])||(g.id===myId?localInput():{ax:0,jump:false,brake:false});}
+ }
+ if(inp.ax!==0)g.face=inp.ax>0?1:-1;
+ // jump buffer shared by ground hops, double jumps, and board ollies,
+ // so quick taps survive the 15Hz guest input sampling.
+ if(inp.jump&&!g.prevJump)g.jumpBuf=0.15;
+ g.prevJump=!!inp.jump;
+ g.lastInp=inp; // host remembers this for mover steering in step()
+ // riding the board: steer it (weak authority mid-air), tap jump for an
+ // ollie that launches board AND rider with one flip, hold jump to bail.
+ // Ollies keep you riding until you land elsewhere or hop off.
+ if(g.riding&&board){
+  if(inp.ax!==0)g.face=inp.ax>0?1:-1;
+  board.vx+=inp.ax*(board.ground?900:360)*dt;
+  board.vx=Math.max(-260,Math.min(260,board.vx));
+  if(inp.jump)g.jumpHold=(g.jumpHold||0)+dt;else g.jumpHold=0;
+  if(g.jumpHold>0.45){
+   // held jump: bail out (noBoard stops an instant remount while held)
+   g.jumpHold=0;g.jumpBuf=0;g.noBoard=0.6;
+   g.riding=false;board.rider=-1;g.vy=-300;g.vx=board.vx;g.jumps=1;
+   return;
+  }
+  if(inp.brake){
+   g.riding=false;board.rider=-1;g.vy=-300;g.vx=board.vx;g.jumps=1;
+   return;
+  }
+  if(g.ground){
+   if(g.jumpBuf>0){
+    g.jumpBuf=0;
+    g.vy=-780;g.vx=board.vx+inp.ax*60;g.jumps=1;g.sq=-0.5;g.ground=false; // ollie!
+    board.vy=-780;board.ground=false; // the board pops too — flip starts
+    burst(g.x,g.y+g.r,8,40,160,.4,2.5,['#fff','#d6a05c'],0);
+   }else{
+    g.x=board.x;
+    g.y=board.y-5-g.r;g.vy=0;g.vx=board.vx;g.ground=true;g.jumps=0;
+    return;
+   }
+  }
+  // airborne ollie: feet stay over the deck, bonk platforms for real
+  g.vy=Math.min(g.vy+GRAV*dt,1500);
+  g.x=board.x;g.y+=g.vy*dt;g.vx=board.vx;
+  g.ground=false;collidePlats(g,inp);
+  if(g.dead)return;
+  if(g.vy>=0&&Math.abs((g.y+g.r)-(board.y-5))<12&&Math.abs(g.x-board.x)<board.w/2+6){
+   g.y=board.y-5-g.r;g.vy=0;g.vx=board.vx;g.ground=true;g.jumps=0;
+  }else if(g.ground){
+   g.riding=false;if(board.rider===g.idx)board.rider=-1; // landed elsewhere
+  }
+  return;
+ }
+ var ACC=g.ground?1400:700,MAX=300;
+ if(inp.ax<0&&g.vx>-MAX)g.vx-=ACC*dt;
+ if(inp.ax>0&&g.vx<MAX)g.vx+=ACC*dt;
+ if(inp.brake)g.vx*=Math.exp(-6*dt);
+ g.vx*=Math.exp(-0.4*dt);
+ // substep so no single move exceeds ~8px: no tunneling through floors
+ var travel=(Math.abs(g.vx)+Math.abs(g.vy))*dt;
+ var steps=Math.min(8,Math.max(1,Math.ceil(travel/8))),h=dt/steps;
+ for(var s=0;s<steps&&!g.dead;s++){
+  g.vy=Math.min(g.vy+GRAV*h,1500);
+  g.x+=g.vx*h;g.y+=g.vy*h;
+  g.ground=false;
+  collidePlats(g,inp);
+  if(!g.dead&&g.jumpBuf>0&&!g.ground&&g.jumps<2){
+   g.jumpBuf=0;g.jumps=2;g.vy=-580;g.vx+=inp.ax*80;
+   burst(g.x,g.y+14,8,40,160,.4,2.5,['#fff','#bae6fd'],0);
+  }
+ }
+ if(g.dead)return;
+ // ride the mover: carried along when standing on top of it
+ if(g.ground&&mover&&Math.abs(g.x-mover.x)<mover.w/2+g.r*0.5&&Math.abs((g.y+g.r)-mover.y)<12){
+  g.x+=mover.dx;g.y+=mover.dy;g.onMover=true; // aboard: you steer the elevator
+ }
+  // mount the board: land on the deck and you're riding (suplex off).
+  // noBoard blocks remounts right after a hold-to-bail.
+  if(!g.riding&&!g.dead&&board&&g.noBoard<=0&&g.vy>=0&&
+  Math.abs((g.y+g.r)-(board.y-5))<12&&Math.abs(g.x-board.x)<board.w/2+6){
+  g.riding=true;board.rider=g.idx;
+  g.y=board.y-5-g.r;g.vy=0;g.vx=board.vx;g.ground=true;g.jumps=0;
+  if(g.suplex){g.suplex=false;if(g.id===myId)flash('SUPLEX OFF — riding!');}
+  releaseHold(g);
+  burst(g.x,g.y+g.r,6,30,120,.35,2,['#fff','#d6a05c'],0);
+ }
+ if(g.dead)return;
+ if(g.x<20){g.x=20;g.vx=Math.abs(g.vx)*0.5;}
+ if(g.x>W-20){g.x=W-20;g.vx=-Math.abs(g.vx)*0.5;}
+ // the abyss always catches you: no flying off the bottom, invincible or not
+ if(g.y>H+60){g.inv=0;g.starT=0;splat(g,'ABYSS!',null,true);}
+}
+function localInput(){
+ var L=keys.ArrowLeft||keys.KeyA,R=keys.ArrowRight||keys.KeyD;
+ var J=keys.Space||keys.ArrowUp||keys.KeyW,B=keys.ArrowDown||keys.KeyS;
+ return{ax:(R?1:0)-(L?1:0),jump:!!J,brake:!!B,up:!!(keys.ArrowUp||keys.KeyW)};
+}
+function eggVsEgg(a,b){
+ if(a.dead||b.dead)return;
+ if(a.heldBy>=0||b.heldBy>=0)return; // carried eggs don't collide
+ var dx=b.x-a.x,dy=b.y-a.y,d=Math.hypot(dx,dy),min=30;
+ if(d>=min||d===0)return;dx/=d;dy/=d;
+ var push=(min-d)/2;a.x-=dx*push;a.y-=dy*push;b.x+=dx*push;b.y+=dy*push;
+ var rel=Math.abs((a.vx-b.vx)*dx+(a.vy-b.vy)*dy)+Math.abs(a.vy)+Math.abs(b.vy);
+ var aStar=a.starT>0, bStar=b.starT>0;
+ var aBig=a.bigT>0, bBig=b.bigT>0;
+ if(aStar&&!bStar){splat(b,'STAR SMASH!',a);return;}
+ if(bStar&&!aStar){splat(a,'STAR SMASH!',b);return;}
+ if(aStar&&bStar){burst((a.x+b.x)/2,(a.y+b.y)/2,16,100,300,.6,3,['#ffd23f','#fff'],0);return;}
+ // big eggs squash normal eggs on contact (big vs big just bounces)
+ if(aBig&&!bBig&&!bStar){splat(b,'SQUASHED!',a);return;}
+ if(bBig&&!aBig&&!aStar){splat(a,'SQUASHED!',b);return;}
+ if(aBig&&bBig){burst((a.x+b.x)/2,(a.y+b.y)/2,12,60,220,.5,3,['#d6a05c','#fff'],0);}
+ // thrown bodies are missiles: they wreck whoever they hit (except big eggs)
+ var aSpd=Math.hypot(a.vx,a.vy),bSpd=Math.hypot(b.vx,b.vy);
+ if(a.thrownT>0&&!bStar&&!bBig&&aSpd>350){splat(b,'THROWN!',a.thrownBy||a);a.thrownT=0;a.thrownBy=null;return;}
+ if(b.thrownT>0&&!aStar&&!aBig&&bSpd>350){splat(a,'THROWN!',b.thrownBy||b);b.thrownT=0;b.thrownBy=null;return;}
+ if(a.thrownT>0&&b.thrownT>0){burst((a.x+b.x)/2,(a.y+b.y)/2,16,100,300,.6,3,['#fff','#fca5a5'],0);a.thrownT=0;b.thrownT=0;return;}
+ // suplex grab: lift them overhead instead of exploding on contact.
+ // no grabbing from a board, and grabbing a rider yanks them off it.
+ if(a.suplex&&!a.riding&&a.holding<0&&b.heldBy<0&&!b.suplex&&a.throwCD<=0&&b.thrownT<=0){grab(a,b);return;}
+ if(b.suplex&&!b.riding&&b.holding<0&&a.heldBy<0&&!a.suplex&&b.throwCD<=0&&a.thrownT<=0){grab(b,a);return;}
+ if(rel>700){
+  // hard mid-air crunch: faster (and bigger) one survives
+  var av=Math.hypot(a.vx,a.vy)*(aBig?1.6:1),bv=Math.hypot(b.vx,b.vy)*(bBig?1.6:1);
+  if(Math.abs(av-bv)<120){splat(a,'MID-AIR SPLAT!');splat(b,'MID-AIR SPLAT!');}
+  else if(av>bv)splat(b,'CRUNCHED!',a.thrownBy||a);else splat(a,'CRUNCHED!',b.thrownBy||b);
+ }else{
+  var rv=(a.vx-b.vx)*dx+(a.vy-b.vy)*dy;
+  if(rv>0){a.vx-=dx*rv*0.6;a.vy-=dy*rv*0.6;b.vx+=dx*rv*0.6;b.vy+=dy*rv*0.6;}
+ }
+}
+function grab(h,v){
+ if(v.riding){v.riding=false;if(board&&board.rider===v.idx)board.rider=-1;}
+ v.heldBy=h.idx;h.holding=v.idx;h.holdT=0;
+ v.vx=h.vx;v.vy=h.vy;v.thrownT=0;v.thrownBy=null;
+ popText(h.x,h.y-44,'LIFT!');
+ burst(h.x,h.y-20,8,40,160,.4,2,['#fff','#fca5a5'],0);
+}
+function splat(g,text,by,force){
+ if(g.dead)return;
+ if(!force&&(g.inv>0&&!by||g.starT>0&&!by))return;
+ releaseHold(g);
+ if(board&&board.rider===g.idx)board.rider=-1;
+ g.riding=false;
+ g.dead=1;g.deadT=0;g.splats++;g.thrownT=0;
+ decals.push({x:Math.round(g.x),y:Math.round(Math.min(H-8,g.y+8)),r:1,t:0,seed:Math.random()});
+ if(decals.length>30)decals.splice(0,decals.length-30);
+ burst(g.x,g.y,26,80,380,.8,4,['#ffffff','#fef3c7','#fde68a'],1);
+ burst(g.x,g.y,12,30,160,1,6,['#fbbf24','#f59e0b'],0);
+ popText(g.x,g.y-24,text||'SPLAT!');
+ if(by){by.kills++;
+  var bn=by.name||'Someone',vn=g.name||'Someone';
+  Hub.up('say',bn+' smashed '+vn+' at eggs');
+  Hub.up('result',{players:rosterPlusMe().map(function(m){return m.id;}),text:bn+' smashed '+vn+' at eggs'});
+ }
+  setTimeout(function(){
+   // resolve by id: the eggs array may have been rebuilt (roster change)
+   // since death, and a captured object could be an orphan by now.
+   for(var i=0;i<eggs.length;i++)if(eggs[i].id===g.id){respawn(eggs[i]);return;}
+  },1300);
+}
+function popText(x,y,t){parts.push({k:'t',x:x,y:y,t:0,tx:t});}
+function burst(x,y,n,v0,v1,l,sz,cols,g){for(var k=0;k<n;k++){var a=Math.random()*6.283,v=v0+Math.random()*(v1-v0);
+ if(parts.length<400)parts.push({k:'p',x:x,y:y,vx:Math.cos(a)*v,vy:Math.sin(a)*v,l:l*(0.6+Math.random()*0.8),m:l,s:sz*(0.6+Math.random()*0.8),c:cols[k%cols.length]});}}
+
+function step(dt,now){
+ ensureEggs();
+ // star spawn: only one per level, every 5 minutes
+ if((isHost||amSolo)&&!star&&now-lastStarAt>5000){
+  // first star comes fast for fun; afterwards every 5 minutes
+  var wait=(decals.length||eggs.some(function(g){return g.kills>0;}))?300000:5000;
+  if(now-lastStarAt>wait){star={x:rnd(80,W-80),y:rnd(120,300),t:0};popText(star.x,star.y-20,'STAR!');}
+ }
+  if(star)star.t+=dt;
+  if(bean)bean.t+=dt;
+  // the mover putters along its loop on the host; a rider aboard drives it
+  // with up (faster) and down (slower/reverse) while left/right still
+  // move along the deck. guests adopt it from snapshots.
+  if(isHost||amSolo){
+   var mtarget=45;mdriver='';
+   for(var mri=0;mri<eggs.length;mri++){var mre=eggs[mri];
+    if(mre.onMover&&!mre.dead&&mre.lastInp){
+     var mli=mre.lastInp;
+     mtarget=(mli.up?160:(mli.brake?-120:45));mdriver=mre.name||'';break;}}
+   moverSpeed+=(mtarget-moverSpeed)*Math.min(1,3*dt);
+   moverD=(moverD+moverSpeed*dt)%moverPerim;
+   mover.sp=Math.round(moverSpeed);mover.by=mdriver;
+   var _mp=sampleMover(moverD);
+   mover.dx=_mp.x-mover.x;mover.dy=_mp.y-mover.y;mover.x=_mp.x;mover.y=_mp.y;
+   stepBoard(dt);
+   if(!bean){
+    var bwait=beanEver?45000:8000;
+    if(now-lastBeanAt>bwait){bean={x:rnd(120,W-120),y:rnd(150,320),t:0};beanEver=true;lastBeanAt=now;popText(bean.x,bean.y-22,'BEAN!');}
+   }
+  }
+  eggs.forEach(function(g){
+   g.onMover=false; // re-set by the carry check during this tick's physics
+   if(g.inv>0)g.inv-=dt;
+   if(g.starT>0)g.starT-=dt;
+   if(g.bigT>0)g.bigT-=dt;
+   syncSize(g);
+   if(g.sq>0)g.sq=Math.max(0,g.sq-dt*4);
+   if(g.sq<0)g.sq=Math.min(0,g.sq+dt*4);
+   if(g.throwCD>0)g.throwCD-=dt;
+   if(g.thrownT>0)g.thrownT-=dt;
+   if(g.jumpBuf>0)g.jumpBuf-=dt;
+   if(g.noBoard>0)g.noBoard-=dt;
+   if(g.dead){g.deadT+=dt;return;}
+   if(isHost||amSolo)collideEgg(g,dt);
+   // star pickup
+   if(star&&Math.hypot(g.x-star.x,g.y-star.y)<26&&!g.dead){
+    g.starT=10;star=null;lastStarAt=now;
+    Hub.up('say',(g.name||'An egg')+' grabbed the STAR at eggs');
+    burst(g.x,g.y,30,100,400,1,4,['#ffd23f','#fff','#f472b6'],0);
+   }
+   // bean pickup: become a big egg for 20 seconds
+   if(bean&&Math.hypot(g.x-bean.x,g.y-bean.y)<30&&!g.dead){
+    g.bigT=20;syncSize(g);bean=null;lastBeanAt=now;
+    Hub.up('say',(g.name||'An egg')+' ate the BEAN and got BIG at eggs');
+    burst(g.x,g.y,24,60,320,1,4,['#d6a05c','#a16207','#fff'],0);
+    popText(g.x,g.y-34,'BIG!');
+   }
+  });
+  for(var i=0;i<eggs.length;i++)for(var j=i+1;j<eggs.length;j++)eggVsEgg(eggs[i],eggs[j]);
+  // suplex carry & throw: the victim rides overhead, then gets hurled
+  if(isHost||amSolo)eggs.forEach(function(h){
+   if(h.holding<0||h.dead)return;
+   var v=eggs[h.holding];
+   if(!v||v.heldBy!==h.idx||v.dead){h.holding=-1;h.holdT=0;return;}
+   h.holdT+=dt;
+   v.x=h.x;v.y=h.y-40;v.vx=h.vx;v.vy=h.vy;
+   if(h.holdT>0.9){
+    var dir=h.vx>60?1:(h.vx<-60?-1:(h.face||1));
+     v.heldBy=-1;h.holding=-1;h.holdT=0;h.throwCD=1.2;
+     v.vx=h.vx+dir*620;v.vy=-560;v.inv=0;v.thrownT=1.4;v.thrownBy=h;v.jumps=1; // one air-jump left while flying
+    popText(v.x,v.y-26,'THROW!');
+    burst(v.x,v.y,10,80,260,.5,3,['#fff','#fca5a5'],0);
+   }
+  });
+ // guest sends input
+ if(!isHost&&!amSolo&&now-fxT>66){fxT=now;Hub.up('intent',{a:'input',v:localInput()});}
+ // parts
+ for(var k=parts.length-1;k>=0;k--){var p=parts[k];
+  if(p.k==='p'){p.x+=p.vx*dt;p.y+=p.vy*dt;p.vy+=900*dt;p.l-=dt;if(p.l<=0)parts.splice(k,1);}
+  else{p.t+=dt;if(p.t>1.1)parts.splice(k,1);}}
+ // shouts grow from your egg and fade fast
+ for(var qi=shouts.length-1;qi>=0;qi--){shouts[qi].t+=dt;if(shouts[qi].t>1.5)shouts.splice(qi,1);}
+ decals.forEach(function(d){d.t+=dt;});
+ if(isHost&&!amSolo&&now-(step._b||0)>50){step._b=now;Hub.up('state',snapshot());}
+}
+
+/* ---------- render ---------- */
+function drawEgg(g){
+ var C=colorOf(g.idx);
+ ctx.save();ctx.translate(g.x,g.y);
+ if(g.heldBy>=0)ctx.rotate(Math.sin(performance.now()/90)*0.25); // dangling victim wiggle
+ if(g.inv>0&&((g.inv*8)|0)%2===0)ctx.globalAlpha=0.45;
+ if(g.starT>0){ctx.shadowColor='#ffd23f';ctx.shadowBlur=22;}
+ var s=(g.suplex?1.12:1)*(g.bigT>0?1.6:1);
+ // juice: lean into motion, stretch with speed, squash on landing
+ var spd=Math.hypot(g.vx,g.vy),stretch=Math.min(0.22,spd/2500),sq=g.sq||0;
+ if(g.heldBy<0)ctx.rotate(Math.max(-1,Math.min(1,g.vx/300))*0.15);
+ ctx.scale(s*(1+stretch-Math.max(0,sq)*0.28),s*(1-stretch+sq*0.32));
+ // suplex limbs (arms shoot up while carrying someone overhead)
+ if(g.suplex){
+  ctx.strokeStyle='#78350f';ctx.lineWidth=4;ctx.lineCap='round';
+  var t=performance.now()/150, lift=g.holding>=0;
+  ctx.beginPath();
+  if(lift){ctx.moveTo(-12,0);ctx.lineTo(-20,-22);ctx.moveTo(12,0);ctx.lineTo(20,-22);}
+  else{ctx.moveTo(-12,2);ctx.lineTo(-22,6+Math.sin(t)*4);ctx.moveTo(12,2);ctx.lineTo(22,6-Math.sin(t)*4);}
+  ctx.stroke();
+  ctx.beginPath();ctx.moveTo(-7,16);ctx.lineTo(-10,28+Math.cos(t)*3);ctx.moveTo(7,16);ctx.lineTo(10,28-Math.cos(t)*3);ctx.stroke();
+ }
+ // shell: egg path
+ ctx.beginPath();
+ ctx.moveTo(0,-20);
+ ctx.bezierCurveTo(11,-20,17,-8,17,4);
+ ctx.bezierCurveTo(17,14,9,20,0,20);
+ ctx.bezierCurveTo(-9,20,-17,14,-17,4);
+ ctx.bezierCurveTo(-17,-8,-11,-20,0,-20);
+ ctx.closePath();
+ if(g.idx===3){ // easter: striped
+  var gr=ctx.createLinearGradient(-17,-20,17,20);
+  gr.addColorStop(0,'#f0abfc');gr.addColorStop(.5,'#86efac');gr.addColorStop(1,'#93c5fd');
+  ctx.fillStyle=gr;ctx.fill();
+  ctx.strokeStyle='#fff';ctx.lineWidth=2;
+  for(var yy=-10;yy<16;yy+=7){ctx.beginPath();ctx.moveTo(-15,yy);ctx.quadraticCurveTo(0,yy+5,15,yy);ctx.stroke();}
+ }else{ctx.fillStyle=C.shell;ctx.fill();}
+ ctx.lineWidth=2;ctx.strokeStyle='rgba(0,0,0,.35)';ctx.stroke();
+ // shine
+ ctx.fillStyle='rgba(255,255,255,.75)';ctx.beginPath();ctx.ellipse(-6,-6,3.4,5.4,-0.4,0,7);ctx.fill();
+ // cracks
+ if(g.cracks>0){ctx.strokeStyle='rgba(0,0,0,.5)';ctx.lineWidth=1;ctx.beginPath();ctx.moveTo(-6,-2);ctx.lineTo(-2,3);ctx.lineTo(-6,8);ctx.stroke();}
+ // face: none at all — plain shell, shine, cracks, name only
+ // name + star timer
+ ctx.globalAlpha=1;ctx.shadowBlur=0;
+ ctx.fillStyle='rgba(0,0,0,.6)';ctx.font='700 10px monospace';ctx.textAlign='center';
+ ctx.fillText(g.name||'',0,-27);
+  if(g.starT>0){ctx.fillStyle='#ffd23f';ctx.font='900 12px system-ui';ctx.fillText('★'+Math.ceil(g.starT),0,34);}
+  if(g.bigT>0){ctx.fillStyle='#d6a05c';ctx.font='900 12px system-ui';ctx.fillText('BIG '+Math.ceil(g.bigT),0,44);}
+  if(g.suplex){ctx.fillStyle='#fca5a5';ctx.font='900 11px system-ui';ctx.fillText(g.holding>=0?'HOLDING!':'SUPLEX',0,-36);}
+  if(g.thrownT>0){ctx.strokeStyle='rgba(255,255,255,.55)';ctx.lineWidth=2; // hurled-egg speed streaks
+   for(var si2=0;si2<3;si2++){var bx2=-g.vx*0.03*(si2+1),by2=-g.vy*0.03*(si2+1);
+    ctx.beginPath();ctx.moveTo(bx2-6,by2-4+si2*5);ctx.lineTo(bx2+6,by2-4+si2*5);ctx.stroke();}}
+ ctx.restore();
+}
+function render(){
+ ctx.clearRect(0,0,W,H);
+ ctx.fillStyle='#1c160e';ctx.fillRect(0,0,W,H);
+ ctx.strokeStyle='rgba(230,194,128,.1)';ctx.lineWidth=1;
+ for(var x=0;x<=W;x+=40){ctx.beginPath();ctx.moveTo(x,0);ctx.lineTo(x,H);ctx.stroke();}
+ for(var y=0;y<=H;y+=40){ctx.beginPath();ctx.moveTo(0,y);ctx.lineTo(W,y);ctx.stroke();}
+ // decals: white residue with yellow middle
+ decals.forEach(function(d){
+  var a=Math.max(0,1-d.t/40);
+  ctx.save();ctx.globalAlpha=Math.min(1,a+0.2);ctx.translate(d.x,d.y);
+  ctx.fillStyle='rgba(248,250,252,.92)';
+  ctx.beginPath();ctx.ellipse(0,0,20+((d.seed*37)%8),9+((d.seed*53)%5),0,0,7);ctx.fill();
+  ctx.beginPath();ctx.ellipse(8*((d.seed*7)%1-0.5)*2,2,11,6,0.3,0,7);ctx.fill();
+  ctx.fillStyle='#fbbf24';
+  ctx.beginPath();ctx.ellipse(0,0,8,5.4,0,0,7);ctx.fill();
+  ctx.fillStyle='#f59e0b';
+  ctx.beginPath();ctx.ellipse(0,0,4.4,3,0,0,7);ctx.fill();
+  ctx.restore();
+ });
+ plats.forEach(function(p){
+  ctx.save();ctx.translate(p.x,p.y);ctx.rotate(p.a||0);
+  ctx.fillStyle='#6e8e59';ctx.strokeStyle='#475c3a';ctx.lineWidth=2;
+  ctx.beginPath();ctx.rect(-p.w/2,-p.h/2,p.w,p.h);ctx.fill();ctx.stroke();
+  ctx.restore();
+ });
+  // the mover: teal loop platform (up left, across top, down right, back along bottom)
+  if(mover){
+   ctx.save();ctx.translate(mover.x,mover.y);
+   ctx.fillStyle='#155e63';ctx.fillRect(-mover.w/2-3,-mover.h/2-3,mover.w+6,mover.h+6);
+   ctx.fillStyle='#3cc3d4';ctx.strokeStyle='#0b3540';ctx.lineWidth=2;
+   ctx.beginPath();ctx.rect(-mover.w/2,-mover.h/2,mover.w,mover.h);ctx.fill();ctx.stroke();
+   ctx.fillStyle='#0b3540';
+   for(var mi=-mover.w/2+14;mi<mover.w/2-6;mi+=20){
+    ctx.beginPath();ctx.moveTo(mi,-mover.h/2+3);ctx.lineTo(mi+7,0);ctx.lineTo(mi,mover.h/2-3);ctx.fill();
+   }
+   // speed readout + who's driving (riders steer with up/down)
+   ctx.fillStyle='rgba(10,7,4,.7)';
+   ctx.font='700 13px monospace';ctx.textAlign='center';
+   var mlabel='ELEVATOR '+(mover.sp>=0?'+':'')+(mover.sp||0)+(mover.by?' · '+mover.by:'');
+   var mlw=ctx.measureText(mlabel).width;
+   ctx.fillRect(-mlw/2-8,-mover.h/2-34,mlw+16,20);
+   ctx.fillStyle='#3cc3d4';
+   ctx.fillText(mlabel,0,-mover.h/2-19);
+   ctx.restore();
+  }
+  // the peg: striped floor hazard that stops the board cold
+  if(peg){
+   var pegTop=H-48;
+   ctx.save();ctx.translate(peg.x,pegTop);
+   ctx.fillStyle='#e0432f';
+   ctx.beginPath();ctx.rect(-6,-34,12,34);ctx.fill();
+   ctx.fillStyle='#fff';
+   ctx.beginPath();ctx.rect(-6,-28,12,7);ctx.fill();
+   ctx.beginPath();ctx.rect(-6,-14,12,7);ctx.fill();
+   ctx.strokeStyle='rgba(0,0,0,.4)';ctx.lineWidth=2;
+   ctx.beginPath();ctx.rect(-6,-34,12,34);ctx.stroke();
+   ctx.restore();
+  }
+  // the skateboard: land on the deck to ride it (rotates through flips)
+  if(board){
+   ctx.save();ctx.translate(board.x,board.y);
+   ctx.rotate((board.flip||0)+(board.stuck>0?Math.sin(performance.now()/60)*0.04:0));
+   ctx.fillStyle='#8a5a2b';
+   ctx.beginPath();
+   if(ctx.roundRect)ctx.roundRect(-board.w/2,-board.h/2,board.w,board.h,5);else ctx.rect(-board.w/2,-board.h/2,board.w,board.h);
+   ctx.fill();
+   ctx.strokeStyle='#3e2a10';ctx.lineWidth=2;ctx.stroke();
+   ctx.fillStyle='#ffd23f';
+   ctx.fillRect(-board.w/2+8,-2,14,4);
+   ctx.fillRect(board.w/2-22,-2,14,4);
+   ctx.fillStyle='#1b1b1b';
+   ctx.beginPath();ctx.arc(-board.w/2+16,board.h/2+5,5,0,7);ctx.fill();
+   ctx.beginPath();ctx.arc(board.w/2-16,board.h/2+5,5,0,7);ctx.fill();
+   if(board.rider>=0){ctx.fillStyle='#3cc3d4';ctx.font='900 11px system-ui';ctx.textAlign='center';ctx.fillText('RIDING',0,-16);}
+   ctx.restore();
+  }
+ if(star){
+  ctx.save();ctx.translate(star.x,star.y+Math.sin(star.t*4)*3);
+  ctx.shadowColor='#ffd23f';ctx.shadowBlur=18;
+  ctx.fillStyle='#ffd23f';ctx.font='30px sans-serif';ctx.textAlign='center';ctx.textBaseline='middle';
+  ctx.fillText('★',0,0);ctx.restore();ctx.shadowBlur=0;
+ }
+ // the bean: eat it, become a big egg for 20 seconds
+ if(bean){
+  ctx.save();ctx.translate(bean.x,bean.y+Math.sin(bean.t*4)*3);ctx.rotate(0.5+Math.sin(bean.t*2)*0.15);
+  ctx.shadowColor='#d6a05c';ctx.shadowBlur=16;
+  ctx.fillStyle='#a16207';
+  ctx.beginPath();ctx.ellipse(0,0,9,14,0,0,7);ctx.fill();
+  ctx.shadowBlur=0;
+  ctx.strokeStyle='#713f12';ctx.lineWidth=2.5;
+  ctx.beginPath();ctx.moveTo(0,-12);ctx.quadraticCurveTo(6,0,0,12);ctx.stroke();
+  ctx.fillStyle='rgba(255,255,255,.5)';
+  ctx.beginPath();ctx.ellipse(-3,-5,2,4.5,-0.3,0,7);ctx.fill();
+  ctx.restore();
+ }
+ eggs.forEach(function(g){if(!g.dead)drawEgg(g);});
+ parts.forEach(function(p){
+  if(p.k==='p'){ctx.globalAlpha=Math.max(0,p.l/p.m||p.l);ctx.fillStyle=p.c;ctx.beginPath();ctx.arc(p.x,p.y,p.s,0,7);ctx.fill();ctx.globalAlpha=1;}
+  else{var sc=Math.min(1,p.t*8);ctx.save();ctx.translate(p.x,p.y-p.t*40);ctx.scale(sc,sc);ctx.globalAlpha=1-Math.max(0,(p.t-.7)/.4);
+   ctx.font='900 22px system-ui';ctx.lineJoin='round';ctx.lineWidth=6;ctx.strokeStyle='#fff';ctx.textAlign='center';
+   ctx.strokeText(p.tx,0,0);ctx.fillStyle='#e0432f';ctx.fillText(p.tx,0,0);ctx.restore();}
+ });
+ ctx.fillStyle='#f0e6d2';ctx.font='700 15px system-ui';ctx.textAlign='left';ctx.textBaseline='alphabetic';
+ ctx.fillText(levelName||'',10,26);
+ // big scoreboard HUD: one boxed card per egg, readable at a glance
+ function rrect(x,y,w,h,r){ctx.beginPath();ctx.moveTo(x+r,y);ctx.arcTo(x+w,y,x+w,y+h,r);ctx.arcTo(x+w,y+h,x,y+h,r);ctx.arcTo(x,y+h,x,y,r);ctx.arcTo(x,y,x+w,y,r);ctx.closePath();}
+  var m=seats();
+  m.forEach(function(mm,i){var g=eggs[i];if(!g||g.id!==mm.id)return;
+  var y0=36+i*68,bw=330,bh=60;
+  ctx.save();
+  ctx.globalAlpha=0.88;
+  ctx.fillStyle='rgba(10,7,4,.78)';
+  rrect(8,y0,bw,bh,12);ctx.fill();
+  ctx.globalAlpha=1;
+  ctx.strokeStyle=colorOf(i).shell;ctx.lineWidth=3;
+  rrect(8,y0,bw,bh,12);ctx.stroke();
+  ctx.fillStyle=colorOf(i).shell;
+  var nm=mm.name||'egg',ns=19;
+  ctx.font='900 '+ns+'px system-ui,sans-serif';
+  while(ctx.measureText(nm).width>bw-44&&ns>12){ns-=1;ctx.font='900 '+ns+'px system-ui,sans-serif';}
+  ctx.fillText(nm,20,y0+25);
+  // stats line shrinks to stay inside the card as numbers grow
+  var stat='SPLATS '+g.splats+'  •  KILLS '+g.kills,ss=25;
+  ctx.font='900 '+ss+'px system-ui,sans-serif';
+  while(ctx.measureText(stat).width>bw-44&&ss>14){ss-=1;ctx.font='900 '+ss+'px system-ui,sans-serif';}
+  ctx.fillStyle='#fff';
+  ctx.fillText(stat,20,y0+51);
+  var badges=[];
+  if(g.suplex&&!g.riding)badges.push(['SUPLEX','#fca5a5']);
+  if(g.riding)badges.push(['BOARD','#3cc3d4']);
+  if(g.starT>0)badges.push(['STAR '+Math.ceil(g.starT),'#ffd23f']);
+  if(g.bigT>0)badges.push(['BIG '+Math.ceil(g.bigT),'#d6a05c']);
+  var bx=8+bw+8,by=y0+18;
+  ctx.font='900 13px system-ui,sans-serif';
+  badges.forEach(function(bd){
+   var tw=ctx.measureText(bd[0]).width+14;
+   ctx.fillStyle='rgba(10,7,4,.78)';
+   rrect(bx,by,tw,24,12);ctx.fill();
+   ctx.strokeStyle=bd[1];ctx.lineWidth=2;
+   rrect(bx,by,tw,24,12);ctx.stroke();
+   ctx.fillStyle=bd[1];
+   ctx.fillText(bd[0],bx+7,by+17);
+   bx+=tw+6;
+  });
+  ctx.restore();});
+ // shouts: wrapped words on a dark card, clamped in-frame; drifts from
+ // your egg toward center as it grows, then fades fast
+ shouts.forEach(function(s){
+  var g=eggs[s.i];if(!g||g.dead)return;
+  var t=s.t,DUR=1.5;
+  if(t>=DUR)return;
+  var grow=Math.min(1,t/0.8);
+  var size=26+grow*260;
+  var alpha=t<1.0?1:Math.max(0,1-(t-1.0)/0.5);
+  ctx.save();
+  ctx.font='900 '+Math.round(size)+'px system-ui,sans-serif';
+  var words=String(s.text).split(' '),lines=[],line='',maxW=W*0.88,wi;
+  for(wi=0;wi<words.length;wi++){var trial=line?line+' '+words[wi]:words[wi];
+   if(ctx.measureText(trial).width>maxW&&line){lines.push(line);line=words[wi];}
+   else line=trial;}
+  if(line)lines.push(line);
+  if(!lines.length){ctx.restore();return;}
+  var lh=size*1.08,blockH=lh*lines.length,bw=0,li;
+  for(li=0;li<lines.length;li++)bw=Math.max(bw,ctx.measureText(lines[li]).width);
+  var k=Math.min(1,(W*0.94)/(bw+56),(H*0.7)/(blockH+36));
+  var px=g.x+(W/2-g.x)*grow*0.65,py=(g.y-40)+(H/2-(g.y-40))*grow*0.65;
+  px=Math.max(bw*k/2+28,Math.min(W-bw*k/2-28,px));
+  py=Math.max(blockH*k/2+24,Math.min(H-blockH*k/2-24,py));
+  ctx.translate(px,py);ctx.scale(k,k);ctx.globalAlpha=alpha;
+  ctx.fillStyle='rgba(10,7,4,.74)';
+  rrect(-bw/2-28,-blockH/2-18,bw+56,blockH+36,20);ctx.fill();
+  ctx.strokeStyle='rgba(255,210,63,.85)';ctx.lineWidth=3;
+  rrect(-bw/2-28,-blockH/2-18,bw+56,blockH+36,20);ctx.stroke();
+  ctx.textAlign='center';ctx.textBaseline='middle';ctx.lineJoin='round';
+  ctx.lineWidth=Math.max(2,size/18);
+  ctx.fillStyle='#fff';
+  for(li=0;li<lines.length;li++){
+   var ly=-blockH/2+lh*(li+0.5);
+   ctx.strokeStyle='rgba(20,10,5,.9)';ctx.strokeText(lines[li],0,ly);
+   ctx.fillText(lines[li],0,ly);
+  }
+  ctx.restore();
+ });
+}
+
+function renderRole(){var r=document.getElementById('role');
+ var m=rosterPlusMe();
+ if(r)r.textContent=(isHost?'host':'guest')+' · '+myName+' · '+m.length+' eggs'+(amSolo?' · solo':'');
+ var s=document.getElementById('stat');
+ if(s&&!booted)s.textContent='tap to enter the nest';}
+function resetLocal(){plats=[];eggs=[];decals=[];parts=[];star=null;newWorld();}
+document.getElementById('btn-world').onclick=function(){if(isHost||amSolo)newWorld();else Hub.up('intent',{a:'world'});};
+document.getElementById('btn-shout').onclick=function(){sendShout();};
+document.getElementById('shout-input').addEventListener('keydown',function(e){if(e.key==='Enter'){e.preventDefault();sendShout();}e.stopPropagation();});
+document.getElementById('btn-star').onclick=function(){if(isHost||amSolo){star={x:W/2,y:200,t:0};}else Hub.up('intent',{a:'world'});};
+document.getElementById('btn-hide').onclick=function(){Hub.up('close');};
+overlay.addEventListener('click',function(){overlay.classList.add('hide');Hub.up('hello');});
+window.addEventListener('pointerdown',function once(){Hub.up('hello');},{once:true});
+function bootAll(){newWorld();ensureEggs();renderRole();requestAnimationFrame(loop);reportHeight();}
+var lastT=performance.now();
+function loop(now){var dt=Math.min(.05,(now-lastT)/1000);lastT=now;step(dt,now);render();requestAnimationFrame(loop);}
+Hub.init();reportHeight();
+})();
+</script>
+</body>
+</html>

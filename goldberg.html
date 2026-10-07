@@ -27,27 +27,64 @@ button.gb:disabled{opacity:.45;cursor:not-allowed;}
 #err{font-family:monospace;font-size:11px;color:#ff8888;min-height:14px;}
 #cursors{position:absolute;inset:0;pointer-events:none;z-index:3;}
 .cur{position:absolute;font-size:10px;font-family:monospace;background:rgba(0,0,0,.65);border:1px solid #e6c280;color:#ffe9bd;border-radius:8px;padding:1px 5px;transform:translate(-50%,-140%);white-space:nowrap;}
+/* Selection actions: the touch-friendly way to rotate / lock / delete the
+   tapped part. Only visible while something is selected. */
+#selbar{display:flex;gap:6px;align-items:center;flex-wrap:wrap;background:#241b12;border:1px solid #e6c280;border-radius:12px;padding:6px 10px;font-size:12px;}
+#selbar.hidden{display:none;}
+#sel-label{font-family:monospace;color:#ffe9bd;margin-right:4px;}
+/* Re-openable help card (the intro overlay is one-shot, so this is the
+   permanent home for the full controls list). */
+#help{position:absolute;inset:0;z-index:6;display:flex;align-items:center;justify-content:center;background:rgba(10,7,4,.9);padding:20px;}
+#help.hidden{display:none;}
+#help .card{max-width:540px;max-height:100%;overflow-y:auto;background:#241b12;border:1px solid #6b5636;border-radius:14px;padding:16px 18px;font-size:13px;color:#f0e6d2;}
+#help h2{margin:0 0 4px;color:#e6c280;font-size:16px;letter-spacing:2px;}
+#help table{border-collapse:collapse;width:100%;margin-top:8px;}
+#help td{padding:3px 8px 3px 0;vertical-align:top;}
+#help td:first-child{white-space:nowrap;color:#e6c280;font-weight:700;}
+#help .row-end{display:flex;justify-content:flex-end;margin-top:10px;}
 </style>
 </head>
 <body>
 <div id="wrap">
   <div id="bar">
-    <button class="gb" data-add="ball">Ball</button>
-    <button class="gb" data-add="plank">Plank</button>
-    <button class="gb" data-add="ramp">Ramp</button>
-    <button class="gb" data-add="block">Block</button>
-    <button class="gb" id="btn-draw">Draw</button>
-    <button class="gb" id="btn-erase">Erase</button>
+    <button class="gb" data-add="ball" title="Drop a ball at the spawn marker">⚪ Ball</button>
+    <button class="gb" data-add="plank" title="Tap the stage to place a plank (starts locked)">Plank</button>
+    <button class="gb" data-add="block" title="Tap the stage to place a block (starts locked)">Block</button>
+    <button class="gb" id="btn-draw" title="Sketch a static track">Draw</button>
+    <button class="gb" id="btn-erase" title="Tap a part to remove it">Erase</button>
     <label style="font-size:12px">Gravity <input type="range" id="grav" min="0" max="2" step="0.1" value="1" style="width:90px"></label>
     <button class="gb" id="btn-sim">Pause</button>
     <button class="gb" id="btn-clear">Clear</button>
     <button class="gb" id="btn-music">Music: off</button>
+    <button class="gb" id="btn-help" title="Show all controls">❓</button>
+    <button class="gb" id="btn-hide" title="Hide Goldberg">Hide</button>
     <span id="role" style="font-family:monospace;font-size:11px;opacity:.8">connecting…</span>
+  </div>
+  <div id="selbar" class="hidden">
+    <span id="sel-label">selected</span>
+    <button class="gb" id="btn-rot-ccw" title="Rotate 15° counter-clockwise (Shift+R)">⟲</button>
+    <button class="gb" id="btn-rot-cw" title="Rotate 15° clockwise (R)">⟳</button>
+    <button class="gb" id="btn-lock" title="Lock / unlock in place (L)">🔒</button>
+    <button class="gb" id="btn-del" title="Delete the selected part (Del)">🗑</button>
   </div>
   <div id="stage-wrap">
     <canvas id="stage" width="960" height="640"></canvas>
     <div id="cursors"></div>
-    <div id="overlay"><h1>GOLDBERG</h1><p>Tap to enter the workshop. Build a chain-reaction machine with friends: drop parts, sketch tracks, tip the first ball.</p><p style="font-size:11px;opacity:.75">Click selects · drag moves · R rotates · L locks · Delete removes</p></div>
+    <div id="overlay"><h1>GOLDBERG</h1><p>Tap to enter the workshop. Build a chain-reaction machine with friends: drop parts, sketch tracks, tip the first ball.</p><p style="font-size:11px;opacity:.75">Tap a part to select it, then use the buttons above (⟲ ⟳ 🔒 🗑) or the keys R / L / Del · drag the 📍 marker to move where new balls appear</p></div>
+    <div id="help" class="hidden"><div class="card">
+      <h2>HOW TO BUILD</h2>
+      <div>Press Plank or Block, then tap the stage to place the part — it starts locked in place. Balls always appear at the 📍 spawn marker — drag the marker to move it.</div>
+      <table>
+        <tr><td>Select</td><td>Tap / click a part</td></tr>
+        <tr><td>Move</td><td>Drag the selected part</td></tr>
+        <tr><td>Rotate</td><td>⟲ / ⟳ buttons, or R (Shift+R = other way)</td></tr>
+        <tr><td>Lock in place</td><td>🔒 button, or L (new parts start locked; unlock to drop them)</td></tr>
+        <tr><td>Delete</td><td>🗑 button, Erase mode, or the Del key</td></tr>
+        <tr><td>Spawn point</td><td>Drag the 📍 marker itself</td></tr>
+        <tr><td>Draw track</td><td>Draw mode, then sketch with your finger or mouse</td></tr>
+      </table>
+      <div class="row-end"><button class="gb" id="btn-help-close">Got it</button></div>
+    </div></div>
   </div>
   <div id="meta"><span id="sel">nothing selected</span><span id="hint"></span></div>
   <div id="denied"></div>
@@ -102,7 +139,18 @@ function onDown(e){
   if(m.k==='state'){ onState(m.p,m.from); return; }
   if(m.k==='intent'){ onIntent(m.p,m.from); return; }
   if(m.k==='denied'){ flashDenied(m.p&&m.p.text||'denied'); return; }
-  if(m.k==='reset'){ doReset(); return; }
+  if(m.k==='show'){ setHidden(false); return; }
+  if(m.k==='hide'){ setHidden(true); return; }
+  if(m.k==='reset'){ doReset(); setHidden(true); return; }
+}
+// The hub tells us when our stage frame is hidden ('hide') or shown
+// again ('show'). While hidden we suspend the local loop entirely:
+// no render, no physics, no music — other players' copies keep the room alive.
+let stageHidden=false;
+function setHidden(h){
+  stageHidden=!!h;
+  if(stageHidden) fadeOutStop();
+  else reportHeight();
 }
 function flashDenied(t){
   deniedEl.textContent=t;
@@ -111,7 +159,14 @@ function flashDenied(t){
 }
 
 /* ---------- local UI state (never synced) ---------- */
-let mode='select'; // select | draw | erase
+let mode='select'; // select | draw | erase | place
+let placeKind=null; // 'plank' | 'block' while placement is armed
+// Ball spawn marker: synced through the host. Balls always appear here.
+let spawnPt={x:W/2,y:80};
+function clampSpawn(x,y){
+  return {x:Math.max(20,Math.min(W-20,Math.round(x))),y:Math.max(20,Math.min(H-20,Math.round(y)))};
+}
+function hitSpawn(px,py){ return Math.hypot(px-spawnPt.x,py-spawnPt.y)<26; }
 let selectedId=null;
 let draftPts=[]; // world-space while drawing
 let dragging=null; // {id, moved}
@@ -133,15 +188,17 @@ function toWorld(e){
   return { x:(e.clientX-r.left)*W/r.width, y:(e.clientY-r.top)*H/r.height };
 }
 function clampRec(r){
-  r.x=Math.max(20,Math.min(W-20,r.x));
-  r.y=Math.max(20,Math.min(H-20,r.y));
+  // Clamp by the part's own half-extent so a wide plank can't hang off-stage.
+  const hx=Math.max(20,((r.w||40)/2)+2), hy=Math.max(20,((r.h||r.r||40)/2)+2);
+  r.x=Math.max(hx,Math.min(W-hx,r.x));
+  r.y=Math.max(hy,Math.min(H-hy,r.y));
   return r;
 }
 function makeRecord(kind,x,y,extra){
+  if(kind==='ramp')kind='plank'; // legacy: plank and ramp are one part now
   const rec=Object.assign({id:uid('o'),kind,x:Math.round(x),y:Math.round(y),angle:0,
-    color:nextColor(),locked:false},extra||{});
+    color:nextColor(),locked:kind!=='ball'},extra||{});
   if(kind==='plank'){rec.w=240;rec.h=14;rec.angle=0;}
-  if(kind==='ramp'){rec.w=240;rec.h=14;rec.angle=-Math.PI/6;}
   if(kind==='ball'){rec.r=14;}
   if(kind==='block'){rec.w=48;rec.h=48;}
   return clampRec(rec);
@@ -219,6 +276,8 @@ function compoundFromVerts(rec){
   return c;
 }
 function hostAdd(rec){
+  // Parts arrive locked (see makeRecord) and statics never push each
+  // other, so user-placed parts stay exactly where they were tapped.
   records.set(rec.id,rec);
   ensureEngine();
   const b=bodyFor(rec);
@@ -229,7 +288,22 @@ function hostAdd(rec){
     bodies.set(rec.id,b);
   }
   queueAdd(rec);
+  pruneCaps();
   if(rec.kind==='ball') Hub.up('say',myName+' released a ball');
+}
+// Browser-safety caps: each ball is a live Matter body plus a network
+// snapshot entry every 50ms, so unbounded tables eventually crash the tab.
+// Past the cap the OLDEST parts go first (hostDel relays the delete, so
+// guests drop them too).
+const MAX_BALLS=60, MAX_PARTS=220;
+function pruneCaps(){
+  let culled=0;
+  const balls=[]; for(const [id,r] of records) if(r.kind==='ball') balls.push(id);
+  for(let i=0;i+MAX_BALLS<balls.length;i++){ hostDel(balls[i]); culled++; }
+  while(records.size>MAX_PARTS){ hostDel(records.keys().next().value); culled++; }
+  if(culled>0){
+    const h=$('hint'); if(h) h.textContent='table full — removed '+culled+' oldest part'+(culled>1?'s':'')+' (cap: 60 balls, 220 parts)';
+  }
 }
 const pendingAdd=[], pendingDel=[];
 function queueAdd(r){ pendingAdd.push(r); }
@@ -239,6 +313,33 @@ function hostMove(id,x,y){
   if(!rec) return;
   rec.x=Math.round(x); rec.y=Math.round(y);
   if(b) Matter.Body.setPosition(b,{x:rec.x,y:rec.y});
+}
+// Grip: while anyone holds a part, freeze its body so the physics engine
+// stops fighting the cursor. A dragged plank otherwise keeps accumulating
+// gravity velocity and pops out of your hand on release. The freeze is
+// tracked per part so pause/lock (which also use static bodies) resume
+// correctly afterwards.
+const heldFrozen=new Set(); // ids the host froze for an active drag
+function hostHold(id){
+  const rec=records.get(id); const b=bodies.get(id);
+  if(!rec||!b||rec.locked||typeof Matter==='undefined') return;
+  try{
+    Matter.Body.setVelocity(b,{x:0,y:0});
+    Matter.Body.setAngularVelocity(b,0);
+    if(!b.isStatic){ Matter.Body.setStatic(b,true); heldFrozen.add(id); }
+  }catch(e){}
+}
+function hostRelease(id){
+  if(!heldFrozen.has(id)) return;
+  heldFrozen.delete(id);
+  const rec=records.get(id); const b=bodies.get(id);
+  if(!rec||!b||typeof Matter==='undefined') return;
+  try{
+    Matter.Body.setVelocity(b,{x:0,y:0});
+    Matter.Body.setAngularVelocity(b,0);
+    if(isRunning&&!rec.locked) Matter.Body.setStatic(b,false);
+    else pausedFrozen.add(id); // stay frozen until sim resume / unlock
+  }catch(e){}
 }
 function hostRot(id,angle){
   const rec=records.get(id); const b=bodies.get(id);
@@ -259,14 +360,16 @@ function hostDel(id){
   const b=bodies.get(id);
   if(b&&engine) Matter.Composite.remove(engine.world,b);
   bodies.delete(id); records.delete(id);
-  draggedBy.delete(id); pausedFrozen.delete(id);
+  draggedBy.delete(id); pausedFrozen.delete(id); heldFrozen.delete(id);
+  celebrated.delete(id);
   if(selectedId===id) selectedId=null;
   queueDel(id);
 }
+function hostSpawn(x,y){ spawnPt=clampSpawn(x,y); }
 function hostClear(){
   if(engine){ for(const [,b] of bodies) Matter.Composite.remove(engine.world,b); }
   const ids=[...records.keys()];
-  bodies.clear(); records.clear(); draggedBy.clear(); pausedFrozen.clear(); celebrated.clear();
+  bodies.clear(); records.clear(); draggedBy.clear(); pausedFrozen.clear(); heldFrozen.clear(); celebrated.clear();
   selectedId=null;
   ids.forEach(queueDel);
 }
@@ -330,7 +433,10 @@ function onIntent(p,from){
     const own=draggedBy.get(p.id);
     if(own&&own.by!==peerKey&&Date.now()<own.until){deny(from,'someone else is holding that part');return;}
     draggedBy.set(p.id,{by:peerKey,until:Date.now()+(p.done?0:2000)});
-    if(p.done) setTimeout(()=>{const d=draggedBy.get(p.id);if(d&&d.by===peerKey)draggedBy.delete(p.id);},60);
+    if(p.done){
+      hostRelease(p.id);
+      setTimeout(()=>{const d=draggedBy.get(p.id);if(d&&d.by===peerKey)draggedBy.delete(p.id);},60);
+    } else hostHold(p.id);
     hostMove(p.id,Math.max(0,Math.min(W,p.x)),Math.max(0,Math.min(H,p.y)));
     return;
   }
@@ -346,6 +452,7 @@ function onIntent(p,from){
     if(!records.has(p.id)){deny(from,'part is gone');return;}
     hostDel(p.id); return;
   }
+  if(a==='spawn'){ hostSpawn(p.x,p.y); return; }
   if(a==='sim'){ applySim(p.running); return; }
   if(a==='grav'){ applyGrav(p.y); return; }
   if(a==='clear'){ hostClear(); return; }
@@ -359,9 +466,10 @@ function onState(p,from){
   if(!p) return;
   if(typeof p.g==='number') applyGrav(p.g);
   if(typeof p.sim==='boolean'&&p.sim!==isRunning){isRunning=p.sim;$('btn-sim').textContent=isRunning?'Pause':'Play';}
+  if(Array.isArray(p.sp)) spawnPt=clampSpawn(p.sp[0],p.sp[1]);
   if(Array.isArray(p.add)){
     for(const r of p.add){ if(r&&r.i&&!records.has(r.i)){
-      records.set(r.i,{id:r.i,kind:r.kind,x:r.x,y:r.y,angle:r.a||0,color:r.c||r.color||'#8b5a2b',
+      records.set(r.i,{id:r.i,kind:r.kind==='ramp'?'plank':r.kind,x:r.x,y:r.y,angle:r.a||0,color:r.c||r.color||'#8b5a2b',
         locked:!!r.l,w:r.w,h:r.h,r:r.r,verts:r.verts});
     }}
   }
@@ -369,7 +477,7 @@ function onState(p,from){
     for(const id of p.del){ records.delete(id); if(selectedId===id)selectedId=null; }
   }
   if(p.addFull){ records.clear(); for(const r of (p.add||[])){
-    records.set(r.i,{id:r.i,kind:r.kind,x:r.x,y:r.y,angle:r.a||0,color:r.c||r.color||'#8b5a2b',locked:!!r.l,w:r.w,h:r.h,r:r.r,verts:r.verts});
+    records.set(r.i,{id:r.i,kind:r.kind==='ramp'?'plank':r.kind,x:r.x,y:r.y,angle:r.a||0,color:r.c||r.color||'#8b5a2b',locked:!!r.l,w:r.w,h:r.h,r:r.r,verts:r.verts});
   }}
   const map=new Map();
   if(Array.isArray(p.obs)) for(const o of p.obs) map.set(o.i,{x:o.x,y:o.y,a:o.a,l:!!o.l});
@@ -432,6 +540,7 @@ function bootAll(){
   bindToolbar();
   bindPointer();
   bindKeys();
+  refreshHint();
   requestAnimationFrame(loop);
   setInterval(broadcastTick,50);
   reportHeight();
@@ -463,7 +572,7 @@ function broadcastTick(){
   const del=pendingDel.splice(0);
   const sfx=pendingSfx.splice(0);
   // include remote cursors so guests see each other
-  const msg={sim:isRunning,seq:++seq,t:Date.now(),obs,add,del,g:gravityY};
+  const msg={sim:isRunning,seq:++seq,t:Date.now(),obs,add,del,g:gravityY,sp:[Math.round(spawnPt.x),Math.round(spawnPt.y)]};
   if(sfx.length) msg.sfx=sfx;
   const ck={}; for(const k of Object.keys(cursorsOut)) ck[k]=cursorsOut[k];
   if(myCursor) ck[myId||'host']={x:Math.round(myCursor.x),y:Math.round(myCursor.y),name:myName};
@@ -517,6 +626,7 @@ function render(){
   for(let y=0;y<=H;y+=40){ctx.beginPath();ctx.moveTo(0,y);ctx.lineTo(W,y);ctx.stroke();}
   ctx.fillStyle='#3a2f1f';ctx.fillRect(0,H-6,W,6);
   ctx.strokeStyle='#6b5636';ctx.lineWidth=2;ctx.strokeRect(1,1,W-2,H-2);
+  drawSpawn();
   for(const r of records.values()) drawRecord(r);
   // draft polyline
   if(draftPts.length>1){
@@ -544,6 +654,14 @@ function renderCursors(){
 function loop(t){
   requestAnimationFrame(loop);
   if(!booted) return;
+  if(stageHidden){
+    // Nobody renders or plays music while hidden — but the host keeps
+    // stepping physics so the room stays alive for everyone else.
+    if(isHost&&engine&&isRunning){
+      try{ Matter.Engine.update(engine,1000/60); }catch(e){}
+    }
+    return;
+  }
   if(isHost&&engine&&isRunning){
     try{ Matter.Engine.update(engine,1000/60); }catch(e){}
     // celebrate check happens in broadcastTick
@@ -570,8 +688,29 @@ function hitRecord(px,py){
   return null;
 }
 
+function drawSpawn(){
+  const x=spawnPt.x,y=spawnPt.y;
+  ctx.save();
+  ctx.strokeStyle='rgba(255,233,168,.9)';ctx.lineWidth=2;ctx.setLineDash([6,4]);
+  ctx.beginPath();ctx.arc(x,y,20,0,7);ctx.stroke();
+  ctx.setLineDash([]);
+  ctx.fillStyle='#ffe9a8';ctx.font='bold 13px system-ui';ctx.textAlign='center';
+  ctx.fillText('⚪',x,y+5);
+  ctx.font='bold 10px monospace';
+  ctx.fillText('SPAWN',x,y-28);
+  ctx.strokeStyle='rgba(255,233,168,.18)';ctx.lineWidth=1;
+  ctx.beginPath();ctx.moveTo(x,y+20);ctx.lineTo(x,H-6);ctx.stroke();
+  ctx.restore();
+}
+
 /* ---------- mutations (route through host) ---------- */
+function doSpawn(x,y){
+  const s=clampSpawn(x,y);
+  if(isHost) hostSpawn(s.x,s.y);
+  else { spawnPt=s; Hub.up('intent',{a:'spawn',x:s.x,y:s.y}); }
+}
 function doAdd(kind,x,y){
+  if(kind==='ramp')kind='plank'; // legacy button id, just in case
   const rec=makeRecord(kind,x,y);
   if(isHost) hostAdd(rec);
   else Hub.up('intent',{a:'add',rec});
@@ -605,7 +744,7 @@ function doDel(id){
   else Hub.up('intent',{a:'del',id});
 }
 function doReset(){
-  records.clear();bodies.clear();snaps.length=0;selectedId=null;draftPts=[];
+  records.clear();bodies.clear();snaps.length=0;selectedId=null;draftPts=[];heldFrozen.clear();
   if(engine){ try{Matter.Composite.clear(engine.world,false,true);}catch(e){} ensureEngine(); }
   updateSel();reportHeight();
 }
@@ -624,18 +763,36 @@ function bindPointer(){
       dragging={draw:true};
       return;
     }
+    if(mode==='place'&&placeKind){
+      // Tap-to-place: the part lands exactly where tapped, locked in place.
+      doAdd(placeKind,p.x,p.y);
+      placeKind=null; setMode('select');
+      return;
+    }
     const hit=hitRecord(p.x,p.y);
+    if(!hit&&hitSpawn(p.x,p.y)){
+      // Grab the spawn marker itself and drag it anywhere.
+      // Parts win ties: tapping a ball sitting on the marker grabs the ball.
+      selectedId=null;updateSel();
+      dragging={spawn:true};
+      try{canvas.setPointerCapture(e.pointerId);}catch(err){}
+      doSpawn(p.x,p.y);
+      return;
+    }
     if(mode==='erase'){
       if(hit) doDel(hit.id);
       return;
     }
     if(hit){
+      // Select immediately, but don't grab yet: a plain tap only selects.
+      // The drag (freeze + follow) starts once the finger actually moves,
+      // and keeps the original finger offset so the part never snaps its
+      // center onto the cursor.
       selectedId=hit.id;updateSel();
-      dragging={id:hit.id,moved:false};
+      dragging={id:hit.id,moved:false,held:false,sx:p.x,sy:p.y,ox:hit.x-p.x,oy:hit.y-p.y};
       try{canvas.setPointerCapture(e.pointerId);}catch(err){}
       if(!isHost){ optimisticId=hit.id; }
       else { draggedBy.set(hit.id,{by:myId||'host',until:Date.now()+2000}); }
-      doMove(hit.id,p.x,p.y,false);
     }else{ selectedId=null;updateSel(); }
   });
   canvas.addEventListener('pointermove',(e)=>{
@@ -643,31 +800,52 @@ function bindPointer(){
     myCursor=p;
     const now=Date.now();
     if(now-cursorT>120){cursorT=now;Hub.up('intent',{a:'cursor',x:Math.round(p.x),y:Math.round(p.y)});}
+    if(dragging&&dragging.spawn){
+      doSpawn(p.x,p.y);
+      return;
+    }
     if(mode==='draw'&&dragging&&dragging.draw){
       const last=draftPts[draftPts.length-1];
       if(!last||Math.hypot(p.x-last.x,p.y-last.y)>=4) draftPts.push(p);
       return;
     }
     if(dragging&&dragging.id){
+      if(!dragging.held){
+        // Still a tap so far — wait for real movement before grabbing.
+        if(Math.hypot(p.x-dragging.sx,p.y-dragging.sy)<6) return;
+        dragging.held=true;
+        if(isHost) hostHold(dragging.id);
+      }
       dragging.moved=true;
-      doMove(dragging.id,p.x,p.y,false);
+      doMove(dragging.id,p.x+dragging.ox,p.y+dragging.oy,false);
       if(isHost) draggedBy.set(dragging.id,{by:myId||'host',until:Date.now()+2000});
     }
   });
   const up=(e)=>{
+    if(dragging&&dragging.spawn){
+      const p=toWorld(e);
+      doSpawn(p.x,p.y);
+      dragging=null;return;
+    }
     if(mode==='draw'&&dragging&&dragging.draw){
       finishDraw();
       dragging=null;return;
     }
     if(dragging&&dragging.id){
-      const p=toWorld(e);
-      doMove(dragging.id,p.x,p.y,true);
-      if(isHost) draggedBy.delete(dragging.id);
+      if(dragging.held){
+        // Let go dead-still: no leftover velocity, no pop.
+        const p=toWorld(e);
+        doMove(dragging.id,p.x+dragging.ox,p.y+dragging.oy,true);
+      }
+      if(isHost){ draggedBy.delete(dragging.id); if(dragging.held) hostRelease(dragging.id); }
       dragging=null;optimisticId=null;
     }
   };
   canvas.addEventListener('pointerup',up);
-  canvas.addEventListener('pointercancel',()=>{dragging=null;draftPts=[];optimisticId=null;});
+  canvas.addEventListener('pointercancel',()=>{
+    if(dragging&&dragging.id&&dragging.held&&isHost){ draggedBy.delete(dragging.id); hostRelease(dragging.id); }
+    dragging=null;draftPts=[];optimisticId=null;
+  });
   overlay.addEventListener('click',()=>{
     overlay.classList.add('hide');
     unlockAudio();startMusic();
@@ -695,13 +873,34 @@ function finishDraw(){
 }
 function setMode(m){
   mode=m;
+  if(m!=='place') placeKind=null;
   $('btn-draw').classList.toggle('on',m==='draw');
   $('btn-erase').classList.toggle('on',m==='erase');
-  $('hint').textContent=m==='draw'?'draw a track — release to drop it':m==='erase'?'click a part to remove it':'';
+  document.querySelectorAll('[data-add]').forEach(b=>{
+    b.classList.toggle('on',m==='place'&&b.getAttribute('data-add')===placeKind);
+  });
+  canvas.style.cursor=(m==='draw'||m==='place')?'crosshair':'default';
+  refreshHint();
+}
+function refreshHint(){
+  const h=$('hint'); if(!h) return;
+  if(mode==='draw'){h.textContent='draw a track — release to drop it';return;}
+  if(mode==='erase'){h.textContent='tap a part to remove it';return;}
+  if(mode==='place'){h.textContent='tap where to put the '+(placeKind||'part')+' — it starts locked in place';return;}
+  const r=selectedId&&records.get(selectedId);
+  h.textContent=r?(`${r.kind} selected${r.locked?' 🔒 locked — unlock (L) to drop it':''} — drag to move · ⟲/⟳ or R rotate · 🔒 or L lock · 🗑 or Del delete`)
+                 :'tap a part to select it · R rotate · L lock · Del delete · drag the 📍 marker to move new balls';
 }
 function updateSel(){
   const r=selectedId&&records.get(selectedId);
   $('sel').textContent=r?('selected '+r.kind+' '+(r.locked?'🔒':'')+' '+r.id.slice(-4)):'nothing selected';
+  $('selbar').classList.toggle('hidden',!r);
+  if(r){
+    $('sel-label').textContent=r.kind+' '+(r.locked?'🔒':'')+' '+r.id.slice(-4);
+    $('btn-lock').classList.toggle('on',!!r.locked);
+    $('btn-lock').textContent=r.locked?'🔓':'🔒';
+  }
+  refreshHint();
 }
 
 /* ---------- toolbar + keys ---------- */
@@ -711,12 +910,21 @@ function bindToolbar(){
   document.querySelectorAll('[data-add]').forEach(b=>b.addEventListener('click',()=>{
     unlockAudio();
     const kind=b.getAttribute('data-add');
-    const spots={ball:[W/2,80],plank:[W/2,300],ramp:[W/2,300],block:[W/2,200]};
-    const s=spots[kind]||[W/2,H/2];
-    doAdd(kind,s[0]+Math.random()*40-20,s[1]+Math.random()*20-10);
+    if(kind==='ball'){ doAdd('ball',spawnPt.x,spawnPt.y); return; }
+    // Planks/blocks arm placement: tap the stage to put the part exactly
+    // there, locked in place. Re-press the button to cancel.
+    if(placeKind===kind&&mode==='place'){ placeKind=null; setMode('select'); return; }
+    placeKind=kind; setMode('place');
   }));
   $('btn-draw').addEventListener('click',()=>setMode(mode==='draw'?'select':'draw'));
   $('btn-erase').addEventListener('click',()=>setMode(mode==='erase'?'select':'erase'));
+  $('btn-rot-cw').addEventListener('click',()=>{unlockAudio();if(selectedId)doRot(selectedId,Math.PI/12);});
+  $('btn-rot-ccw').addEventListener('click',()=>{unlockAudio();if(selectedId)doRot(selectedId,-Math.PI/12);});
+  $('btn-lock').addEventListener('click',()=>{unlockAudio();if(selectedId)doLock(selectedId);});
+  $('btn-del').addEventListener('click',()=>{unlockAudio();const id=selectedId;selectedId=null;updateSel();if(id)doDel(id);});
+  $('btn-hide').addEventListener('click',()=>{fadeOutStop();Hub.up('close');});
+  $('btn-help').addEventListener('click',()=>{unlockAudio();$('help').classList.remove('hidden');});
+  $('btn-help-close').addEventListener('click',()=>{$('help').classList.add('hidden');});
   $('grav').addEventListener('input',(e)=>{
     const y=parseFloat(e.target.value);
     if(isHost) applyGrav(y);
@@ -743,12 +951,16 @@ function bindKeys(){
     }else if((k==='Delete'||k==='Backspace')&&selectedId){
       const id=selectedId;selectedId=null;updateSel();doDel(id);
       e.preventDefault();
+    }else if(k==='Escape'&&mode==='place'){
+      placeKind=null;setMode('select');
     }
   });
 }
 
-/* ---------- audio ---------- */
-let music=null,musicOn=false,musicReady=false,audioCtx=null;
+/* ---------- audio: random Goldberg variation per press ---------- */
+const GOLDBERG_PREFIX='assets/music/Kimiko Ishizaka - J.S. Bach- -Open- Goldberg Variations, BWV 988 (Piano) - ';
+const GOLDBERG_TRACKS=["01 Aria.mp3", "02 Variatio 1 a 1 Clav..mp3", "03 Variatio 2 a 1 Clav..mp3", "04 Variatio 3 a 1 Clav. Canone all Unisuono.mp3", "05 Variatio 4 a 1 Clav..mp3", "06 Variatio 5 a 1 ovvero 2 Clav..mp3", "07 Variatio 6 a 1 Clav. Canone alla Seconda.mp3", "08 Variatio 7 a 1 ovvero 2 Clav..mp3", "09 Variatio 8 a 2 Clav..mp3", "10 Variatio 9 a 1 Clav. Canone alla Terza.mp3", "11 Variatio 10 a 1 Clav. Fughetta.mp3", "12 Variatio 11 a 2 Clav..mp3", "13 Variatio 12 Canone alla Quarta.mp3", "14 Variatio 13 a 2 Clav..mp3", "15 Variatio 14 a 2 Clav..mp3", "16 Variatio 15 a 1 Clav. Canone alla Quinta.mp3", "17 Variatio 16 a 1 Clav. Ouverture.mp3", "18 Variatio 17 a 2 Clav..mp3", "19 Variatio 18 a 1 Clav. Canone alla Sexta.mp3", "20 Variatio 19 a 1 Clav..mp3", "21 Variatio 20 a 2 Clav..mp3", "22 Variatio 21 Canone alla Settima.mp3", "23 Variatio 22 a 1 Clav..mp3", "24 Variatio 23 a 2 Clav..mp3", "25 Variatio 24 a 1 Clav. Canone all Ottava.mp3", "26 Variatio 25 a 2 Clav..mp3", "27 Variatio 26 a 2 Clav..mp3", "28 Variatio 27 a 2 Clav. Canone alla Nona - Variatio 28 a 2 Clav..mp3", "29 Variatio 29 a 1 ovvero 2 Clav..mp3", "30 Variatio 30 a 1 Clav. Quodlibet.mp3", "31 Aria da Capo è Fine.mp3"];
+let music=null,musicOn=false,musicIdx=-1,audioCtx=null;
 function unlockAudio(){
   try{
     if(typeof Howl!=='undefined'&&Howler&&Howler.ctx&&Howler.ctx.state==='suspended') Howler.ctx.resume();
@@ -758,29 +970,53 @@ function unlockAudio(){
     if(audioCtx.state==='suspended') audioCtx.resume();
   }catch(e){}
 }
-function ensureMusic(){
-  if(music||typeof Howl==='undefined') return music;
+function trackLabel(i){
+  const m=/^(\d\d) (Aria da Capo|Aria|Variatio (\d+))/.exec(GOLDBERG_TRACKS[i]||'');
+  if(!m) return 'Track '+(i+1);
+  if(m[2]==='Aria') return 'Aria';
+  if(m[2]==='Aria da Capo') return 'Aria da Capo';
+  return 'Var '+m[3];
+}
+function playTrack(i){
+  if(typeof Howl==='undefined') return;
+  try{ if(music){ try{music.unload();}catch(e){} } }catch(e){}
+  musicIdx=i;
   try{
-    music=new Howl({src:['assets/music/relaxing_track.mp3','assets/music/relaxing_track.ogg'],
-      loop:true,volume:0.25,
-      onloaderror:function(){musicReady=false;},
-      onplayerror:function(){musicReady=false;}});
+    // html5 audio: reliable for local file:// playback (WebAudio XHR is
+    // blocked on file:// in some browsers).
+    music=new Howl({src:[GOLDBERG_PREFIX+GOLDBERG_TRACKS[i]],html5:true,volume:0.25,
+      onend:function(){ if(musicOn) nextTrack(); },
+      onloaderror:function(){ if(musicOn) nextTrack(); },
+      onplayerror:function(){ musicOn=false; $('btn-music').textContent='Music: off'; }});
+    music.play(); musicOn=true;
+    $('btn-music').textContent='Music: '+trackLabel(i);
   }catch(e){ music=null; }
-  return music;
+}
+function nextTrack(){
+  if(!GOLDBERG_TRACKS.length) return;
+  let j=Math.floor(Math.random()*GOLDBERG_TRACKS.length);
+  if(GOLDBERG_TRACKS.length>1){ let guard=0; while(j===musicIdx&&guard++<10) j=Math.floor(Math.random()*GOLDBERG_TRACKS.length); }
+  playTrack(j);
 }
 function startMusic(){ /* only via button; gesture unlocks ctx */ }
+// Fade the current track out and stop it. The timeout only stops the exact
+// Howl it faded, so starting a new track mid-fade can never kill the new one.
+function fadeOutStop(){
+  const m=music;
+  musicOn=false;
+  $('btn-music').textContent='Music: off';
+  if(!m) return;
+  try{
+    m.fade(m.volume(),0,600);
+    setTimeout(()=>{ try{ if(music===m) m.stop(); }catch(e){} },700);
+  }catch(e){ try{ m.pause(); }catch(err){} }
+}
 function toggleMusic(){
   unlockAudio();
-  const m=ensureMusic();
-  if(!m) return; // missing file or CDN: silent no-op
+  if(typeof Howl==='undefined') return; // CDN blocked: silent no-op
   try{
-    if(!musicOn){
-      if(m.state()==='loaded'){ m.play(); musicOn=true; $('btn-music').textContent='Music: on'; }
-      else{
-        // not loaded (file absent) — fail silently per spec
-        m.once('load',()=>{ try{m.play();musicOn=true;$('btn-music').textContent='Music: on';}catch(e){} });
-      }
-    }else{ m.pause(); musicOn=false; $('btn-music').textContent='Music: off'; }
+    if(!musicOn){ nextTrack(); } // every press shuffles a fresh variation
+    else{ try{ if(music) music.pause(); }catch(e){} musicOn=false; $('btn-music').textContent='Music: off'; }
   }catch(e){}
 }
 function playClink(v){
