@@ -1,4 +1,4 @@
-# 🫧 Bub Hub — Peer-to-Peer Arcade
+#  Bub Hub — Peer-to-Peer Arcade
 
 Bub Hub is a tiny, modular arcade for HTML games. The **hub** (`index.html`) owns rooms,
 chat, and networking. **Games** are plain `.html` files that render in a shared stage and
