@@ -292,7 +292,7 @@
     </div>
 
 
-    <footer class="text-center text-slate-500 text-xs pt-2 relative z-10">Bub Hub v9 (game-first stage + solo/multiplayer sections) • click the Room ID to copy • if a friend sees something different, both reload with Ctrl+Shift+R</footer>
+    <footer class="text-center text-slate-500 text-xs pt-2 relative z-10">Bub Hub v9 (game-first stage + solo/multiplayer sections) • click the Room ID to copy • if a friend sees something different, both reload with Ctrl+Shift+R<br>Room hosts share room activity (names, which game) with the site admin. Chat is not shared.</footer>
 
     <script>
         // ============ Hub: multi-peer room + game broker ============
@@ -1303,6 +1303,58 @@
             }
             renderResume();
             renderRoomChips();
+        })();
+    </script>
+
+    <script>
+        // ============ Admin reporting (room host -> admin registry) ============
+        // Only the HOST of a room reports. The report contains: room ID, each
+        // player's display name, and which game (or lobby) they are in.
+        // Chat is NEVER sent. Must match REGISTRY_ID in admin.html.
+        (function () {
+            const REGISTRY_ID = 'bubhub-registry-12547-k8x2q9f4';
+            let rp = null, rc = null, connecting = false, lastRoom = null;
+
+            function snapshot() {
+                if (!inRoom || !isHost) return null;
+                const players = [{ id: myId, name: getName(), host: true, game: myGame() }];
+                openLinks().forEach(([id, e]) => {
+                    const pr = presence[id] || {};
+                    players.push({ id, name: e.name, host: !!e.host, game: pr.game || null });
+                });
+                players.forEach(p => { p.gameTitle = p.game ? gameTitle(p.game) : null; });
+                return { type: 'room-report', room: currentRoomId, players, ts: Date.now() };
+            }
+            function ensureLink() {
+                if (connecting || (rc && rc.open)) return;
+                connecting = true;
+                try { if (rp && !rp.destroyed) rp.destroy(); } catch (e) {}
+                try {
+                    rp = new Peer();
+                    rp.on('open', () => {
+                        rc = rp.connect(REGISTRY_ID, { reliable: true });
+                        rc.on('open', () => { connecting = false; tick(); });
+                        rc.on('close', () => { rc = null; connecting = false; });
+                        rc.on('error', () => { rc = null; connecting = false; });
+                    });
+                    rp.on('error', () => { rc = null; connecting = false; });
+                } catch (e) { connecting = false; }
+            }
+            function tick() {
+                const snap = snapshot();
+                if (snap) {
+                    lastRoom = snap.room;
+                    if (rc && rc.open) { try { rc.send(snap); } catch (e) {} }
+                    else ensureLink();
+                } else if (lastRoom) {
+                    if (rc && rc.open) { try { rc.send({ type: 'room-closed', room: lastRoom }); } catch (e) {} }
+                    lastRoom = null;
+                }
+            }
+            setInterval(tick, 5000);          // heartbeat + presence changes
+            window.addEventListener('beforeunload', () => {
+                if (lastRoom && rc && rc.open) { try { rc.send({ type: 'room-closed', room: lastRoom }); } catch (e) {} }
+            });
         })();
     </script>
 </body>
