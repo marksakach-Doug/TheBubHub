@@ -46,7 +46,6 @@ Open <a href="index.html">Bub Hub</a>, join a room, and press [ Play Wordwright 
           <button id="btn-ww-new" class="ww-b">[ NEW GAME ]</button>
           <button id="btn-ww-invite" class="ww-b">[ SHOW TABLE ]</button>
           <button id="btn-ww-sync" class="ww-b">[ SYNC ]</button>
-          <button id="btn-ww-hide" class="ww-b">[ HIDE ]</button>
         </span>
       </div>
       <div id="ww-room">ROOM: - | YOU: -</div>
@@ -996,7 +995,6 @@ function doReset(){
 }
 
 // ---------- wire up ----------
-$('btn-ww-hide').addEventListener('click', function(){ Hub.up('close'); });
 $('btn-ww-new').addEventListener('click', function(){ newGame(); });
 $('btn-ww-invite').addEventListener('click', function(){ Hub.up('invite'); });
 $('btn-ww-submit').addEventListener('click', function(){ actGuess('guess'); });

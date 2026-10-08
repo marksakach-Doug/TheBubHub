@@ -129,7 +129,6 @@ body{margin:0;background:var(--felt);color:var(--ink);font:15px/1.45 Georgia,ser
         <div><span class="lr-t">LOTR CARDS</span> <span id="lr-err" style="font:11px monospace;color:#ff8888"></span></div>
         <div style="display:flex;gap:8px">
             <button id="btn-lr-new" class="lr-b hidden">New game</button>
-            <button id="btn-lr-close" class="lr-b k">Hide</button>
         </div>
     </div>
     <div id="lr-status">Opening…</div>
@@ -192,7 +191,8 @@ function reportHeight(){
 function onDown(e){
     const m = e.data;
     if (!m || m.t !== 'gd' || m.game !== GAME_ID) return;
-    if (m.k === 'roster'){ Hub.me = m.p.you; Hub.roster = m.p.roster; Hub.room = m.p.room; Hub.names = rosterNames(); if (syncNames() && isHost() && S) broadcast(); else render(); return; }
+    if (m.k === 'roster'){ Hub.me = m.p.you; Hub.roster = m.p.roster; Hub.room = m.p.room; Hub.names = rosterNames(); rosterAdopt(); return; }
+    if (m.k === 'hostmove'){ toast('host moved to ' + ((m.p && m.p.name) || 'someone')); if (!isHost()) act('hello'); else if (S) broadcast(); render(); return; }
     if (m.k === 'state'){ if (m.p) { S = m.p; render(); } return; }
     if (m.k === 'intent'){ onIntent(m.p, m.from); return; }
     if (m.k === 'denied'){ toast(m.p.text); return; }
@@ -203,6 +203,19 @@ const myName = () => (Hub.names && Hub.names[myId()]) || (Hub.me && cleanName(Hu
 const isHost = () => !!(Hub.me && Hub.me.isHost);
 const peerCount = () => Hub.roster.length;
 const hostPresent = () => Hub.roster.some(m => m.host);
+// rosterAdopt: hosting (or newly hosting after a takeover) means the table
+// continues as-is — never start over. The host re-broadcasts on every
+// roster so joiners and returners always sync to the live table.
+let wasHost = false;
+function rosterAdopt(){
+    const nowHost = isHost();
+    if (S) syncNames();
+    if (nowHost && S){
+        if (!wasHost) toast('you are hosting — table continues');
+        broadcast();
+    } else render();
+    wasHost = nowHost;
+}
 
 // ---- Name system: clean, unique, live-synced display names ----
 // Roster order differs per client (each hub lists itself first), so we sort
@@ -274,74 +287,147 @@ function dread(p){
     if (!S.cfg.dread) return 0;
     return Math.max(0, p.lvl - Math.min(...S.pl.filter(x => !x.gone).map(x => x.lvl)));
 }
-function norm(p){
-    const bad = p.eq.filter(c => !canEq(p, c));
-    if (bad.length){
-        p.eq = p.eq.filter(c => canEq(p, c));
-        p.hand.push(...bad);
-        say(`${pn(p)}'s ${bad.map(wname).join(', ')} no longer legal at this level — moved to spare.`);
-    }
-    p.eq.sort((a, b) => val(b) - val(a));
-    while (p.eq.length < cap(p) && p.hand.length > 0) {
-        const next = p.hand.shift();
-        if (canEq(p, next)) {
-            p.eq.push(next);
-            say(`${pn(p)} automatically equips ${wname(next)}.`);
-        } else {
-            p.hand.unshift(next);
-            break;
-        }
-    }
-    while (p.eq.length > cap(p)) p.hand.push(p.eq.pop());
-    p.hand.sort((a, b) => val(b) - val(a));
-    while (p.hand.length > 1){
-        let li = 0;
-        p.hand.forEach((x, i) => { if (spareVal(p, x) < spareVal(p, p.hand[li])) li = i; });
-        const d = p.hand.splice(li, 1)[0];
-        S.lootD.push(d);
-        say(`${pn(p)} must discard spare ${wname(d)} (1 spare max).`);
-    }
+// fightOdds: exact win arithmetic over the 26-card monster deck, in words.
+// No card is revealed, so explore-vs-fight stays a judgement call.
+function fightOdds(c){
+    const need = c.lvl >= 10 ? 2 : 1, P = power(c), dr = dread(c);
+    const vals = [2,3,4,5,6,7,8,9,10,12,14,16,18];
+    let fav = 0, tot = 0;
+    if (need === 1){ vals.forEach(v => { tot++; if (P >= v + dr) fav++; }); }
+    else vals.forEach(a => vals.forEach(b => {
+        // a third number card joins when both are numbers (see fight) —
+        // use the number mean (6) rather than peeking the deck.
+        const t = a + b + ((a <= 10 && b <= 10) ? 6 : 0);
+        tot++; if (P >= t + dr) fav++;
+    }));
+    const pct = Math.round(fav / tot * 100);
+    const w = pct >= 85 ? 'near certain' : pct >= 65 ? 'likely' : pct >= 45 ? 'roughly even' : pct >= 25 ? 'unlikely' : 'a long shot';
+    return w + ' (~' + pct + '%) vs ' + (need === 1 ? '1 monster' : '2 monsters') + (dr ? ' + dread' : '');
 }
-// ---- Player-chosen swaps -----------------------------------------------
-// Strategy means never letting the computer pick your cards. Whenever the
-// game would silently swap or drop one of your weapons it now opens a
-// decision instead (S.pend + phase 'decide') and waits for your tap.
-// give() returns true when it opens a decision — its caller must then NOT
-// call next(); the choice handler finishes the flow.
-function give(p, c){
-    const can = canEq(p, c);
-    if (can && p.eq.length < cap(p)){
-        p.eq.push(c);
-        say(`${pn(p)} takes ${wname(c)} — equipped.`);
-    } else if (can && !p.hand.length && p.eq.length){
-        // Gear full but spare empty: the player picks which equipped weapon
-        // moves to the spare; the new card takes its slot.
-        const cands = stashCands(p);
-        if (cands.length <= 1){
-            p.eq.sort((a, b) => val(a) - val(b));
-            const out = p.eq.shift();
-            p.eq.push(c); p.hand = [out];
-            say(`${pn(p)} takes ${wname(c)} — equipped, stashing spare ${wname(out)}.`);
-        } else {
-            S.pend = { who: p.id, kind: 'stash', cards: cands, incoming: c,
-                       why: `${pn(p)}'s gear is full — choose a weapon to move to the spare.` };
-            S.phase = 'decide';
-            S.msg = S.pend.why;
-            return true;
-        }
-    } else if (p.hand.length){
-        // Spare full: the player picks one card to keep, the other is discarded.
-        S.pend = { who: p.id, kind: 'swap', cards: [p.hand[0], c], incoming: c,
-                   why: `${pn(p)}'s spare slot is full — choose which card to keep.` };
+// normSort: display order only. It never moves a card anywhere — every
+// card movement in this game is a tap on a prompt (see fitOptions).
+function normSort(p){
+    p.eq.sort((a, b) => val(b) - val(a));
+    p.hand.sort((a, b) => val(b) - val(a));
+}
+// normLevel: after a level drop, newly-illegal weapons ask instead of being
+// dumped. Returns true when it opened a decision (caller must stop).
+function normLevel(p){
+    const bad = p.eq.filter(c => !canEq(p, c));
+    if (!bad.length){ normSort(p); return false; }
+    bad.forEach(c => S.illQ.push({ who: p.id, card: c }));
+    return pumpIll();
+}
+// Illegal-weapon queue: one explicit move-to-spare-or-discard per weapon,
+// oldest first. Same one-decision-at-a-time contract as pumpLose.
+function pumpIll(){
+    while (S.illQ.length){
+        const q = S.illQ[0];
+        const p = S.pl.find(x => x.id === q.who);
+        if (!p || p.gone || p.eq.indexOf(q.card) < 0){ S.illQ.shift(); continue; }
+        const c = q.card;
+        const opts = [];
+        if (!p.hand.length) opts.push({ t: 'Move to spare', d: 'your one spare slot', go: 'spare' });
+        else opts.push({ t: 'Move to spare', d: 'spare is full — your ' + wname(p.hand[0]) + ' is discarded', go: 'sparedrop' });
+        opts.push({ t: 'Discard ' + wname(c), d: 'to the loot pile', go: 'drop' });
+        S.pend = { who: p.id, kind: 'illegal', cards: [c], incoming: c, opts,
+                   why: pn(p) + ' dropped a level — ' + wname(c) + ' is no longer legal. Where does it go?' };
         S.phase = 'decide';
         S.msg = S.pend.why;
         return true;
-    } else {
-        p.hand.push(c);
-        say(`${pn(p)} takes ${wname(c)} as spare.`);
     }
-    norm(p);
     return false;
+}
+// ---- Player-chosen swaps -----------------------------------------------
+// Strategy means never letting the computer pick your cards. A new card
+// always opens one fit prompt that names every consequence up front —
+// nothing is auto-equipped, auto-stashed or auto-discarded behind you.
+// give() always opens a decision (returns true): its caller must then NOT
+// call next(); the choice handler finishes the flow.
+function fitOptions(p, c){
+    const opts = [], can = canEq(p, c), cn = wname(c), cv = val(c);
+    if (can && p.eq.length < cap(p))
+        opts.push({ t: 'Equip ' + cn, d: 'Power ' + cv + ' — gear ' + p.eq.length + '/' + cap(p), go: 'eq' });
+    else if (can && p.eq.length && !p.hand.length)
+        opts.push({ t: 'Equip ' + cn, d: 'gear is full — you choose a weapon to move to the spare', go: 'place', dropSpare: false });
+    else if (can && p.eq.length && p.hand.length)
+        opts.push({ t: 'Equip ' + cn, d: 'gear AND spare full — your spare ' + wname(p.hand[0]) + ' is discarded, and you choose what leaves the gear', go: 'place', dropSpare: true });
+    if (!can || !p.eq.length || p.eq.length >= cap(p)){
+        if (!p.hand.length) opts.push({ t: 'Stow as spare', d: 'your one spare slot — kept, not equipped', go: 'spare' });
+        else opts.push({ t: 'Stow as spare', d: 'spare is full — your ' + wname(p.hand[0]) + ' is discarded', go: 'sparedrop' });
+    }
+    opts.push({ t: 'Discard ' + cn, d: 'to the loot pile — nothing changes', go: 'drop' });
+    return opts;
+}
+function give(p, c){
+    S.pend = { who: p.id, kind: 'fit', cards: [c], incoming: c, opts: fitOptions(p, c),
+               why: 'New card: ' + wname(c) + ' (' + val(c) + ') — where does it go?' };
+    S.phase = 'decide';
+    S.msg = S.pend.why;
+    return true;
+}
+// Choice resolution for fit/illegal prompts (option buttons, not card taps).
+function resolveChoice(i){
+    const pd = S.pend;
+    const p = pd && S.pl.find(x => x.id === pd.who);
+    if (!pd || !p || !pd.opts || !pd.opts[i]) return null;
+    const o = pd.opts[i], c = pd.incoming;
+    if (pd.kind === 'illegal'){
+        // the card starts equipped: take it off first, then place it.
+        // (for fit arrivals the filters below are no-ops.)
+        p.eq = p.eq.filter(x => x !== c); p.hand = p.hand.filter(x => x !== c);
+        if (S.illQ.length && S.illQ[0].who === p.id) S.illQ.shift();
+    }
+    if (o.go === 'eq'){ p.eq.push(c); say(`${pn(p)} equips ${wname(c)}.`); }
+    else if (o.go === 'spare'){ p.hand = [c]; say(`${pn(p)} stows ${wname(c)} as spare.`); }
+    else if (o.go === 'sparedrop'){
+        const old = p.hand[0]; p.hand = [c]; S.lootD.push(old);
+        say(`${pn(p)} stows ${wname(c)} as spare (${wname(old)} is discarded).`);
+    }
+    else if (o.go === 'drop'){ S.lootD.push(c); say(`${pn(p)} discards ${wname(c)}.`); }
+    else if (o.go === 'place'){
+        S.pend = { who: p.id, kind: 'place', cards: stashCands(p), incoming: c,
+                   dropSpare: !!o.dropSpare, then: 'chain',
+                   why: 'Gear is full — choose a weapon to move to the spare' +
+                        (o.dropSpare && p.hand[0] ? ' (your spare ' + wname(p.hand[0]) + ' is discarded).' : '.') };
+        S.msg = S.pend.why;
+        return null;
+    }
+    S.pend = null;
+    normSort(p);
+    return chainNext();
+}
+// Shared tail for the new explicit flows: drain any waiting decisions,
+// then continue the turn (or the boss aftermath).
+function chainNext(){
+    if (pumpIll()) return null;
+    if (pumpLose()) return null;
+    if (S.after === 'bosschk'){ S.after = null; const pw = S.afterPw; S.afterPw = null; if (!chk(pw)) endTurn(); }
+    else next();
+    return null;
+}
+// Gear-is-full placement: pick which equipped weapon moves to the spare.
+// then 'chain' continues the turn flow; then 'back' (manual gear swaps)
+// restores the phase it interrupted.
+function resolvePlace(i){
+    const pd = S.pend;
+    const p = pd && S.pl.find(x => x.id === pd.who);
+    if (!pd || !p || !pd.cards[i]) return null;
+    const pick = pd.cards[i], c = pd.incoming;
+    p.eq = p.eq.filter(x => x !== pick);
+    if (pd.dropSpare && p.hand[0]){
+        S.lootD.push(p.hand[0]);
+        say(`${pn(p)} discards spare ${wname(p.hand[0])}.`);
+    }
+    p.hand = [pick];
+    p.eq.push(c);
+    say(`${pn(p)} moves ${wname(pick)} to the spare and equips ${wname(c)}.`);
+    const then = pd.then || 'back', back = pd.back || 'choose';
+    S.pend = null;
+    normSort(p);
+    if (then === 'chain') return chainNext();
+    S.phase = back;
+    return null;
 }
 // Narsil (K) cannot be discarded or stashed while another weapon is equipped
 // (house rule) — so it only appears as a choice when it is the lone option.
@@ -396,7 +482,7 @@ function resolveDecision(i){
         S.lossQ.shift();
     }
     S.pend = null;
-    norm(p);
+    normSort(p);
     if (pumpLose()) return null;
     if (S.after === 'bosschk'){ S.after = null; const pw = S.afterPw; S.afterPw = null; if (!chk(pw)) endTurn(); }
     else next();
@@ -417,7 +503,7 @@ function fresh(dr){
     S = { cfg: { dread: dr }, pl: ps.map(x => ({ id: x.id, name: x.name, lvl: 1, eq: [], hand: [] })),
           loot: deck('B'), lootD: [], mon: deck('R'), monD: [], turn: 0, phase: 'choose', over: false,
           fight: null, pick: null, boss: null, win: null, feed: [], feedN: 0, msg: '',
-          pend: null, lossQ: [], after: null, afterPw: null, inst: ++lotrInst };
+          pend: null, lossQ: [], illQ: [], after: null, afterPw: null, inst: ++lotrInst };
     const aside = [];
     S.pl.forEach(p => { let c; for (;;){ c = draw('L'); if (isNum(c)) break; aside.push(c); } p.eq = [c]; });
     S.loot.push(...aside); shuffle(S.loot);
@@ -438,7 +524,7 @@ const rematch = () => { if (isHost() && S) startGame(S.cfg.dread); };
 
 function endTurn(){
     S.fight = null; S.pick = null; S.boss = null; S.q = [];
-    S.pend = null; S.lossQ = []; S.after = null; S.afterPw = null;
+    S.pend = null; S.lossQ = []; S.illQ = []; S.after = null; S.afterPw = null;
     let k = 0;
     do { S.turn = (S.turn + 1) % S.pl.length; k++; } while (cur().gone && k < S.pl.length);
     S.phase = 'choose';
@@ -457,7 +543,7 @@ function chk(pw){
                     }
                 }
     S.phase = 'over'; S.over = true; S.win = c[0].id; S.fight = null; S.boss = null; S.pick = null;
-    S.pend = null; S.lossQ = []; S.after = null; S.afterPw = null;
+    S.pend = null; S.lossQ = []; S.illQ = []; S.after = null; S.afterPw = null;
     say(`🏆 ${pn(c[0])} reaches Level 15 and wins!`);
     S.msg = `🏆 ${pn(c[0])} wins the game!`;
     if (isHost()) Hub.up('result', { inst: S.inst, win: c[0].id, players: S.pl.map(p => p.id) });
@@ -490,9 +576,12 @@ function resolve(){
         queueLose(p);
         if (f.pushed){ p.lvl = Math.max(1, p.lvl - 1); say(`${pn(p)} pushed and lost — drops to Lv ${p.lvl}.`); }
         if (h && h.id !== p.id) queueLose(h);
-        norm(p); if (h) norm(h);
+        normSort(p); if (h) normSort(h);
     }
-    if (!pumpLose()) next();
+    if (pumpLose()) return;
+    if (normLevel(p)) return;
+    if (h && normLevel(h)) return;
+    next();
 }
 const bossP = () => 14 + S.boss.ms.reduce((s, c) => s + val(c, true), 0);
 function startBoss(){
@@ -515,8 +604,11 @@ function resolveBoss(){
     while (team === bossP()) B.ms.push(draw('M'));
     const win = team > bossP();
     say(`Team ${team} vs Dragon ${bossP()} — ${win ? 'the Dragon falls! +2 Levels' : 'the Dragon wins.'}`);
-    J.forEach(p => { if (win){ p.lvl += 2; say(`${pn(p)} rises to Lv ${p.lvl}.`); } else { queueLose(p); p.lvl = Math.max(1, p.lvl - 1); say(`${pn(p)} drops to Lv ${p.lvl}.`); } norm(p); });
+    J.forEach(p => { if (win){ p.lvl += 2; say(`${pn(p)} rises to Lv ${p.lvl}.`); } else { queueLose(p); p.lvl = Math.max(1, p.lvl - 1); say(`${pn(p)} drops to Lv ${p.lvl}.`); } normSort(p); });
     S.monD.push(...B.ms);
+    let bossOpened = false;
+    J.forEach(p => { if (normLevel(p)) bossOpened = true; });
+    if (bossOpened){ S.after = 'bosschk'; S.afterPw = pw; return; }
     if (pumpLose()){ S.after = 'bosschk'; S.afterPw = pw; return; }
     if (!chk(pw)) endTurn();
 }
@@ -535,10 +627,13 @@ function handle(d){
             const x = p.hand[0]; if (!x) return null;
             if (!canEq(p, x)) return 'Face-card weapons unlock at Level 5.';
             if (p.eq.length >= cap(p)){
-                p.eq.sort((m, n) => val(m) - val(n));
-                const out = p.eq.shift();
-                p.hand = [out]; p.eq.push(x);
-                say(`${pn(p)} equips ${wname(x)}, stashing ${wname(out)} as spare.`);
+                // gear full: ask which equipped weapon moves to the spare
+                // instead of silently replacing your best one.
+                S.pend = { who: p.id, kind: 'place', cards: stashCands(p), incoming: x,
+                           dropSpare: false, then: 'back', back: S.phase,
+                           why: 'Gear is full — choose a weapon to move to the spare.' };
+                S.phase = 'decide';
+                S.msg = S.pend.why;
             } else { p.hand = []; p.eq.push(x); say(`${pn(p)} equips ${wname(x)}.`); }
         } else {
             if (p.eq.length <= 1) return 'Equip something else first — you need a weapon in hand.';
@@ -549,6 +644,16 @@ function handle(d){
         return null;
     }
     if (S.phase === 'decide'){
+        if (S.pend && (S.pend.kind === 'fit' || S.pend.kind === 'illegal')){
+            if (S.pend.who !== d.pid) return 'Waiting for ' + (S.pl.find(x => x.id === S.pend.who) ? pn(S.pl.find(x => x.id === S.pend.who)) : 'someone') + ' to choose.';
+            if (a !== 'choice') return 'Choose an option below.';
+            return resolveChoice(d.i);
+        }
+        if (S.pend && S.pend.kind === 'place'){
+            if (S.pend.who !== d.pid) return 'Waiting for ' + (S.pl.find(x => x.id === S.pend.who) ? pn(S.pl.find(x => x.id === S.pend.who)) : 'someone') + ' to choose.';
+            if (a !== 'decide' || d.i == null || !S.pend.cards[d.i]) return 'Tap one of the highlighted cards.';
+            return resolvePlace(d.i);
+        }
         if (a !== 'decide' || !S.pend || S.pend.who !== d.pid){
             const w = S.pend && S.pl.find(x => x.id === S.pend.who);
             return 'Waiting for ' + (w ? pn(w) : 'someone') + ' to choose a card.';
@@ -576,8 +681,8 @@ function handle(d){
     }
     if (S.phase === 'hreward'){
         if (a !== 'hr' || f.helper !== d.pid) return 'Waiting for the helper to choose.';
-        if (d.j === 'lvl'){ p.lvl++; norm(p); say(`${pn(p)} takes 1 Level for helping (now Lv ${p.lvl}).`); if (chk()) return null; }
-        else { if (!give(p, draw('L'))) say(`${pn(p)} takes 1 Loot card for helping.`); }
+        if (d.j === 'lvl'){ p.lvl++; normSort(p); say(`${pn(p)} takes 1 Level for helping (now Lv ${p.lvl}).`); if (chk()) return null; }
+        else give(p, draw('L'));
         if (!S.pend) next();
         return null;
     }
@@ -730,7 +835,7 @@ function waitingText(){
         const done = Object.keys(S.boss.ch).length;
         return [`Waiting on the Dragon — ${done}/${S.pl.length} decided`, 'Join the battle or stay out.'];
     }
-    if (S.phase === 'pick') return [`Waiting for ${S.pl.find(x => x.id === S.pick.who).name} to keep a card`, 'Draw 2 Loot, keep 1.'];
+    if (S.phase === 'pick') return [`Waiting for ${S.pl.find(x => x.id === S.pick.who).name} to keep a card (${S.pick.why || 'Explore'})`, 'Draw 2 Loot, keep 1.'];
     if (S.phase === 'hreward') return [`Waiting for the helper to choose`, 'Draw 1 Loot or gain 1 Level.'];
     if (S.phase === 'fight'){
         const f = S.fight;
@@ -774,7 +879,7 @@ function scoreboard(){
         const need = c.lvl >= 10 ? (c.eq.length >= 2 ? '2–3 monsters' : '2 monsters') : '1 monster';
         L = { cap: (p && p.id === c.id ? 'YOUR POWER' : pn(c).toUpperCase() + "'S POWER"), n: power(c), sub: gearNames(c), you: !!(p && p.id === c.id), win: false };
         R = { cap: 'MONSTERS', n: '—', sub: ph === 'pick' ? 'drawing loot…' : (mineTurn() ? 'fight for ' + need : 'waiting on ' + pn(c)), mon: true };
-        verdict = ph === 'pick' ? 'DRAW 2, KEEP 1' : (ph === 'hreward' ? 'HELPER REWARD' : 'VS');
+        verdict = ph === 'pick' ? (S.pick && S.pick.who === myId() ? 'KEEP ONE — tap a card' : 'DRAW 2, KEEP 1') : (ph === 'hreward' ? 'HELPER REWARD' : 'VS');
         vcls = '';
     }
     const side = (s) => `<div class="sc-side${s.you ? ' you' : ''}${s.mon ? ' mon' : ''}${s.win ? ' win' : ''}">` +
@@ -816,7 +921,7 @@ function render(){
         big = (S.pend.who === myId()) ? 'Your choice.' : `${w ? pn(w) : 'Someone'} chooses.`;
         sub = S.pend.why || 'Tap a highlighted card below.';
     }
-    else if (mine && ph === 'choose'){ big = 'Your turn.'; sub = 'Swap gear below if you like, then Explore or Fight.'; }
+    else if (mine && ph === 'choose'){ big = 'Your turn.'; sub = 'Explore for a safe card, or Fight for Levels — the buttons below show the trade.'; }
     if (!isOver()){
         st.classList.remove('winner');
         st.innerHTML = `${esc(big)}${sub ? `<small>${esc(sub)}</small>` : ''}`;
@@ -848,9 +953,7 @@ function render(){
     let mid = `<div>${deckBox('black', S.loot.length, S.lootD.length, 'LOOT')}</div>`;
     if (p){
         const gearing = p && !p.gone && (ph === 'choose' || ph === 'fight' || ph === 'boss' || ph === 'over') && !paused;
-        const can = mine && ph === 'choose' && !paused;
         let gearBtn = '';
-        if (can && p.eq.length) gearBtn = `<button class="lr-act" data-a="fight" style="margin-top:10px; min-height:50px; padding:10px; font-size:14px"><span class="ic" style="font-size:20px">⚔️</span><span style="font-weight:800">Fight!</span></button>`;
         if (ph === 'fight' && mine) {
             gearBtn = `<button class="lr-act" data-a="resolve" style="margin-top:10px; min-height:50px; padding:10px; font-size:14px"><span class="ic" style="font-size:20px">⚖️</span><span style="font-weight:800">Resolve Fight</span></button>`;
         }
@@ -867,15 +970,26 @@ function render(){
     let ar = '';
     if (ph === 'pick'){
         const who = S.pl.find(x => x.id === S.pick.who);
-        ar = `<span class="lr-lbl">LOOT — ${esc(who.name)} keeps one (click a card)</span><div class="lr-cards">${S.pick.cards.map((x, i) => card(x, S.pick.who === myId() && !paused ? `data-a="keep" data-i="${i}"` : '')).join('')}</div>`;
+        const picking = S.pick.who === myId() && !paused;
+        ar = `<span class="lr-lbl">LOOT — ${esc(who.name)} keeps one (${picking ? 'click a card' : 'waiting for them'})</span><div class="lr-cards"${picking ? '' : ' style="opacity:.55"'}>${S.pick.cards.map((x, i) => card(x, picking ? `data-a="keep" data-i="${i}"` : '')).join('')}</div>`;
     } else if (ph === 'hreward'){
         ar = `<span class="lr-lbl">HELPER REWARD — ${esc(S.pl.find(x => x.id === f.helper).name)} chooses below.</span>`;
     } else if (ph === 'decide' && S.pend){
         const pd = S.pend, who = S.pl.find(x => x.id === pd.who);
         const minePd = pd.who === myId() && !paused;
+        if (pd.kind === 'fit' || pd.kind === 'illegal'){
+            // a new card with explicit options: each button names its cost
+            ar = `<span class="lr-lbl">${esc(pd.why || 'choose')}</span>` +
+                `<div class="lr-cards">${card(pd.incoming, '', true)}</div>` +
+                (minePd ? `<div class="lr-cards" style="justify-content:center;gap:10px">${(pd.opts || []).map((o, i) => `<button class="lr-act" data-a="choice" data-i="${i}"><span><span class="tt">${esc(o.t)}</span><br><span class="ss">${esc(o.d)}</span></span></button>`).join('')}</div>`
+                        : `<span class="lr-lbl">waiting for them to choose</span>`);
+        } else if (pd.kind === 'place'){
+            ar = `<span class="lr-lbl">GEAR FULL — ${esc(who ? pn(who) : 'choosing')} moves one weapon to the spare${pd.dropSpare ? ' (spare is discarded)' : ''} — ${esc(pd.why || 'tap a weapon')}</span><div class="lr-cards">${pd.cards.map((x, i) => card(x, minePd ? `data-a="decide" data-i="${i}"` : '', true)).join('')}</div>`;
+        } else {
         const tag = pd.kind === 'lose' ? 'DISCARD ONE' : (pd.kind === 'stash' ? `GEAR FULL — new card: ${wname(pd.incoming)}` : 'SPARE FULL — keep 1');
         const verb = pd.kind === 'lose' ? 'tap the card to DISCARD' : (pd.kind === 'stash' ? 'tap a weapon to move to the spare' : 'tap the card to KEEP');
         ar = `<span class="lr-lbl">${esc(tag)} — ${esc(who ? pn(who) : 'choosing')} (${verb})</span><div class="lr-cards">${pd.cards.map((x, i) => card(x, minePd ? `data-a="decide" data-i="${i}"` : '', true)).join('')}</div>`;
+        }
     } else if (ph === 'over'){
         const w = S.pl.find(x => x.id === S.win);
         const table = S.pl.slice().sort((a, b) => b.lvl - a.lvl || power(b) - power(a))
@@ -903,7 +1017,12 @@ function render(){
     let ac = '';
     if (paused) ac = '';
     else if (ph === 'choose' && mine) {
-        ac = bigBtn('explore', '🔍', 'Explore', 'Draw 2 Loot cards, keep 1. Safe and quiet.', 'k');
+        // the whole turn in two equal buttons: safe card vs risky levels
+        const canFight = c.eq.length > 0 || c.hand.length > 0;
+        ac = bigBtn('explore', '🔍', 'Explore', 'Safe · keep 1 of 2 Loot cards · no Levels either way.', 'k') +
+            (canFight
+                ? bigBtn('fight', '⚔️', 'Fight', 'Win 1 Level (2 if you push your luck) · lose = discard a weapon · ' + fightOdds(c) + '.', '')
+                : `<div class="lr-lbl">No weapons — explore first, then fight.</div>`);
     }
     else if (ph === 'fight' && mine) {
         const canPush = !f.pushed && !f.ask && (power(c) + (f.helper ? power(S.pl.find(x => x.id === f.helper)) : 0) >= total());
@@ -924,7 +1043,6 @@ $('lotr-panel').addEventListener('click', (e) => {
 });
 $('btn-lr-start').addEventListener('click', () => startGame($('lr-dread').checked));
 $('btn-lr-new').addEventListener('click', () => rematch());
-$('btn-lr-close').addEventListener('click', () => Hub.up('close'));
 
 Hub.init();
 render();

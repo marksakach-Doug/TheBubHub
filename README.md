@@ -157,7 +157,7 @@ function onIntent(move, from) { if (valid(move)) { applyMove(move); Hub.up('stat
 - Every hub broadcasts `{ type: 'presence', id, name, game }` on open/close/hello.
 - The room controls render one chip per player (`#roster-list`): name + `in <game>` or `in lobby`, so you can tell which game everyone is in.
 
-## Sessions & reconnects (v9)
+## Sessions, reconnects & host migration
 
 - Your player id, display name, room, and role are kept in `sessionStorage`
   (`bubhub.session`), so a reload offers **Rejoin `<room>` as host/guest** in the lobby
@@ -166,21 +166,56 @@ function onIntent(move, from) { if (valid(move)) { applyMove(move); Hub.up('stat
   of silently minting a random room.
 - Guests whose host link drops show **host lost — reconnecting…** and keep dialing
   the room with capped backoff until it answers.
+- **If the host is really gone, the table moves instead of dying.** The lowest-id
+  survivor claims the same room id (staggered 3s + 4s per rank, standing down the
+  moment any host answers — the room id itself is the mutex, so only one host
+  can win). Its game keeps the exact table it already holds (LOTR/Blast Off
+  broadcast full state to every guest) and re-broadcasts; everyone else's
+  reconnect loop lands on the same id and play continues. A returning host
+  whose id is taken is offered **"Table moved to X — join them?"** and rejoins
+  as a guest on its old seat. If nobody can take over, the room may start a
+  fresh game instead — never silently.
+- Clicks with no host link are answered **"host gone — waiting"** instead of
+  vanishing. After ~60s of silence the pill says so explicitly (it keeps trying).
 
 ## Game chrome conventions
 
-- **Hide**: every game must be hideable — in-game `Hide`/`Close Game` button posting
-  `{ t:'gu', game, k:'close' }`, plus the hub's `✕ Stage` bar. (The hub guarantees
-  hidden iframes really disappear: `#game-stage iframe.hidden { display:none !important }`.)
+- **Hide**: the hub owns this — every game is closed from the hub's `✕ Stage`
+  bar, which really hides the frame
+  (`#game-stage iframe.hidden { display:none !important }`) and sends the
+  game a `hide` message (stop music, suspend your loop). Games must NOT ship
+  their own Hide/Close buttons.
 - **Room number**: always visible in the focus bar (`Room <id> · N players`, click to copy).
 - **Chat drawer**: dismissible via the 💬 pill toggle, the drawer ✕, or tapping the
   backdrop — never Esc-only.
-- **LOTR swaps are player choices**: a full spare (`swap`), a full gear set (`stash`),
-  and a lost fight (`lose`) each open a tap-the-card decision; the engine never
-  silently picks your cards (Narsil/K is excluded unless it is your only weapon).
-- **Goldberg touch**: ⟲/⟳ rotate, 🔒 lock, 🗑 delete on the selection row; the 📍
-  spawn marker (tap Spawn mode, or drag the marker) is where new balls appear.
-  Plank and ramp are one part — angle comes from rotate.
+- **LOTR choices are player choices**: a new card always opens a fit prompt
+  (Equip / Stow / Discard, each naming its cost) instead of auto-equipping or
+  auto-discarding; a full spare (`swap`), a full gear set (`stash`), a gear
+  swap from a full set (`place`), an illegal weapon after a level drop
+  (`illegal`), and a lost fight (`lose`) each open a tap-the-card decision;
+  the engine never silently picks your cards (Narsil/K is excluded unless it
+  is your only weapon). Explore and Fight are equal-weight buttons with the
+  real trade-off spelled out (safe card vs risky Levels, with exact odds in
+  words — no card is ever previewed).
+- **Goldberg touch**: press a part, then drag it out on the stage (tap = default
+  size) — the drag sets length + angle. Placed parts show canvas handles: end
+  dots reshape, the ring turns, ✛ moves the pendulum anchor / lever pivot /
+  catapult hinge. Tap a part twice for the lock/delete pill (⇄ flips
+  conveyor / turntable / fan / spawner-what, FIRE shoots a cocked catapult,
+  🎈 pops a balloon, 🔗 welds two parts into one rigid unit, 📋 copies).
+  No spawn marker — balls are placed by tap like everything else. 🔔 bell rings
+  its tuned chime when struck (tune root + scale + per-bell degrees in the 🎵
+  drawer; G major out of the box). The catapult cocks by dragging its arm back
+  past ~45° (or aim it with the ring), then fires on tap / F / knock — the arm
+  is centred on its body with a real cup and a torsion spring that throws.
+  Balloons pop on a hard hit and drop their bob as a ball. The spawner drops
+  a ball/domino/block every 2s, oldest children culled past 8 alive. Clear
+  needs every player in the room to approve (25s, one No cancels). 💾 Machines
+  saves named tables to this browser (plus export/import text).
+  The host auto-saves the table to localStorage; Clear wipes it. World is a
+  fixed 1920×1200 so every screen shares coordinates. Opened with no room
+  (lobby Play button), Goldberg runs a private local table — hosting a room
+  later shares that same table, joining someone's room starts from theirs.
 
 ## Run it
 
@@ -213,8 +248,8 @@ a Goldberg intent and records the line when the panel closes.
 | `games.js` | ✅ to add games | The registry. The only file you edit for a new game. |
 | `bub-record.js` | Rarely | Modular BubHub Record (loaded via script tag). Generic `played X` lines mean even a brand-new game with no `result` logic leaves a line on open/close. |
 | `warpfront.html`, `lotr.html` | Reference | Multiplayer examples (host + guests, like-for-like pattern to copy). |
-| `goldberg.html` | Playable | Chain-reaction sandbox (host-authoritative physics, everyone builds). |
+| `goldberg.html` | Playable | Chain-reaction sandbox (host-authoritative physics, everyone builds). Parts: ball, plank, block, domino, peg, bucket, bouncer, turntable, conveyor, fan, balloon, lever, pendulum, bell (tunable), catapult (cocks + throws), spawner + drawn tracks. Weld parts rigidly, copy/paste groups, save named machines, clear by unanimous vote. |
 | `DrawDrive.html` | Playable | Draw and Drive (multiplayer: maze turn-taking drawer/driver + versus battle + off-rails). Tiny laser crumbs dissolve; cookie mode deleted. |
-| `eggs.html` | Playable | eggs sandbox (random worlds, splat decals, star every 5 min, secret `=` suplex mode, white/brown/baby-blue/easter). |
+| `eggs.html` | Playable | eggs sandbox in a night-time chicken coop (plank walls, wire, bulb, straw floor, wooden perches, hens). Random worlds, tiered splats (BIG → HUGE → TITAN: smash harder, die easier), legs pickup for lift & throw (mash jump to wiggle free), one rotating reachable power-up at a time (star/bean/legs). |
 | `LobbyWaltzEngine.html` | Reference | Solo example (`solo` + `lobby` + fixed `height`). |
 | `horse.jpg` | – | Mascot 🐴 |

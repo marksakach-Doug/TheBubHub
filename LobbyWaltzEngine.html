@@ -19,8 +19,6 @@ html,body{margin:0;width:100%;height:100%;background:var(--floor);color:var(--iv
 #timerDisplay,#scoreDisplay{font-family:var(--serif);font-style:italic;font-weight:700;font-size:38px;line-height:1}
 #scoreDisplay{text-align:right}
 #comboDisplay{display:block;font:600 13px var(--sans);color:var(--brass);margin-top:4px;min-height:16px}
-.hud-close{pointer-events:auto;cursor:pointer;color:var(--mute);font-size:24px;line-height:1;transition:color .2s;background:none;border:0;padding:0}
-.hud-close:hover{color:var(--ivory)}
 #mainMenu{position:absolute;inset:0;display:flex;align-items:center;justify-content:center;background:rgba(20,16,31,.82);
   backdrop-filter:blur(6px);-webkit-backdrop-filter:blur(6px);pointer-events:auto;overflow-y:auto;padding:20px;box-sizing:border-box;
   touch-action:pan-y; /* the document disables touch panning for the game; the menu must still scroll on small phones so Close Game stays reachable */}
@@ -38,8 +36,6 @@ h1{font:italic 700 52px/1 var(--serif);margin:0 0 6px;color:var(--ivory)}
 input[type=range]{width:120px;accent-color:var(--brass)}
 :focus-visible{outline:2px solid var(--brass);outline-offset:3px}
 #startBtn{width:100%;margin-top:22px;padding:15px;border:0;border-radius:12px;background:var(--brass);color:var(--floor);font:600 19px var(--sans);cursor:pointer}
-#closeBtn{width:100%;margin-top:12px;padding:12px;border:1px solid rgba(217,178,111,.3);border-radius:12px;background:var(--panel);color:var(--mute);font:600 16px var(--sans);cursor:pointer;transition:all .2s;position:sticky;bottom:0;z-index:2}
-#closeBtn:hover{background:rgba(217,178,111,.1);color:var(--ivory)}
 #startBtn:active{transform:scale(.98)}
 @media (max-height:700px){
   h1{font-size:36px}
@@ -55,7 +51,6 @@ input[type=range]{width:120px;accent-color:var(--brass)}
 <canvas id="gameCanvas"></canvas>
 <div id="uiLayer">
   <div class="hud" id="hud">
-    <button class="hud-close" id="hudCloseBtn" title="Close Game">✕</button>
     <div id="timerDisplay">0:30</div>
     <div><div id="scoreDisplay">0</div><span id="comboDisplay" style="text-align:right"></span></div>
   </div>
@@ -75,7 +70,6 @@ input[type=range]{width:120px;accent-color:var(--brass)}
       <label class="row">Obstacles <input class="sw" type="checkbox" id="modObs" checked></label>
     </div>
     <button id="startBtn">Start dance</button>
-    <button id="closeBtn">Close Game</button>
   </div>
 </div>
 
@@ -89,7 +83,6 @@ let waltzInst = 0;
 const canvas = $('gameCanvas'), ctx = canvas.getContext('2d');
 const mainMenu = $('mainMenu'), hud = $('hud'), scoreDisp = $('scoreDisplay'), comboDisp = $('comboDisplay'), timerDisp = $('timerDisplay'), startBtn = $('startBtn');
 const modPartner = $('modPartner'), modChild = $('modChild'), childSkillSlider = $('childSkill'), modLead = $('modLead'), modObs = $('modObs');
-const hudCloseBtn = $('hudCloseBtn'), closeBtn = $('closeBtn');
 const SERIF = '"Cormorant Garamond", Georgia, serif';
 const coarse = matchMedia('(pointer: coarse)').matches;
 const calm = matchMedia('(prefers-reduced-motion: reduce)').matches;
@@ -423,13 +416,6 @@ function endGame() {
   mainMenu.style.display = 'flex';
   drawFloor();
 }
-
-const closeGame = () => {
-  window.parent.postMessage({ t: 'gu', game: 'waltz', k: 'close' }, '*');
-};
-
-hudCloseBtn.addEventListener('click', closeGame);
-closeBtn.addEventListener('click', closeGame);
 
 addEventListener('resize', resize);
 resize();

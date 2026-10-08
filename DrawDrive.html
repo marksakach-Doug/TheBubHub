@@ -37,7 +37,6 @@ button.go{background:#3cc3d4;color:#06222a;border-color:#3cc3d4}
     <button class="dd" data-tool="goal" id="goalBtn">Move finish</button>
     <button class="dd" id="clear">Clear maze</button>
     <button class="dd go" id="go">Start driving</button>
-    <button class="dd" id="hide">Hide</button>
     <span id="role" style="font-family:monospace;font-size:11px;opacity:.85">connecting…</span>
   </div>
   <div id="rolebar">
@@ -445,7 +444,6 @@ document.getElementById('back').onclick=function(){ restoreWalls();fx=[];bolts=[
  if(isHost&&!amSolo)Hub.up('state',snapshot()); else if(!amSolo)Hub.up('intent',{a:'phase',phase:'draw'}); };
 document.getElementById('retry').onclick=function(){ if(isHost||amSolo){resetRun();if(!amSolo)Hub.up('state',snapshot());} else Hub.up('intent',{a:'phase',phase:'drive'}); };
 document.getElementById('swap').onclick=function(){ if(isHost||amSolo){swapRoles();if(!amSolo)Hub.up('state',snapshot());renderRole();} else Hub.up('intent',{a:'swap'}); };
-document.getElementById('hide').onclick=function(){Hub.up('close')};
 overlay.addEventListener('click',function(){overlay.classList.add('hide');Hub.up('hello');});
 window.addEventListener('pointerdown',function once(){Hub.up('hello');},{once:true});
 

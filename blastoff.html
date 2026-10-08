@@ -102,7 +102,6 @@ body{margin:0;background:var(--space);color:var(--ink);font:15px/1.45 'Segoe UI'
         <div><span class="bo-t">BLAST OFF!</span> <span id="bo-err"></span></div>
         <div style="display:flex;gap:8px">
             <button id="btn-bo-new" class="bo-b hidden">New game</button>
-            <button id="btn-bo-close" class="bo-b k">Hide</button>
         </div>
     </div>
     <div id="bo-status">Preparing for launch…</div>
@@ -162,7 +161,8 @@ function reportHeight(){
 function onDown(e){
     const m = e.data;
     if (!m || m.t !== 'gd' || m.game !== GAME_ID) return;
-    if (m.k === 'roster'){ Hub.me = m.p.you; Hub.roster = m.p.roster; Hub.room = m.p.room; Hub.names = rosterNames(); if (syncNames() && isHost() && S) broadcast(); else render(); return; }
+    if (m.k === 'roster'){ Hub.me = m.p.you; Hub.roster = m.p.roster; Hub.room = m.p.room; Hub.names = rosterNames(); rosterAdopt(); return; }
+    if (m.k === 'hostmove'){ toast('host moved to ' + ((m.p && m.p.name) || 'someone')); if (!isHost()) act('hello'); else if (S) broadcast(); render(); return; }
     if (m.k === 'state'){ if (m.p) { S = m.p; render(); } return; }
     if (m.k === 'intent'){ onIntent(m.p, m.from); return; }
     if (m.k === 'denied'){ toast(m.p.text); return; }
@@ -173,6 +173,19 @@ const myName = () => (Hub.names && Hub.names[myId()]) || (Hub.me && cleanName(Hu
 const isHost = () => !!(Hub.me && Hub.me.isHost);
 const peerCount = () => Hub.roster.length;
 const hostPresent = () => Hub.roster.some(m => m.host);
+// rosterAdopt: hosting (or newly hosting after a takeover) means the table
+// continues as-is — never start over. The host re-broadcasts on every
+// roster so joiners and returners always sync to the live table.
+let wasHost = false;
+function rosterAdopt(){
+    const nowHost = isHost();
+    if (S) syncNames();
+    if (nowHost && S){
+        if (!wasHost) toast('you are hosting — table continues');
+        broadcast();
+    } else render();
+    wasHost = nowHost;
+}
 
 function cleanName(s){ return String(s == null ? '' : s).replace(/\s+/g, ' ').trim().slice(0, 14) || 'Player'; }
 function rosterNames(){
@@ -426,6 +439,7 @@ function toast(t){
 function onIntent(d, from){
     if (!isHost()) return;
     d.pid = from.id; d.name = from.name;
+    if (d.action === 'hello'){ if (S) broadcast(); return; }
     if (!S) return;
     const e = handle(d);
     if (e) Hub.up('denied', { to: from.id, text: e });
@@ -481,9 +495,12 @@ function render(){
     lastTurn = S.turn;
 
     const p = me(), c = cur();
+    const paused = !isHost() && !hostPresent();
     if (S.over){
         const winner = S.pl.reduce((prev, curr) => (prev.score > curr.score) ? prev : curr);
         st.innerHTML = `<span style="color:var(--gold); font-size:24px">MISSION COMPLETE!</span><small>${pn(winner)} won the race!</small>`;
+    } else if (paused){
+        st.innerHTML = `Game paused — host disconnected.<small>It resumes when they return.</small>`;
     } else {
         st.innerHTML = `${esc(S.msg)}<small>${S.phase === 'decide' ? 'Waiting for a pilot' : 'Prepare for maneuvers'}</small>`;
     }
@@ -532,7 +549,10 @@ function render(){
 
     $('bo-arena').innerHTML = '';
     const veil = $('bo-veil');
-    if (!S.over && !myAction() && !S.pend){
+    if (!S.over && paused){
+        $('bo-veil-text').innerHTML = `Paused<small>Host disconnected — it resumes when they return.</small>`;
+        veil.classList.remove('hidden');
+    } else if (!S.over && !myAction() && !S.pend){
         $('bo-veil-text').innerHTML = `Waiting for ${pn(cur())}...`;
         veil.classList.remove('hidden');
     } else if (S.pend){
@@ -544,7 +564,8 @@ function render(){
 
     const bigBtn = (a, ic, t, s, o, attr = '') => `<button class="bo-act ${o || ''}" data-a="${a}" ${attr}><span class="ic">${ic}</span><span><span class="tt">${t}</span><br><span class="ss">${s}</span></span></button>`;
     let ac = '';
-    if (!S.over){
+    if (paused) ac = '';
+    else if (!S.over){
         if (S.phase === 'choose' && myId() === (cur() ? cur().id : null)){
             ac = bigBtn('newship', '🛠️', 'Find New Ship', 'Draw a new ship to replace your current one.', 'k') +
                  bigBtn('blastoff', '🚀', 'Blast Off!', 'Head towards a destination to collect red cards.');
@@ -577,7 +598,6 @@ $('bo-panel').addEventListener('click', (e) => {
 });
 $('btn-bo-start').addEventListener('click', () => startGame());
 $('btn-bo-new').addEventListener('click', () => rematch());
-$('btn-bo-close').addEventListener('click', () => Hub.up('close'));
 
 (function init(){
     Hub.init();

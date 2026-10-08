@@ -197,6 +197,13 @@
                 <button id="btn-resume-forget" title="Forget this room" class="btn-bouncy bg-slate-700 hover:bg-slate-600 text-white text-sm font-bold py-1.5 px-3 rounded-xl">✕</button>
             </div>
         </div>
+        <div id="takeover-bar" class="hidden md:col-span-2 bg-teal-500/10 backdrop-blur px-4 py-3 rounded-2xl border border-teal-500/40 card-glow items-center justify-between gap-3">
+            <span id="takeover-text" class="text-sm text-teal-100"></span>
+            <div class="flex gap-2 flex-none">
+                <button id="btn-takeover-go" class="btn-bouncy bg-teal-500 hover:bg-teal-400 text-slate-950 text-sm font-extrabold py-1.5 px-4 rounded-xl">Join them</button>
+                <button id="btn-takeover-no" title="Stay here" class="btn-bouncy bg-slate-700 hover:bg-slate-600 text-white text-sm font-bold py-1.5 px-3 rounded-xl">✕</button>
+            </div>
+        </div>
         <div class="bg-slate-800/90 backdrop-blur p-5 rounded-2xl border border-slate-700 card-glow">
             <h2 class="text-lg font-bold text-white mb-1">Host a Room</h2>
             <p class="text-slate-400 text-xs mb-3">Create a new room and share the ID.</p>
@@ -607,6 +614,18 @@
                     clearTimeout(reconnectT);
                     hostLostBanner(false);
                 }
+                if (!isHost && data.host && inRoom) {
+                    // a new host id on the same room means the table moved
+                    if (knownHostId && knownHostId !== data.id) {
+                        logChat('table continues — ' + (data.name || 'someone') + ' is hosting');
+                        Object.keys(GB.frames).forEach(gid => {
+                            GB.down(gid, { t: 'gd', game: gid, k: 'hostmove', p: { from: knownHostId, to: data.id, name: data.name } });
+                        });
+                    }
+                    knownHostId = data.id;
+                    deadHostId = null;
+                    cancelTakeover();
+                }
                 refreshRoster();
                 return;
             }
@@ -642,16 +661,25 @@
 
         // ---- Reconnect: guests keep dialing the room when the host link drops,
         // and the host keeps its id (session) so games can resume in place.
+        // If the host is really gone, the lowest-id survivor takes over the
+        // same room id (staggered, so a blip doesn't trigger a coup) and the
+        // table continues — every multiplayer game already holds the state.
         let reconnectT = null, reconnectDelay = 1500, lastLostNote = 0;
         let hostGone = false, expectReconnect = false;
+        let hostLostAt = 0, deadHostId = null, knownHostId = null, takeOverT = null;
         function hostLostBanner(on) {
             hostGone = !!on;
+            if (on && !hostLostAt) hostLostAt = Date.now();
+            if (!on) hostLostAt = 0;
             renderPeerStatus();
         }
         function renderPeerStatus() {
             if (!ui.peerStatus) return;
             if (hostGone && !isHost && inRoom) {
-                ui.peerStatus.textContent = 'host lost — reconnecting…';
+                const mins = hostLostAt ? Math.floor((Date.now() - hostLostAt) / 1000) : 0;
+                ui.peerStatus.textContent = mins > 60
+                    ? `still trying to reach room “${currentRoomId}” — leave this tab open`
+                    : `host lost — reconnecting… (room “${currentRoomId}”)`;
                 ui.peerStatus.className = 'text-xs font-mono px-2 py-1 rounded-full bg-red-500/15 text-red-300 border border-red-500/40';
                 return;
             }
@@ -683,6 +711,7 @@
                     peer = new Peer();
                     peer.on('open', () => { dialHost(); });
                     peer.on('connection', (c) => { wireConnection(c); });
+                    peer.on('disconnected', () => { scheduleReconnect(); });
                     peer.on('error', onGuestPeerErr);
                 } catch(e) { scheduleReconnect(); }
                 return;
@@ -707,6 +736,39 @@
                 scheduleReconnect();
             }
         }
+        // ---- Takeover election: who hosts next when the host is gone ----
+        // Candidates are everyone seen recently plus me, minus the dead host.
+        // Lowest id goes first (~3s grace for a blip); the rest stagger 4s
+        // apart, each standing down the moment any host answers. A stale
+        // (long-gone) candidate just costs a few seconds — the room id
+        // itself is the mutex, so a race can only ever crown one host.
+        function electionRank() {
+            const ids = new Set([myId]);
+            Object.keys(presence).forEach(id => ids.add(id));
+            if (deadHostId) ids.delete(deadHostId);
+            const sorted = [...ids].sort();
+            const r = sorted.indexOf(myId);
+            return r < 0 ? sorted.length : r;
+        }
+        function scheduleTakeover() {
+            if (isHost || !inRoom || !currentRoomId) return;
+            clearTimeout(takeOverT);
+            const rank = Math.max(0, electionRank());
+            takeOverT = setTimeout(considerTakeover, 3000 + rank * 4000);
+        }
+        function considerTakeover() {
+            if (isHost || !inRoom || !currentRoomId) return;
+            if (hostLink()) return; // someone already hosts — stand down
+            becomeHost();
+        }
+        function cancelTakeover() { clearTimeout(takeOverT); takeOverT = null; }
+        // Claim the same room id and keep the room: frames, games and table
+        // stay exactly as they are — only the crown moves.
+        function becomeHost() {
+            if (isHost || !inRoom || !currentRoomId) return;
+            cancelTakeover();
+            hostCreate(currentRoomId, 0, true);
+        }
 
         function wireConnection(conn) {
             conn.on('open', () => {
@@ -720,10 +782,18 @@
                 let nm = 'A player', wasHost = false;
                 if (id && links.has(id)) { nm = links.get(id).name || nm; wasHost = !!links.get(id).host; links.delete(id); }
                 try { delete presence[id]; } catch(e){}
+                if (wasHost && inRoom) {
+                    deadHostId = id;
+                    if (knownHostId === id) knownHostId = null;
+                }
                 if (!isHost && wasHost && inRoom) {
                     expectReconnect = true;
                     hostLostBanner(true);
                     scheduleReconnect();
+                    scheduleTakeover();
+                    logChat(nm + ' (host) disconnected — electing a new host…');
+                } else if (inRoom && isHost && id) {
+                    logChat(nm + ' left.');
                 }
                 refreshRoster();
             });
@@ -748,27 +818,64 @@
         // Host creation retries the same id: after a kick or a fast reload the
         // PeerJS cloud may still hold the id for a few seconds ("taken" /
         // "unavailable-id"). We never silently swap in a random room here.
-        function hostCreate(roomId, attempt) {
-            cleanup();
-            isHost = true;
-            reconnectDelay = 1500; hostGone = false; expectReconnect = false;
-            setStatus(ui.hostStatus, attempt ? `retrying room ${roomId}… (${attempt + 1}/6)` : 'creating room ' + roomId + '…');
+        // keepRoom (takeover): same id, same room — frames, games and tables
+        // stay exactly as they are, only the crown moves.
+        function hostCreate(roomId, attempt, keepRoom) {
+            if (!keepRoom) {
+                cleanup();
+                isHost = true;
+                reconnectDelay = 1500; hostGone = false; expectReconnect = false;
+            }
+            else { try { if (peer && !peer.destroyed) peer.destroy(); } catch(e){} peer = null; links.clear(); }
+            // keepRoom claims asynchronously: isHost flips only once the id
+            // is actually held, so a failed claim never strands me as a
+            // fake host (the guest dial loop keeps running meanwhile).
+            // The host-lost banner also stays up until the claim lands.
+            setStatus(ui.hostStatus, attempt ? `retrying room ${roomId}… (${attempt + 1}/6)` : (keepRoom ? ('taking over room ' + roomId + '…') : ('creating room ' + roomId + '…')));
             try {
                 peer = new Peer(roomId);
             } catch (err) {
                 setStatus(ui.hostStatus, 'error: ' + err.message);
                 return;
             }
-            peer.on('open', () => { saveSession(); showRoom(roomId); });
+            peer.on('open', () => {
+                if (keepRoom) isHost = true;
+                saveSession();
+                if (keepRoom) onTakeoverOpen(roomId);
+                else showRoom(roomId);
+            });
             peer.on('connection', (conn) => { wireConnection(conn); });
+            peer.on('disconnected', () => { try { peer.reconnect(); } catch(e){} });
             peer.on('error', (err) => {
                 const msg = err && err.type ? err.type : (err && err.message) || 'error';
-                if ((String(msg).includes('unavailable-id') || String(msg).includes('taken')) && attempt < 5 && !inRoom) {
+                if ((String(msg).includes('unavailable-id') || String(msg).includes('taken')) && attempt < 5) {
                     setStatus(ui.hostStatus, `room “${roomId}” still releasing — retry ${attempt + 1}/5…`);
-                    setTimeout(() => hostCreate(roomId, attempt + 1), 1200 * (attempt + 1));
+                    setTimeout(() => hostCreate(roomId, attempt + 1, keepRoom), 1200 * (attempt + 1));
+                    return;
+                }
+                if ((String(msg).includes('unavailable-id') || String(msg).includes('taken')) && keepRoom) {
+                    // Someone else holds the id now (a successor, or my own
+                    // ghost): find out who before giving up.
+                    probeRoom(roomId);
                     return;
                 }
                 setStatus(ui.hostStatus, 'error: ' + msg);
+            });
+        }
+        function onTakeoverOpen(roomId) {
+            // The crown moved but the room didn't: tell every open game to
+            // keep its state and carry on.
+            const prev = deadHostId;
+            deadHostId = null;
+            reconnectDelay = 1500;
+            hostLostBanner(false);
+            cancelTakeover();
+            refreshRoster();
+            renderRoomChips();
+            try { broadcastPresence(); } catch(e){}
+            logChat('table continues — ' + getName() + ' is hosting');
+            Object.keys(GB.frames).forEach(gid => {
+                GB.down(gid, { t: 'gd', game: gid, k: 'hostmove', p: { from: prev, to: myId, name: getName() } });
             });
         }
 
@@ -783,9 +890,14 @@
             if (!nameConfirmed) { setStatus(ui.joinStatus, 'tap ✓ by your Display Name first'); return; }
             const roomId = ui.joinInput.value.trim();
             if (!roomId) { setStatus(ui.joinStatus, 'enter a Room ID first'); return; }
+            joinAsGuest(roomId);
+        });
+        function joinAsGuest(roomId) {
             cleanup();
             isHost = false;
             reconnectDelay = 1500; hostGone = false; expectReconnect = false;
+            deadHostId = null; knownHostId = null; cancelTakeover();
+            hideTakeoverBar();
             setStatus(ui.joinStatus, 'connecting to ' + roomId + '…');
             peer = new Peer();
             peer.on('open', () => {
@@ -796,13 +908,85 @@
                 setStatus(ui.joinStatus, 'connected!');
             });
             peer.on('connection', (conn) => { wireConnection(conn); });
+            peer.on('disconnected', () => { scheduleReconnect(); });
             peer.on('error', onGuestPeerErr);
+        }
+        // D4: the room id is taken — dial it to find out who holds it. A
+        // different host means my table moved on without me: offer to join
+        // them. My own ghost (or nothing) means keep waiting / retry.
+        let probePeer = null, probeRoomId = null;
+        function probeRoom(roomId) {
+            probeRoomId = roomId;
+            setStatus(ui.hostStatus, `room “${roomId}” is held by someone else — looking…`);
+            try { if (probePeer && !probePeer.destroyed) probePeer.destroy(); } catch(e){}
+            probePeer = null;
+            try {
+                probePeer = new Peer();
+                probePeer.on('open', () => {
+                    let done = false;
+                    const finish = (found) => {
+                        if (done) return; done = true;
+                        try { if (probePeer && !probePeer.destroyed) probePeer.destroy(); } catch(e){}
+                        probePeer = null;
+                        probeDone(found);
+                    };
+                    const to = setTimeout(() => finish(null), 6000);
+                    try {
+                        const conn = probePeer.connect(roomId, { reliable: true });
+                        conn.on('open', () => { try { conn.send({ type: 'hello', id: myId, name: getName(), host: false, game: null }); } catch(e){} });
+                        conn.on('data', (data) => {
+                            if (data && data.type === 'hello' && data.host) {
+                                clearTimeout(to);
+                                finish({ id: data.id, name: data.name });
+                            }
+                        });
+                        conn.on('error', () => { clearTimeout(to); finish(null); });
+                        conn.on('close', () => { clearTimeout(to); finish(null); });
+                    } catch(e) { clearTimeout(to); finish(null); }
+                });
+                probePeer.on('error', () => { probeDone(null); });
+            } catch(e) { probeDone(null); }
+        }
+        function probeDone(found) {
+            // In-room losers heal through the guest dial loop on their own;
+            // only lobby users need the explicit offer.
+            if (inRoom) return;
+            if (found && found.id && found.id !== myId) showTakeoverBar(found);
+            else setStatus(ui.hostStatus, 'room is still releasing — press Create again to retry.');
+        }
+        function showTakeoverBar(found) {
+            const bar = document.getElementById('takeover-bar');
+            const txt = document.getElementById('takeover-text');
+            if (!bar || !txt) return;
+            probeRoomId = probeRoomId || (ui.hostInput.value.trim() || '');
+            txt.textContent = `Table moved to ${found.name || 'someone'} — join them on your old seat?`;
+            bar.classList.remove('hidden');
+            bar.classList.add('flex');
+            bar._found = found;
+        }
+        function hideTakeoverBar() {
+            const bar = document.getElementById('takeover-bar');
+            if (!bar) return;
+            bar.classList.add('hidden');
+            bar.classList.remove('flex');
+            bar._found = null;
+        }
+        document.getElementById('btn-takeover-go').addEventListener('click', () => {
+            const bar = document.getElementById('takeover-bar');
+            const roomId = probeRoomId || ui.hostInput.value.trim();
+            hideTakeoverBar();
+            if (!roomId) return;
+            ui.joinInput.value = roomId;
+            joinAsGuest(roomId);
         });
+        document.getElementById('btn-takeover-no').addEventListener('click', hideTakeoverBar);
 
         document.getElementById('btn-disconnect').addEventListener('click', () => {
             cleanup();
             clearSession();
             clearTimeout(reconnectT);
+            cancelTakeover();
+            deadHostId = null; knownHostId = null;
             hostGone = false; expectReconnect = false;
             showLobby();
             renderRoomChips();
@@ -864,6 +1048,8 @@
             links.clear();
             try { if (peer) peer.destroy(); } catch {}
             peer = null;
+            cancelTakeover();
+            deadHostId = null; knownHostId = null;
             GB.resetAll();
         }
 
@@ -1151,6 +1337,8 @@
                     } else {
                         const h = hostLink();
                         if (h) sendTo(h, { type: 'game', game, k: 'intent', from: { id: myId, name: getName() }, p: m.p });
+                        // no host link: say so instead of swallowing the click
+                        else GB.down(game, { t: 'gd', game, k: 'denied', p: { text: 'host gone — waiting' } });
                     }
                     return;
                 }
@@ -1352,6 +1540,7 @@
                 }
             }
             setInterval(tick, 5000);          // heartbeat + presence changes
+            setInterval(() => { if (hostGone && !isHost && inRoom) renderPeerStatus(); }, 5000); // 60s+ message
             window.addEventListener('beforeunload', () => {
                 if (lastRoom && rc && rc.open) { try { rc.send({ type: 'room-closed', room: lastRoom }); } catch (e) {} }
             });

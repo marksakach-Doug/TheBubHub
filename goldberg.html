@@ -38,6 +38,32 @@ button.gb.pick{padding:6px 8px;}
    twice, or tap the pill button). */
 #selbar{position:absolute;left:50%;bottom:10px;transform:translateX(-50%);z-index:4;display:flex;gap:6px;align-items:center;flex-wrap:wrap;justify-content:center;background:rgba(36,27,18,.94);border:1px solid #e6c280;border-radius:12px;padding:6px 10px;font-size:12px;max-width:calc(100% - 20px);}
 #selbar.hidden{display:none;}
+/* Clear-vote bar: floats above the selection pill while a vote runs. */
+#votebar{position:absolute;left:50%;bottom:56px;transform:translateX(-50%);z-index:4;display:flex;gap:8px;align-items:center;flex-wrap:wrap;justify-content:center;background:rgba(36,27,18,.94);border:1px solid #e6c280;border-radius:12px;padding:6px 10px;font-size:12px;max-width:calc(100% - 20px);}
+#votebar.hidden{display:none;}
+#vote-text{font-family:monospace;color:#ffe9bd;}
+/* Bell tuner: a side drawer for root note, scale, and per-bell degrees. */
+#tune{position:absolute;top:10px;right:10px;bottom:44px;width:252px;z-index:5;background:rgba(36,27,18,.96);border:1px solid #e6c280;border-radius:12px;padding:10px 12px;font-size:12px;overflow-y:auto;}
+#tune.hidden{display:none;}
+/* Saved machines: same drawer pattern as the bell tuner. */
+#machines{position:absolute;top:10px;right:10px;bottom:44px;width:252px;z-index:5;background:rgba(36,27,18,.96);border:1px solid #e6c280;border-radius:12px;padding:10px 12px;font-size:12px;overflow-y:auto;}
+#machines.hidden{display:none;}
+#machines h3{margin:0 0 6px;color:#e6c280;font-size:13px;letter-spacing:1px;}
+#machines .trow{display:flex;gap:6px;align-items:center;margin:4px 0;flex-wrap:wrap;}
+#machines .mrow{display:flex;gap:6px;align-items:center;padding:3px 4px;border-radius:8px;}
+#machines .mrow:hover{background:rgba(230,194,128,.12);}
+#machines .mrow .nn{flex:1;font-family:monospace;overflow:hidden;text-overflow:ellipsis;white-space:nowrap;}
+#machines .mrow .mm{font-family:monospace;font-size:10px;color:#8a7a5c;white-space:nowrap;}
+#machines .mrow button{flex:none;padding:4px 8px;}
+#mach-text{width:100%;box-sizing:border-box;background:#0d0a06;color:#f0e6d2;border:1px solid #6b5636;border-radius:8px;font:11px/1.4 monospace;padding:6px;resize:vertical;}
+#tune h3{margin:0 0 6px;color:#e6c280;font-size:13px;letter-spacing:1px;}
+#tune .trow{display:flex;gap:6px;align-items:center;margin:4px 0;flex-wrap:wrap;}
+#tune select{background:#241b12;color:#f0e6d2;border:1px solid #6b5636;border-radius:8px;padding:4px 6px;font-size:12px;max-width:100%;}
+#tune .brow{display:flex;gap:6px;align-items:center;padding:3px 4px;border-radius:8px;cursor:pointer;}
+#tune .brow:hover{background:rgba(230,194,128,.12);}
+#tune .brow .nn{flex:1;font-family:monospace;}
+#tune .brow button{flex:none;}
+#tune .tnote{font-family:monospace;font-size:11px;color:#8a7a5c;}
 #sel-label{font-family:monospace;color:#ffe9bd;margin-right:4px;}
 /* Re-openable help card (the intro overlay is one-shot, so this is the
    permanent home for the full controls list). */
@@ -69,23 +95,27 @@ button.gb.pick{padding:6px 8px;}
       <button class="gb pick" data-add="conveyor" title="Conveyor — carries things along its arrow; rotate to steer">Conveyor</button>
       <button class="gb pick" data-add="fan" title="Fan — blows along its arrow; drag its end to set strength">Fan</button>
       <button class="gb pick" data-add="balloon" title="Balloon — floats up, carrying its little bob">Balloon</button>
+      <button class="gb pick" data-add="spawner" title="Spawner — drops a ball every 2s (⇄ picks ball/domino/block, max 8 alive)">Spawner</button>
     </div>
     <div class="div"></div>
     <div class="grp"><span class="grp-label">machines</span>
       <button class="gb pick" data-add="lever" title="Lever — a seesaw on a draggable pivot">Lever</button>
       <button class="gb pick" data-add="pendulum" title="Pendulum — press for the anchor, drag out the bob">Pendulum</button>
       <button class="gb pick" data-add="bell" title="Bell — rings with a chime when something taps it">🔔 Bell</button>
-      <button class="gb pick" data-add="catapult" title="Catapult — drag its arm back to cock, a knock sets it off">Catapult</button>
+      <button class="gb pick" data-add="catapult" title="Catapult — drag its arm back to cock, then tap it (or F) to fire. A knock sets it off too.">Catapult</button>
     </div>
     <div class="div"></div>
     <button class="gb" id="btn-draw" title="Sketch a static track">Draw</button>
     <button class="gb" id="btn-erase" title="Tap a part to remove it">Erase</button>
+    <button class="gb" id="btn-copy" title="Copy the selected part + its weld group (Ctrl+C)">📋</button>
+    <button class="gb" id="btn-paste" title="Paste at the cursor (Ctrl+V)">📌</button>
     <label style="font-size:12px">Gravity <input type="range" id="grav" min="0" max="2" step="0.1" value="1" style="width:90px"></label>
     <button class="gb" id="btn-sim">Pause</button>
     <button class="gb" id="btn-clear">Clear</button>
     <button class="gb" id="btn-music">Music: off</button>
+    <button class="gb" id="btn-tune" title="Tune the bells (T)">🎵</button>
+    <button class="gb" id="btn-machines" title="Save / load machines (M)">💾</button>
     <button class="gb" id="btn-help" title="Show all controls">❓</button>
-    <button class="gb" id="btn-hide" title="Hide Goldberg">Hide</button>
     <span id="role" style="font-family:monospace;font-size:11px;opacity:.8">connecting…</span>
   </div>
   <div id="stage-wrap">
@@ -96,8 +126,36 @@ button.gb.pick{padding:6px 8px;}
       <button class="gb" id="btn-rot-ccw" title="Rotate 15° counter-clockwise (Shift+R)">⟲</button>
       <button class="gb" id="btn-rot-cw" title="Rotate 15° clockwise (R)">⟳</button>
       <button class="gb" id="btn-flip" title="Flip direction (conveyor / turntable / fan)">⇄</button>
+      <button class="gb" id="btn-fire" title="Fire the catapult (F)">FIRE</button>
+      <button class="gb" id="btn-pop" title="Pop this balloon">🎈</button>
+      <button class="gb" id="btn-link" title="Weld to another part">🔗</button>
       <button class="gb" id="btn-lock" title="Lock / unlock in place (L)">🔒</button>
       <button class="gb" id="btn-del" title="Delete the selected part (Del)">🗑</button>
+    </div>
+    <div id="votebar" class="hidden">
+      <span id="vote-text"></span>
+      <button class="gb" id="btn-vote-yes">Approve</button>
+      <button class="gb" id="btn-vote-no">No</button>
+    </div>
+    <div id="tune" class="hidden">
+      <h3>🎵 BELL TUNER</h3>
+      <div class="trow"><label>Root <select id="tune-root"></select></label>
+      <label>Scale <select id="tune-scale"></select></label></div>
+      <div class="trow"><button class="gb" id="btn-tune-g">G major</button>
+      <button class="gb" id="btn-tune-re">Reassign ←→</button>
+      <button class="gb" id="btn-tune-prev">Preview</button></div>
+      <div class="tnote">Bells ring left to right up the scale. Tap a row to hear it, ◀ ▶ to retune.</div>
+      <div id="tune-list"></div>
+      <div class="trow" style="justify-content:flex-end"><button class="gb" id="btn-tune-close">Close</button></div>
+    </div>
+    <div id="machines" class="hidden">
+      <h3>💾 MACHINES</h3>
+      <div class="trow"><button class="gb" id="btn-mach-save">Save current table</button></div>
+      <div id="mach-list"></div>
+      <div class="trow"><button class="gb" id="btn-mach-exp">Export table</button>
+      <button class="gb" id="btn-mach-imp">Load text</button></div>
+      <textarea id="mach-text" rows="3" placeholder='Paste a machine here, or Export to share this table as text.'></textarea>
+      <div class="trow" style="justify-content:flex-end"><button class="gb" id="btn-mach-close">Close</button></div>
     </div>
     <div id="overlay"><h1>GOLDBERG</h1><p>Tap to enter the workshop. Build a chain-reaction machine with friends: press a part, drag it out on the table, tip the first ball.</p><p style="font-size:11px;opacity:.75">Drag a part's end dots to reshape it · tap a part twice for lock / delete · drag the 📍 marker to move where new balls appear</p></div>
     <div id="help" class="hidden"><div class="card">
@@ -112,6 +170,8 @@ button.gb.pick{padding:6px 8px;}
         <tr><td>Lock in place</td><td>Tap the part twice, then 🔒 — or L (new parts start locked)</td></tr>
         <tr><td>Delete</td><td>Tap twice, then 🗑 — or Erase mode, or the Del key</td></tr>
         <tr><td>Flip</td><td>Tap twice, then ⇄ (conveyor / turntable / fan)</td></tr>
+        <tr><td>Link</td><td>Tap twice, then 🔗, then tap another part — they move as one (🔓 splits them)</td></tr>
+        <tr><td>Copy / paste</td><td>📋 copies the selection with its weld group, 📌 pastes at the cursor (Ctrl+C / Ctrl+V)</td></tr>
         <tr><td>Spawn point</td><td>Drag the 📍 marker itself</td></tr>
         <tr><td>Draw track</td><td>Draw mode, then sketch with your finger or mouse</td></tr>
       </table>
@@ -272,6 +332,7 @@ const KIND_DEF={
   pendulum: {r:16, locked:true},
   bell:     {r:24, locked:true},
   catapult: {w:260, locked:true},
+  spawner:  {w:120,h:64, locked:true},
 };
 const SIZE_LIMITS={
   ball:     {r:[8,70]},
@@ -287,9 +348,9 @@ const SIZE_LIMITS={
 };
 const LEN_KINDS=['plank','domino','bouncer','conveyor','lever'];
 const RAD_KINDS=['ball','turntable'];
-const ROT_KINDS=['plank','block','domino','bouncer','conveyor','fan','lever','bucket'];
+const ROT_KINDS=['plank','block','domino','bouncer','conveyor','fan','lever','bucket','catapult'];
 const ANCHOR_KINDS=['pendulum','lever','catapult'];
-const FLIP_KINDS=['turntable','conveyor','fan'];
+const FLIP_KINDS=['turntable','conveyor','fan','spawner'];
 function makeRecord(kind,x,y,extra){
   if(kind==='ramp')kind='plank'; // legacy: plank and ramp are one part now
   const d=KIND_DEF[kind]||{};
@@ -303,6 +364,7 @@ function makeRecord(kind,x,y,extra){
   if(kind==='pendulum'&&(rec.ax===undefined)){rec.ax=rec.x;rec.ay=rec.y-220;}
   if(kind==='lever'&&(rec.ax===undefined)){rec.ax=rec.x;rec.ay=rec.y;}
   if(kind==='catapult'&&(rec.ax===undefined)){rec.ax=rec.x-rec.w*0.25;rec.ay=rec.y;rec.a0=rec.angle;}
+  if(kind==='spawner'){rec.what=rec.what||'ball';rec.iv=rec.iv||2;rec.cap=rec.cap||8;}
   if(rec.a0===undefined&&kind==='catapult')rec.a0=rec.angle;
   return clampRec(rec);
 }
@@ -360,6 +422,10 @@ function ensureEngine(){
       if(sp<1.2) continue;
       const bellRec=(ra&&ra.kind==='bell')?ra:((rb&&rb.kind==='bell')?rb:null);
       if(bellRec&&sp>1.5){ ringBell(bellRec.id,Math.min(1,sp/10)); continue; }
+      // balloons pop when the envelope itself is hit hard (hitting the
+      // little bob does nothing). queued — never mutate mid-solve.
+      const popRec=(ra&&ra.kind==='balloon'&&a===bodies.get(ra.id))?ra:((rb&&rb.kind==='balloon'&&b===bodies.get(rb.id))?rb:null);
+      if(popRec&&sp>6){ if(!popQueue.includes(popRec.id)) popQueue.push(popRec.id); continue; }
       if(sp>2.5){
         const rec=ra||rb, id=rec&&rec.id;
         if(id){
@@ -403,8 +469,14 @@ function bucketBody(rec){
   return c;
 }
 function catapultArm(rec){
+  // The arm is centred on rec.x/rec.y (the drawing matches it exactly —
+  // the hinge sits a quarter-length back, the cup a half-length forward).
+  // A short lip at the cup end cradles the payload while cocking but is
+  // low enough to hop during the whip.
   const len=rec.w||260;
-  return Matter.Bodies.rectangle(rec.x,rec.y,len,14,{friction:.4,restitution:.1,density:.0015});
+  const bar=Matter.Bodies.rectangle(rec.x,rec.y,len,14,{friction:.6,restitution:0,density:.002});
+  const lip=Matter.Bodies.rectangle(rec.x+len/2-5,rec.y-12,12,14,{friction:.6,restitution:0,density:.002});
+  return Matter.Body.create({parts:[bar,lip],friction:.6,restitution:0});
 }
 function bodyFor(rec){
   if(typeof Matter==='undefined') return null;
@@ -422,6 +494,7 @@ function bodyFor(rec){
   else if(rec.kind==='turntable') b=Matter.Bodies.circle(rec.x,rec.y,rec.r||42,{friction:.5,frictionAir:.06,restitution:.1,density:.001});
   else if(rec.kind==='balloon') b=Matter.Bodies.circle(rec.x,rec.y,rec.r||20,{friction:.1,frictionAir:.02,restitution:.5,density:.0004});
   else if(rec.kind==='pendulum') b=Matter.Bodies.circle(rec.x,rec.y,rec.r||16,{friction:.05,restitution:.3,density:.002});
+  else if(rec.kind==='spawner') b=Matter.Bodies.rectangle(rec.x,rec.y,rec.w||120,rec.h||64,{friction:.4,restitution:.05});
   else if(rec.kind==='catapult') b=catapultArm(rec);
   else if(rec.kind==='drawn') b=compoundFromVerts(rec);
   if(b){ b._gid=rec.id; if(rec.angle&&rec.kind!=='drawn') Matter.Body.setAngle(b,rec.angle); }
@@ -431,6 +504,97 @@ function bodyFor(rec){
    links: id -> {cons:[], extras:[], bob?}. Latch state for catapults. */
 const links=new Map();
 const latch=new Map(); // catapult id -> true while cocked
+/* Welds: rigid pairs that move as one. weldCons: "idA<idB" -> Constraint;
+   weldGroups: gid -> Set(ids); records carry lid (the gid). Unlike pivot
+   links, welds join two bodies together (bucket bolted to a lever). */
+const weldCons=new Map();
+const weldGroups=new Map();
+let linkArm=null; // id of the part waiting for a weld partner (Esc cancels)
+function weldKey(a,b){ return a<b?a+'<'+b:b+'<'+a; }
+function weldMembers(id){
+  const rec=records.get(id);
+  if(!rec) return [];
+  if(!rec.lid||!weldGroups.has(rec.lid)) return [rec];
+  return [...weldGroups.get(rec.lid)].map(x=>records.get(x)).filter(Boolean);
+}
+// A weld containing a locked-in-place part is immovable.
+function weldMovable(id){
+  for(const m of weldMembers(id)) if(m.locked&&!LINKED.includes(m.kind)) return false;
+  return true;
+}
+function hostWeld(aId,bId){
+  const ra=records.get(aId), rb=records.get(bId);
+  if(!ra||!rb||aId===bId) return false;
+  const ba=bodies.get(aId), bb=bodies.get(bId);
+  if(!ba||!bb||typeof Matter==='undefined'||!engine) return false;
+  const k=weldKey(aId,bId);
+  if(weldCons.has(k)) return true;
+  const mx=(ra.x+rb.x)/2, my=(ra.y+rb.y)/2;
+  // Soft pin (never a rigid snap): adjacent parts sit rock-solid, distant
+  // parts glide together instead of exploding. Damping eats oscillation.
+  // User-driven moves stay perfectly rigid (hostMove/hostRot move the
+  // whole group explicitly); only free physics is springy.
+  const con=Matter.Constraint.create({bodyA:ba,pointA:bodyLocal(ba,mx,my),
+    bodyB:bb,pointB:bodyLocal(bb,mx,my),stiffness:0.2,length:0,damping:0.3});
+  Matter.Composite.add(engine.world,con);
+  weldCons.set(k,con);
+  // merge any existing groups the two members belong to
+  let gid=ra.lid||rb.lid||uid('g');
+  const mem=new Set();
+  if(ra.lid&&weldGroups.has(ra.lid)) weldGroups.get(ra.lid).forEach(x=>mem.add(x));
+  if(rb.lid&&weldGroups.has(rb.lid)) weldGroups.get(rb.lid).forEach(x=>mem.add(x));
+  mem.add(aId); mem.add(bId);
+  if(ra.lid&&ra.lid!==gid) weldGroups.delete(ra.lid);
+  if(rb.lid&&rb.lid!==gid) weldGroups.delete(rb.lid);
+  weldGroups.set(gid,mem);
+  mem.forEach(x=>{const r=records.get(x); if(r) r.lid=gid;});
+  scheduleSave();
+  return true;
+}
+function dropWeldCons(id){
+  let touched=false;
+  for(const [k,con] of [...weldCons]){
+    const parts=k.split('<');
+    if(parts[0]===id||parts[1]===id){
+      if(engine) try{Matter.Composite.remove(engine.world,con);}catch(e){}
+      weldCons.delete(k); touched=true;
+    }
+  }
+  return touched;
+}
+// Rebuild connected components from the surviving pair constraints.
+function recomputeWelds(){
+  const adj=new Map();
+  for(const k of weldCons.keys()){
+    const parts=k.split('<'), a=parts[0], b=parts[1];
+    if(!records.has(a)||!records.has(b)){ // stale pair
+      const con=weldCons.get(k);
+      if(engine&&con) try{Matter.Composite.remove(engine.world,con);}catch(e){}
+      weldCons.delete(k); continue;
+    }
+    if(!adj.has(a))adj.set(a,[]);
+    if(!adj.has(b))adj.set(b,[]);
+    adj.get(a).push(b); adj.get(b).push(a);
+  }
+  weldGroups.clear();
+  for(const r of records.values()) delete r.lid;
+  const seen=new Set();
+  for(const start of adj.keys()){
+    if(seen.has(start)) continue;
+    const comp=[]; const q=[start]; seen.add(start);
+    while(q.length){const cur=q.pop(); comp.push(cur);
+      for(const nb of (adj.get(cur)||[])) if(!seen.has(nb)){seen.add(nb);q.push(nb);}}
+    if(comp.length>1){
+      const gid=uid('g');
+      weldGroups.set(gid,new Set(comp));
+      comp.forEach(x=>{const r=records.get(x); if(r) r.lid=gid;});
+    }
+  }
+}
+function hostUnweld(id){
+  if(dropWeldCons(id)) recomputeWelds();
+  scheduleSave();
+}
 const LINKED=['lever','pendulum','turntable','balloon','catapult'];
 function bodyLocal(b,wx,wy){
   const dx=wx-b.position.x, dy=wy-b.position.y;
@@ -496,6 +660,18 @@ function seatPin(rec){
 }
 function rebuildBody(rec){
   if(!engine||typeof Matter==='undefined') return;
+  // Weld constraints point at this exact body object: detach them, rebuild,
+  // then re-pin to the same partners (the group id survives on the record).
+  const partners=[];
+  for(const k of [...weldCons.keys()]){
+    const parts=k.split('<');
+    if(parts[0]===rec.id||parts[1]===rec.id){
+      partners.push(parts[0]===rec.id?parts[1]:parts[0]);
+      const con=weldCons.get(k);
+      try{Matter.Composite.remove(engine.world,con);}catch(e){}
+      weldCons.delete(k);
+    }
+  }
   removeLinks(rec.id);
   const old=bodies.get(rec.id);
   if(old) Matter.Composite.remove(engine.world,old);
@@ -510,6 +686,7 @@ function rebuildBody(rec){
     bodies.set(rec.id,b);
   }
   buildLinks(rec);
+  partners.forEach(other=>hostWeld(rec.id,other));
 }
 function compoundFromVerts(rec){
   const cx=rec.x, cy=rec.y, vs=rec.verts||[];
@@ -548,14 +725,18 @@ function hostAdd(rec){
   queueAdd(rec);
   pruneCaps();
   scheduleSave();
+  renderTune();
 }
 // Browser-safety caps: each ball is a live Matter body plus a network
 // snapshot entry every 50ms, so unbounded tables eventually crash the tab.
 // Past the cap the OLDEST parts go first (hostDel relays the delete, so
 // guests drop them too).
-const MAX_BALLS=90, MAX_PARTS=260;
+const MAX_BALLS=90, MAX_PARTS=260, MAX_AUTO=60;
 function pruneCaps(){
   let culled=0;
+  // auto-spawned children are culled first, oldest first
+  const autos=[]; for(const [id,r] of records) if(r.auto) autos.push(id);
+  for(let i=0;i+MAX_AUTO<autos.length;i++){ hostDel(autos[i]); culled++; }
   const balls=[]; for(const [id,r] of records) if(r.kind==='ball') balls.push(id);
   for(let i=0;i+MAX_BALLS<balls.length;i++){ hostDel(balls[i]); culled++; }
   while(records.size>MAX_PARTS){ hostDel(records.keys().next().value); culled++; }
@@ -566,12 +747,25 @@ const pendingAdd=[], pendingDel=[];
 function queueAdd(r){ pendingAdd.push(r); }
 function queueDel(id){ pendingDel.push(id); }
 function hostMove(id,x,y){
-  const rec=records.get(id); const b=bodies.get(id);
-  if(!rec) return;
+  const rec=records.get(id);
+  if(!rec||typeof Matter==='undefined') return;
+  if(!weldMovable(id)) return; // welded to something locked in place
   const dx=x-rec.x, dy=y-rec.y;
-  rec.x=Math.round(x); rec.y=Math.round(y);
-  if(b) Matter.Body.setPosition(b,{x:rec.x,y:rec.y});
-  const L=links.get(id);
+  // Welded members travel together, so the assembly moves as one.
+  for(const m of weldMembers(id)){
+    m.x=Math.round(m.x+dx); m.y=Math.round(m.y+dy);
+    clampRec(m);
+    const mb=bodies.get(m.id);
+    if(mb) Matter.Body.setPosition(mb,{x:m.x,y:m.y});
+    moveExtras(m,dx,dy);
+  }
+  scheduleSave();
+}
+// Aux bodies/pins that travel with their part (lever pivot, catapult hinge
+// + base, balloon bob, turntable centre pin).
+function moveExtras(rec,dx,dy){
+  if(typeof Matter==='undefined') return;
+  const L=links.get(rec.id);
   if(rec.kind==='lever'||rec.kind==='catapult'){
     // The pivot/hinge travels with the part.
     rec.ax+=dx; rec.ay+=dy; updateLink(rec);
@@ -581,7 +775,6 @@ function hostMove(id,x,y){
   }else if(rec.kind==='turntable'||(rec.kind==='balloon'&&rec.locked)){
     seatPin(rec);
   }
-  scheduleSave();
 }
 // Grip: while anyone holds a part, freeze its body so the physics engine
 // stops fighting the cursor. A dragged plank otherwise keeps accumulating
@@ -590,6 +783,13 @@ function hostMove(id,x,y){
 // correctly afterwards.
 const heldFrozen=new Set(); // ids the host froze for an active drag
 function hostHold(id){
+  // A dragged weld freezes together, so the assembly never fights the cursor.
+  for(const m of weldMembers(id)) holdOne(m.id);
+}
+function hostRelease(id){
+  for(const m of weldMembers(id)) releaseOne(m.id);
+}
+function holdOne(id){
   const rec=records.get(id); const b=bodies.get(id);
   if(!rec||!b||typeof Matter==='undefined') return;
   if(b.isStatic) return; // statics never need freezing; pinned parts do
@@ -599,7 +799,7 @@ function hostHold(id){
     Matter.Body.setStatic(b,true); heldFrozen.add(id);
   }catch(e){}
 }
-function hostRelease(id){
+function releaseOne(id){
   if(!heldFrozen.has(id)) return;
   heldFrozen.delete(id);
   const rec=records.get(id); const b=bodies.get(id);
@@ -616,16 +816,41 @@ function hostRot(id,angle){
   const rec=records.get(id); const b=bodies.get(id);
   if(!rec) return;
   if(rec.kind==='catapult'){
-    // Rotate the arm about its hinge, not its centre.
+    // Rotate the arm about its hinge, not its centre. Aiming also moves
+    // the rest angle — the spring always throws back to a0.
     const len=(rec.w||260)*0.25;
-    rec.angle=angle;
+    rec.angle=angle; rec.a0=angle;
     rec.x=Math.round(rec.ax+Math.cos(angle)*len);
     rec.y=Math.round(rec.ay+Math.sin(angle)*len);
     if(b){ Matter.Body.setPosition(b,{x:rec.x,y:rec.y}); Matter.Body.setAngle(b,angle); }
     updateLink(rec);
   }else{
+    const mems=weldMembers(id);
+    if(mems.length>1){
+      // Rigid rotation of the whole weld about this member (catapults pivot
+      // on their hinge, everything else on its centre).
+      const px=(rec.kind==='catapult'&&rec.ax!==undefined)?rec.ax:rec.x;
+      const py=(rec.kind==='catapult'&&rec.ay!==undefined)?rec.ay:rec.y;
+      const dAng=angle-rec.angle;
+      const c=Math.cos(dAng), s=Math.sin(dAng);
+      const rot=(x,y)=>({x:px+(x-px)*c-(y-py)*s, y:py+(x-px)*s+(y-py)*c});
+      for(const m of mems){
+        if(m===rec) continue;
+        const np=rot(m.x,m.y);
+        m.x=Math.round(np.x); m.y=Math.round(np.y);
+        m.angle=(m.angle||0)+dAng;
+        if(m.ax!==undefined&&(m.kind==='lever'||m.kind==='catapult'||m.kind==='pendulum')){
+          const ap=rot(m.ax,m.ay); m.ax=Math.round(ap.x); m.ay=Math.round(ap.y);
+        }
+        const mb=bodies.get(m.id);
+        clampRec(m);
+        if(mb&&typeof Matter!=='undefined'){ Matter.Body.setPosition(mb,{x:m.x,y:m.y}); Matter.Body.setAngle(mb,m.angle); }
+        updateLink(m);
+        if(m.kind==='turntable'||(m.kind==='balloon'&&m.locked)) seatPin(m);
+      }
+    }
     rec.angle=angle;
-    if(b) Matter.Body.setAngle(b,angle);
+    if(b&&typeof Matter!=='undefined') Matter.Body.setAngle(b,angle);
     if(rec.kind==='lever') updateLink(rec);
   }
   scheduleSave();
@@ -664,6 +889,11 @@ function hostFlip(id){
   const rec=records.get(id);
   if(!rec||!FLIP_KINDS.includes(rec.kind)) return;
   if(rec.kind==='fan'){ hostRot(id,(rec.angle||0)+Math.PI); return; }
+  if(rec.kind==='spawner'){
+    // cycle what it drops: ball -> domino -> block
+    rec.what=rec.what==='ball'?'domino':(rec.what==='domino'?'block':'ball');
+    scheduleSave(); return;
+  }
   rec.u=((rec.u===undefined?1:rec.u)>=0)?-1:1;
   scheduleSave();
 }
@@ -684,18 +914,27 @@ function hostLock(id,locked){
   scheduleSave();
 }
 function hostDel(id){
+  const doomed=records.get(id);
+  if(doomed&&doomed.kind==='spawner'){
+    // deleting a spawner takes its children with it
+    for(const [cid,cr] of [...records]) if(cr.auto===id) hostDel(cid);
+  }
   const b=bodies.get(id);
   if(b&&engine) Matter.Composite.remove(engine.world,b);
   bodies.delete(id); records.delete(id);
   removeLinks(id); latch.delete(id);
+  if(dropWeldCons(id)) recomputeWelds(); // survivors re-group
   draggedBy.delete(id); pausedFrozen.delete(id); heldFrozen.delete(id);
   if(selectedId===id){ selectedId=null; pillOpen=false; }
   queueDel(id);
   scheduleSave();
+  renderTune();
 }
 function hostClear(){
   const ids=[...records.keys()];
   for(const id of ids) removeLinks(id); // first: pins/strings/bobs live in links
+  for(const [,con] of weldCons) if(engine) try{Matter.Composite.remove(engine.world,con);}catch(e){}
+  weldCons.clear(); weldGroups.clear();
   if(engine){ for(const [,b] of bodies) Matter.Composite.remove(engine.world,b); }
   bodies.clear(); records.clear(); draggedBy.clear(); pausedFrozen.clear(); heldFrozen.clear();
   links.clear(); latch.clear();
@@ -703,6 +942,101 @@ function hostClear(){
   ids.forEach(queueDel);
   try{ localStorage.removeItem(SAVE_KEY); }catch(e){}
   updateSel(); reportHeight();
+  renderTune();
+}
+/* ---------- clear vote: wiping the table needs everyone ----------
+   Solo (or a private table) clears immediately. In a room the host
+   proposes and every player in the room must approve: one No (or 25s of
+   silence) cancels. Guests vote through intents; the host evaluates
+   against its own roster and broadcasts the vote in the state. */
+let clearVote=null; // {by,name,yes:[ids],ynames:{},no:[ids],nnames:{},until}
+let voteDone=null; // {text,until} — one-shot outcome note
+let vote=null, voteMsg='', voteMsgUntil=0; // guest-side mirror
+let voteHtml='__', clearLabel='__';
+function voteRoster(){
+  const ids=[myId], names={};
+  names[myId]=myName;
+  (Hub.roster||[]).forEach(m=>{ if(m.id&&m.id!==myId){ ids.push(m.id); names[m.id]=m.name||'guest'; } });
+  return {ids,names};
+}
+function voteApply(id,name,v){
+  if(!clearVote||!id) return;
+  clearVote.yes=clearVote.yes.filter(x=>x!==id);
+  clearVote.no=clearVote.no.filter(x=>x!==id);
+  if(v){ clearVote.yes.push(id); clearVote.ynames[id]=name||'guest'; }
+  else{ clearVote.no.push(id); clearVote.nnames[id]=name||'guest'; }
+  checkVote();
+}
+function checkVote(){
+  if(!clearVote||!isHost) return;
+  const now=Date.now();
+  const {ids,names}=voteRoster();
+  // drop departed voters from the tally
+  clearVote.yes=clearVote.yes.filter(x=>ids.indexOf(x)>=0);
+  clearVote.no=clearVote.no.filter(x=>ids.indexOf(x)>=0);
+  if(clearVote.no.length){
+    const n=clearVote.nnames[clearVote.no[0]]||'someone';
+    clearVote=null; voteDone={text:n+' said no — table stays',until:now+3000};
+    renderVote(); return;
+  }
+  if(now>clearVote.until){
+    clearVote=null; voteDone={text:'clear vote expired — table stays',until:now+3000};
+    renderVote(); return;
+  }
+  const missing=ids.filter(x=>clearVote.yes.indexOf(x)<0);
+  if(!missing.length){
+    clearVote=null; voteDone=null;
+    hostClear();
+    flashNote('table cleared');
+  }else renderVote();
+}
+function startVote(from){
+  from=from||{id:myId,name:myName};
+  clearVote={by:from.id,name:from.name||'guest',yes:[from.id],ynames:{},no:[],nnames:{},until:Date.now()+25000};
+  clearVote.ynames[from.id]=from.name||'guest';
+  checkVote(); // instant-clear when alone in the room
+}
+function castVote(v){
+  if(isHost){ if(clearVote) voteApply(myId,myName,v?1:0); }
+  else Hub.up('intent',{a:'vote',v:v?1:0});
+}
+function renderVote(){
+  const box=$('votebar'); if(!box) return;
+  const now=Date.now();
+  let html='', showBtns=false, label='Clear';
+  const v=isHost?clearVote:vote;
+  if(v){
+    const secs=Math.max(0,Math.ceil((v.until-now)/1000));
+    let yn, wt, total;
+    if(isHost){
+      // the host tallies against its own roster (a guest's roster is only
+      // itself + the host, so it could never count everyone)
+      const rs=voteRoster();
+      const missing=rs.ids.filter(x=>v.yes.indexOf(x)<0);
+      yn=v.yes.map(id=>((v.ynames||{})[id]||rs.names[id]||'guest')).join(', ');
+      wt=missing.map(x=>rs.names[x]||'guest').join(', ');
+      total=rs.ids.length;
+    }else{
+      yn=(v.yes||[]).map(id=>((v.ynames||{})[id]||'guest')).join(', ');
+      wt=(v.wait||[]).join(', ');
+      total=v.need||((v.yes||[]).length+(v.wait||[]).length);
+    }
+    html=(v.name||'Someone')+' wants to clear the table — '+(v.yes||[]).length+'/'+total+' yes'+(yn?' ('+yn+')':'')+(wt?' · waiting: '+wt:'')+' · '+secs+'s';
+    const voted=(v.yes||[]).indexOf(myId)>=0||(v.no||[]).indexOf(myId)>=0;
+    showBtns=!voted;
+    label='Clear?';
+  }else{
+    const msg=isHost?(voteDone&&now<voteDone.until?voteDone.text:''):(now<voteMsgUntil?voteMsg:'');
+    if(msg) html=msg;
+  }
+  if(html!==voteHtml){
+    voteHtml=html;
+    box.classList.toggle('hidden',!html);
+    $('vote-text').textContent=html;
+    $('btn-vote-yes').style.display=showBtns?'':'none';
+    $('btn-vote-no').style.display=showBtns?'':'none';
+  }
+  if(label!==clearLabel){ clearLabel=label; $('btn-clear').textContent=label; }
 }
 function applySim(running){
   running=!!running;
@@ -744,25 +1078,61 @@ function pushSfx(s){
 }
 function ringBell(id,v){
   rungAt.set(id,Date.now());
-  pushSfx({i:id,t:'bell',v});
+  pushSfx({i:id,t:'bell',v,m:bellMidi(records.get(id))});
+}
+/* ---------- bell tuner: root + scale + per-bell degrees ----------
+   Degrees climb left to right across the scale; middle C octave base. */
+const SCALES={major:[0,2,4,5,7,9,11],'minor-pent':[0,3,5,7,10],'whole':[0,2,4,6,8,10],chromatic:[0,1,2,3,4,5,6,7,8,9,10,11]};
+const NOTE_NAMES=['C','C#','D','D#','E','F','F#','G','G#','A','A#','B'];
+let tune={root:7,scale:'major'}; // G major out of the box
+function bellDeg(rec){
+  if(rec&&rec.note!==undefined) return Math.max(0,rec.note|0);
+  const bells=[...records.values()].filter(r=>r.kind==='bell').sort((a,b)=>a.x-b.x);
+  const i=rec?bells.findIndex(b=>b.id===rec.id):-1;
+  return i<0?0:i;
+}
+function bellMidi(rec){
+  const sc=SCALES[(tune&&tune.scale)]||SCALES.major;
+  const deg=bellDeg(rec);
+  return Math.min(96,(60+(tune&&tune.root||0))+sc[deg%sc.length]+12*Math.floor(deg/sc.length));
+}
+function midiName(m){
+  m=Math.max(0,Math.round(m)||0);
+  return NOTE_NAMES[m%12]+(Math.floor(m/12)-1);
+}
+function hostNote(id,n){
+  const rec=records.get(id); if(!rec||rec.kind!=='bell') return;
+  rec.note=Math.max(0,Math.min(24,n|0));
+  scheduleSave(); renderTune();
+}
+function hostTune(root,scale){
+  if(root!==undefined) tune.root=Math.max(0,Math.min(11,root|0));
+  if(scale!==undefined&&SCALES[scale]) tune.scale=scale;
+  scheduleSave(); renderTune();
+}
+function hostReassign(){
+  const bells=[...records.values()].filter(r=>r.kind==='bell').sort((a,b)=>a.x-b.x);
+  bells.forEach((b,i)=>{ b.note=i; });
+  scheduleSave(); renderTune();
 }
 function fireCatapult(id){
-  if(!latch.get(id)) return;
-  latch.delete(id);
   const rec=records.get(id), b=bodies.get(id);
-  if(rec&&b&&typeof Matter!=='undefined'){
-    try{
-      if(b.isStatic) Matter.Body.setStatic(b,false);
-      // A starting shove; the torsion spring below does the rest.
-      Matter.Body.setAngularVelocity(b,(b.angularVelocity||0)+0.35);
-    }catch(e){}
-  }
+  if(!rec||!b||typeof Matter==='undefined') return;
+  const d=wrapAngle((rec.a0||0)-b.angle);
+  // Fire when cocked (latched) or dragged back past ~45 degrees. The kick
+  // starts the swing; the torsion spring in tickParts does the throwing.
+  if(!latch.get(id)&&Math.abs(d)<0.8) return;
+  latch.delete(id);
+  try{
+    if(b.isStatic) Matter.Body.setStatic(b,false);
+    Matter.Body.setAngularVelocity(b,(Math.sign(d)||1)*0.5);
+  }catch(e){}
   pushSfx({i:id,t:'whoosh',v:.8});
 }
 function impactSound(kind){
   if(kind==='bouncer') return 'boing';
   if(kind==='plank'||kind==='block'||kind==='domino'||kind==='lever'||
-     kind==='bucket'||kind==='catapult'||kind==='drawn'||kind==='turntable') return 'knock';
+     kind==='bucket'||kind==='catapult'||kind==='drawn'||kind==='turntable'||kind==='spawner') return 'knock';
   if(kind==='ball'||kind==='peg'||kind==='bell'||kind==='balloon'||kind==='pendulum') return 'thud';
   return null; // conveyor, fan: silent by design
 }
@@ -800,17 +1170,67 @@ function tickParts(){
       const load=b.mass+((L&&L.bob)?L.bob.mass:0.2);
       b.force.y-=load*0.0013;
       if(b.velocity.y<-6) Matter.Body.setVelocity(b,{x:b.velocity.x,y:-6});
+    }else if(rec.kind==='spawner'){
+      // drop the next object out of the chute (every ~2s, capped — the
+      // actual spawn happens after the physics step, never mid-solve)
+      if(rec.next===undefined) rec.next=now+1000;
+      if(now>=rec.next){ rec.next=now+Math.max(0.5,rec.iv||2)*1000; spawnQueue.push(rec.id); }
     }else if(rec.kind==='catapult'&&rec.locked){
       const b=bodies.get(rec.id); if(!b||b.isStatic) continue;
       if(latch.get(rec.id)){ Matter.Body.setVelocity(b,{x:0,y:0}); Matter.Body.setAngularVelocity(b,0); continue; }
       const d=wrapAngle((rec.a0||0)-b.angle);
       // Cock the arm by dragging it back; it latches past ~45 degrees.
       if(d>0.8&&Math.abs(b.angularVelocity)<0.5){ latch.set(rec.id,true); pushSfx({i:rec.id,t:'click',v:.5}); continue; }
-      Matter.Body.setAngularVelocity(b,b.angularVelocity*0.92+d*0.06); // torsion spring
+      // Torsion spring: whips the arm back to its rest angle hard enough to
+      // throw whatever sits in the cup. Also holds it there against sag.
+      Matter.Body.setAngularVelocity(b,b.angularVelocity*0.9+d*0.25);
     }
   }
 }
 
+/* ---------- auto-spawner runtime (host only) ----------
+   Spawns and pops are queued during physics/events and applied after
+   Engine.update, so bodies are never added or removed mid-solve. */
+const spawnQueue=[], popQueue=[];
+function runSpawns(){
+  if(!spawnQueue.length) return;
+  const ids=spawnQueue.splice(0);
+  for(const sid of ids){
+    const rec=records.get(sid);
+    if(!rec||rec.kind!=='spawner') continue;
+    const kids=[]; for(const r of records.values()) if(r.auto===sid) kids.push(r);
+    const cap=Math.max(1,Math.min(20,rec.cap||8));
+    // oldest children make room first: the table never fills up
+    kids.sort((a,b)=>(a.born||0)-(b.born||0));
+    while(kids.length>=cap){ const old=kids.shift(); hostDel(old.id); }
+    const what=(rec.what==='domino'||rec.what==='block')?rec.what:'ball';
+    const child=makeRecord(what,Math.round(rec.x+(Math.random()*20-10)),Math.round(rec.y+(rec.h||64)/2+24),{locked:false});
+    child.auto=sid; child.born=Date.now();
+    hostAdd(child);
+  }
+}
+function runPops(){
+  if(!popQueue.length) return;
+  const ids=popQueue.splice(0);
+  for(const id of ids){
+    const rec=records.get(id);
+    if(!rec||rec.kind!=='balloon') continue;
+    // the little bob survives as a real ball and drops
+    const L=links.get(id);
+    let bx=rec.x, by=rec.y+90;
+    if(L&&L.bob){ bx=L.bob.position.x; by=L.bob.position.y; }
+    hostDel(id);
+    const ball=makeRecord('ball',Math.round(bx),Math.round(by),{locked:false});
+    ball.r=10;
+    hostAdd(ball);
+    pushSfx({i:ball.id,t:'pop',v:.9});
+  }
+}
+function doPop(id){
+  const r=records.get(id); if(!r||r.kind!=='balloon') return;
+  if(isHost){ if(!popQueue.includes(id)) popQueue.push(id); }
+  else Hub.up('intent',{a:'pop',id});
+}
 /* ---------- table persistence (host only; guests get it over the wire) ---------- */
 const SAVE_KEY='bubhub.goldberg.table';
 let saveT=null;
@@ -823,10 +1243,8 @@ function saveTable(){
   if(!isHost) return;
   try{
     const parts=[];
-    for(const r of records.values()) parts.push({id:r.id,kind:r.kind,x:Math.round(r.x),y:Math.round(r.y),
-      angle:+((r.angle||0).toFixed(3)),color:r.color,locked:!!r.locked,w:r.w,h:r.h,r:r.r,
-      u:r.u,ax:r.ax,ay:r.ay,a0:r.a0,verts:r.verts});
-    localStorage.setItem(SAVE_KEY,JSON.stringify({v:1,g:gravityY,parts}));
+    for(const r of records.values()) parts.push(serPart(r));
+    localStorage.setItem(SAVE_KEY,JSON.stringify({v:1,g:gravityY,tune:{r:tune.root,s:tune.scale},parts,welds:[...weldCons.keys()]}));
   }catch(e){}
 }
 let restored=false;
@@ -838,12 +1256,18 @@ function restoreTable(){
   if(!data||!Array.isArray(data.parts)||!data.parts.length) return;
   ensureEngine();
   if(typeof data.g==='number') applyGravSilent(data.g);
+  if(data.tune&&typeof data.tune.r==='number'&&SCALES[data.tune.s]){ tune.root=data.tune.r; tune.scale=data.tune.s; }
   for(const s of data.parts){
     if(!s||!s.id||records.has(s.id)) continue;
     const rec=makeRecord(s.kind||'plank',s.x||W/2,s.y||H/2,{});
     Object.assign(rec,{id:s.id,color:s.color||rec.color,angle:s.a!==undefined?s.a:(s.angle||0),
-      locked:!!s.locked,w:s.w,h:s.h,r:s.r,u:s.u,ax:s.ax,ay:s.ay,a0:s.a0,verts:s.verts});
+      locked:!!s.locked,w:s.w,h:s.h,r:s.r,u:s.u,ax:s.ax,ay:s.ay,a0:s.a0,verts:s.verts,note:s.n,what:s.sw,auto:s.sa});
     hostAddDirect(rec);
+  }
+  // re-pin saved welds between the restored parts
+  for(const k of (data.welds||[])){
+    const parts=k.split('<');
+    if(parts.length===2&&records.has(parts[0])&&records.has(parts[1])) hostWeld(parts[0],parts[1]);
   }
   // hostAddDirect skipped the debounce; save once so the file stays fresh.
   try{ saveTable(); }catch(e){}
@@ -901,7 +1325,8 @@ function onIntent(p,from){
   if(a==='move'){
     const rec=records.get(p.id); if(!rec){deny(from,'part is gone');return;}
     // Pinned parts (lever, pendulum, ...) stay draggable while mounted.
-    if(rec.locked&&!LINKED.includes(rec.kind)){deny(from,'part is locked (tap twice, then 🔓)');return;}
+    // A weld holding a locked-in-place part is immovable.
+    if(!weldMovable(p.id)){deny(from,rec.locked?'part is locked (tap twice, then 🔓)':'welded to a locked part (🔓 first)');return;}
     const own=draggedBy.get(p.id);
     if(own&&own.by!==peerKey&&Date.now()<own.until){deny(from,'someone else is holding that part');return;}
     draggedBy.set(p.id,{by:peerKey,until:Date.now()+(p.done?0:2000)});
@@ -928,6 +1353,38 @@ function onIntent(p,from){
     const rec=records.get(p.id); if(!rec){deny(from,'part is gone');return;}
     hostFlip(p.id); return;
   }
+  if(a==='fire'){
+    const rec=records.get(p.id); if(!rec||rec.kind!=='catapult'){deny(from,'part is gone');return;}
+    fireCatapult(p.id); return;
+  }
+  if(a==='weld'){
+    const ra=records.get(p.p), rb=records.get(p.q);
+    if(!ra||!rb){deny(from,'part is gone');return;}
+    if(!hostWeld(p.p,p.q)) deny(from,'could not weld those parts');
+    return;
+  }
+  if(a==='unweld'){
+    if(!records.has(p.id)){deny(from,'part is gone');return;}
+    hostUnweld(p.id); return;
+  }
+  if(a==='paste'){
+    if(!Array.isArray(p.parts)||!p.parts.length||p.parts.length>12){deny(from,'nothing to paste');return;}
+    pasteParts(p.parts,p.links); return;
+  }
+  if(a==='pop'){
+    const rec=records.get(p.id); if(!rec||rec.kind!=='balloon'){deny(from,'part is gone');return;}
+    if(!popQueue.includes(p.id)) popQueue.push(p.id); return;
+  }
+  if(a==='note'){
+    const rec=records.get(p.id); if(!rec||rec.kind!=='bell'){deny(from,'part is gone');return;}
+    hostNote(p.id,p.n); return;
+  }
+  if(a==='reassign'){
+    if(isHost) hostReassign(); return;
+  }
+  if(a==='tune'){
+    if(isHost) hostTune(p.root,p.scale); return;
+  }
   if(a==='lock'){
     const rec=records.get(p.id); if(!rec){deny(from,'part is gone');return;}
     hostLock(p.id,p.locked); return;
@@ -938,7 +1395,16 @@ function onIntent(p,from){
   }
   if(a==='sim'){ applySim(p.running); return; }
   if(a==='grav'){ applyGrav(p.y); return; }
-  if(a==='clear'){ hostClear(); return; }
+  if(a==='clear'||a==='proposeClear'){
+    // wiping the table needs the room: solo tables clear straight away
+    if(localHost||!Hub.room){ hostClear(); return; }
+    if(!clearVote) startVote(from);
+    return;
+  }
+  if(a==='vote'){
+    if(!clearVote) return;
+    voteApply(from.id,from.name,p.v?1:0); return;
+  }
   if(a==='cursor'){ cursorsOut[peerKey]={x:p.x,y:p.y,name:(from&&from.name)||'guest'}; return; }
 }
 
@@ -948,11 +1414,18 @@ function onState(p,from){
   if(isHost) return;
   if(!p) return;
   if(typeof p.g==='number') applyGrav(p.g);
+  if(p.mus&&typeof p.mus.r==='number'&&SCALES[p.mus.s]){ tune.root=p.mus.r; tune.scale=p.mus.s; }
+  if(p.cv!==undefined){
+    if(p.cv&&p.cv.done){ vote=null; voteMsg=p.cv.done; voteMsgUntil=Date.now()+3000; }
+    else vote=p.cv||null;
+    renderVote();
+  }
   if(typeof p.sim==='boolean'&&p.sim!==isRunning){isRunning=p.sim;$('btn-sim').textContent=isRunning?'Pause':'Play';}
   if(Array.isArray(p.add)){
     for(const r of p.add){ if(r&&r.i&&!records.has(r.i)){
       records.set(r.i,{id:r.i,kind:r.kind==='ramp'?'plank':r.kind,x:r.x,y:r.y,angle:r.a||0,color:r.c||r.color||'#8b5a2b',
-        locked:!!r.l,w:r.w,h:r.h,r:r.r,u:r.u,ax:r.ax,ay:r.ay,a0:r.a0,verts:r.verts,bx:r.x,by:r.y});
+        locked:!!r.l,w:r.w,h:r.h,r:r.r,u:r.u,ax:r.ax,ay:r.ay,a0:r.a0,verts:r.verts,note:r.n,lid:r.q||undefined,what:r.sw,auto:r.sa,bx:r.x,by:r.y});
+      if(r.kind==='bell') renderTune();
     }}
   }
   if(Array.isArray(p.del)){
@@ -961,8 +1434,8 @@ function onState(p,from){
     if(changed) updateSel();
   }
   if(p.addFull){ records.clear(); for(const r of (p.add||[])){
-    records.set(r.i,{id:r.i,kind:r.kind==='ramp'?'plank':r.kind,x:r.x,y:r.y,angle:r.a||0,color:r.c||r.color||'#8b5a2b',locked:!!r.l,w:r.w,h:r.h,r:r.r,u:r.u,ax:r.ax,ay:r.ay,a0:r.a0,verts:r.verts,bx:r.x,by:r.y});
-  }}
+    records.set(r.i,{id:r.i,kind:r.kind==='ramp'?'plank':r.kind,x:r.x,y:r.y,angle:r.a||0,color:r.c||r.color||'#8b5a2b',locked:!!r.l,w:r.w,h:r.h,r:r.r,u:r.u,ax:r.ax,ay:r.ay,a0:r.a0,verts:r.verts,note:r.n,lid:r.q||undefined,what:r.sw,auto:r.sa,bx:r.x,by:r.y});
+  } renderTune(); }
   const map=new Map();
   if(Array.isArray(p.obs)) for(const o of p.obs) map.set(o.i,{x:o.x,y:o.y,a:o.a,l:!!o.l,g:o.g||null,e:o.e||null});
   snaps.push({rt:Date.now(),map,sfx:p.sfx||null,curs:p.curs||null});
@@ -986,7 +1459,7 @@ function guestRenderAt(now){
     for(const [id,v] of a.map){
       if(id===optimisticId) continue;
       const r=records.get(id); if(!r) continue;
-      r.x=v.x;r.y=v.y;r.angle=v.a;r.locked=v.l;
+      r.x=v.x;r.y=v.y;r.angle=v.a;r.locked=v.l;r.lid=v.d||undefined;
       applySnapExtra(r,v);
     }
     return;
@@ -1001,9 +1474,9 @@ function guestRenderAt(now){
       r.x=va.x+(vb.x-va.x)*f; r.y=va.y+(vb.y-va.y)*f;
       let d=vb.a-va.a;
       while(d>Math.PI)d-=2*Math.PI; while(d<-Math.PI)d+=2*Math.PI;
-      r.angle=va.a+d*f; r.locked=vb.l;
+      r.angle=va.a+d*f; r.locked=vb.l; r.lid=vb.d||undefined;
       applySnapExtra(r,vb);
-    } else if(vb){ r.x=vb.x;r.y=vb.y;r.angle=vb.a;r.locked=vb.l; applySnapExtra(r,vb); }
+    } else if(vb){ r.x=vb.x;r.y=vb.y;r.angle=vb.a;r.locked=vb.l;r.lid=vb.d||undefined; applySnapExtra(r,vb); }
   }
 }
 function applySnapExtra(r,v){
@@ -1014,6 +1487,11 @@ function applySnapExtra(r,v){
   if(v.e&&Array.isArray(v.e)){
     if(r.kind==='pendulum'||r.kind==='lever'||r.kind==='catapult'){ r.ax=v.e[0]; r.ay=v.e[1]; }
     else if(r.kind==='balloon'){ r.bx=v.e[0]; r.by=v.e[1]; }
+    else if(r.kind==='bell'){
+      const nn=v.e[0]>=0?v.e[0]:undefined;
+      if(nn!==r.note){ if(nn===undefined) delete r.note; else r.note=nn; renderTune(); }
+    }
+    else if(r.kind==='spawner'){ if(typeof v.e[0]==='string') r.what=v.e[0]; }
   }
 }
 
@@ -1045,12 +1523,15 @@ function onRoster(p){
     // bootstrap late joiners with the full world before the first tick
     pendingAdd.length=0;
     for(const r of records.values()) queueAdd(r);
+    if(clearVote) checkVote(); // the room changed: re-tally
   }
   reportHeight();
 }
 // Drop the live world but keep engine, walls, and the saved table.
 function clearLiveTable(){
   for(const id of [...links.keys()]) removeLinks(id);
+  for(const [,con] of weldCons) if(engine) try{Matter.Composite.remove(engine.world,con);}catch(e){}
+  weldCons.clear(); weldGroups.clear(); linkArm=null;
   if(engine){ for(const [,b] of bodies) try{Matter.Composite.remove(engine.world,b);}catch(e){} }
   bodies.clear(); records.clear(); snaps.length=0;
   draggedBy.clear(); pausedFrozen.clear(); heldFrozen.clear(); latch.clear(); rungAt.clear();
@@ -1067,6 +1548,7 @@ function bootAll(){
   refreshHint();
   requestAnimationFrame(loop);
   setInterval(broadcastTick,50);
+  setInterval(renderVote,1000); // vote countdown + outcome notes
   reportHeight();
 }
 function ensureEngineIfHost(){ if(isHost||amSolo) ensureEngine(); }
@@ -1083,6 +1565,8 @@ function obsGeom(r){
 }
 function obsExtra(r){
   if(r.kind==='pendulum'||r.kind==='lever'||r.kind==='catapult') return [Math.round(r.ax),Math.round(r.ay)];
+  if(r.kind==='bell') return [r.note===undefined?-1:r.note];
+  if(r.kind==='spawner') return [r.what||'ball'];
   if(r.kind==='balloon'){
     const L=links.get(r.id);
     if(L&&L.bob) return [Math.round(L.bob.position.x),Math.round(L.bob.position.y)];
@@ -1100,15 +1584,24 @@ function broadcastTick(){
   for(const [id,b] of bodies){
     const rec=records.get(id); if(!rec) continue;
     rec.x=b.position.x; rec.y=b.position.y; rec.angle=b.angle;
-    obs.push({i:id,x:Math.round(rec.x),y:Math.round(rec.y),a:+rec.angle.toFixed(3),l:rec.locked?1:0,g:obsGeom(rec),e:obsExtra(rec)});
+    obs.push({i:id,x:Math.round(rec.x),y:Math.round(rec.y),a:+rec.angle.toFixed(3),l:rec.locked?1:0,d:rec.lid||0,g:obsGeom(rec),e:obsExtra(rec)});
   }
   const add=pendingAdd.splice(0).map(r=>({i:r.id,kind:r.kind,x:Math.round(r.x),y:Math.round(r.y),
     a:+((r.angle||0).toFixed(3)),c:r.color,l:r.locked?1:0,w:r.w,h:r.h,r:r.r,
-    u:r.u,ax:r.ax,ay:r.ay,a0:r.a0,verts:r.verts}));
+    u:r.u,ax:r.ax,ay:r.ay,a0:r.a0,verts:r.verts,n:r.note,q:r.lid||0,sw:r.what,sa:r.auto}));
   const del=pendingDel.splice(0);
   const sfx=pendingSfx.splice(0);
   // include remote cursors so guests see each other
-  const msg={sim:isRunning,seq:++seq,t:Date.now(),obs,add,del,g:gravityY};
+  const msg={sim:isRunning,seq:++seq,t:Date.now(),obs,add,del,g:gravityY,mus:{r:tune.root,s:tune.scale}};
+  if(clearVote&&Date.now()>clearVote.until) checkVote(); // a silent room lets it expire
+  if(clearVote){
+    const rs=voteRoster();
+    const missing=rs.ids.filter(x=>clearVote.yes.indexOf(x)<0);
+    msg.cv={by:clearVote.by,name:clearVote.name,yes:clearVote.yes.slice(),ynames:clearVote.ynames,
+      no:clearVote.no.slice(),nnames:clearVote.nnames,
+      wait:missing.map(x=>rs.names[x]||'guest'),need:rs.ids.length,until:clearVote.until};
+  }else if(voteDone&&Date.now()<voteDone.until) msg.cv={done:voteDone.text};
+  else msg.cv=null;
   if(sfx.length) msg.sfx=sfx;
   const ck={}; for(const k of Object.keys(cursorsOut)) ck[k]=cursorsOut[k];
   if(myCursor) ck[myId||'host']={x:Math.round(myCursor.x),y:Math.round(myCursor.y),name:myName};
@@ -1254,7 +1747,12 @@ function drawRecord(r){
   }else if(K==='pendulum'){
     const rad=r.r||16;
     ctx.strokeStyle=sel?'#ffe9a8':'rgba(230,194,128,.7)';ctx.lineWidth=3;
-    ctx.beginPath();ctx.moveTo(r.ax-r.x,r.ay-r.y);ctx.lineTo(0,0);ctx.stroke();
+    // The anchor is a world point but we draw in the bob's rotated frame,
+    // so rotate the offset back — otherwise the string visibly peels off the
+    // axis as the bob swings.
+    const cA=Math.cos(-(r.angle||0)), sA=Math.sin(-(r.angle||0));
+    const adx=r.ax-r.x, ady=r.ay-r.y;
+    ctx.beginPath();ctx.moveTo(adx*cA-ady*sA,adx*sA+ady*cA);ctx.lineTo(0,0);ctx.stroke();
     ctx.fillStyle=r.color||'#8b5a2b';ctx.strokeStyle=sel?'#ffe9a8':'rgba(0,0,0,.55)';ctx.lineWidth=sel?3:1.5;
     ctx.beginPath();ctx.arc(0,0,rad,0,7);ctx.fill();ctx.stroke();
   }else if(K==='bucket'){
@@ -1265,13 +1763,43 @@ function drawRecord(r){
     ctx.strokeRect(-w/2,-wallH/2+6,w,wallH);
   }else if(K==='catapult'){
     const w=r.w||260;
-    const cocked=isHost&&latch.get(r.id);
+    // Cocked state from the arm's offset from rest — host and guests agree
+    // without an extra sync field.
+    const cocked=Math.abs(wrapAngle((r.a0||0)-(r.angle||0)))>0.8;
     ctx.strokeStyle=cocked?'#ff9c9c':(sel?'#ffe9a8':'rgba(0,0,0,.55)');
     ctx.lineWidth=sel||cocked?3:1.5;
     ctx.fillStyle=r.color||'#8b5a2b';
-    ctx.fillRect(-w*0.25,-7,w,14);ctx.strokeRect(-w*0.25,-7,w,14);
-    ctx.beginPath();ctx.arc(w*0.75,-8,10,Math.PI*0.9,Math.PI*1.9);ctx.stroke(); // cup
-    ctx.fillStyle='#3a2f1f';ctx.beginPath();ctx.arc(-w*0.25,0,5,0,7);ctx.fill();
+    ctx.fillRect(-w/2,-7,w,14);ctx.strokeRect(-w/2,-7,w,14);
+    ctx.fillRect(w/2-11,-19,12,14); // cup lip at the throwing end
+    ctx.beginPath();ctx.arc(w/2,-10,10,Math.PI*0.9,Math.PI*1.9);ctx.stroke(); // cup
+    ctx.fillStyle='#3a2f1f';ctx.beginPath();ctx.arc(-w/4,0,5,0,7);ctx.fill();
+    if(cocked){
+      // hinge in body-local coords, for the tension ring + label
+      const hx=r.ax-r.x, hy=r.ay-r.y;
+      const c0=Math.cos(-(r.angle||0)), s0=Math.sin(-(r.angle||0));
+      const hlx=hx*c0-hy*s0, hly=hx*s0+hy*c0;
+      ctx.strokeStyle='rgba(255,156,156,.85)';ctx.lineWidth=2;
+      ctx.beginPath();ctx.arc(hlx,hly,28,0,7);ctx.stroke();
+      ctx.fillStyle='#ff9c9c';ctx.font='900 13px system-ui';ctx.textAlign='center';
+      ctx.fillText('COCKED',hlx,hly-36);
+    }
+  }else if(K==='spawner'){
+    const w=r.w||120,h=r.h||64;
+    ctx.fillRect(-w/2,-h/2,w,h);ctx.strokeRect(-w/2,-h/2,w,h);
+    ctx.fillStyle='rgba(0,0,0,.25)';
+    for(let x=-w/2+12;x<w/2;x+=24) ctx.fillRect(x,-h/2,3,h);
+    // chute mouth below
+    ctx.fillStyle='#3a2f1f';
+    ctx.fillRect(-18,h/2-2,36,16);
+    ctx.strokeStyle=sel?'#ffe9a8':'rgba(0,0,0,.55)';ctx.lineWidth=1.5;
+    ctx.strokeRect(-18,h/2-2,36,16);
+    // what it drops + live count
+    const ic=(r.what||'ball')==='ball'?'●':(r.what==='domino'?'▮':'■');
+    ctx.fillStyle='#ffe9a8';ctx.font='bold 20px system-ui';ctx.textAlign='center';
+    ctx.fillText(ic,0,7);
+    let nn=0;for(const q of records.values()) if(q.auto===r.id) nn++;
+    ctx.font='700 13px monospace';
+    ctx.fillText(nn+'/'+(r.cap||8),0,h/2-10);
   }else if(K==='drawn'&&r.verts&&r.verts.length){
     ctx.beginPath();
     ctx.moveTo(r.verts[0].x,r.verts[0].y);
@@ -1300,6 +1828,10 @@ function drawRecord(r){
     if(K==='catapult'){ // static base under the hinge
       ctx.save();ctx.fillStyle='#3a2f1f';ctx.strokeStyle=sel?'#ffe9a8':'rgba(0,0,0,.55)';ctx.lineWidth=1.5;
       ctx.fillRect(r.ax-55,r.ay+35,110,34);ctx.strokeRect(r.ax-55,r.ay+35,110,34);ctx.restore();
+    }
+    if(K==='pendulum'){ // wall bracket the string hangs from
+      ctx.save();ctx.fillStyle='#3a2f1f';ctx.strokeStyle=sel?'#ffe9a8':'rgba(0,0,0,.55)';ctx.lineWidth=1.5;
+      ctx.beginPath();ctx.moveTo(r.ax-16,r.ay-14);ctx.lineTo(r.ax+16,r.ay-14);ctx.lineTo(r.ax,r.ay);ctx.closePath();ctx.fill();ctx.stroke();ctx.restore();
     }
   }
   if(K==='balloon'&&!r.locked){
@@ -1381,6 +1913,21 @@ function render(){
   ctx.fillStyle='#3a2f1f';ctx.fillRect(0,H-6,W,6);
   ctx.strokeStyle='#6b5636';ctx.lineWidth=2;ctx.strokeRect(1,1,W-2,H-2);
   for(const r of records.values()) drawRecord(r);
+  // weld ties: a dashed line through each welded group plus a link glyph,
+  // so bolted-together machines read as one.
+  const wgroups=new Map();
+  for(const r of records.values()) if(r.lid){ if(!wgroups.has(r.lid))wgroups.set(r.lid,[]); wgroups.get(r.lid).push(r); }
+  if(wgroups.size){
+    ctx.save();ctx.strokeStyle='rgba(255,233,168,.75)';ctx.lineWidth=2;ctx.setLineDash([7,7]);
+    for(const mem of wgroups.values()){
+      ctx.beginPath();
+      mem.forEach((m,i)=>{ if(i===0)ctx.moveTo(m.x,m.y); else ctx.lineTo(m.x,m.y); });
+      ctx.stroke();
+      ctx.fillStyle='rgba(255,233,168,.9)';ctx.font='bold 15px system-ui';ctx.textAlign='center';
+      mem.forEach(m=>ctx.fillText('🔗',m.x,m.y-((m.h||m.r||24))-34));
+    }
+    ctx.restore();ctx.setLineDash([]);
+  }
   // placement ghost
   if(draft){
     const g=draftPreview(draft);
@@ -1423,6 +1970,8 @@ function loop(t){
   if(isHost&&engine&&isRunning){
     try{ tickParts(); }catch(e){}
     try{ Matter.Engine.update(engine,1000/60); }catch(e){}
+    try{ runSpawns(); }catch(e){}
+    try{ runPops(); }catch(e){}
   }
   if(!isHost) guestRenderAt(Date.now());
   render();
@@ -1450,12 +1999,12 @@ function hitRecord(px,py){
       if(Math.abs(lx)<=34&&Math.abs(ly)<=34) return r;
     }else if(K==='catapult'){
       const w=r.w||260;
-      if(lx>=-w*0.25-8&&lx<=w*0.75+8&&Math.abs(ly)<=16) return r;
+      if(lx>=-w/2-8&&lx<=w/2+18&&Math.abs(ly)<=20) return r;
       if(r.ax!==undefined&&Math.abs(px-r.ax)<62&&Math.abs(py-(r.ay+52))<26) return r;
     }else if(K==='bucket'){
       const w=r.w||110;
       if(Math.abs(lx)<=w/2+6&&Math.abs(ly)<=40) return r;
-    }else if(K==='block'||K==='plank'||K==='ramp'||K==='domino'||K==='bouncer'||K==='conveyor'||K==='lever'){
+    }else if(K==='block'||K==='plank'||K==='ramp'||K==='domino'||K==='bouncer'||K==='conveyor'||K==='lever'||K==='spawner'){
       if(Math.abs(lx)<=(r.w||48)/2+6&&Math.abs(ly)<=(r.h||16)/2+8) return r;
     }else if(K==='drawn'&&r.verts){
       for(const v of r.verts){ if(Math.hypot(lx-v.x,ly-v.y)<12) return r; }
@@ -1511,7 +2060,7 @@ function doMove(id,x,y,done){
   x=Math.max(0,Math.min(W,x));y=Math.max(0,Math.min(H,y));
   if(isHost){
     const rec=records.get(id);
-    if(rec&&(!rec.locked||LINKED.includes(rec.kind))) hostMove(id,x,y);
+    if(rec&&weldMovable(id)) hostMove(id,x,y);
   }else{
     const r=records.get(id);
     if(r){ r.x=x;r.y=y; optimisticId=done?null:id; }
@@ -1526,7 +2075,7 @@ function doRot(id,delta){
   else{
     if(r.kind==='catapult'&&r.ax!==undefined){
       const len=(r.w||260)*0.25;
-      r.angle=na; r.x=Math.round(r.ax+Math.cos(na)*len); r.y=Math.round(r.ay+Math.sin(na)*len);
+      r.angle=na; r.a0=na; r.x=Math.round(r.ax+Math.cos(na)*len); r.y=Math.round(r.ay+Math.sin(na)*len);
     }else r.angle=na;
     Hub.up('intent',{a:'rot',id,angle:na});
   }
@@ -1560,10 +2109,108 @@ function doFlip(id){
   if(isHost) hostFlip(id);
   else{
     if(r.kind==='fan') r.angle=(r.angle||0)+Math.PI;
+    else if(r.kind==='spawner') r.what=r.what==='ball'?'domino':(r.what==='domino'?'block':'ball');
     else r.u=((r.u===undefined?1:r.u)>=0)?-1:1;
     Hub.up('intent',{a:'flip',id});
   }
   updateSel();
+}
+function doFire(id){
+  const r=records.get(id); if(!r||r.kind!=='catapult') return;
+  if(isHost) fireCatapult(id);
+  else Hub.up('intent',{a:'fire',id});
+}
+// Transient note in the hint line (restores the contextual hint after).
+function flashNote(t){
+  const el=$('hint'); if(!el) return;
+  el.textContent=t;
+  clearTimeout(flashNote._t);
+  flashNote._t=setTimeout(refreshHint,1800);
+}
+/* ---------- copy / paste ----------
+   Copies the selected part plus its whole weld group (a bucket-and-lever
+   copies as one machine). Paste drops it at the cursor with fresh ids and
+   re-welds the group. One 'paste' intent carries parts + links together so
+   the host adds and welds atomically. */
+let clip=null; // {parts:[{...fields,dx,dy}],links:[[i,j],...]}
+function clipOf(ids){
+  const recs=ids.map(id=>records.get(id)).filter(Boolean);
+  if(!recs.length||recs.length>12) return null;
+  let cx=0,cy=0; recs.forEach(r=>{cx+=r.x;cy+=r.y;}); cx/=recs.length; cy/=recs.length;
+  const parts=recs.map(r=>({kind:r.kind,dx:Math.round(r.x-cx),dy:Math.round(r.y-cy),
+    angle:+((r.angle||0).toFixed(3)),color:r.color,locked:!!r.locked,w:r.w,h:r.h,r:r.r,
+    u:r.u,ax:r.ax!==undefined?Math.round(r.ax-cx):undefined,ay:r.ay!==undefined?Math.round(r.ay-cy):undefined,
+    a0:r.a0,verts:r.verts?JSON.parse(JSON.stringify(r.verts)):undefined,note:r.note,what:r.what}));
+  const idx=new Map(recs.map((r,i)=>[r.id,i]));
+  const links=[];
+  for(const k of weldCons.keys()){
+    const ps=k.split('<');
+    if(idx.has(ps[0])&&idx.has(ps[1])) links.push([idx.get(ps[0]),idx.get(ps[1])]);
+  }
+  return {parts,links};
+}
+function doCopy(){
+  const lead=selectedId&&records.get(selectedId);
+  if(!lead){ flashNote('select a part first, then copy'); return; }
+  const ids=lead.lid&&weldGroups.has(lead.lid)?[...weldGroups.get(lead.lid)]:[selectedId];
+  clip=clipOf(ids);
+  if(!clip){ flashNote('that group is too big to copy (12 max)'); return; }
+  try{
+    if(navigator.clipboard&&navigator.clipboard.writeText)
+      navigator.clipboard.writeText(JSON.stringify({v:1,kind:'goldberg-clip',parts:clip.parts,links:clip.links}));
+  }catch(e){}
+  flashNote('copied '+clip.parts.length+' part'+(clip.parts.length>1?'s':'')+' — paste with 📌 or Ctrl+V');
+}
+function doPaste(wx,wy){
+  if(!clip||!clip.parts.length){ flashNote('nothing to paste — copy something first'); return; }
+  if(wx===undefined||wy===undefined){
+    if(myCursor){ wx=myCursor.x; wy=myCursor.y; } else { wx=W/2; wy=H/2; }
+  }
+  const parts=clip.parts.map(p=>({id:uid('o'),kind:p.kind,
+    x:Math.round(wx+p.dx),y:Math.round(wy+p.dy),
+    angle:p.angle,color:p.color,locked:!!p.locked,w:p.w,h:p.h,r:p.r,u:p.u,
+    ax:p.ax!==undefined?Math.round(wx+p.ax):undefined,
+    ay:p.ay!==undefined?Math.round(wy+p.ay):undefined,
+    a0:p.a0,verts:p.verts?JSON.parse(JSON.stringify(p.verts)):undefined,note:p.note,what:p.what}));
+  const links=[];
+  for(const pr of (clip.links||[])){ if(parts[pr[0]]&&parts[pr[1]]) links.push([parts[pr[0]].id,parts[pr[1]].id]); }
+  if(isHost){
+    const ids=pasteParts(parts,links);
+    if(ids.length){ selectedId=ids[0]; pillOpen=false; updateSel(); }
+    flashNote('pasted '+parts.length+' part'+(parts.length>1?'s':''));
+  }else Hub.up('intent',{a:'paste',parts,links});
+}
+// Host: add pasted parts (keeping guest-made ids when free) then weld.
+function pasteParts(parts,links){
+  const map=new Map(), ids=[];
+  for(const s of (parts||[])){
+    if(!s||!s.kind) continue;
+    const rec=makeRecord(s.kind,s.x||W/2,s.y||H/2,{});
+    Object.assign(rec,{angle:s.angle||0,color:s.color||rec.color,locked:!!s.locked,
+      w:s.w,h:s.h,r:s.r,u:s.u,ax:s.ax,ay:s.ay,a0:s.a0,verts:s.verts,note:s.note,what:s.what});
+    clampRec(rec);
+    if(s.id&&!records.has(s.id)) rec.id=s.id;
+    map.set(s.id,rec.id);
+    hostAdd(rec); ids.push(rec.id);
+    if(ids.length>=12) break;
+  }
+  for(const pr of (links||[])){
+    const na=map.get(pr[0]), nb=map.get(pr[1]);
+    if(na&&nb) hostWeld(na,nb);
+  }
+  return ids;
+}
+/* ---------- weld / unweld ---------- */
+function doWeld(a,b){
+  if(isHost){
+    if(hostWeld(a,b)) flashNote('welded — they move as one (🔓 splits them)');
+    else flashNote('could not weld those parts');
+  }else Hub.up('intent',{a:'weld',p:a,q:b});
+  selectedId=b; pillOpen=false; updateSel();
+}
+function doUnweld(id){
+  if(isHost){ hostUnweld(id); updateSel(); flashNote('unlinked'); }
+  else Hub.up('intent',{a:'unweld',id});
 }
 function handleDragTo(rec,hid,wx,wy){
   const dx=wx-rec.x, dy=wy-rec.y;
@@ -1599,9 +2246,11 @@ function doDel(id){
 function doReset(){
   records.clear();bodies.clear();snaps.length=0;selectedId=null;pillOpen=false;draft=null;draftPts=[];
   heldFrozen.clear();links.clear();latch.clear();rungAt.clear();
+  weldCons.clear(); weldGroups.clear(); linkArm=null;
   try{ localStorage.removeItem(SAVE_KEY); }catch(e){}
   if(engine){ try{Matter.Composite.clear(engine.world,false,true);}catch(e){} addWalls(); }
   updateSel();reportHeight();
+  renderTune();
 }
 
 /* ---------- pointer ---------- */
@@ -1641,6 +2290,13 @@ function bindPointer(){
     }
     const hit=hitRecord(p.x,p.y);
     if(hit){
+      if(linkArm&&hit.id!==linkArm){
+        // link mode: this tap welds instead of selecting
+        const a=linkArm; linkArm=null;
+        doWeld(a,hit.id);
+        return;
+      }
+      linkArm=null;
       // Select immediately, but don't grab yet: a plain tap only selects
       // (tap again to open the lock/delete pill). The drag (freeze +
       // follow) starts once the finger actually moves, and keeps the
@@ -1651,7 +2307,7 @@ function bindPointer(){
       try{canvas.setPointerCapture(e.pointerId);}catch(err){}
       if(!isHost){ optimisticId=hit.id; }
       else { draggedBy.set(hit.id,{by:myId||'host',until:Date.now()+2000}); }
-    }else{ selectedId=null; pillOpen=false; updateSel(); }
+    }else{ linkArm=null; selectedId=null; pillOpen=false; updateSel(); }
   });
   canvas.addEventListener('pointermove',(e)=>{
     const p=toWorld(e);
@@ -1709,9 +2365,12 @@ function bindPointer(){
         doMove(dragging.id,p.x+dragging.ox,p.y+dragging.oy,true);
       }else if(dragging.was){
         // A clean second tap on the same part opens the actions pill.
+        // Tapping a cocked catapult also fires it.
         const p=toWorld(e);
         if(Math.hypot(p.x-dragging.sx,p.y-dragging.sy)<8&&Date.now()-(dragging.t0||0)<600){
           selectedId=dragging.id; pillOpen=!pillOpen; updateSel();
+          const rc=records.get(dragging.id);
+          if(rc&&rc.kind==='catapult'&&Math.abs(wrapAngle((rc.a0||0)-(rc.angle||0)))>0.8) doFire(dragging.id);
         }
       }
       if(isHost){ draggedBy.delete(dragging.id); if(dragging.held) hostRelease(dragging.id); }
@@ -1761,6 +2420,7 @@ function setMode(m){
 }
 function refreshHint(){
   const h=$('hint'); if(!h) return;
+  if(linkArm){h.textContent='tap another part to weld it to the first (Esc cancels)';return;}
   if(mode==='draw'){h.textContent='draw a track — release to drop it';return;}
   if(mode==='erase'){h.textContent='tap a part to remove it';return;}
   if(mode==='place'){h.textContent='drag on the stage to draw out the '+(placeKind||'part')+' — or tap for the default size (Esc cancels)';return;}
@@ -1772,10 +2432,149 @@ function refreshHint(){
   if(r.kind==='block') bits.push('drag the corner to resize');
   if(r.kind==='fan') bits.push('drag the end dot for strength');
   if(ANCHOR_KINDS.includes(r.kind)) bits.push('drag the ✛ to move the '+(r.kind==='lever'?'pivot':(r.kind==='catapult'?'hinge':'anchor')));
+  if(r.kind==='catapult') bits.push('drag the arm back to cock it — tap it or press F to fire');
   bits.push('drag the middle to move');
   if(ROT_KINDS.includes(r.kind)) bits.push('the ring (or R) turns it');
   if(!pillOpen) bits.push('tap again for lock / delete');
   h.textContent=r.kind+' — '+bits.join(' · ');
+}
+/* ---------- bell tuner drawer ---------- */
+function renderTune(){
+  const box=$('tune'); if(!box||box.classList.contains('hidden')) return;
+  const rl=$('tune-root'), sl=$('tune-scale');
+  if(rl&&!rl.options.length){
+    NOTE_NAMES.forEach((n,i)=>{const o=document.createElement('option');o.value=i;o.textContent=n;rl.appendChild(o);});
+    Object.keys(SCALES).forEach(k=>{const o=document.createElement('option');o.value=k;o.textContent=k;sl.appendChild(o);});
+  }
+  if(rl) rl.value=String(tune.root);
+  if(sl) sl.value=tune.scale;
+  const list=$('tune-list'); if(!list) return;
+  const bells=[...records.values()].filter(x=>x.kind==='bell').sort((a,b)=>a.x-b.x);
+  list.innerHTML='';
+  if(!bells.length){ list.innerHTML='<div class="tnote">No bells on the table yet.</div>'; return; }
+  bells.forEach((b)=>{
+    const row=document.createElement('div'); row.className='brow'; row.title='Tap to hear it';
+    const deg=bellDeg(b);
+    const nm=document.createElement('span'); nm.className='nn';
+    nm.textContent='🔔 '+midiName(bellMidi(b))+' (deg '+deg+')';
+    const dn=document.createElement('button'); dn.className='gb'; dn.textContent='◀'; dn.title='Tune down';
+    dn.addEventListener('click',(e)=>{e.stopPropagation();tuneBell(b.id,bellDeg(b)-1);});
+    const up=document.createElement('button'); up.className='gb'; up.textContent='▶'; up.title='Tune up';
+    up.addEventListener('click',(e)=>{e.stopPropagation();tuneBell(b.id,bellDeg(b)+1);});
+    row.appendChild(dn); row.appendChild(nm); row.appendChild(up);
+    row.addEventListener('click',()=>{unlockAudio();playBell(0.7,bellMidi(b));});
+    list.appendChild(row);
+  });
+}
+function tuneBell(id,n){
+  n=Math.max(0,Math.min(24,n|0));
+  if(isHost) hostNote(id,n);
+  else Hub.up('intent',{a:'note',id,n});
+}
+function setTune(root,scale){
+  if(isHost) hostTune(root,scale);
+  else Hub.up('intent',{a:'tune',root,scale});
+}
+/* ---------- saved machines: name the table, come back to it ----------
+   Machines live in this browser's localStorage (named slots), plus an
+   export/import text blob for passing a machine to someone else. Loading
+   replaces the live table for everyone, so only the host can load. */
+const MACH_KEY='bubhub.goldberg.machines';
+function serPart(r){
+  return {id:r.id,kind:r.kind,x:Math.round(r.x),y:Math.round(r.y),
+    angle:+((r.angle||0).toFixed(3)),color:r.color,locked:!!r.locked,w:r.w,h:r.h,r:r.r,
+    u:r.u,ax:r.ax,ay:r.ay,a0:r.a0,verts:r.verts,n:r.note,sw:r.what,sa:r.auto};
+}
+function serializeMachine(name){
+  const parts=[];
+  for(const r of records.values()) parts.push(serPart(r));
+  return {name:String(name||'machine').slice(0,40),ts:Date.now(),g:gravityY,
+    tune:{r:tune.root,s:tune.scale},parts,welds:[...weldCons.keys()]};
+}
+function loadMachines(){
+  try{ const a=JSON.parse(localStorage.getItem(MACH_KEY)||'[]'); return Array.isArray(a)?a:[]; }
+  catch(e){ return []; }
+}
+function storeMachines(list){
+  try{ localStorage.setItem(MACH_KEY,JSON.stringify(list.slice(0,25))); }
+  catch(e){ try{ localStorage.setItem(MACH_KEY,JSON.stringify(list.slice(-24))); }catch(e2){} }
+}
+function cleanPatch(o){
+  for(const k of Object.keys(o)) if(o[k]===undefined) delete o[k];
+  return o;
+}
+function loadMachine(m){
+  if(!m||!Array.isArray(m.parts)) return;
+  if(!isHost){ flashNote('only the host can load a machine onto the table'); return; }
+  ensureEngine();
+  const oldIds=[...records.keys()];
+  for(const id of [...links.keys()]) removeLinks(id);
+  for(const [,con] of weldCons) if(engine) try{Matter.Composite.remove(engine.world,con);}catch(e){}
+  weldCons.clear(); weldGroups.clear();
+  if(engine){ for(const [,b] of bodies) try{Matter.Composite.remove(engine.world,b);}catch(e){} }
+  bodies.clear(); records.clear(); snaps.length=0;
+  draggedBy.clear(); pausedFrozen.clear(); heldFrozen.clear(); latch.clear(); rungAt.clear();
+  pendingAdd.length=0; pendingDel.length=0;
+  oldIds.forEach(queueDel); // guests wipe first (fresh ids below can't collide)
+  selectedId=null; pillOpen=false; linkArm=null;
+  if(typeof m.g==='number') applyGravSilent(m.g);
+  if(m.tune&&typeof m.tune.r==='number'&&SCALES[m.tune.s]) tune={root:m.tune.r,scale:m.tune.s};
+  const map=new Map();
+  for(const s of m.parts){
+    if(!s||!s.kind) continue;
+    const rec=makeRecord(s.kind,s.x||W/2,s.y||H/2,{});
+    Object.assign(rec,cleanPatch({color:s.color,angle:s.angle,locked:!!s.locked,
+      w:s.w,h:s.h,r:s.r,u:s.u,ax:s.ax,ay:s.ay,a0:s.a0,verts:s.verts,note:s.n,what:s.sw}));
+    clampRec(rec);
+    map.set(s.id,rec.id); // makeRecord minted a fresh id
+    hostAddDirect(rec);
+    if(records.size>=MAX_PARTS) break;
+  }
+  // re-point auto-parent links at the fresh ids
+  for(const s of m.parts){
+    const nid=map.get(s.id), rec=nid&&records.get(nid);
+    if(rec&&s.sa&&map.get(s.sa)) rec.auto=map.get(s.sa);
+  }
+  for(const k of (m.welds||[])){
+    const ps=k.split('<');
+    const na=map.get(ps[0]), nb=map.get(ps[1]);
+    if(na&&nb) hostWeld(na,nb);
+  }
+  pruneCaps();
+  scheduleSave();
+  updateSel(); renderTune(); renderMachines();
+  flashNote('loaded '+(m.name||'machine')+' ('+records.size+' parts)');
+}
+function renderMachines(){
+  const box=$('machines'); if(!box||box.classList.contains('hidden')) return;
+  const list=$('mach-list'); if(!list) return;
+  const ms=loadMachines();
+  list.innerHTML='';
+  if(!ms.length){ list.innerHTML='<div class="tnote" style="font-family:monospace;font-size:11px;color:#8a7a5c">No saved machines yet.</div>'; return; }
+  ms.forEach((m,i)=>{
+    const row=document.createElement('div'); row.className='mrow';
+    const nm=document.createElement('span'); nm.className='nn'; nm.textContent='💾 '+m.name;
+    nm.title=m.name;
+    const mm=document.createElement('span'); mm.className='mm';
+    let ds=''; try{ ds=new Date(m.ts).toLocaleDateString(); }catch(e){}
+    mm.textContent=(m.parts||[]).length+'p · '+ds;
+    const ld=document.createElement('button'); ld.className='gb'; ld.textContent='Load';
+    if(!isHost){ ld.disabled=true; ld.title='Only the host can load'; }
+    ld.addEventListener('click',()=>loadMachine(m));
+    const rn=document.createElement('button'); rn.className='gb'; rn.textContent='✎'; rn.title='Rename';
+    rn.addEventListener('click',()=>{
+      const nn=prompt('Rename machine:',m.name);
+      if(nn===null) return;
+      const all=loadMachines(); if(!all[i]) return;
+      all[i].name=String(nn||'machine').slice(0,40); storeMachines(all); renderMachines();
+    });
+    const dl=document.createElement('button'); dl.className='gb'; dl.textContent='🗑'; dl.title='Delete';
+    dl.addEventListener('click',()=>{
+      const all=loadMachines(); all.splice(i,1); storeMachines(all); renderMachines();
+    });
+    row.appendChild(nm); row.appendChild(mm); row.appendChild(ld); row.appendChild(rn); row.appendChild(dl);
+    list.appendChild(row);
+  });
 }
 function updateSel(){
   const r=selectedId&&records.get(selectedId);
@@ -1789,6 +2588,10 @@ function updateSel(){
     $('btn-rot-cw').disabled=!canRot;
     $('btn-rot-ccw').disabled=!canRot;
     $('btn-flip').style.display=FLIP_KINDS.includes(r.kind)?'':'none';
+    $('btn-fire').style.display=r.kind==='catapult'?'':'none';
+    $('btn-pop').style.display=r.kind==='balloon'?'':'none';
+    $('btn-link').textContent=r.lid?'🔓':'🔗';
+    $('btn-link').title=r.lid?'Unlink these parts':'Weld to another part';
   }
   refreshHint();
 }
@@ -1810,9 +2613,20 @@ function bindToolbar(){
   $('btn-rot-cw').addEventListener('click',()=>{unlockAudio();if(selectedId)doRot(selectedId,Math.PI/12);});
   $('btn-rot-ccw').addEventListener('click',()=>{unlockAudio();if(selectedId)doRot(selectedId,-Math.PI/12);});
   $('btn-flip').addEventListener('click',()=>{unlockAudio();if(selectedId)doFlip(selectedId);});
+  $('btn-fire').addEventListener('click',()=>{unlockAudio();if(selectedId)doFire(selectedId);});
+  $('btn-pop').addEventListener('click',()=>{unlockAudio();if(selectedId)doPop(selectedId);});
+  $('btn-link').addEventListener('click',()=>{
+    unlockAudio();
+    const r=selectedId&&records.get(selectedId);
+    if(!r) return;
+    if(r.lid){ doUnweld(r.id); return; }
+    linkArm=r.id; pillOpen=false; updateSel();
+    flashNote('tap another part to weld them together (Esc cancels)');
+  });
+  $('btn-copy').addEventListener('click',()=>{unlockAudio();doCopy();});
+  $('btn-paste').addEventListener('click',()=>{unlockAudio();doPaste();});
   $('btn-lock').addEventListener('click',()=>{unlockAudio();if(selectedId)doLock(selectedId);});
   $('btn-del').addEventListener('click',()=>{unlockAudio();const id=selectedId;selectedId=null;updateSel();if(id)doDel(id);});
-  $('btn-hide').addEventListener('click',()=>{fadeOutStop();Hub.up('close');});
   $('btn-help').addEventListener('click',()=>{unlockAudio();$('help').classList.remove('hidden');});
   $('btn-help-close').addEventListener('click',()=>{$('help').classList.add('hidden');});
   $('grav').addEventListener('input',(e)=>{
@@ -1825,24 +2639,80 @@ function bindToolbar(){
     else Hub.up('intent',{a:'sim',running:!isRunning});
   });
   $('btn-clear').addEventListener('click',()=>{
-    if(isHost) hostClear();
-    else Hub.up('intent',{a:'clear'});
+    if(isHost){
+      if(localHost||!Hub.room){ hostClear(); return; }
+      if(clearVote){ clearVote=null; voteDone={text:'clear cancelled',until:Date.now()+3000}; renderVote(); }
+      else startVote({id:myId,name:myName});
+    }
+    else Hub.up('intent',{a:'proposeClear'});
   });
+  $('btn-vote-yes').addEventListener('click',()=>castVote(1));
+  $('btn-vote-no').addEventListener('click',()=>castVote(0));
   $('btn-music').addEventListener('click',toggleMusic);
+  $('btn-tune').addEventListener('click',()=>{unlockAudio();$('tune').classList.toggle('hidden');renderTune();});
+  $('btn-tune-close').addEventListener('click',()=>{$('tune').classList.add('hidden');});
+  $('btn-tune-g').addEventListener('click',()=>{unlockAudio();setTune(7,'major');});
+  $('btn-tune-re').addEventListener('click',()=>{unlockAudio();if(isHost)hostReassign();else Hub.up('intent',{a:'reassign'});});
+  $('btn-tune-prev').addEventListener('click',()=>{
+    unlockAudio();
+    const bells=[...records.values()].filter(x=>x.kind==='bell').sort((a,b)=>a.x-b.x);
+    bells.forEach((b,i)=>setTimeout(()=>playBell(0.7,bellMidi(b)),i*180));
+  });
+  $('tune-root').addEventListener('change',(e)=>setTune(parseInt(e.target.value,10),undefined));
+  $('tune-scale').addEventListener('change',(e)=>setTune(undefined,e.target.value));
+  $('btn-machines').addEventListener('click',()=>{unlockAudio();$('machines').classList.toggle('hidden');renderMachines();});
+  $('btn-mach-close').addEventListener('click',()=>{$('machines').classList.add('hidden');});
+  $('btn-mach-save').addEventListener('click',()=>{
+    unlockAudio();
+    const all=loadMachines();
+    const nm=prompt('Name this machine:','machine '+(all.length+1));
+    if(nm===null) return;
+    all.unshift(serializeMachine(nm||('machine '+(all.length+1))));
+    storeMachines(all); renderMachines();
+    flashNote('saved');
+  });
+  $('btn-mach-exp').addEventListener('click',()=>{
+    unlockAudio();
+    const t=$('mach-text');
+    const txt=JSON.stringify(serializeMachine('table'));
+    if(t) t.value=txt;
+    try{ if(navigator.clipboard&&navigator.clipboard.writeText) navigator.clipboard.writeText(txt); }catch(e){}
+    flashNote('table copied as text — paste it anywhere');
+  });
+  $('btn-mach-imp').addEventListener('click',()=>{
+    unlockAudio();
+    const t=$('mach-text');
+    let m=null;
+    try{ m=JSON.parse((t&&t.value)||''); }catch(e){}
+    if(!m||!Array.isArray(m.parts)){ flashNote('that text is not a machine'); return; }
+    if(!m.name) m.name='imported';
+    if(!isHost){ flashNote('imported into the list — only the host can load it'); }
+    const all=loadMachines(); all.unshift(m); storeMachines(all); renderMachines();
+    if(isHost) loadMachine(all[0]);
+  });
 }
 function bindKeys(){
   window.addEventListener('keydown',(e)=>{
     if(e.target&&(e.target.tagName==='INPUT'||e.target.tagName==='SELECT')) return;
     const k=e.key;
+    if((e.ctrlKey||e.metaKey)&&(k==='c'||k==='C')){ doCopy(); e.preventDefault(); return; }
+    if((e.ctrlKey||e.metaKey)&&(k==='v'||k==='V')){ doPaste(); e.preventDefault(); return; }
     if((k==='r'||k==='R')&&selectedId){
       doRot(selectedId,e.shiftKey?-Math.PI/12:Math.PI/12);
     }else if(k==='l'||k==='L'){
       if(selectedId) doLock(selectedId);
+    }else if(k==='f'||k==='F'){
+      if(selectedId) doFire(selectedId);
+    }else if(k==='t'||k==='T'){
+      $('tune').classList.toggle('hidden');renderTune();
+    }else if(k==='m'||k==='M'){
+      $('machines').classList.toggle('hidden');renderMachines();
     }else if((k==='Delete'||k==='Backspace')&&selectedId){
       const id=selectedId;selectedId=null;updateSel();doDel(id);
       e.preventDefault();
     }else if(k==='Escape'){
-      if(mode==='place'){ placeKind=null; draft=null; setMode('select'); }
+      if(linkArm){ linkArm=null; flashNote('link cancelled'); }
+      else if(mode==='place'){ placeKind=null; draft=null; setMode('select'); }
       else if(pillOpen){ pillOpen=false; updateSel(); }
     }
   });
@@ -1913,11 +2783,12 @@ function toggleMusic(){
 function playSfx(s){
   if(!s) return;
   const t=s.t||'clink', v=(s.v===undefined?0.5:s.v);
-  if(t==='bell') playBell(v);
+  if(t==='bell') playBell(v,s.m);
   else if(t==='boing') playBoing(v);
   else if(t==='knock') playKnock(v);
   else if(t==='thud') playThud(v);
   else if(t==='click') playClick(v);
+  else if(t==='pop') playPop(v);
   else if(t==='whoosh') playWhoosh(v);
   else playClink(v); // legacy {i,v} payloads
 }
@@ -1934,9 +2805,10 @@ function tone(freq,type,dur,vol,slideTo,delay){
     o.start(t0);o.stop(t0+dur+0.02);
   }catch(e){}
 }
-function playBell(v){
-  // A small brass bell: detuned partials, long decay.
-  const base=660+Math.random()*60, vol=Math.min(0.3,0.1+0.2*v);
+function playBell(v,midi){
+  // A small brass bell: detuned partials, long decay. Tuned to the bell
+  // tuner's note when one is attached, old random base otherwise.
+  const base=(midi?440*Math.pow(2,((midi-69)/12)):660+Math.random()*60), vol=Math.min(0.3,0.1+0.2*v);
   tone(base,'sine',1.6,vol);
   tone(base*2.01,'sine',1.2,vol*0.5);
   tone(base*2.74,'sine',0.9,vol*0.25);
@@ -1946,6 +2818,10 @@ function playBoing(v){ tone(180+Math.random()*40,'sine',0.35,Math.min(0.3,0.12+0
 function playKnock(v){ tone(320+Math.random()*120,'triangle',0.09,Math.min(0.25,0.1+0.15*v),140); }
 function playThud(v){ tone(110+Math.random()*30,'sine',0.14,Math.min(0.25,0.1+0.15*v),55); }
 function playClick(v){ tone(1900,'square',0.04,Math.min(0.12,0.05+0.07*v)); }
+function playPop(v){
+  // a bright balloon pop: sharp attack sliding down
+  tone(900+Math.random()*300,'square',0.12,Math.min(0.3,0.15+0.2*v),200);
+}
 function playWhoosh(v){
   if(!audioCtx) return;
   try{ // filtered noise puff for the catapult release
