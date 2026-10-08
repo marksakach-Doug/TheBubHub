@@ -2,7 +2,7 @@
 <html lang="en">
 <head>
 <meta charset="utf-8">
-<meta name="viewport" content="width=device-width, initial-scale=1">
+<meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
 <title>eggs</title>
 <style>
 *{box-sizing:border-box}
@@ -22,7 +22,35 @@ button.eg.on{background:#ffd23f;color:#241b12;border-color:#ffd23f}
  #shoutbar{display:flex;gap:6px;align-items:center}
  #shout-input{flex:1;background:#0d0a06;border:1px solid #6b5636;border-radius:10px;padding:6px 12px;color:#f0e6d2;font:inherit}
  #shout-input:focus{outline:none;border-color:#ffd23f}
- .hint{color:#8a7a5c;font-size:12px;margin:0}
+  .hint{color:#8a7a5c;font-size:12px;margin:0}
+  /* ── phone touch controls ── hidden on mouse/desktop, shown on touch-only devices */
+  #phone-controls{position:absolute;inset:0;display:none;pointer-events:none;z-index:4}
+  @media (hover:none) and (pointer:coarse){#phone-controls{display:flex}}
+  #phone-controls .phone-dpad{
+   position:absolute;left:calc(12px + env(safe-area-inset-left,0px));bottom:calc(20px + env(safe-area-inset-bottom,0px));
+   display:grid;grid-template-columns:repeat(3,56px);grid-auto-rows:56px;gap:8px;width:fit-content;pointer-events:auto}
+  #phone-controls .dpad-up{grid-column:2;grid-row:1}
+  #phone-controls .dpad-left{grid-column:1;grid-row:2}
+  #phone-controls .dpad-down{grid-column:2;grid-row:3}
+  #phone-controls .dpad-right{grid-column:3;grid-row:2}
+  #phone-controls .phone-jump{
+   position:absolute;right:calc(12px + env(safe-area-inset-right,0px));bottom:calc(48px + env(safe-area-inset-bottom,0px));
+   width:84px;height:84px;border-radius:50%;pointer-events:auto}
+  #phone-controls .phone-suplex{
+   position:absolute;right:calc(12px + env(safe-area-inset-right,0px));bottom:calc(136px + env(safe-area-inset-bottom,0px));
+   width:56px;height:56px;border-radius:50%;font-size:22px;pointer-events:auto}
+  .phone-btn{
+   font:700 19px/1 system-ui; color:#f0e6d2;
+   background:rgba(51,40,24,.65);border:2px solid #6b5636;border-radius:12px;cursor:pointer;
+   touch-action:none;user-select:none;-webkit-user-select:none;-webkit-tap-highlight-color:transparent;
+   transition:background .08s ease,border-color .08s ease,color .08s ease,transform .04s ease}
+  .phone-btn:active{transform:scale(.95)}
+  .phone-btn.on,.phone-btn.phone-suplex.on{
+   background:#ffd23f;color:#241b12;border-color:#ffd23f}
+  .phone-btn.phone-jump{font-size:18px}
+  .phone-btn .ico{display:block;font-size:22px}
+  @media (hover:none) and (pointer:coarse){
+   .phone-btn{background:rgba(51,40,24,.85);border-color:#8a7a5c}}
 </style>
 </head>
 <body>
@@ -35,7 +63,17 @@ button.eg.on{background:#ffd23f;color:#241b12;border-color:#ffd23f}
   </div>
   <div id="stage-wrap">
     <canvas id="cv" width="1400" height="900"></canvas>
-    <div id="overlay"><h1>eggs</h1><p>A sandbox for eggs. Bounce around, splat, respawn. Jump twice for a double jump. Ride the teal elevator around its loop — hold up/down to drive it. Hop on the skateboard: tap jump for a flipping ollie (the board jumps too), hold jump to bail, mind the peg. One star every 5 minutes makes you invincible, and a bean makes you a big egg. Shout at each other below. There is a secret key…</p><p style="font-size:11px;opacity:.75">Arrows / WASD move · Space jumps (twice!) · brake hops off the board · you are the egg with your name on it</p></div>
+    <div id="overlay"><h1>eggs</h1><p>A sandbox for eggs. Bounce around, splat, respawn. Jump twice for a double jump. Ride the teal elevator around its loop — hold up/down to drive it. Hop on the skateboard: tap jump for a flipping ollie (the board jumps too), hold jump to bail, mind the peg. One star every 5 minutes makes you invincible, and a bean makes you a big egg. Shout at each other below. There is a secret key…</p><p class="controls-hint" style="font-size:11px;opacity:.75">Arrows / WASD move · Space jumps (twice!) · brake hops off the board · you are the egg with your name on it</p></div>
+    <div id="phone-controls">
+      <div class="phone-dpad">
+        <button class="phone-btn dpad-up" data-key="ArrowUp" aria-label="up / jump"><span class="ico">▲</span></button>
+        <button class="phone-btn dpad-left" data-key="ArrowLeft" aria-label="left"><span class="ico">◄</span></button>
+        <button class="phone-btn dpad-down" data-key="ArrowDown" aria-label="down / brake"><span class="ico">▼</span></button>
+        <button class="phone-btn dpad-right" data-key="ArrowRight" aria-label="right"><span class="ico">►</span></button>
+      </div>
+      <button class="phone-btn phone-jump" data-key="Space" aria-label="jump"><span class="ico">JUMP</span></button>
+      <button class="phone-btn phone-suplex" data-action="suplex" aria-label="suplex grab / throw"><span class="ico">👐</span></button>
+    </div>
   </div>
   <div id="meta"><span id="stat">tap to enter the nest</span></div>
   <div id="shoutbar">
@@ -870,7 +908,66 @@ overlay.addEventListener('click',function(){overlay.classList.add('hide');Hub.up
 window.addEventListener('pointerdown',function once(){Hub.up('hello');},{once:true});
 function bootAll(){newWorld();ensureEggs();renderRole();requestAnimationFrame(loop);reportHeight();}
 var lastT=performance.now();
-function loop(now){var dt=Math.min(.05,(now-lastT)/1000);lastT=now;step(dt,now);render();requestAnimationFrame(loop);}
+function loop(now){var dt=Math.min(.05,(now-lastT)/1000);lastT=now;step(dt,now);render();syncPhoneControls();requestAnimationFrame(loop);}
+/* ── phone touch controls ────────────────────────── */
+var isTouch = window.matchMedia && window.matchMedia('(hover: none) and (pointer: coarse)').matches;
+(function setupPhoneControls(){
+  var box=document.getElementById('phone-controls');
+  if(!box){
+    if(isTouch){
+      var h=document.querySelector('.controls-hint');
+      if(h)h.innerHTML='Drag the D-pad to move &amp; drive the elevator · JUMP for double jump / ollie / bail · 👐 to suplex grab &amp; throw · you are the egg with your name on it';
+    }
+    return;
+  }
+  // D-pad + jump buttons: set/clear keys[code] directly — localInput() reads them.
+  // setPointerCapture keeps the key held even if the finger slides off the button.
+  var keyBtns=box.querySelectorAll('[data-key]');
+  keyBtns.forEach(function(btn){
+    var code=btn.getAttribute('data-key');
+    btn.addEventListener('pointerdown',function(e){
+      if(e.button!==0)return; // ignore right-click
+      e.preventDefault();
+      keys[code]=true;
+      btn.classList.add('on');
+      if(btn.setPointerCapture)try{btn.setPointerCapture(e.pointerId);}catch(err){}
+    });
+    function release(){keys[code]=false;btn.classList.remove('on');}
+    btn.addEventListener('pointerup',release);
+    btn.addEventListener('pointercancel',release);
+    btn.addEventListener('pointerleave',release);
+    btn.addEventListener('contextmenu',function(e){e.preventDefault();});
+  });
+  // suplex toggle: single-tap fires on pointerup so a slip cancels it
+  var sb=box.querySelector('[data-action="suplex"]');
+  if(sb){
+    sb.addEventListener('pointerdown',function(e){
+      if(e.button!==0)return;
+      e.preventDefault();
+      sb._pending=true;
+    });
+    function commit(){
+      if(!sb._pending)return;sb._pending=false;toggleSuplex();
+    }
+    sb.addEventListener('pointerup',commit);
+    sb.addEventListener('pointercancel',function(){sb._pending=false;});
+    sb.addEventListener('pointerleave',commit);
+    sb.addEventListener('contextmenu',function(e){e.preventDefault();});
+  }
+  // hint: mention touch controls (only on touch devices)
+  if(isTouch){
+    var h=document.querySelector('.controls-hint');
+    if(h)h.innerHTML='Drag the D-pad to move &amp; drive the elevator · JUMP for double jump / ollie / bail · 👐 to suplex grab &amp; throw · you are the egg with your name on it';
+  }
+})();
+function syncPhoneControls(){
+  if(!isTouch)return;
+  var sb=document.querySelector('.phone-suplex');
+  if(!sb)return;
+  var me=null;
+  for(var i=0;i<eggs.length;i++)if(eggs[i].id===myId){me=eggs[i];break;}
+  if(me&&me.suplex&&!me.riding)sb.classList.add('on');else sb.classList.remove('on');
+}
 Hub.init();reportHeight();
 })();
 </script>

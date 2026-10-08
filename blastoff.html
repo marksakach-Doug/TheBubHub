@@ -1,0 +1,589 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Blast Off!</title>
+<style>
+:root{--ink:#e0f0ff;--dim:#8ba8c0;--gold:#ffe082;--neon:#00f2ff;--space:#0a0e1a;--nebula:#1a1c3a;--ship:#4a5568;}
+*{box-sizing:border-box}
+body{margin:0;background:var(--space);color:var(--ink);font:15px/1.45 'Segoe UI', Tahoma, Geneva, Verdana, sans-serif;}
+#bo-panel{max-width:960px;margin:0 auto;padding:12px;display:flex;flex-direction:column;gap:12px;}
+.bo-head{display:flex;flex-wrap:wrap;align-items:center;justify-content:space-between;gap:8px;}
+.bo-t{color:var(--neon);font-weight:900;letter-spacing:.2em;font-size:20px;text-shadow:0 0 10px var(--neon);}
+.bo-b{font:700 13px system-ui;padding:8px 16px;border-radius:12px;border:1px solid #334155;background:var(--ship);color:#f0f4ff;cursor:pointer;}
+.bo-b.k{background:#c08a4a}
+.bo-b[disabled]{opacity:.4;cursor:not-allowed}
+#bo-err{font:11px monospace;color:#ff8888}
+#bo-status{background:rgba(0,0,0,.6);border:2px solid var(--neon);border-radius:14px;padding:14px 16px;font-size:19px;font-weight:700;text-align:center;color:#f2faff;box-shadow:0 0 20px rgba(0,242,255,0.3);min-height:70px;display:flex;flex-direction:column;justify-content:center;align-items:center}
+#bo-status small{display:block;font-size:12px;font-weight:400;color:var(--dim);margin-top:4px}
+.feed-item{background:rgba(10,14,26,.92);border:1px solid var(--neon);color:#f2faff;border-radius:12px;padding:8px 16px;font-size:14px;max-width:92%;text-align:center;box-shadow:0 4px 14px rgba(0,242,255,0.2);position:absolute;top:6%;left:50%;transform:translate(-50%,0);z-index:100;white-space:normal;animation:feedPop .45s cubic-bezier(.34,1.56,.64,1) forwards, fadeOut .7s ease 1.6s forwards}
+@keyframes feedPop{0%{transform:scale(.7) translateY(10px);opacity:0}60%{transform:scale(1.05)}100%{transform:scale(1);opacity:1}}
+@keyframes fadeOut{to{opacity:0;transform:translate(-50%,-160%);pointer-events:none}}
+#bo-score{background:rgba(0,0,0,.5);border:2px solid var(--neon);border-radius:14px;padding:10px 12px;display:flex;flex-direction:column;gap:8px}
+.sc-vsrow{display:flex;align-items:center;justify-content:center;gap:14px}
+.sc-side{flex:1;text-align:center;min-width:0}
+.sc-cap{font:700 11px system-ui;letter-spacing:.15em;color:var(--dim)}
+.sc-side.you .sc-cap{color:var(--neon)}
+.sc-n{font-size:52px;font-weight:900;line-height:1.05;color:#f2faff;text-shadow:0 0 10px var(--neon)}
+.sc-side.dest .sc-n{color:#ff8888}
+.sc-side.win .sc-n{color:var(--gold);text-shadow:0 0 18px var(--gold)}
+.sc-sub{font-size:11px;color:var(--dim);min-height:14px;overflow:hidden;text-overflow:ellipsis;white-space:nowrap}
+.sc-vs{text-align:center;flex:none}
+.sc-vs .x{font-size:26px;font-weight:900;color:var(--neon)}
+.sc-verdict{margin-top:4px;font:800 12px system-ui;padding:3px 10px;border-radius:9px;border:1px solid #334155;color:#d8cfae}
+.sc-verdict.win{background:#1e3a1e;border-color:#4caf50;color:#e9f2d0;animation:pulseA 1.2s infinite}
+.sc-verdict.lose{background:#3a1e1e;border-color:#f44336;color:#f0c8b8}
+.sc-verdict.hole{background:#1a1a1a;border-color:#888;color:#fff}
+@keyframes pulseA{0%,100%{transform:scale(1)}50%{transform:scale(1.05)}}
+.sc-chips{display:flex;gap:6px;flex-wrap:wrap;justify-content:center}
+.sc-chip{font:700 11px system-ui;background:rgba(0,0,0,.45);border:1px solid #334155;border-radius:9px;padding:3px 9px;color:#d8cfae;white-space:nowrap}
+.sc-chip .pw{color:#fff;font-size:13px}
+.sc-chip.on{border-color:var(--neon);color:#fff;box-shadow:0 0 8px var(--neon)}
+.sc-chip.you{border-color:var(--gold)}
+.sc-chip.winner{border-color:var(--gold);background:rgba(255,224,130,.2);color:var(--gold)}
+#bo-tablewrap{position:relative;background:rgba(0,0,0,.28);border:1px solid #334155;border-radius:14px;padding:12px;display:flex;flex-direction:column;gap:12px;overflow:hidden}
+.bo-lbl{font:11px monospace;color:var(--dim);letter-spacing:.05em}
+.bo-deckrow{display:flex;gap:14px;align-items:stretch;justify-content:center;flex-wrap:wrap}
+.deck{background:rgba(0,0,0,.4);border:1px solid #334155;border-radius:12px;padding:10px 14px;display:flex;gap:10px;align-items:center;min-width:200px}
+.deck .stack{width:52px;height:74px;border-radius:8px;position:relative;flex:none;background:#222;box-shadow:3px 3px 0 #111,6px 6px 0 #0a0a0a;border:2px solid #444}
+.deck.red .stack{background:linear-gradient(135deg,#ff4d4d,#8b0000);border-color:#ff8888}
+.deck.black .stack{background:linear-gradient(135deg,#4d6a8a,#0a1428);border-color:#a0c0ff}
+.deck .n{font-size:26px;font-weight:900;color:#fff}
+.deck .cap{font-size:12px;font-weight:700}
+.deck .dim{font:11px monospace;color:var(--dim)}
+.bo-midrow{display:grid;grid-template-columns:220px 1fr 220px;gap:12px;align-items:start}
+@media(max-width:640px){.bo-midrow{grid-template-columns:1fr}}
+.bo-zone{background:rgba(0,0,0,.32);border:1px solid #334155;border-radius:12px;padding:10px;min-height:150px}
+.bo-zone.you{border-color:var(--neon);box-shadow:0 0 12px rgba(0,242,255,0.25)}
+.bo-cards{display:flex;gap:10px;flex-wrap:wrap;justify-content:center;min-height:108px;align-items:center}
+.bo-c{width:76px;height:108px;border-radius:9px;display:flex;flex-direction:column;align-items:center;justify-content:space-between;padding:6px 3px 5px;border:2px solid;position:relative;flex:none;user-select:none;background:#fff}
+.bo-c.red{background:linear-gradient(#ff6b6b,#c0392b);border-color:#ff8888;color:#fff}
+.bo-c.black{background:linear-gradient(#4a69bd,#1e3799);border-color:#a0c0ff;color:#fff}
+.bo-c.hole{box-shadow:0 0 15px #000;border-color:#000}
+.bo-c b{position:absolute;top:-9px;left:-9px;min-width:26px;height:26px;padding:0 4px;border-radius:13px;background:#0a0e1a;border:2px solid var(--neon);color:#fff;font:700 12px/22px system-ui;text-align:center}
+.bo-c i{font-style:normal;font-size:40px;line-height:1;margin-top:14px}
+.bo-c u{text-decoration:none;font-size:10px;font-weight:700;text-align:center;line-height:1.1}
+.bo-c[data-a]{cursor:pointer}
+.bo-c[data-a]:hover{transform:translateY(-3px)}
+.bo-c.flip{animation:flipIn .45s ease}
+@keyframes flipIn{0%{transform:rotateY(90deg) scale(.9);opacity:0}100%{transform:none;opacity:1}}
+#bo-actions{display:flex;flex-direction:column;gap:10px}
+.bo-act{display:flex;gap:12px;align-items:center;width:100%;text-align:left;background:#1a202c;border:2px solid var(--neon);color:#f0f4ff;border-radius:14px;padding:14px 16px;cursor:pointer;min-height:64px}
+.bo-act:hover:not([disabled]){transform:translateY(-2px);box-shadow:0 6px 16px rgba(0,242,255,0.2)}
+.bo-act:active:not([disabled]){transform:scale(.99)}
+.bo-act[disabled]{opacity:.45;cursor:not-allowed}
+.bo-act.k{background:#2d3748;border-color:var(--gold)}
+.bo-act .ic{font-size:30px;flex:none}
+.bo-act .tt{font-size:17px;font-weight:800}
+.bo-act .ss{font-size:12px;color:var(--dim);font-weight:400}
+#bo-veil{position:absolute;inset:0;display:flex;align-items:center;justify-content:center;background:rgba(10,14,26,.65);backdrop-filter:blur(2px);pointer-events:none;border-radius:14px;z-index:5;transition:opacity .5s ease, visibility .5s ease}
+#bo-veil.hidden{opacity:0;visibility:hidden}
+#bo-veil .ribbon{background:rgba(26,28,58,.92);border:2px solid var(--neon);border-radius:14px;padding:14px 26px;font-size:19px;font-weight:800;text-align:center;box-shadow:0 6px 20px rgba(0,242,255,0.3)}
+#bo-veil .ribbon small{display:block;font-size:12px;font-weight:400;color:var(--dim);margin-top:4px}
+#bo-note{font:11px monospace;color:var(--neon);min-height:14px;text-align:center}
+.hidden{display:none!important}
+.wf-setup{background:rgba(0,0,0,.4);border:1px solid #334155;border-radius:10px;padding:10px;display:flex;flex-direction:column;gap:8px}
+#standalone-note{max-width:520px;margin:60px auto;text-align:center}
+#standalone-note a{color:var(--neon)}
+@media (prefers-reduced-motion:reduce){*{animation:none!important;transition:none!important}}
+
+/* Result Popup Styles */
+#bo-result-popup{position:absolute;inset:0;z-index:110;display:flex;align-items:center;justify-content:center;pointer-events:none}
+.res-ribbon{background:rgba(26,28,58,.95);border:3px solid var(--neon);color:#fff;padding:20px 40px;border-radius:20px;font-size:24px;font-weight:900;text-align:center;box-shadow:0 0 30px var(--neon);animation:resPop .5s cubic-bezier(.34,1.56,.64,1) forwards}
+@keyframes resPop{0%{transform:scale(0);opacity:0}100%{transform:scale(1);opacity:1}}
+.res-fade-out{animation:resFade .5s ease forwards}
+@keyframes resFade{to{opacity:0;transform:translateY(-20px)}}
+</style>
+</head>
+<body>
+<div id="bo-panel">
+    <div class="bo-head">
+        <div><span class="bo-t">BLAST OFF!</span> <span id="bo-err"></span></div>
+        <div style="display:flex;gap:8px">
+            <button id="btn-bo-new" class="bo-b hidden">New game</button>
+            <button id="btn-bo-close" class="bo-b k">Hide</button>
+        </div>
+    </div>
+    <div id="bo-status">Preparing for launch…</div>
+    <div id="bo-feed" style="position:absolute;inset:0;pointer-events:none;z-index:100"></div>
+    <div id="bo-setup" class="wf-setup hidden">
+        <span class="bo-lbl">HOST SETUP — Everyone plays (2–6). Most red cards win.</span>
+        <div style="display:flex;align-items:center;gap:8px"><button id="btn-bo-start" class="bo-b">Ignite Engines</button><span id="bo-setup-note" class="bo-lbl"></span></div>
+    </div>
+    <div id="bo-waiting" class="hidden bo-lbl" style="background:rgba(0,0,0,.28);border:1px solid #334155;border-radius:12px;padding:10px">Waiting for the mission commander to start.</div>
+    <div id="bo-game" class="hidden" style="flex-direction:column;gap:12px">
+        <div id="bo-tablewrap">
+            <div id="bo-result-popup" class="hidden"></div>
+            <div id="bo-veil" class="hidden"><div class="ribbon" id="bo-veil-text">Waiting…</div></div>
+            <div id="bo-topdeck"></div>
+            <div id="bo-score"></div>
+            <div class="bo-midrow" id="bo-midrow"></div>
+            <div id="bo-arena"></div>
+        </div>
+        <div id="bo-actions"></div>
+        <div id="bo-note"></div>
+    </div>
+</div>
+<div id="standalone-note" class="hidden">
+    <h1 style="color:var(--neon);letter-spacing:.2em">BLAST OFF!</h1>
+    <p>Blast Off! lives inside Bub Hub.<br>Open <a href="index.html">Bub Hub</a>, join a room, and press <b>Play Blast Off!</b>.</p>
+</div>
+<script>
+(function(){
+'use strict';
+const GAME_ID = 'blastoff';
+const $ = (id) => document.getElementById(id);
+const esc = (s) => String(s).replace(/[&<>"']/g, c => ({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;'}[c]));
+
+const Hub = {
+    me: null, roster: [], room: '',
+    up(k, p){ try { window.parent.postMessage({ t: 'gu', game: GAME_ID, k, p }, '*'); } catch(e) {} },
+    init(){
+        window.addEventListener('message', onDown);
+        this.up('hello');
+        setTimeout(() => {
+            if (!Hub.me){
+                $('bo-panel').classList.add('hidden');
+                $('standalone-note').classList.remove('hidden');
+                reportHeight();
+            }
+        }, 1500);
+    }
+};
+let heightT = null;
+function reportHeight(){
+    clearTimeout(heightT);
+    heightT = setTimeout(() => {
+        const h = Math.max(document.body.scrollHeight, document.documentElement.scrollHeight);
+        Hub.up('height', h);
+    }, 60);
+}
+function onDown(e){
+    const m = e.data;
+    if (!m || m.t !== 'gd' || m.game !== GAME_ID) return;
+    if (m.k === 'roster'){ Hub.me = m.p.you; Hub.roster = m.p.roster; Hub.room = m.p.room; Hub.names = rosterNames(); if (syncNames() && isHost() && S) broadcast(); else render(); return; }
+    if (m.k === 'state'){ if (m.p) { S = m.p; render(); } return; }
+    if (m.k === 'intent'){ onIntent(m.p, m.from); return; }
+    if (m.k === 'denied'){ toast(m.p.text); return; }
+    if (m.k === 'reset'){ S = null; render(); return; }
+}
+const myId = () => Hub.me && Hub.me.id;
+const myName = () => (Hub.names && Hub.names[myId()]) || (Hub.me && cleanName(Hub.me.name)) || 'Player';
+const isHost = () => !!(Hub.me && Hub.me.isHost);
+const peerCount = () => Hub.roster.length;
+const hostPresent = () => Hub.roster.some(m => m.host);
+
+function cleanName(s){ return String(s == null ? '' : s).replace(/\s+/g, ' ').trim().slice(0, 14) || 'Player'; }
+function rosterNames(){
+    const seen = new Map(), out = {};
+    Hub.roster.slice().sort((a, b) => a.id < b.id ? -1 : (a.id > b.id ? 1 : 0)).forEach(m => {
+        const base = cleanName(m.name);
+        const n = (seen.get(base) || 0) + 1;
+        seen.set(base, n);
+        out[m.id] = n > 1 ? base + ' ' + n : base;
+    });
+    return out;
+}
+Hub.names = {};
+const pn = (p) => (p && p.name) || 'Player';
+function syncNames(){
+    if (!S) return false;
+    let changed = false;
+    S.pl.forEach(p => {
+        const n = (Hub.names || {})[p.id];
+        if (n && n !== p.name){ p.name = n; changed = true; }
+    });
+    return changed;
+}
+
+window.addEventListener('error', (e) => {
+    try {
+        const el = $('bo-err');
+        if (el){ el.textContent = 'Error: ' + (e.message || 'script error'); }
+    } catch(err) {}
+});
+
+const V = { J: 11, Q: 12, K: 13, A: 14 };
+const DEST = {
+    2: ['Venus','🌍'], 3: ['Mars','🔴'], 4: ['Mercury','🌑'], 5: ['Asteroid belt','☄️'],
+    6: ['Jupiter','🪐'], 7: ['Saturn','💍'], 8: ['Uranus','🧊'], 9: ['Neptune','🔵'],
+    10: ['Kuiper belt','🌌'], 11: ['Proxima Centauri','⭐'], 12: ['Tau Ceti','✨'],
+    13: ['Cygnus X-1','🕳️'], 14: ['Sagittarius A*','🌌']
+};
+const BLACK_HOLES = [13, 14];
+let S = null, noteT = null, lastFeedN = 0;
+let lastTurn = null;
+
+const val = (c) => V[c.r] || +c.r;
+function shuffle(a){ for (let i = a.length - 1; i > 0; i--){ const j = Math.random() * (i + 1) | 0; [a[i], a[j]] = [a[j], a[i]]; } return a; }
+function deck(col){ const d = []; ['2','3','4','5','6','7','8','9','10','J','Q','K','A'].forEach(r => { d.push({ r, c: col }); d.push({ r, c: col }); }); return shuffle(d); }
+function draw(k){
+    const d = k === 'R' ? S.redDeck : S.blackDeck;
+    if (!d.length) {
+        const disco = k === 'R' ? S.redDisco : S.blackDisco;
+        if (!disco || !disco.length) return { r: '2', c: k };
+        const shuff = shuffle([...disco]);
+        S.redDisco = k === 'R' ? [] : S.redDisco;
+        S.blackDisco = k === 'B' ? [] : S.blackDisco;
+        d.push(...shuff);
+    }
+    return d.pop() || { r: '2', c: k };
+}
+
+const cur = () => S && S.pl[S.turn];
+const me = () => S && S.pl.find(p => p.id === myId());
+
+function say(t){
+    S.feed.unshift({ n: ++S.feedN, t });
+    while (S.feed.length > 8) S.feed.pop();
+    Hub.up('say', t);
+}
+
+function fresh(){
+    const nm = rosterNames();
+    Hub.names = nm;
+    const ids = [myId()].concat(Hub.roster.filter(m => m.id !== myId()).map(m => m.id));
+    const ps = ids.map(id => ({ id, name: nm[id] || cleanName(id), ship: null, score: 0 }));
+    S = {
+        pl: ps,
+        redDeck: deck('R'), redDisco: [],
+        blackDeck: deck('B'), blackDisco: [],
+        turn: 0, phase: 'choose', over: false,
+        currentDest: null, extraDest: null,
+        pend: null, pend_p: null, pend_path: null,
+        feed: [], feedN: 0, msg: '',
+        inst: Date.now()
+    };
+    S.pl.forEach(p => {
+        let c;
+        do {
+            c = draw('B');
+            if (val(c) <= 4) break;
+            S.blackDisco.push(c);
+        } while (true);
+        p.ship = c;
+    });
+    S.msg = `${pn(cur())}'s turn.`;
+}
+function startGame(){
+    if (!isHost()) return false;
+    if (peerCount() < 2 || peerCount() > 6){ $('bo-setup-note').textContent = 'Need 2–6 players in the room.'; return false; }
+    fresh();
+    say(`Blast Off begins! ${S.pl.length} pilots ready. ${pn(cur())} takes the helm.`);
+    broadcast();
+    Hub.up('invite');
+    return true;
+}
+const rematch = () => { if (isHost() && S) startGame(); };
+
+function endTurn(){
+    S.currentDest = null; S.extraDest = null; S.pend = null; S.pend_p = null; S.pend_path = null;
+    S.turn = (S.turn + 1) % S.pl.length;
+    S.phase = 'choose';
+    S.msg = `${pn(cur())}'s turn.`;
+}
+
+function resolveFight(p, helperId, path){
+    const h = helperId && S.pl.find(x => x.id === helperId);
+    const shipVal = p.ship ? val(p.ship) : 0;
+    const helperVal = (h && h.ship) ? val(h.ship) : 0;
+    const totalPower = shipVal + helperVal;
+    
+    let dests = [S.currentDest];
+    if (path === 'afterburner' && S.extraDest) dests.push(S.extraDest);
+    
+    const destSum = dests.reduce((s, c) => s + val(c), 0);
+    const win = totalPower >= destSum;
+    const isBlackHole = dests.some(c => BLACK_HOLES.includes(val(c)));
+
+    say(`${pn(p)}${h ? ' + ' + pn(h) : ''}: Power ${totalPower} vs Destination ${destSum} — ${win ? 'Success!' : 'Failure!'}`);
+
+    if (win){
+        p.score += dests.length;
+        say(`${pn(p)} collects ${dests.length} red card(s)!`);
+        if (h) {
+            const ns = draw('B');
+            h.ship = ns;
+            say(`${pn(h)} draws a new ship: ${val(ns)}.`);
+        }
+    } else {
+        p.ship = null;
+        say(`${pn(p)}'s spaceship was lost!`);
+        if (h) {
+            h.ship = null;
+            say(`${pn(h)}'s spaceship was also lost!`);
+        }
+        if (path === 'afterburner' && p.score > 0){
+            p.score--;
+            say(`${pn(p)} lost a previously collected red card in the crash!`);
+        }
+    }
+
+    if (isBlackHole){
+        say(`⚠️ BLACK HOLE DETECTED! The ships are sucked in regardless of the outcome.`);
+        p.ship = null;
+        if (h) h.ship = null;
+    }
+
+    S.redDisco.push(...dests);
+    
+    if (S.redDeck.length === 0){
+        S.over = true;
+        const winner = S.pl.reduce((prev, curr) => (prev.score > curr.score) ? prev : curr);
+        say(`🚀 Mission Over! ${pn(winner)} wins with ${winner.score} red cards!`);
+        S.msg = `🏆 ${pn(winner)} wins the game!`;
+    } else {
+        endTurn();
+    }
+}
+
+function handle(d){
+    const p = S.pl.find(x => x.id === d.pid);
+    if (!p) return 'You are not in this game.';
+    if (S.over) return 'The game is over.';
+    const mine = cur() && cur().id === d.pid;
+
+    if (S.phase === 'decide'){
+        if (d.action !== 'decide' || !S.pend || S.pend.who !== d.pid) return 'Waiting for ' + pn(S.pl.find(x => x.id === (S.pend ? S.pend.who : ''))) + ' to decide.';
+        const pid_p = S.pend_p;
+        const path = S.pend_path;
+        S.pend = null; S.pend_p = null; S.pend_path = null;
+        if (d.i === 'yes'){
+            resolveFight(pid_p, d.pid, path);
+            return null;
+        }
+        if (d.i === 'no'){
+            resolveFight(pid_p, null, path);
+            return null;
+        }
+    }
+
+    if (!mine) return `It is ${pn(cur())}'s turn.`;
+
+    if (S.phase === 'choose'){
+        if (d.action === 'newship'){
+            const ns = draw('B');
+            S.blackDisco.push(p.ship || {r:'0', c:'B'});
+            p.ship = ns;
+            say(`${pn(p)} finds a new ship: ${val(ns)}.`);
+            endTurn();
+            return null;
+        }
+        if (d.action === 'blastoff'){
+            S.currentDest = draw('R');
+            S.phase = 'fight';
+            S.msg = `Destination: ${DEST[val(S.currentDest)][0]} (${val(S.currentDest)}). Choose your flight path.`;
+            return null;
+        }
+    }
+
+    if (S.phase === 'fight'){
+        if (d.action === 'pathA'){
+            resolveFight(p, null, 'normal');
+            return null;
+        }
+        if (d.action === 'pathB'){
+            const others = S.pl.filter(x => x.id !== p.id && x.ship);
+            if (!others.length) return 'No other pilots with ships are available to help!';
+            const helper = others[0];
+            S.pend = { who: helper.id, why: `${pn(p)} asks for help to reach ${DEST[val(S.currentDest)][0]}!` };
+            S.pend_p = p;
+            S.pend_path = 'share';
+            S.phase = 'decide';
+            S.msg = `${pn(helper)}: Will you help ${pn(p)}?`;
+            return null;
+        }
+        if (d.action === 'pathC'){
+            S.extraDest = draw('R');
+            resolveFight(p, null, 'afterburner');
+            return null;
+        }
+    }
+
+    return 'Invalid action.';
+}
+
+function broadcast(){
+    render();
+    if (!S || !isHost()) return;
+    Hub.up('state', S);
+}
+function act(action, x){
+    const d = Object.assign({ action, pid: myId(), name: myName() }, x || {});
+    if (isHost()){
+        if (!S) return;
+        const e = handle(d); if (e) toast(e);
+        broadcast();
+    } else {
+        Hub.up('intent', d);
+    }
+}
+function toast(t){
+    const n = $('bo-note'); if (!n) return;
+    n.textContent = t; clearTimeout(noteT); noteT = setTimeout(() => { n.textContent = ''; }, 2400);
+}
+function onIntent(d, from){
+    if (!isHost()) return;
+    d.pid = from.id; d.name = from.name;
+    if (!S) return;
+    const e = handle(d);
+    if (e) Hub.up('denied', { to: from.id, text: e });
+    broadcast();
+}
+
+function card(c, attr){
+    if (!c) return '';
+    const isRed = c.c === 'R';
+    const name = isRed ? DEST[val(c)][0] : 'Spaceship';
+    const icon = isRed ? DEST[val(c)][1] : '🚀';
+    const hole = isRed && BLACK_HOLES.includes(val(c)) ? ' hole' : '';
+    return `<div class="bo-c ${isRed ? 'red' : 'black'}${hole}" ${attr || ''}><b>${val(c)}</b><i>${icon}</i><u>${name}</u></div>`;
+}
+function deckBox(kind, count, disc, label){
+    return `<div class="deck ${kind}"><div class="stack"></div><div><div class="n">${count}</div><div class="cap">${label}</div><div class="dim">discard ${disc}</div></div></div>`;
+}
+
+function triggerResultPopup(text){
+    const pop = $('bo-result-popup');
+    if (!pop) return;
+    pop.innerHTML = `<div class="res-ribbon">${esc(text)}</div>`;
+    pop.classList.remove('hidden');
+    setTimeout(() => {
+        const ribbon = pop.querySelector('.res-ribbon');
+        if (ribbon) ribbon.classList.add('res-fade-out');
+        setTimeout(() => { pop.classList.add('hidden'); }, 500);
+    }, 2500);
+}
+
+function render(){
+    const st = $('bo-status'); if (!st) return;
+    const sh = (id, on) => {
+        const e = $(id);
+        if (!e) return;
+        e.classList.toggle('hidden', !on);
+        if (id === 'bo-game') e.style.display = on ? 'flex' : '';
+    };
+    sh('bo-setup', isHost() && !S); sh('bo-waiting', !isHost() && !S); sh('bo-game', !!S);
+    $('btn-bo-new').classList.toggle('hidden', !(isHost() && S));
+    if (!S){
+        st.textContent = 'Ready for launch? Gather your crew and blast off!';
+        return;
+    }
+    
+    // Turn Change Detection for Popup
+    if (lastTurn !== null && S.turn !== lastTurn){
+        const meIdx = S.pl.findIndex(p => p.id === myId());
+        if (lastTurn === meIdx && S.feed.length > 0){
+            triggerResultPopup(S.feed[0].t);
+        }
+    }
+    lastTurn = S.turn;
+
+    const p = me(), c = cur();
+    if (S.over){
+        const winner = S.pl.reduce((prev, curr) => (prev.score > curr.score) ? prev : curr);
+        st.innerHTML = `<span style="color:var(--gold); font-size:24px">MISSION COMPLETE!</span><small>${pn(winner)} won the race!</small>`;
+    } else {
+        st.innerHTML = `${esc(S.msg)}<small>${S.phase === 'decide' ? 'Waiting for a pilot' : 'Prepare for maneuvers'}</small>`;
+    }
+
+    $('bo-feed').innerHTML = S.feed.slice(0, 1).map(e =>
+        `<div class="feed-item${e.n > lastFeedN ? ' pop' : ''}">${esc(e.t)}</div>`
+    ).join('');
+    if (S.feed.length) lastFeedN = Math.max(lastFeedN, S.feed[0].n);
+
+    $('bo-topdeck').innerHTML =
+        `<div class="bo-deckrow">${deckBox('red', S.redDeck.length, S.redDisco.length, 'DESTINATIONS')}` +
+        (S.currentDest ? `<div class="bo-cards">${card(S.currentDest)} ${S.extraDest ? card(S.extraDest) : ''}</div>` : '') +
+        `</div>`;
+
+    const sc = $('bo-score');
+    let L_cap = 'SHIP POWER', L_n = '—', L_sub = '—', L_you = false, L_win = false;
+    let R_cap = 'DESTINATION', R_n = '—', R_sub = '—', R_dest = true, R_win = false;
+    let verdict = 'READY', vcls = '';
+
+    if (S.currentDest){
+        const shipVal = c && c.ship ? val(c.ship) : 0;
+        const destVal = val(S.currentDest) + (S.extraDest ? val(S.extraDest) : 0);
+        L_n = shipVal; L_sub = c && c.ship ? 'Pilot: ' + pn(c) : 'No Ship!'; L_you = (p && p.id === c.id); L_win = shipVal >= destVal;
+        R_n = destVal; R_sub = DEST[val(S.currentDest)][0] + (S.extraDest ? ' + ' + DEST[val(S.extraDest)][0] : '');
+        verdict = L_win ? 'SUCCESS' : 'DANGER'; vcls = L_win ? 'win' : 'lose';
+        if (BLACK_HOLES.includes(val(S.currentDest)) || (S.extraDest && BLACK_HOLES.includes(val(S.extraDest)))) {
+            verdict = 'BLACK HOLE!'; vcls = 'hole';
+        }
+    }
+
+    const leftSide = `<div class="sc-side ${L_you ? 'you' : ''} ${L_win ? 'win' : ''}"><div class="sc-cap">${L_cap}</div><div class="sc-n">${L_n}</div><div class="sc-sub">${L_sub}</div></div>`;
+    const rightSide = `<div class="sc-side dest ${R_win ? 'win' : ''}"><div class="sc-cap">${R_cap}</div><div class="sc-n">${R_n}</div><div class="sc-sub">${R_sub}</div></div>`;
+    const center = `<div class="sc-vs"><div class="x">🚀</div><div class="sc-verdict ${vcls}">${verdict}</div></div>`;
+    
+    sc.innerHTML = `<div class="sc-vsrow">${leftSide}${center}${rightSide}</div>` +
+        `<div class="sc-chips">${S.pl.map(q => `<span class="sc-chip ${S.turn === S.pl.indexOf(q) ? 'on' : ''} ${q.id === myId() ? 'you' : ''}">${esc(pn(q))} <span class="pw">🔴${q.score}</span></span>`).join('')}</div>`;
+
+    let mid = `<div>${deckBox('black', S.blackDeck.length, S.blackDisco.length, 'SPACESHIPS')}</div>`;
+    if (p){
+        mid += `<div class="bo-zone ${S.turn === S.pl.indexOf(p) ? 'you' : ''}"><span class="bo-lbl">YOUR SHIP</span><div class="bo-cards">${card(p.ship)}</div></div>`;
+    } else {
+        mid += `<div class="bo-zone"><span class="bo-lbl">Join the game to see your ship.</span></div>`;
+    }
+    mid += `<div class="bo-zone"><span class="bo-lbl">MISSION LOG</span><div class="bo-lbl" style="margin-top:10px">The pilot with the most red cards wins.</div></div>`;
+    $('bo-midrow').innerHTML = mid;
+
+    $('bo-arena').innerHTML = '';
+    const veil = $('bo-veil');
+    if (!S.over && !myAction() && !S.pend){
+        $('bo-veil-text').innerHTML = `Waiting for ${pn(cur())}...`;
+        veil.classList.remove('hidden');
+    } else if (S.pend){
+        $('bo-veil-text').innerHTML = `Awaiting Response...<small>${S.pend.why}</small>`;
+        veil.classList.remove('hidden');
+    } else {
+        veil.classList.add('hidden');
+    }
+
+    const bigBtn = (a, ic, t, s, o, attr = '') => `<button class="bo-act ${o || ''}" data-a="${a}" ${attr}><span class="ic">${ic}</span><span><span class="tt">${t}</span><br><span class="ss">${s}</span></span></button>`;
+    let ac = '';
+    if (!S.over){
+        if (S.phase === 'choose' && myId() === (cur() ? cur().id : null)){
+            ac = bigBtn('newship', '🛠️', 'Find New Ship', 'Draw a new ship to replace your current one.', 'k') +
+                 bigBtn('blastoff', '🚀', 'Blast Off!', 'Head towards a destination to collect red cards.');
+        } else if (S.phase === 'fight' && myId() === (cur() ? cur().id : null)){
+            ac = bigBtn('pathA', '🛡️', 'Normal Flight', 'Ship vs Destination. Low risk.') +
+                 bigBtn('pathB', '🤝', 'Share Ships', 'Ask another pilot for help. Higher success chance.') +
+                 bigBtn('pathC', '🔥', 'After Burner', 'Draw two destinations. High risk, double reward!');
+        } else if (S.phase === 'decide' && S.pend && S.pend.who === myId()){
+            ac = bigBtn('decide', '✅', 'YES', 'Help the other pilot.', '', 'data-i="yes"') +
+                 bigBtn('decide', '❌', 'NO', 'Stay in orbit.', 'k', 'data-i="no"');
+        }
+    }
+    $('bo-actions').innerHTML = ac;
+    reportHeight();
+}
+
+function myAction(){
+    if (!S || S.over) return false;
+    const p = me();
+    if (!p) return false;
+    if (S.phase === 'choose' || S.phase === 'fight') return cur() && cur().id === myId();
+    if (S.phase === 'decide') return S.pend && S.pend.who === myId();
+    return false;
+}
+
+$('bo-panel').addEventListener('click', (e) => {
+    const t = e.target.closest('[data-a]');
+    if (!t) return;
+    act(t.dataset.a, { i: t.dataset.i });
+});
+$('btn-bo-start').addEventListener('click', () => startGame());
+$('btn-bo-new').addEventListener('click', () => rematch());
+$('btn-bo-close').addEventListener('click', () => Hub.up('close'));
+
+(function init(){
+    Hub.init();
+    render();
+})();
+})();
+</script>
+</body>
+</html>
