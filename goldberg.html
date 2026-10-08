@@ -10,14 +10,20 @@
 *{box-sizing:border-box}
 html,body{height:100%;overflow:hidden;}
 body{margin:0;background:#14100b;color:#f0e6d2;font:14px/1.45 system-ui,sans-serif;}
-#wrap{max-width:1000px;margin:0 auto;padding:10px;height:100dvh;display:flex;flex-direction:column;gap:8px;}
+#wrap{max-width:none;margin:0 auto;padding:10px;height:100dvh;display:flex;flex-direction:column;gap:8px;}
 #bar{display:flex;flex-wrap:wrap;gap:6px;align-items:center;background:#241b12;border:1px solid #4a3a26;border-radius:12px;padding:8px 10px;}
 #bar button,#bar input[type=range]{accent-color:#e6c280;}
+#bar .grp{display:flex;gap:4px;align-items:center;flex-wrap:wrap;}
+#bar .div{width:1px;align-self:stretch;background:#4a3a26;margin:0 2px;}
+#bar .grp-label{font-size:10px;color:#8a7a5c;font-family:monospace;margin-right:2px;}
 button.gb{font-size:12px;font-weight:800;padding:6px 12px;border-radius:10px;border:1px solid #6b5636;background:#332818;color:#f0e6d2;cursor:pointer;}
 button.gb.on{background:#e6c280;color:#241b12;border-color:#e6c280;}
 button.gb:disabled{opacity:.45;cursor:not-allowed;}
+button.gb.pick{padding:6px 8px;}
 #stage-wrap{position:relative;width:100%;flex:1;min-height:0;display:flex;align-items:center;justify-content:center;background:#0d0a06;border:1px solid #4a3a26;border-radius:12px;overflow:hidden;}
-#stage{display:block;max-width:100%;max-height:100%;width:auto;height:auto;aspect-ratio:3/2;background:#1c160e;touch-action:none;}
+/* The canvas owns the whole stage box; the world is contain-fit inside it
+   (see fitView), so the table fills any screen at identical coordinates. */
+#stage{display:block;width:100%;height:100%;background:#1c160e;touch-action:none;}
 #overlay{position:absolute;inset:0;display:flex;flex-direction:column;gap:10px;align-items:center;justify-content:center;background:rgba(10,7,4,.88);z-index:5;cursor:pointer;transition:opacity .35s ease;text-align:center;padding:20px;}
 #overlay.hide{opacity:0;pointer-events:none;}
 #overlay h1{margin:0;letter-spacing:3px;color:#e6c280;font-size:26px;}
@@ -27,9 +33,10 @@ button.gb:disabled{opacity:.45;cursor:not-allowed;}
 #err{font-family:monospace;font-size:11px;color:#ff8888;min-height:14px;}
 #cursors{position:absolute;inset:0;pointer-events:none;z-index:3;}
 .cur{position:absolute;font-size:10px;font-family:monospace;background:rgba(0,0,0,.65);border:1px solid #e6c280;color:#ffe9bd;border-radius:8px;padding:1px 5px;transform:translate(-50%,-140%);white-space:nowrap;}
-/* Selection actions: the touch-friendly way to rotate / lock / delete the
-   tapped part. Only visible while something is selected. */
-#selbar{display:flex;gap:6px;align-items:center;flex-wrap:wrap;background:#241b12;border:1px solid #e6c280;border-radius:12px;padding:6px 10px;font-size:12px;}
+/* Selection actions float over the canvas bottom so appearing never
+   resizes the table. Only visible while the pill is open (tap a part
+   twice, or tap the pill button). */
+#selbar{position:absolute;left:50%;bottom:10px;transform:translateX(-50%);z-index:4;display:flex;gap:6px;align-items:center;flex-wrap:wrap;justify-content:center;background:rgba(36,27,18,.94);border:1px solid #e6c280;border-radius:12px;padding:6px 10px;font-size:12px;max-width:calc(100% - 20px);}
 #selbar.hidden{display:none;}
 #sel-label{font-family:monospace;color:#ffe9bd;margin-right:4px;}
 /* Re-openable help card (the intro overlay is one-shot, so this is the
@@ -47,9 +54,30 @@ button.gb:disabled{opacity:.45;cursor:not-allowed;}
 <body>
 <div id="wrap">
   <div id="bar">
-    <button class="gb" data-add="ball" title="Drop a ball at the spawn marker">⚪ Ball</button>
-    <button class="gb" data-add="plank" title="Tap the stage to place a plank (starts locked)">Plank</button>
-    <button class="gb" data-add="block" title="Tap the stage to place a block (starts locked)">Block</button>
+    <div class="grp"><span class="grp-label">build</span>
+      <button class="gb pick" data-add="ball" title="Ball — tap to drop at spawn, or drag to set its size">⚪ Ball</button>
+      <button class="gb pick" data-add="plank" title="Plank — press and drag on the stage to set length + angle">Plank</button>
+      <button class="gb pick" data-add="block" title="Block — press and drag to set its size">Block</button>
+      <button class="gb pick" data-add="domino" title="Domino — topples when nudged">Domino</button>
+      <button class="gb pick" data-add="peg" title="Peg — a static pin; great for pachinko runs">Peg</button>
+      <button class="gb pick" data-add="bucket" title="Bucket — catches balls">Bucket</button>
+    </div>
+    <div class="div"></div>
+    <div class="grp"><span class="grp-label">motion</span>
+      <button class="gb pick" data-add="bouncer" title="Bouncer — springy mat; drag to set its width">Bouncer</button>
+      <button class="gb pick" data-add="turntable" title="Turntable — spinning disc; tap ⋯ to flip direction">Turntable</button>
+      <button class="gb pick" data-add="conveyor" title="Conveyor — carries things along its arrow; rotate to steer">Conveyor</button>
+      <button class="gb pick" data-add="fan" title="Fan — blows along its arrow; drag its end to set strength">Fan</button>
+      <button class="gb pick" data-add="balloon" title="Balloon — floats up, carrying its little bob">Balloon</button>
+    </div>
+    <div class="div"></div>
+    <div class="grp"><span class="grp-label">machines</span>
+      <button class="gb pick" data-add="lever" title="Lever — a seesaw on a draggable pivot">Lever</button>
+      <button class="gb pick" data-add="pendulum" title="Pendulum — press for the anchor, drag out the bob">Pendulum</button>
+      <button class="gb pick" data-add="bell" title="Bell — rings with a chime when something taps it">🔔 Bell</button>
+      <button class="gb pick" data-add="catapult" title="Catapult — drag its arm back to cock, a knock sets it off">Catapult</button>
+    </div>
+    <div class="div"></div>
     <button class="gb" id="btn-draw" title="Sketch a static track">Draw</button>
     <button class="gb" id="btn-erase" title="Tap a part to remove it">Erase</button>
     <label style="font-size:12px">Gravity <input type="range" id="grav" min="0" max="2" step="0.1" value="1" style="width:90px"></label>
@@ -60,26 +88,30 @@ button.gb:disabled{opacity:.45;cursor:not-allowed;}
     <button class="gb" id="btn-hide" title="Hide Goldberg">Hide</button>
     <span id="role" style="font-family:monospace;font-size:11px;opacity:.8">connecting…</span>
   </div>
-  <div id="selbar" class="hidden">
-    <span id="sel-label">selected</span>
-    <button class="gb" id="btn-rot-ccw" title="Rotate 15° counter-clockwise (Shift+R)">⟲</button>
-    <button class="gb" id="btn-rot-cw" title="Rotate 15° clockwise (R)">⟳</button>
-    <button class="gb" id="btn-lock" title="Lock / unlock in place (L)">🔒</button>
-    <button class="gb" id="btn-del" title="Delete the selected part (Del)">🗑</button>
-  </div>
   <div id="stage-wrap">
     <canvas id="stage" width="960" height="640"></canvas>
     <div id="cursors"></div>
-    <div id="overlay"><h1>GOLDBERG</h1><p>Tap to enter the workshop. Build a chain-reaction machine with friends: drop parts, sketch tracks, tip the first ball.</p><p style="font-size:11px;opacity:.75">Tap a part to select it, then use the buttons above (⟲ ⟳ 🔒 🗑) or the keys R / L / Del · drag the 📍 marker to move where new balls appear</p></div>
+    <div id="selbar" class="hidden">
+      <span id="sel-label">selected</span>
+      <button class="gb" id="btn-rot-ccw" title="Rotate 15° counter-clockwise (Shift+R)">⟲</button>
+      <button class="gb" id="btn-rot-cw" title="Rotate 15° clockwise (R)">⟳</button>
+      <button class="gb" id="btn-flip" title="Flip direction (conveyor / turntable / fan)">⇄</button>
+      <button class="gb" id="btn-lock" title="Lock / unlock in place (L)">🔒</button>
+      <button class="gb" id="btn-del" title="Delete the selected part (Del)">🗑</button>
+    </div>
+    <div id="overlay"><h1>GOLDBERG</h1><p>Tap to enter the workshop. Build a chain-reaction machine with friends: press a part, drag it out on the table, tip the first ball.</p><p style="font-size:11px;opacity:.75">Drag a part's end dots to reshape it · tap a part twice for lock / delete · drag the 📍 marker to move where new balls appear</p></div>
     <div id="help" class="hidden"><div class="card">
       <h2>HOW TO BUILD</h2>
-      <div>Press Plank or Block, then tap the stage to place the part — it starts locked in place. Balls always appear at the 📍 spawn marker — drag the marker to move it.</div>
+      <div>Press a part button, then press-and-drag on the stage — the drag sets the part's length and angle. A plain tap drops a default-size part. New parts stay put so your build holds together; drag the little end dots to reshape, the ring to turn, the middle to move.</div>
       <table>
+        <tr><td>Place</td><td>Press a part, drag on the stage (tap = default size)</td></tr>
         <tr><td>Select</td><td>Tap / click a part</td></tr>
-        <tr><td>Move</td><td>Drag the selected part</td></tr>
-        <tr><td>Rotate</td><td>⟲ / ⟳ buttons, or R (Shift+R = other way)</td></tr>
-        <tr><td>Lock in place</td><td>🔒 button, or L (new parts start locked; unlock to drop them)</td></tr>
-        <tr><td>Delete</td><td>🗑 button, Erase mode, or the Del key</td></tr>
+        <tr><td>Reshape</td><td>Drag the round end dots (balls: the edge dot)</td></tr>
+        <tr><td>Anchor / pivot</td><td>Drag the ✛ dot (pendulum anchor, lever pivot)</td></tr>
+        <tr><td>Rotate</td><td>Drag the ring, or ⟲ / ⟳, or R (Shift+R = other way)</td></tr>
+        <tr><td>Lock in place</td><td>Tap the part twice, then 🔒 — or L (new parts start locked)</td></tr>
+        <tr><td>Delete</td><td>Tap twice, then 🗑 — or Erase mode, or the Del key</td></tr>
+        <tr><td>Flip</td><td>Tap twice, then ⇄ (conveyor / turntable / fan)</td></tr>
         <tr><td>Spawn point</td><td>Drag the 📍 marker itself</td></tr>
         <tr><td>Draw track</td><td>Draw mode, then sketch with your finger or mouse</td></tr>
       </table>
@@ -94,7 +126,9 @@ button.gb:disabled{opacity:.45;cursor:not-allowed;}
 (function(){
 'use strict';
 const GAME_ID = 'goldberg';
-const W = 960, H = 640;
+// Fixed world shared by every player: the canvas contain-fits it at any
+// screen size, so coordinates never depend on anyone's window.
+const W = 1920, H = 1200;
 const PALETTE = ['#8b5a2b','#556b2f','#a0522d','#696969','#bc8f8f','#4a3f35'];
 const $ = (id)=>document.getElementById(id);
 const canvas = $('stage'), ctx = canvas.getContext('2d');
@@ -126,7 +160,7 @@ window.addEventListener('resize',reportHeight);
 if(window.ResizeObserver){ try{ new ResizeObserver(reportHeight).observe($('stage-wrap')); }catch(e){} }
 
 /* ---------- shared state ---------- */
-let isHost=false, booted=false, amSolo=false;
+let isHost=false, booted=false, amSolo=false, localHost=false;
 let myId=null, myName='Player';
 let seq=0, isRunning=true, gravityY=1;
 let colorIdx=0;
@@ -160,14 +194,10 @@ function flashDenied(t){
 
 /* ---------- local UI state (never synced) ---------- */
 let mode='select'; // select | draw | erase | place
-let placeKind=null; // 'plank' | 'block' while placement is armed
-// Ball spawn marker: synced through the host. Balls always appear here.
-let spawnPt={x:W/2,y:80};
-function clampSpawn(x,y){
-  return {x:Math.max(20,Math.min(W-20,Math.round(x))),y:Math.max(20,Math.min(H-20,Math.round(y)))};
-}
-function hitSpawn(px,py){ return Math.hypot(px-spawnPt.x,py-spawnPt.y)<26; }
+let placeKind=null; // armed part while placement is armed
+let draft=null; // {kind,x0,y0,x1,y1} while dragging a placement out
 let selectedId=null;
+let pillOpen=false; // floating actions pill (lock/delete) — tap a part twice
 let draftPts=[]; // world-space while drawing
 let dragging=null; // {id, moved}
 let optimisticId=null;
@@ -179,29 +209,113 @@ const bodies=new Map();  // host only: id -> Matter.Body
 const draggedBy=new Map(); // id -> {by, until}
 const buckets=new Map(); // peerId -> {tokens,last}
 const pausedFrozen=new Set();
-const celebrated=new Set();
 let pendingSfx=[];
 let cursorsOut={};
 
+/* ---------- view: the canvas owns the whole stage box; the fixed world
+   is contain-fit inside it. Backing store tracks CSS size x dpr, so the
+   table is crisp on hi-dpi and identical on every screen. ---------- */
+let view={s:1,ox:0,oy:0};
+function fitView(){
+  const cw=Math.max(1,canvas.clientWidth||1), ch=Math.max(1,canvas.clientHeight||1);
+  const s=Math.min(cw/W,ch/H);
+  view={s,ox:(cw-W*s)/2,oy:(ch-H*s)/2};
+  return view;
+}
+function fitCanvas(){
+  try{
+    const dpr=Math.max(1,Math.min(3,window.devicePixelRatio||1));
+    const cw=Math.max(1,Math.round((canvas.clientWidth||W)*dpr));
+    const ch=Math.max(1,Math.round((canvas.clientHeight||H)*dpr));
+    if(canvas.width!==cw||canvas.height!==ch){ canvas.width=cw; canvas.height=ch; }
+  }catch(e){}
+}
 function toWorld(e){
   const r=canvas.getBoundingClientRect();
-  return { x:(e.clientX-r.left)*W/r.width, y:(e.clientY-r.top)*H/r.height };
+  const v=fitView();
+  return { x:(e.clientX-r.left-v.ox)/v.s, y:(e.clientY-r.top-v.oy)/v.s };
 }
 function clampRec(r){
   // Clamp by the part's own half-extent so a wide plank can't hang off-stage.
-  const hx=Math.max(20,((r.w||40)/2)+2), hy=Math.max(20,((r.h||r.r||40)/2)+2);
-  r.x=Math.max(hx,Math.min(W-hx,r.x));
-  r.y=Math.max(hy,Math.min(H-hy,r.y));
+  const he=halfExtents(r);
+  r.x=Math.max(he.x,Math.min(W-he.x,r.x));
+  r.y=Math.max(he.y,Math.min(H-he.y,r.y));
   return r;
 }
+function halfExtents(r){
+  const w=r.w||0,h=r.h||0,rad=r.r||0;
+  if(r.kind==='ball'||r.kind==='peg'||r.kind==='bell'||r.kind==='balloon') return {x:rad+4,y:rad+4};
+  if(r.kind==='turntable') return {x:rad*1.6+4,y:rad*1.6+4};
+  if(r.kind==='pendulum') return {x:rad+4,y:rad+4};
+  if(r.kind==='fan') return {x:34,y:34};
+  if(r.kind==='catapult') return {x:Math.max(60,(r.w||260)/2),y:70};
+  if(r.kind==='bucket') return {x:(r.w||110)/2+4,y:36};
+  if(r.kind==='drawn') return {x:60,y:60};
+  return {x:Math.max(20,w/2+2),y:Math.max(20,h/2+2)};
+}
+/* Per-kind defaults. Geometry lives in w/h/r; `u` is a second parameter
+   (strength, direction); `ax,ay` is an aux world point (pendulum anchor,
+   lever pivot, catapult hinge); `a0` is the catapult's rest angle. */
+const KIND_DEF={
+  ball:     {r:18, locked:false},
+  plank:    {w:300,h:14, locked:true},
+  block:    {w:72,h:72, locked:true},
+  domino:   {w:16,h:76, locked:false},
+  peg:      {r:12, locked:true},
+  bucket:   {w:110, locked:true},
+  bouncer:  {w:300,h:16, u:1, locked:true},
+  turntable:{r:42, u:1, locked:true},
+  conveyor: {w:340,h:22, u:1, locked:true},
+  fan:      {u:1, locked:true},
+  balloon:  {r:20, locked:false},
+  lever:    {w:340,h:16, locked:true},
+  pendulum: {r:16, locked:true},
+  bell:     {r:24, locked:true},
+  catapult: {w:260, locked:true},
+};
+const SIZE_LIMITS={
+  ball:     {r:[8,70]},
+  plank:    {w:[60,900]},
+  block:    {w:[24,400],h:[24,400]},
+  domino:   {w:[8,40],h:[24,160]},
+  bouncer:  {w:[80,900]},
+  turntable:{r:[16,95]},
+  conveyor: {w:[100,1100]},
+  fan:      {u:[0.3,2]},
+  lever:    {w:[120,900]},
+  bucket:   {w:[60,220]},
+};
+const LEN_KINDS=['plank','domino','bouncer','conveyor','lever'];
+const RAD_KINDS=['ball','turntable'];
+const ROT_KINDS=['plank','block','domino','bouncer','conveyor','fan','lever','bucket'];
+const ANCHOR_KINDS=['pendulum','lever','catapult'];
+const FLIP_KINDS=['turntable','conveyor','fan'];
 function makeRecord(kind,x,y,extra){
   if(kind==='ramp')kind='plank'; // legacy: plank and ramp are one part now
+  const d=KIND_DEF[kind]||{};
   const rec=Object.assign({id:uid('o'),kind,x:Math.round(x),y:Math.round(y),angle:0,
-    color:nextColor(),locked:kind!=='ball'},extra||{});
-  if(kind==='plank'){rec.w=240;rec.h=14;rec.angle=0;}
-  if(kind==='ball'){rec.r=14;}
-  if(kind==='block'){rec.w=48;rec.h=48;}
+    color:nextColor(),locked:kind!=='ball'&&kind!=='domino'&&kind!=='balloon'},extra||{});
+  if(d.w!==undefined&&rec.w===undefined)rec.w=d.w;
+  if(d.h!==undefined&&rec.h===undefined)rec.h=d.h;
+  if(d.r!==undefined&&rec.r===undefined)rec.r=d.r;
+  if(d.u!==undefined&&rec.u===undefined)rec.u=d.u;
+  if(d.locked!==undefined&&rec.locked===undefined)rec.locked=d.locked;
+  if(kind==='pendulum'&&(rec.ax===undefined)){rec.ax=rec.x;rec.ay=rec.y-220;}
+  if(kind==='lever'&&(rec.ax===undefined)){rec.ax=rec.x;rec.ay=rec.y;}
+  if(kind==='catapult'&&(rec.ax===undefined)){rec.ax=rec.x-rec.w*0.25;rec.ay=rec.y;rec.a0=rec.angle;}
+  if(rec.a0===undefined&&kind==='catapult')rec.a0=rec.angle;
   return clampRec(rec);
+}
+function clampSize(kind,patch){
+  const L=SIZE_LIMITS[kind]; if(!L) return patch;
+  const o={};
+  for(const k of ['w','h','r','u']){
+    if(patch[k]===undefined) continue;
+    const lim=L[k];
+    o[k]=lim?Math.max(lim[0],Math.min(lim[1],patch[k])):patch[k];
+  }
+  if(patch.angle!==undefined)o.angle=patch.angle;
+  return o;
 }
 
 /* ---------- RDP simplify ---------- */
@@ -224,39 +338,178 @@ function rdp(pts,eps){
 
 /* ---------- host physics ---------- */
 let engine=null, lastBroadcast=0;
+function addWalls(){
+  const opts={isStatic:true,friction:.5};
+  Matter.Composite.add(engine.world,[
+    Matter.Bodies.rectangle(W/2,H+30,W+300,60,opts),
+    Matter.Bodies.rectangle(W/2,-30,W+300,60,opts),
+    Matter.Bodies.rectangle(-30,H/2,60,H+400,opts),
+    Matter.Bodies.rectangle(W+30,H/2,60,H+400,opts)
+  ]);
+}
 function ensureEngine(){
   if(engine||typeof Matter==='undefined') return;
   engine=Matter.Engine.create();
   engine.gravity.y=gravityY;
-  const opts={isStatic:true,friction:.5};
-  Matter.Composite.add(engine.world,[
-    Matter.Bodies.rectangle(W/2,H+30,W+300,60,opts),
-    Matter.Bodies.rectangle(-30,H/2,60,H+400,opts),
-    Matter.Bodies.rectangle(W+30,H/2,60,H+400,opts)
-  ]);
+  addWalls();
   Matter.Events.on(engine,'collisionStart',(ev)=>{
     for(const pair of ev.pairs){
-      const v=Math.hypot(pair.collision.depth||0,0);
-      const sp=Math.max(
-        Math.hypot(pair.bodyA.velocity.x,pair.bodyA.velocity.y),
-        Math.hypot(pair.bodyB.velocity.x,pair.bodyB.velocity.y));
+      const a=pair.bodyA,b=pair.bodyB;
+      const ra=a._gid&&records.get(a._gid), rb=b._gid&&records.get(b._gid);
+      const sp=Math.max(Math.hypot(a.velocity.x,a.velocity.y),Math.hypot(b.velocity.x,b.velocity.y));
+      if(sp<1.2) continue;
+      const bellRec=(ra&&ra.kind==='bell')?ra:((rb&&rb.kind==='bell')?rb:null);
+      if(bellRec&&sp>1.5){ ringBell(bellRec.id,Math.min(1,sp/10)); continue; }
       if(sp>2.5){
-        const id=pair.bodyA._gid||pair.bodyB._gid;
-        if(id) pendingSfx.push({i:id,v:Math.min(1,sp/12)});
+        const rec=ra||rb, id=rec&&rec.id;
+        if(id){
+          const t=impactSound(rec.kind);
+          if(t) pushSfx({i:id,t,v:Math.min(1,sp/12)});
+        }
+        const catRec=(ra&&ra.kind==='catapult')?ra:((rb&&rb.kind==='catapult')?rb:null);
+        if(catRec&&sp>4) fireCatapult(catRec.id);
       }
     }
   });
+  Matter.Events.on(engine,'collisionActive',(ev)=>{
+    for(const pair of ev.pairs){
+      const a=pair.bodyA,b=pair.bodyB;
+      const ra=a._gid&&records.get(a._gid), rb=b._gid&&records.get(b._gid);
+      const conv=(ra&&ra.kind==='conveyor')?ra:((rb&&rb.kind==='conveyor')?rb:null);
+      if(!conv) continue;
+      const other=(records.get(a._gid)===conv)?b:a;
+      if(!other||other.isStatic) continue;
+      const dx=Math.cos(conv.angle||0),dy=Math.sin(conv.angle||0);
+      const sp=4*(conv.u||1);
+      const vx=other.velocity.x,vy=other.velocity.y;
+      Matter.Body.setVelocity(other,{x:vx+(dx*sp-vx)*0.25,y:vy+(dy*sp-vy)*0.25});
+    }
+  });
+}
+function bodyOpts(rec){
+  if(rec.kind==='bouncer') return {friction:.05,restitution:1.02+0.28*(rec.u===undefined?1:rec.u)};
+  if(rec.kind==='conveyor') return {friction:.9,restitution:0};
+  return {friction:.4,restitution:.05};
+}
+function bucketBody(rec){
+  const w=rec.w||110, wallH=56, th=12;
+  const parts=[
+    Matter.Bodies.rectangle(rec.x,rec.y+wallH/2-th/2,w,th,{friction:.4}),
+    Matter.Bodies.rectangle(rec.x-w/2+th/2,rec.y,th,wallH,{friction:.4}),
+    Matter.Bodies.rectangle(rec.x+w/2-th/2,rec.y,th,wallH,{friction:.4}),
+  ];
+  const c=Matter.Body.create({parts,friction:.4,restitution:.1,density:.0012});
+  Matter.Body.setPosition(c,{x:rec.x,y:rec.y});
+  return c;
+}
+function catapultArm(rec){
+  const len=rec.w||260;
+  return Matter.Bodies.rectangle(rec.x,rec.y,len,14,{friction:.4,restitution:.1,density:.0015});
 }
 function bodyFor(rec){
   if(typeof Matter==='undefined') return null;
   const common={friction:.4,restitution:.05};
   let b=null;
-  if(rec.kind==='ball') b=Matter.Bodies.circle(rec.x,rec.y,rec.r||14,{friction:.08,restitution:.45});
-  else if(rec.kind==='block') b=Matter.Bodies.rectangle(rec.x,rec.y,rec.w||48,rec.h||48,common);
-  else if(rec.kind==='plank'||rec.kind==='ramp') b=Matter.Bodies.rectangle(rec.x,rec.y,rec.w||240,rec.h||14,common);
+  if(rec.kind==='ball') b=Matter.Bodies.circle(rec.x,rec.y,rec.r||18,{friction:.08,restitution:.45,density:.0012});
+  else if(rec.kind==='block') b=Matter.Bodies.rectangle(rec.x,rec.y,rec.w||72,rec.h||72,common);
+  else if(rec.kind==='domino') b=Matter.Bodies.rectangle(rec.x,rec.y,rec.w||16,rec.h||76,{friction:.3,restitution:.05});
+  else if(rec.kind==='bucket') b=bucketBody(rec);
+  else if(rec.kind==='plank'||rec.kind==='ramp'||rec.kind==='bouncer'||rec.kind==='conveyor'||rec.kind==='lever')
+    b=Matter.Bodies.rectangle(rec.x,rec.y,rec.w||300,rec.h||16,bodyOpts(rec));
+  else if(rec.kind==='peg') b=Matter.Bodies.circle(rec.x,rec.y,rec.r||12,{friction:.1,restitution:.6});
+  else if(rec.kind==='bell') b=Matter.Bodies.circle(rec.x,rec.y,rec.r||24,{friction:.2,restitution:.55});
+  else if(rec.kind==='fan') b=Matter.Bodies.rectangle(rec.x,rec.y,56,56,{friction:.4});
+  else if(rec.kind==='turntable') b=Matter.Bodies.circle(rec.x,rec.y,rec.r||42,{friction:.5,frictionAir:.06,restitution:.1,density:.001});
+  else if(rec.kind==='balloon') b=Matter.Bodies.circle(rec.x,rec.y,rec.r||20,{friction:.1,frictionAir:.02,restitution:.5,density:.0004});
+  else if(rec.kind==='pendulum') b=Matter.Bodies.circle(rec.x,rec.y,rec.r||16,{friction:.05,restitution:.3,density:.002});
+  else if(rec.kind==='catapult') b=catapultArm(rec);
   else if(rec.kind==='drawn') b=compoundFromVerts(rec);
-  if(b){ b._gid=rec.id; }
+  if(b){ b._gid=rec.id; if(rec.angle&&rec.kind!=='drawn') Matter.Body.setAngle(b,rec.angle); }
   return b;
+}
+/* Linked parts: constraints + extra bodies that belong to one record.
+   links: id -> {cons:[], extras:[], bob?}. Latch state for catapults. */
+const links=new Map();
+const latch=new Map(); // catapult id -> true while cocked
+const LINKED=['lever','pendulum','turntable','balloon','catapult'];
+function bodyLocal(b,wx,wy){
+  const dx=wx-b.position.x, dy=wy-b.position.y;
+  const c=Math.cos(-b.angle), s=Math.sin(-b.angle);
+  return {x:dx*c-dy*s, y:dx*s+dy*c};
+}
+function pinAt(b,wx,wy){
+  return Matter.Constraint.create({pointA:{x:wx,y:wy},bodyB:b,
+    pointB:bodyLocal(b,wx,wy),stiffness:1,length:0});
+}
+function removeLinks(id){
+  const L=links.get(id); if(!L) return;
+  if(engine){
+    for(const c of (L.cons||[])) try{Matter.Composite.remove(engine.world,c);}catch(e){}
+    for(const x of (L.extras||[])) try{Matter.Composite.remove(engine.world,x);}catch(e){}
+  }
+  links.delete(id);
+}
+function buildLinks(rec){
+  if(typeof Matter==='undefined'||!engine) return;
+  removeLinks(rec.id);
+  const L={cons:[],extras:[]};
+  const b=bodies.get(rec.id);
+  if(rec.kind==='lever'&&rec.locked&&b){
+    L.cons.push(pinAt(b,rec.ax,rec.ay));
+  }else if(rec.kind==='pendulum'&&rec.locked&&b){
+    const len=Math.max(30,Math.hypot(rec.x-rec.ax,rec.y-rec.ay));
+    L.cons.push(Matter.Constraint.create({pointA:{x:rec.ax,y:rec.ay},bodyB:b,
+      pointB:{x:0,y:0},stiffness:1,length:len}));
+  }else if(rec.kind==='turntable'&&rec.locked&&b){
+    L.cons.push(pinAt(b,rec.x,rec.y));
+  }else if(rec.kind==='balloon'&&b){
+    if(rec.locked){ L.cons.push(pinAt(b,rec.x,rec.y)); }
+    else{
+      const bob=Matter.Bodies.circle(rec.x,rec.y+90,10,{friction:.1,restitution:.4,density:.0009});
+      bob._gid=rec.id; L.extras.push(bob); Matter.Composite.add(engine.world,bob);
+      L.cons.push(Matter.Constraint.create({bodyA:b,pointA:{x:0,y:0},bodyB:bob,
+        pointB:{x:0,y:-4},stiffness:1,length:80}));
+      L.bob=bob;
+    }
+  }else if(rec.kind==='catapult'){
+    const base=Matter.Bodies.rectangle(rec.ax,rec.ay+52,110,34,{isStatic:true,friction:.6});
+    base._gid=rec.id; L.extras.push(base); Matter.Composite.add(engine.world,base);
+    if(rec.locked&&b) L.cons.push(pinAt(b,rec.ax,rec.ay));
+  }
+  for(const c of L.cons) Matter.Composite.add(engine.world,c);
+  links.set(rec.id,L);
+}
+// Re-seat a constraint's world anchor after the part moved.
+function updateLink(rec){
+  const L=links.get(rec.id); if(!L||!L.cons.length) return;
+  const c=L.cons[0], b=bodies.get(rec.id);
+  if(c.pointA){ c.pointA.x=rec.ax; c.pointA.y=rec.ay; }
+  if(rec.kind==='pendulum'&&b){
+    c.length=Math.max(30,Math.hypot(b.position.x-rec.ax,b.position.y-rec.ay));
+  }
+  if((rec.kind==='lever'||rec.kind==='catapult')&&b) c.pointB=bodyLocal(b,rec.ax,rec.ay);
+}
+// Keep a centre pin under its body after a drag.
+function seatPin(rec){
+  const L=links.get(rec.id); if(!L||!L.cons.length||!L.cons[0].pointA) return;
+  L.cons[0].pointA.x=rec.x; L.cons[0].pointA.y=rec.y;
+}
+function rebuildBody(rec){
+  if(!engine||typeof Matter==='undefined') return;
+  removeLinks(rec.id);
+  const old=bodies.get(rec.id);
+  if(old) Matter.Composite.remove(engine.world,old);
+  bodies.delete(rec.id);
+  const b=bodyFor(rec);
+  if(b){
+    let statik=!!rec.locked;
+    if(LINKED.includes(rec.kind)) statik=false; // pinned parts stay dynamic
+    if(statik||!isRunning) b.isStatic=true;
+    if(!isRunning&&!statik) pausedFrozen.add(rec.id);
+    Matter.Composite.add(engine.world,b);
+    bodies.set(rec.id,b);
+  }
+  buildLinks(rec);
 }
 function compoundFromVerts(rec){
   const cx=rec.x, cy=rec.y, vs=rec.verts||[];
@@ -276,34 +529,38 @@ function compoundFromVerts(rec){
   return c;
 }
 function hostAdd(rec){
-  // Parts arrive locked (see makeRecord) and statics never push each
-  // other, so user-placed parts stay exactly where they were tapped.
+  // Parts arrive locked (see KIND_DEF) and statics never push each
+  // other, so user-placed parts stay exactly where they were put.
+  // Pinned parts (lever, pendulum, ...) arrive dynamic on a pin instead.
   records.set(rec.id,rec);
   ensureEngine();
   const b=bodyFor(rec);
   if(b){
-    if(rec.locked||!isRunning) b.isStatic=true;
-    if(rec.kind==='drawn'){ b.isStatic=true; rec.locked=true; }
+    let statik=!!rec.locked;
+    if(LINKED.includes(rec.kind)) statik=false;
+    if(rec.kind==='drawn'){ statik=true; rec.locked=true; }
+    if(statik||!isRunning) b.isStatic=true;
+    if(!isRunning&&!statik) pausedFrozen.add(rec.id);
     Matter.Composite.add(engine.world,b);
     bodies.set(rec.id,b);
   }
+  buildLinks(rec);
   queueAdd(rec);
   pruneCaps();
-  if(rec.kind==='ball') Hub.up('say',myName+' released a ball');
+  scheduleSave();
 }
 // Browser-safety caps: each ball is a live Matter body plus a network
 // snapshot entry every 50ms, so unbounded tables eventually crash the tab.
 // Past the cap the OLDEST parts go first (hostDel relays the delete, so
 // guests drop them too).
-const MAX_BALLS=60, MAX_PARTS=220;
+const MAX_BALLS=90, MAX_PARTS=260;
 function pruneCaps(){
   let culled=0;
   const balls=[]; for(const [id,r] of records) if(r.kind==='ball') balls.push(id);
   for(let i=0;i+MAX_BALLS<balls.length;i++){ hostDel(balls[i]); culled++; }
   while(records.size>MAX_PARTS){ hostDel(records.keys().next().value); culled++; }
-  if(culled>0){
-    const h=$('hint'); if(h) h.textContent='table full — removed '+culled+' oldest part'+(culled>1?'s':'')+' (cap: 60 balls, 220 parts)';
-  }
+  // Silent cull: the table protects the tab, it doesn't lecture.
+  void culled;
 }
 const pendingAdd=[], pendingDel=[];
 function queueAdd(r){ pendingAdd.push(r); }
@@ -311,8 +568,20 @@ function queueDel(id){ pendingDel.push(id); }
 function hostMove(id,x,y){
   const rec=records.get(id); const b=bodies.get(id);
   if(!rec) return;
+  const dx=x-rec.x, dy=y-rec.y;
   rec.x=Math.round(x); rec.y=Math.round(y);
   if(b) Matter.Body.setPosition(b,{x:rec.x,y:rec.y});
+  const L=links.get(id);
+  if(rec.kind==='lever'||rec.kind==='catapult'){
+    // The pivot/hinge travels with the part.
+    rec.ax+=dx; rec.ay+=dy; updateLink(rec);
+    if(L) for(const ex of L.extras) Matter.Body.setPosition(ex,{x:ex.position.x+dx,y:ex.position.y+dy});
+  }else if(rec.kind==='balloon'&&L&&L.bob){
+    Matter.Body.setPosition(L.bob,{x:L.bob.position.x+dx,y:L.bob.position.y+dy});
+  }else if(rec.kind==='turntable'||(rec.kind==='balloon'&&rec.locked)){
+    seatPin(rec);
+  }
+  scheduleSave();
 }
 // Grip: while anyone holds a part, freeze its body so the physics engine
 // stops fighting the cursor. A dragged plank otherwise keeps accumulating
@@ -322,11 +591,12 @@ function hostMove(id,x,y){
 const heldFrozen=new Set(); // ids the host froze for an active drag
 function hostHold(id){
   const rec=records.get(id); const b=bodies.get(id);
-  if(!rec||!b||rec.locked||typeof Matter==='undefined') return;
+  if(!rec||!b||typeof Matter==='undefined') return;
+  if(b.isStatic) return; // statics never need freezing; pinned parts do
   try{
     Matter.Body.setVelocity(b,{x:0,y:0});
     Matter.Body.setAngularVelocity(b,0);
-    if(!b.isStatic){ Matter.Body.setStatic(b,true); heldFrozen.add(id); }
+    Matter.Body.setStatic(b,true); heldFrozen.add(id);
   }catch(e){}
 }
 function hostRelease(id){
@@ -337,41 +607,102 @@ function hostRelease(id){
   try{
     Matter.Body.setVelocity(b,{x:0,y:0});
     Matter.Body.setAngularVelocity(b,0);
-    if(isRunning&&!rec.locked) Matter.Body.setStatic(b,false);
+    const linked=LINKED.includes(rec.kind);
+    if(isRunning&&(!rec.locked||linked)) Matter.Body.setStatic(b,false);
     else pausedFrozen.add(id); // stay frozen until sim resume / unlock
   }catch(e){}
 }
 function hostRot(id,angle){
   const rec=records.get(id); const b=bodies.get(id);
   if(!rec) return;
-  rec.angle=angle;
-  if(b) Matter.Body.setAngle(b,angle);
+  if(rec.kind==='catapult'){
+    // Rotate the arm about its hinge, not its centre.
+    const len=(rec.w||260)*0.25;
+    rec.angle=angle;
+    rec.x=Math.round(rec.ax+Math.cos(angle)*len);
+    rec.y=Math.round(rec.ay+Math.sin(angle)*len);
+    if(b){ Matter.Body.setPosition(b,{x:rec.x,y:rec.y}); Matter.Body.setAngle(b,angle); }
+    updateLink(rec);
+  }else{
+    rec.angle=angle;
+    if(b) Matter.Body.setAngle(b,angle);
+    if(rec.kind==='lever') updateLink(rec);
+  }
+  scheduleSave();
+}
+function hostSize(id,patch){
+  const rec=records.get(id);
+  if(!rec) return;
+  const o=clampSize(rec.kind,patch);
+  if(o.angle!==undefined) rec.angle=o.angle;
+  if(o.w!==undefined) rec.w=o.w;
+  if(o.h!==undefined) rec.h=o.h;
+  if(o.r!==undefined) rec.r=o.r;
+  if(o.u!==undefined){
+    rec.u=o.u;
+    if(rec.kind==='bouncer'){ const b=bodies.get(id); if(b) b.restitution=1.02+0.28*o.u; }
+  }
+  if(o.angle!==undefined&&rec.kind==='lever'){ const b=bodies.get(id); if(b) Matter.Body.setAngle(b,o.angle); updateLink(rec); }
+  else if(o.w!==undefined||o.h!==undefined||o.r!==undefined) rebuildBody(rec);
+  else if(o.angle!==undefined){ const b=bodies.get(id); if(b) Matter.Body.setAngle(b,o.angle); }
+  scheduleSave();
+}
+function hostAnchor(id,ax,ay){
+  const rec=records.get(id);
+  if(!rec||!ANCHOR_KINDS.includes(rec.kind)) return;
+  const c={x:Math.max(0,Math.min(W,Math.round(ax))),y:Math.max(0,Math.min(H,Math.round(ay)))};
+  rec.ax=c.x; rec.ay=c.y;
+  if(rec.kind==='catapult'){
+    // The hinge moved: re-seat the arm on it, keep its angle.
+    hostRot(id,rec.angle||0);
+    const L=links.get(id);
+    if(L) for(const ex of L.extras) Matter.Body.setPosition(ex,{x:rec.ax,y:rec.ay+52});
+  }else updateLink(rec);
+  scheduleSave();
+}
+function hostFlip(id){
+  const rec=records.get(id);
+  if(!rec||!FLIP_KINDS.includes(rec.kind)) return;
+  if(rec.kind==='fan'){ hostRot(id,(rec.angle||0)+Math.PI); return; }
+  rec.u=((rec.u===undefined?1:rec.u)>=0)?-1:1;
+  scheduleSave();
 }
 function hostLock(id,locked){
   const rec=records.get(id); const b=bodies.get(id);
   if(!rec) return;
   rec.locked=!!locked;
-  if(b){
+  if(LINKED.includes(rec.kind)){
+    // Locked = mounted on its pin; unlocked = loose debris.
+    removeLinks(id); buildLinks(rec);
+    if(b&&typeof Matter!=='undefined'){
+      try{ if(isRunning) Matter.Body.setStatic(b,false); else pausedFrozen.add(id); }catch(e){}
+    }
+  }else if(b){
     if(rec.locked) Matter.Body.setStatic(b,true);
     else if(isRunning) Matter.Body.setStatic(b,false);
   }
+  scheduleSave();
 }
 function hostDel(id){
   const b=bodies.get(id);
   if(b&&engine) Matter.Composite.remove(engine.world,b);
   bodies.delete(id); records.delete(id);
+  removeLinks(id); latch.delete(id);
   draggedBy.delete(id); pausedFrozen.delete(id); heldFrozen.delete(id);
-  celebrated.delete(id);
-  if(selectedId===id) selectedId=null;
+  if(selectedId===id){ selectedId=null; pillOpen=false; }
   queueDel(id);
+  scheduleSave();
 }
-function hostSpawn(x,y){ spawnPt=clampSpawn(x,y); }
 function hostClear(){
-  if(engine){ for(const [,b] of bodies) Matter.Composite.remove(engine.world,b); }
   const ids=[...records.keys()];
-  bodies.clear(); records.clear(); draggedBy.clear(); pausedFrozen.clear(); heldFrozen.clear(); celebrated.clear();
-  selectedId=null;
+  for(const id of ids) removeLinks(id); // first: pins/strings/bobs live in links
+  if(engine){ for(const [,b] of bodies) Matter.Composite.remove(engine.world,b); }
+  bodies.clear(); records.clear(); draggedBy.clear(); pausedFrozen.clear(); heldFrozen.clear();
+  links.clear(); latch.clear();
+  selectedId=null; pillOpen=false;
   ids.forEach(queueDel);
+  try{ localStorage.removeItem(SAVE_KEY); }catch(e){}
+  updateSel(); reportHeight();
 }
 function applySim(running){
   running=!!running;
@@ -382,22 +713,162 @@ function applySim(running){
   if(!isRunning){
     pausedFrozen.clear();
     for(const [id,b] of bodies){
-      const rec=records.get(id);
-      if(rec&&rec.locked) continue;
-      if(!b.isStatic){ pausedFrozen.add(id); Matter.Body.setStatic(b,true); }
+      if(b.isStatic) continue; // statics (incl. walls) stay as they are
+      pausedFrozen.add(id); Matter.Body.setStatic(b,true);
     }
   }else{
     for(const id of pausedFrozen){
       const b=bodies.get(id); const rec=records.get(id);
-      if(b&&rec&&!rec.locked) Matter.Body.setStatic(b,false);
+      // Pinned parts are dynamic even when "locked" — wake them too.
+      if(b&&rec&&(!rec.locked||LINKED.includes(rec.kind))) Matter.Body.setStatic(b,false);
     }
     pausedFrozen.clear();
   }
+  scheduleSave();
 }
 function applyGrav(y){
   gravityY=Math.max(0,Math.min(2,y));
   const g=$('grav'); if(document.activeElement!==g) g.value=String(gravityY);
   if(engine) engine.gravity.y=gravityY;
+  scheduleSave();
+}
+
+/* ---------- machine-part runtime (host only, except the glow map) ---------- */
+const rungAt=new Map(); // bell id -> last ring timestamp (glow + chime state)
+const lastSfx=new Map();
+function pushSfx(s){
+  const k=s.i+'|'+s.t, now=Date.now();
+  if(now-(lastSfx.get(k)||0)<150) return; // one voice per part at a time
+  lastSfx.set(k,now);
+  pendingSfx.push(s);
+}
+function ringBell(id,v){
+  rungAt.set(id,Date.now());
+  pushSfx({i:id,t:'bell',v});
+}
+function fireCatapult(id){
+  if(!latch.get(id)) return;
+  latch.delete(id);
+  const rec=records.get(id), b=bodies.get(id);
+  if(rec&&b&&typeof Matter!=='undefined'){
+    try{
+      if(b.isStatic) Matter.Body.setStatic(b,false);
+      // A starting shove; the torsion spring below does the rest.
+      Matter.Body.setAngularVelocity(b,(b.angularVelocity||0)+0.35);
+    }catch(e){}
+  }
+  pushSfx({i:id,t:'whoosh',v:.8});
+}
+function impactSound(kind){
+  if(kind==='bouncer') return 'boing';
+  if(kind==='plank'||kind==='block'||kind==='domino'||kind==='lever'||
+     kind==='bucket'||kind==='catapult'||kind==='drawn'||kind==='turntable') return 'knock';
+  if(kind==='ball'||kind==='peg'||kind==='bell'||kind==='balloon'||kind==='pendulum') return 'thud';
+  return null; // conveyor, fan: silent by design
+}
+function wrapAngle(a){ while(a>Math.PI)a-=2*Math.PI; while(a<-Math.PI)a+=2*Math.PI; return a; }
+// Per-tick forces for the parametric parts. Runs before Engine.update.
+function tickParts(){
+  if(typeof Matter==='undefined'||!engine) return;
+  const now=Date.now();
+  for(const rec of records.values()){
+    if(rec.kind==='fan'){
+      const str=rec.u===undefined?1:rec.u;
+      if(!str) continue;
+      const dx=Math.cos(rec.angle||0), dy=Math.sin(rec.angle||0);
+      const LEN=340, WID=180;
+      const cx=rec.x+dx*(28+LEN/2), cy=rec.y+dy*(28+LEN/2);
+      const F=0.0011*str;
+      for(const [,b] of bodies){
+        if(!b||b.isStatic) continue;
+        const rx=b.position.x-cx, ry=b.position.y-cy;
+        const lx=rx*dx+ry*dy, ly=-rx*dy+ry*dx; // wind-local coords
+        if(Math.abs(lx)>LEN/2||Math.abs(ly)>WID/2) continue;
+        const fall=1-Math.abs(lx)/(LEN/2)*0.6; // weaker far from the fan
+        const sway=Math.sin(now/280+b.position.x*0.02)*0.18*F*b.mass;
+        b.force.x+=dx*F*fall*b.mass-dy*sway;
+        b.force.y+=dy*F*fall*b.mass+dx*sway;
+      }
+    }else if(rec.kind==='turntable'){
+      const b=bodies.get(rec.id); if(!b||b.isStatic) continue;
+      const want=(rec.u===undefined?1:rec.u)*0.12;
+      if(Math.abs(b.angularVelocity)<0.6) Matter.Body.setAngularVelocity(b,want);
+    }else if(rec.kind==='balloon'){
+      const b=bodies.get(rec.id); if(!b||b.isStatic||rec.locked) continue;
+      // Lift the whole rig (envelope + bob), then some.
+      const L=links.get(rec.id);
+      const load=b.mass+((L&&L.bob)?L.bob.mass:0.2);
+      b.force.y-=load*0.0013;
+      if(b.velocity.y<-6) Matter.Body.setVelocity(b,{x:b.velocity.x,y:-6});
+    }else if(rec.kind==='catapult'&&rec.locked){
+      const b=bodies.get(rec.id); if(!b||b.isStatic) continue;
+      if(latch.get(rec.id)){ Matter.Body.setVelocity(b,{x:0,y:0}); Matter.Body.setAngularVelocity(b,0); continue; }
+      const d=wrapAngle((rec.a0||0)-b.angle);
+      // Cock the arm by dragging it back; it latches past ~45 degrees.
+      if(d>0.8&&Math.abs(b.angularVelocity)<0.5){ latch.set(rec.id,true); pushSfx({i:rec.id,t:'click',v:.5}); continue; }
+      Matter.Body.setAngularVelocity(b,b.angularVelocity*0.92+d*0.06); // torsion spring
+    }
+  }
+}
+
+/* ---------- table persistence (host only; guests get it over the wire) ---------- */
+const SAVE_KEY='bubhub.goldberg.table';
+let saveT=null;
+function scheduleSave(){
+  if(!isHost) return;
+  clearTimeout(saveT);
+  saveT=setTimeout(saveTable,800);
+}
+function saveTable(){
+  if(!isHost) return;
+  try{
+    const parts=[];
+    for(const r of records.values()) parts.push({id:r.id,kind:r.kind,x:Math.round(r.x),y:Math.round(r.y),
+      angle:+((r.angle||0).toFixed(3)),color:r.color,locked:!!r.locked,w:r.w,h:r.h,r:r.r,
+      u:r.u,ax:r.ax,ay:r.ay,a0:r.a0,verts:r.verts});
+    localStorage.setItem(SAVE_KEY,JSON.stringify({v:1,g:gravityY,parts}));
+  }catch(e){}
+}
+let restored=false;
+function restoreTable(){
+  if(restored||!isHost||records.size) return;
+  restored=true;
+  let data=null;
+  try{ data=JSON.parse(localStorage.getItem(SAVE_KEY)||'null'); }catch(e){}
+  if(!data||!Array.isArray(data.parts)||!data.parts.length) return;
+  ensureEngine();
+  if(typeof data.g==='number') applyGravSilent(data.g);
+  for(const s of data.parts){
+    if(!s||!s.id||records.has(s.id)) continue;
+    const rec=makeRecord(s.kind||'plank',s.x||W/2,s.y||H/2,{});
+    Object.assign(rec,{id:s.id,color:s.color||rec.color,angle:s.a!==undefined?s.a:(s.angle||0),
+      locked:!!s.locked,w:s.w,h:s.h,r:s.r,u:s.u,ax:s.ax,ay:s.ay,a0:s.a0,verts:s.verts});
+    hostAddDirect(rec);
+  }
+  // hostAddDirect skipped the debounce; save once so the file stays fresh.
+  try{ saveTable(); }catch(e){}
+}
+function applyGravSilent(y){
+  gravityY=Math.max(0,Math.min(2,y));
+  const g=$('grav'); if(g) g.value=String(gravityY);
+  if(engine) engine.gravity.y=gravityY;
+}
+// hostAdd without triggering a save (used while restoring).
+function hostAddDirect(rec){
+  records.set(rec.id,rec);
+  ensureEngine();
+  const b=bodyFor(rec);
+  if(b){
+    let statik=!!rec.locked;
+    if(LINKED.includes(rec.kind)) statik=false;
+    if(rec.kind==='drawn'){ statik=true; rec.locked=true; }
+    if(statik||!isRunning) b.isStatic=true;
+    if(!isRunning&&!statik) pausedFrozen.add(rec.id);
+    Matter.Composite.add(engine.world,b);
+    bodies.set(rec.id,b);
+  }
+  buildLinks(rec);
+  queueAdd(rec);
 }
 
 /* ---------- host validation + intents ---------- */
@@ -429,7 +900,8 @@ function onIntent(p,from){
   }
   if(a==='move'){
     const rec=records.get(p.id); if(!rec){deny(from,'part is gone');return;}
-    if(rec.locked){deny(from,'part is locked (L to unlock)');return;}
+    // Pinned parts (lever, pendulum, ...) stay draggable while mounted.
+    if(rec.locked&&!LINKED.includes(rec.kind)){deny(from,'part is locked (tap twice, then 🔓)');return;}
     const own=draggedBy.get(p.id);
     if(own&&own.by!==peerKey&&Date.now()<own.until){deny(from,'someone else is holding that part');return;}
     draggedBy.set(p.id,{by:peerKey,until:Date.now()+(p.done?0:2000)});
@@ -444,6 +916,18 @@ function onIntent(p,from){
     const rec=records.get(p.id); if(!rec){deny(from,'part is gone');return;}
     hostRot(p.id,p.angle); return;
   }
+  if(a==='size'){
+    const rec=records.get(p.id); if(!rec){deny(from,'part is gone');return;}
+    hostSize(p.id,p); return;
+  }
+  if(a==='anchor'){
+    const rec=records.get(p.id); if(!rec){deny(from,'part is gone');return;}
+    hostAnchor(p.id,p.ax,p.ay); return;
+  }
+  if(a==='flip'){
+    const rec=records.get(p.id); if(!rec){deny(from,'part is gone');return;}
+    hostFlip(p.id); return;
+  }
   if(a==='lock'){
     const rec=records.get(p.id); if(!rec){deny(from,'part is gone');return;}
     hostLock(p.id,p.locked); return;
@@ -452,7 +936,6 @@ function onIntent(p,from){
     if(!records.has(p.id)){deny(from,'part is gone');return;}
     hostDel(p.id); return;
   }
-  if(a==='spawn'){ hostSpawn(p.x,p.y); return; }
   if(a==='sim'){ applySim(p.running); return; }
   if(a==='grav'){ applyGrav(p.y); return; }
   if(a==='clear'){ hostClear(); return; }
@@ -466,25 +949,26 @@ function onState(p,from){
   if(!p) return;
   if(typeof p.g==='number') applyGrav(p.g);
   if(typeof p.sim==='boolean'&&p.sim!==isRunning){isRunning=p.sim;$('btn-sim').textContent=isRunning?'Pause':'Play';}
-  if(Array.isArray(p.sp)) spawnPt=clampSpawn(p.sp[0],p.sp[1]);
   if(Array.isArray(p.add)){
     for(const r of p.add){ if(r&&r.i&&!records.has(r.i)){
       records.set(r.i,{id:r.i,kind:r.kind==='ramp'?'plank':r.kind,x:r.x,y:r.y,angle:r.a||0,color:r.c||r.color||'#8b5a2b',
-        locked:!!r.l,w:r.w,h:r.h,r:r.r,verts:r.verts});
+        locked:!!r.l,w:r.w,h:r.h,r:r.r,u:r.u,ax:r.ax,ay:r.ay,a0:r.a0,verts:r.verts,bx:r.x,by:r.y});
     }}
   }
   if(Array.isArray(p.del)){
-    for(const id of p.del){ records.delete(id); if(selectedId===id)selectedId=null; }
+    let changed=false;
+    for(const id of p.del){ records.delete(id); if(selectedId===id){selectedId=null;pillOpen=false;changed=true;} }
+    if(changed) updateSel();
   }
   if(p.addFull){ records.clear(); for(const r of (p.add||[])){
-    records.set(r.i,{id:r.i,kind:r.kind==='ramp'?'plank':r.kind,x:r.x,y:r.y,angle:r.a||0,color:r.c||r.color||'#8b5a2b',locked:!!r.l,w:r.w,h:r.h,r:r.r,verts:r.verts});
+    records.set(r.i,{id:r.i,kind:r.kind==='ramp'?'plank':r.kind,x:r.x,y:r.y,angle:r.a||0,color:r.c||r.color||'#8b5a2b',locked:!!r.l,w:r.w,h:r.h,r:r.r,u:r.u,ax:r.ax,ay:r.ay,a0:r.a0,verts:r.verts,bx:r.x,by:r.y});
   }}
   const map=new Map();
-  if(Array.isArray(p.obs)) for(const o of p.obs) map.set(o.i,{x:o.x,y:o.y,a:o.a,l:!!o.l});
+  if(Array.isArray(p.obs)) for(const o of p.obs) map.set(o.i,{x:o.x,y:o.y,a:o.a,l:!!o.l,g:o.g||null,e:o.e||null});
   snaps.push({rt:Date.now(),map,sfx:p.sfx||null,curs:p.curs||null});
   if(snaps.length>40) snaps.splice(0,snaps.length-40);
   if(p.curs) remoteCursors=remapCursors(p.curs);
-  if(Array.isArray(p.sfx)) for(const s of p.sfx) playClink(s.v);
+  if(Array.isArray(p.sfx)) for(const s of p.sfx){ playSfx(s); if(s&&s.t==='bell') rungAt.set(s.i,Date.now()); }
 }
 function remapCursors(c){
   const o={};
@@ -503,6 +987,7 @@ function guestRenderAt(now){
       if(id===optimisticId) continue;
       const r=records.get(id); if(!r) continue;
       r.x=v.x;r.y=v.y;r.angle=v.a;r.locked=v.l;
+      applySnapExtra(r,v);
     }
     return;
   }
@@ -517,7 +1002,18 @@ function guestRenderAt(now){
       let d=vb.a-va.a;
       while(d>Math.PI)d-=2*Math.PI; while(d<-Math.PI)d+=2*Math.PI;
       r.angle=va.a+d*f; r.locked=vb.l;
-    } else if(vb){ r.x=vb.x;r.y=vb.y;r.angle=vb.a;r.locked=vb.l; }
+      applySnapExtra(r,vb);
+    } else if(vb){ r.x=vb.x;r.y=vb.y;r.angle=vb.a;r.locked=vb.l; applySnapExtra(r,vb); }
+  }
+}
+function applySnapExtra(r,v){
+  if(v.g&&Array.isArray(v.g)){
+    if(v.g[0])r.w=v.g[0]; if(v.g[1])r.h=v.g[1]; if(v.g[2])r.r=v.g[2];
+    if(r.u!==undefined||v.g[3])r.u=v.g[3];
+  }
+  if(v.e&&Array.isArray(v.e)){
+    if(r.kind==='pendulum'||r.kind==='lever'||r.kind==='catapult'){ r.ax=v.e[0]; r.ay=v.e[1]; }
+    else if(r.kind==='balloon'){ r.bx=v.e[0]; r.by=v.e[1]; }
   }
 }
 
@@ -525,8 +1021,25 @@ function guestRenderAt(now){
 function onRoster(p){
   Hub.me=p.you; Hub.roster=p.roster||[]; Hub.room=p.room||'';
   myId=Hub.me.id; myName=Hub.me.name||'Player';
-  isHost=!!Hub.me.isHost;
-  $('role').textContent=(isHost?'host':'guest')+' · '+myName+' · '+(Hub.roster.length)+' players';
+  const realHost=!!Hub.me.isHost;
+  // No room and no host around (lobby) means guest intents would go nowhere
+  // and every placed part would vanish on release. Run a private local
+  // table instead — nothing is shared out there, so nothing can desync.
+  const hostPresent=(Hub.roster||[]).some(m=>m.host);
+  const wantLocal=!realHost&&(!Hub.room||!hostPresent);
+  if(wantLocal&&!localHost){
+    localHost=true; isHost=true;
+    ensureEngine();
+  }else if(!wantLocal&&localHost){
+    // Leaving the private table behind (e.g. joined someone's room as a
+    // guest): drop the local parts and take the host's world instead.
+    // The save is kept, so the lobby build is back next time you host.
+    localHost=false; isHost=realHost;
+    if(!isHost) clearLiveTable();
+  }else{
+    isHost=realHost||localHost;
+  }
+  $('role').textContent=(localHost?'solo':(isHost?'host':'guest'))+' · '+myName+' · '+(Hub.roster.length)+' players';
   if(!booted){ booted=true; bootAll(); }
   if(isHost){
     // bootstrap late joiners with the full world before the first tick
@@ -535,8 +1048,19 @@ function onRoster(p){
   }
   reportHeight();
 }
+// Drop the live world but keep engine, walls, and the saved table.
+function clearLiveTable(){
+  for(const id of [...links.keys()]) removeLinks(id);
+  if(engine){ for(const [,b] of bodies) try{Matter.Composite.remove(engine.world,b);}catch(e){} }
+  bodies.clear(); records.clear(); snaps.length=0;
+  draggedBy.clear(); pausedFrozen.clear(); heldFrozen.clear(); latch.clear(); rungAt.clear();
+  selectedId=null; pillOpen=false; draft=null; draftPts=[];
+  updateSel();
+}
 function bootAll(){
   ensureEngineIfHost();
+  if(isHost) restoreTable();
+  fitCanvas();
   bindToolbar();
   bindPointer();
   bindKeys();
@@ -551,6 +1075,21 @@ function ensureEngineIfHost(){ if(isHost||amSolo) ensureEngine(); }
 setTimeout(()=>{ if(!booted){ amSolo=true; isHost=true; myId=myId||'solo'; booted=true; bootAll();
   $('role').textContent='solo · local table'; } },1800);
 
+/* Extra sync: geometry for resizable kinds (g) and aux points (e).
+   Positions interpolate; these just take the latest value. */
+function obsGeom(r){
+  if(!SIZE_LIMITS[r.kind]) return null;
+  return [r.w||0,r.h||0,r.r||0,(r.u===undefined?0:r.u)];
+}
+function obsExtra(r){
+  if(r.kind==='pendulum'||r.kind==='lever'||r.kind==='catapult') return [Math.round(r.ax),Math.round(r.ay)];
+  if(r.kind==='balloon'){
+    const L=links.get(r.id);
+    if(L&&L.bob) return [Math.round(L.bob.position.x),Math.round(L.bob.position.y)];
+    return [Math.round(r.x),Math.round(r.y+90)];
+  }
+  return null;
+}
 /* ---------- broadcast (host, 20 Hz) ---------- */
 function broadcastTick(){
   if(!isHost||!booted||!engine) return;
@@ -561,48 +1100,179 @@ function broadcastTick(){
   for(const [id,b] of bodies){
     const rec=records.get(id); if(!rec) continue;
     rec.x=b.position.x; rec.y=b.position.y; rec.angle=b.angle;
-    // milestone: ball settled on the floor
-    if(rec.kind==='ball'&&!celebrated.has(id)&&rec.y>H-40&&Math.hypot(b.velocity.x,b.velocity.y)<0.6){
-      celebrated.add(id); Hub.up('say','machine completed — nice build '+myName+'!');
-    }
-    obs.push({i:id,x:Math.round(rec.x),y:Math.round(rec.y),a:+rec.angle.toFixed(3),l:rec.locked?1:0});
+    obs.push({i:id,x:Math.round(rec.x),y:Math.round(rec.y),a:+rec.angle.toFixed(3),l:rec.locked?1:0,g:obsGeom(rec),e:obsExtra(rec)});
   }
   const add=pendingAdd.splice(0).map(r=>({i:r.id,kind:r.kind,x:Math.round(r.x),y:Math.round(r.y),
-    a:+((r.angle||0).toFixed(3)),c:r.color,l:r.locked?1:0,w:r.w,h:r.h,r:r.r,verts:r.verts}));
+    a:+((r.angle||0).toFixed(3)),c:r.color,l:r.locked?1:0,w:r.w,h:r.h,r:r.r,
+    u:r.u,ax:r.ax,ay:r.ay,a0:r.a0,verts:r.verts}));
   const del=pendingDel.splice(0);
   const sfx=pendingSfx.splice(0);
   // include remote cursors so guests see each other
-  const msg={sim:isRunning,seq:++seq,t:Date.now(),obs,add,del,g:gravityY,sp:[Math.round(spawnPt.x),Math.round(spawnPt.y)]};
+  const msg={sim:isRunning,seq:++seq,t:Date.now(),obs,add,del,g:gravityY};
   if(sfx.length) msg.sfx=sfx;
   const ck={}; for(const k of Object.keys(cursorsOut)) ck[k]=cursorsOut[k];
   if(myCursor) ck[myId||'host']={x:Math.round(myCursor.x),y:Math.round(myCursor.y),name:myName};
   if(Object.keys(ck).length) msg.curs=ck;
   Hub.up('state',msg);
-  if(sfx.length) for(const s of sfx) playClink(s.v);
+  if(sfx.length) for(const s of sfx) playSfx(s);
 }
 
 /* ---------- render ---------- */
+function bobPos(r){
+  if(isHost){
+    const L=links.get(r.id);
+    if(L&&L.bob) return {x:L.bob.position.x,y:L.bob.position.y};
+  }else if(r.bx!==undefined){ return {x:r.bx,y:r.by}; }
+  return {x:r.x,y:r.y+90};
+}
 function drawRecord(r){
+  const K=r.kind;
+  const sel=(r.id===selectedId);
   ctx.save();
   ctx.translate(r.x,r.y);
   ctx.rotate(r.angle||0);
-  const sel=(r.id===selectedId);
   ctx.fillStyle=r.color||'#8b5a2b';
   ctx.strokeStyle=sel?'#ffe9a8':'rgba(0,0,0,.55)';
   ctx.lineWidth=sel?3:1.5;
-  if(r.kind==='ball'){
-    ctx.beginPath();ctx.arc(0,0,r.r||14,0,7);ctx.fill();ctx.stroke();
+  if(K==='ball'){
+    const rad=r.r||18;
+    ctx.beginPath();ctx.arc(0,0,rad,0,7);ctx.fill();ctx.stroke();
     ctx.strokeStyle='rgba(255,255,255,.5)';ctx.lineWidth=1;
-    ctx.beginPath();ctx.moveTo(0,0);ctx.lineTo(r.r||14,0);ctx.stroke();
-  }else if(r.kind==='block'){
-    const w=r.w||48,h=r.h||48;
+    ctx.beginPath();ctx.moveTo(0,0);ctx.lineTo(rad,0);ctx.stroke();
+  }else if(K==='block'){
+    const w=r.w||72,h=r.h||72;
     ctx.fillRect(-w/2,-h/2,w,h);ctx.strokeRect(-w/2,-h/2,w,h);
-  }else if(r.kind==='plank'||r.kind==='ramp'){
-    const w=r.w||240,h=r.h||14;
+    ctx.strokeStyle='rgba(255,255,255,.25)';ctx.lineWidth=1;
+    ctx.strokeRect(-w/2+6,-h/2+6,w-12,h-12);
+  }else if(K==='plank'||K==='ramp'||K==='lever'){
+    const w=r.w||300,h=r.h||16;
     ctx.fillRect(-w/2,-h/2,w,h);ctx.strokeRect(-w/2,-h/2,w,h);
     ctx.fillStyle='rgba(0,0,0,.25)';
-    for(let x=-w/2+12;x<w/2;x+=24) ctx.fillRect(x,-h/2,3,h);
-  }else if(r.kind==='drawn'&&r.verts&&r.verts.length){
+    for(let x=-w/2+14;x<w/2;x+=28) ctx.fillRect(x,-h/2,3,h);
+    if(K==='lever'&&r.ax!==undefined){
+      // fulcrum under the pivot (pivot in body-local coords)
+      const dx=r.ax-r.x,dy=r.ay-r.y;
+      const c=Math.cos(-(r.angle||0)),s=Math.sin(-(r.angle||0));
+      const lx=dx*c-dy*s,ly=dx*s+dy*c;
+      ctx.fillStyle='#3a2f1f';ctx.strokeStyle=sel?'#ffe9a8':'rgba(0,0,0,.55)';ctx.lineWidth=1.5;
+      ctx.beginPath();ctx.moveTo(lx-16,ly+h/2+34);ctx.lineTo(lx+16,ly+h/2+34);ctx.lineTo(lx,ly+h/2);ctx.closePath();ctx.fill();ctx.stroke();
+      ctx.fillStyle='#ffe9a8';ctx.beginPath();ctx.arc(lx,ly,5,0,7);ctx.fill();
+    }
+  }else if(K==='domino'){
+    const w=r.w||16,h=r.h||76;
+    ctx.beginPath();
+    if(ctx.roundRect) ctx.roundRect(-w/2,-h/2,w,h,5); else ctx.rect(-w/2,-h/2,w,h);
+    ctx.fill();ctx.stroke();
+    ctx.fillStyle='rgba(0,0,0,.5)';
+    ctx.beginPath();ctx.arc(0,-h/4,Math.min(4,w/4),0,7);ctx.fill();
+    ctx.beginPath();ctx.arc(0,h/4,Math.min(4,w/4),0,7);ctx.fill();
+  }else if(K==='peg'){
+    const rad=r.r||12;
+    ctx.beginPath();ctx.arc(0,0,rad,0,7);ctx.fill();ctx.stroke();
+    ctx.fillStyle='#ffe9a8';ctx.beginPath();ctx.arc(0,0,Math.max(2,rad*0.3),0,7);ctx.fill();
+  }else if(K==='bell'){
+    const rad=r.r||24;
+    const dt=Date.now()-(rungAt.get(r.id)||0);
+    const glow=dt<900?1-dt/900:0;
+    if(glow>0){
+      ctx.save();ctx.globalAlpha=glow*0.9;ctx.strokeStyle='#ffe9a8';ctx.lineWidth=3;
+      ctx.beginPath();ctx.arc(0,0,rad+6+(1-glow)*26,0,7);ctx.stroke();ctx.restore();
+    }
+    if(glow>0) ctx.rotate(Math.sin(dt/60)*0.25*glow); // happy wobble
+    ctx.beginPath();ctx.arc(0,0,rad,Math.PI,0);ctx.closePath();ctx.fill();ctx.stroke();
+    ctx.fillRect(-rad-4,0,(rad+4)*2,5);
+    ctx.fillStyle='rgba(255,255,255,.55)';
+    ctx.beginPath();ctx.arc(-rad*0.35,-rad*0.5,rad*0.18,0,7);ctx.fill();
+    ctx.fillStyle='#3a2f1f';ctx.beginPath();ctx.arc(0,8,5,0,7);ctx.fill();
+  }else if(K==='bouncer'){
+    const w=r.w||300,h=r.h||16;
+    ctx.fillRect(-w/2,-h/2,w,h);ctx.strokeRect(-w/2,-h/2,w,h);
+    ctx.strokeStyle='rgba(255,255,255,.6)';ctx.lineWidth=2;
+    ctx.beginPath();
+    for(let x=-w/2+10;x<w/2-6;x+=28){ctx.moveTo(x,-h/2-2);ctx.lineTo(x+14,-h/2-12);}
+    ctx.stroke();
+    ctx.strokeStyle=sel?'#ffe9a8':'rgba(0,0,0,.55)';ctx.lineWidth=1.5;
+    ctx.beginPath(); // springs
+    ctx.moveTo(-w/2+8,h/2);ctx.lineTo(-w/2+8,h/2+14);ctx.lineTo(-w/2+22,h/2);ctx.lineTo(-w/2+22,h/2+14);
+    ctx.moveTo(w/2-8,h/2);ctx.lineTo(w/2-8,h/2+14);ctx.lineTo(w/2-22,h/2);ctx.lineTo(w/2-22,h/2+14);
+    ctx.stroke();
+  }else if(K==='turntable'){
+    const rad=r.r||42;
+    const dir=(r.u===undefined?1:r.u)>=0?1:-1;
+    ctx.beginPath();ctx.arc(0,0,rad*1.5,0,7);ctx.fill();ctx.stroke();
+    ctx.strokeStyle='rgba(255,255,255,.5)';ctx.lineWidth=2;
+    for(let i=0;i<3;i++){
+      const a=i*Math.PI*2/3;
+      ctx.beginPath();ctx.moveTo(0,0);ctx.lineTo(Math.cos(a)*rad*1.4,Math.sin(a)*rad*1.4);ctx.stroke();
+    }
+    ctx.strokeStyle='#ffe9a8';ctx.lineWidth=3; // direction arrow
+    ctx.beginPath();ctx.arc(0,0,rad*0.9,0,dir*1.4);ctx.stroke();
+    const ea=dir*1.4;
+    ctx.fillStyle='#ffe9a8';ctx.beginPath();
+    ctx.arc(Math.cos(ea)*rad*0.9,Math.sin(ea)*rad*0.9,5,0,7);ctx.fill();
+    ctx.fillStyle='#3a2f1f';ctx.beginPath();ctx.arc(0,0,5,0,7);ctx.fill();
+  }else if(K==='conveyor'){
+    const w=r.w||340,h=r.h||22,dir=(r.u===undefined?1:r.u)>=0?1:-1;
+    ctx.fillRect(-w/2,-h/2,w,h);ctx.strokeRect(-w/2,-h/2,w,h);
+    ctx.fillStyle='#3a2f1f';
+    ctx.beginPath();ctx.arc(-w/2,0,h/2+3,0,7);ctx.fill();
+    ctx.beginPath();ctx.arc(w/2,0,h/2+3,0,7);ctx.fill();
+    const off=(Date.now()/30)%36; // marching chevrons show the flow
+    ctx.strokeStyle='rgba(255,233,168,.85)';ctx.lineWidth=3;
+    for(let x=-w/2+18+((off*dir%36)+36)%36-36;x<w/2-8;x+=36){
+      ctx.beginPath();
+      if(dir>0){ctx.moveTo(x,-6);ctx.lineTo(x+10,0);ctx.lineTo(x,6);}
+      else{ctx.moveTo(x,-6);ctx.lineTo(x-10,0);ctx.lineTo(x,6);}
+      ctx.stroke();
+    }
+  }else if(K==='fan'){
+    const str=r.u===undefined?1:r.u;
+    ctx.fillRect(-28,-28,56,56);ctx.strokeRect(-28,-28,56,56);
+    ctx.strokeStyle='rgba(255,255,255,.25)';ctx.lineWidth=1;ctx.strokeRect(-20,-20,40,40);
+    const ba=Date.now()/160; // blades spin visually for host and guests alike
+    ctx.strokeStyle='rgba(255,233,168,.9)';ctx.lineWidth=5;ctx.lineCap='round';
+    for(let i=0;i<3;i++){
+      const a=ba+i*Math.PI*2/3;
+      ctx.beginPath();ctx.moveTo(0,0);ctx.lineTo(Math.cos(a)*20,Math.sin(a)*20);ctx.stroke();
+    }
+    // faint wind zone along the facing
+    ctx.save();ctx.globalAlpha=.16;ctx.fillStyle='#9adcff';
+    ctx.fillRect(28,-85,340,170);ctx.restore();
+    ctx.save();ctx.globalAlpha=.5;ctx.strokeStyle='#9adcff';ctx.lineWidth=1.5;ctx.setLineDash([8,10]);
+    for(let i=0;i<3;i++){
+      const y=-56+i*56, off=(Date.now()/12)%56;
+      ctx.beginPath();ctx.moveTo(34+((off)%56),y);ctx.lineTo(34+((off)%56)+40,y);ctx.stroke();
+    }
+    ctx.restore();
+  }else if(K==='balloon'){
+    const rad=r.r||20;
+    ctx.beginPath();ctx.ellipse(0,0,rad*0.85,rad,0,0,7);ctx.fill();ctx.stroke();
+    ctx.fillStyle='rgba(255,255,255,.5)';
+    ctx.beginPath();ctx.ellipse(-rad*0.3,-rad*0.35,rad*0.2,rad*0.32,-0.4,0,7);ctx.fill();
+    ctx.fillStyle=r.color||'#8b5a2b';
+    ctx.beginPath();ctx.moveTo(-5,rad);ctx.lineTo(5,rad);ctx.lineTo(0,rad+8);ctx.closePath();ctx.fill();
+  }else if(K==='pendulum'){
+    const rad=r.r||16;
+    ctx.strokeStyle=sel?'#ffe9a8':'rgba(230,194,128,.7)';ctx.lineWidth=3;
+    ctx.beginPath();ctx.moveTo(r.ax-r.x,r.ay-r.y);ctx.lineTo(0,0);ctx.stroke();
+    ctx.fillStyle=r.color||'#8b5a2b';ctx.strokeStyle=sel?'#ffe9a8':'rgba(0,0,0,.55)';ctx.lineWidth=sel?3:1.5;
+    ctx.beginPath();ctx.arc(0,0,rad,0,7);ctx.fill();ctx.stroke();
+  }else if(K==='bucket'){
+    const w=r.w||110, wallH=56, th=12;
+    ctx.fillRect(-w/2,wallH/2-th,w,th);
+    ctx.fillRect(-w/2,-wallH/2+6,th,wallH);
+    ctx.fillRect(w/2-th,-wallH/2+6,th,wallH);
+    ctx.strokeRect(-w/2,-wallH/2+6,w,wallH);
+  }else if(K==='catapult'){
+    const w=r.w||260;
+    const cocked=isHost&&latch.get(r.id);
+    ctx.strokeStyle=cocked?'#ff9c9c':(sel?'#ffe9a8':'rgba(0,0,0,.55)');
+    ctx.lineWidth=sel||cocked?3:1.5;
+    ctx.fillStyle=r.color||'#8b5a2b';
+    ctx.fillRect(-w*0.25,-7,w,14);ctx.strokeRect(-w*0.25,-7,w,14);
+    ctx.beginPath();ctx.arc(w*0.75,-8,10,Math.PI*0.9,Math.PI*1.9);ctx.stroke(); // cup
+    ctx.fillStyle='#3a2f1f';ctx.beginPath();ctx.arc(-w*0.25,0,5,0,7);ctx.fill();
+  }else if(K==='drawn'&&r.verts&&r.verts.length){
     ctx.beginPath();
     ctx.moveTo(r.verts[0].x,r.verts[0].y);
     for(let i=1;i<r.verts.length;i++) ctx.lineTo(r.verts[i].x,r.verts[i].y);
@@ -611,14 +1281,98 @@ function drawRecord(r){
     if(sel){ctx.lineWidth=1.5;ctx.strokeStyle='#ffe9a8';ctx.stroke();}
   }
   ctx.restore();
-  if(r.locked){
-    ctx.save();ctx.translate(r.x,r.y);ctx.fillStyle='#ffe9a8';
-    ctx.font='bold 13px system-ui';ctx.textAlign='center';
-    ctx.fillText('🔒',0,-(r.r||r.h||20)-8);ctx.restore();
+  // World-frame extras: lock glyph, anchors, balloon string, handles.
+  ctx.save();ctx.translate(r.x,r.y);
+  if(r.locked&&!LINKED.includes(K)&&K!=='ball'){
+    ctx.fillStyle='#ffe9a8';ctx.font='bold 20px system-ui';ctx.textAlign='center';
+    ctx.fillText('🔒',0,-((r.h||r.r||24))-16);
   }
+  ctx.restore();
+  if(ANCHOR_KINDS.includes(K)&&r.ax!==undefined){
+    const faint=!sel;
+    ctx.save();ctx.globalAlpha=faint?0.45:1;
+    ctx.strokeStyle='#ffe9a8';ctx.lineWidth=2;
+    ctx.beginPath();ctx.arc(r.ax,r.ay,12,0,7);ctx.stroke();
+    ctx.beginPath();
+    ctx.moveTo(r.ax-6,r.ay);ctx.lineTo(r.ax+6,r.ay);
+    ctx.moveTo(r.ax,r.ay-6);ctx.lineTo(r.ax,r.ay+6);
+    ctx.stroke();ctx.restore();
+    if(K==='catapult'){ // static base under the hinge
+      ctx.save();ctx.fillStyle='#3a2f1f';ctx.strokeStyle=sel?'#ffe9a8':'rgba(0,0,0,.55)';ctx.lineWidth=1.5;
+      ctx.fillRect(r.ax-55,r.ay+35,110,34);ctx.strokeRect(r.ax-55,r.ay+35,110,34);ctx.restore();
+    }
+  }
+  if(K==='balloon'&&!r.locked){
+    const bp=bobPos(r);
+    ctx.save();ctx.strokeStyle='rgba(230,194,128,.8)';ctx.lineWidth=2;
+    ctx.beginPath();ctx.moveTo(r.x,r.y+(r.r||20));ctx.lineTo(bp.x,bp.y-6);ctx.stroke();
+    ctx.fillStyle='#d8c9a8';ctx.strokeStyle=sel?'#ffe9a8':'rgba(0,0,0,.55)';ctx.lineWidth=1.5;
+    ctx.beginPath();ctx.arc(bp.x,bp.y,10,0,7);ctx.fill();ctx.stroke();
+    ctx.restore();
+  }
+  if(sel) drawHandles(r);
 }
+function drawHandles(r){
+  const hsr=handleScale(), hs2=hsr*1.3;
+  const hs=handleList(r);
+  ctx.save();
+  for(const h of hs){
+    if(h.hid==='anchor'){
+      ctx.strokeStyle='#7dff9a';ctx.lineWidth=3;
+      ctx.beginPath();ctx.arc(h.x,h.y,hs2,0,7);ctx.stroke();
+    }else if(h.hid==='ring'){
+      ctx.strokeStyle='rgba(255,233,168,.9)';ctx.lineWidth=2;ctx.setLineDash([5,5]);
+      ctx.beginPath();ctx.arc(h.x,h.y,hsr,0,7);ctx.stroke();ctx.setLineDash([]);
+      ctx.fillStyle='rgba(255,233,168,.9)';ctx.beginPath();ctx.arc(h.x,h.y,hsr*0.4,0,7);ctx.fill();
+    }else{
+      ctx.fillStyle='#fff';ctx.strokeStyle='#241b12';ctx.lineWidth=2.5;
+      ctx.beginPath();ctx.arc(h.x,h.y,hsr,0,7);ctx.fill();ctx.stroke();
+    }
+  }
+  ctx.restore();
+}
+function handleList(r){
+  const list=[];
+  const push=(hid,x,y)=>list.push({hid,x,y});
+  const cos=Math.cos(r.angle||0), sin=Math.sin(r.angle||0);
+  const L=(lx,ly)=>({x:r.x+lx*cos-ly*sin, y:r.y+lx*sin+ly*cos});
+  if(LEN_KINDS.includes(r.kind)||r.kind==='bucket'){
+    const w=r.w||300;
+    let p=L(-w/2,0); push('e0',p.x,p.y);
+    p=L(w/2,0); push('e1',p.x,p.y);
+  }
+  if(RAD_KINDS.includes(r.kind)){ const p=L(r.r||18,0); push('rad',p.x,p.y); }
+  if(r.kind==='block'){ const p=L((r.w||72)/2,(r.h||72)/2); push('corner',p.x,p.y); }
+  if(r.kind==='fan'){ const u=r.u===undefined?1:r.u; const p=L(40+u*60,0); push('str',p.x,p.y); }
+  if(ROT_KINDS.includes(r.kind)){
+    const half=(r.kind==='ball')?(r.r||18):((r.h||r.r||40)/2);
+    const p=L(0,-(half+52)); push('ring',p.x,p.y);
+  }
+  if(ANCHOR_KINDS.includes(r.kind)&&r.ax!==undefined) push('anchor',r.ax,r.ay);
+  return list;
+}
+function hitHandle(px,py){
+  const r=selectedId&&records.get(selectedId);
+  if(!r) return null;
+  // Touch-sized in screen space: world radius grows as the table shrinks.
+  const R=Math.min(46,Math.max(22,22/(view.s||1)));
+  const hs=handleList(r);
+  for(let i=hs.length-1;i>=0;i--){
+    if(Math.hypot(px-hs[i].x,py-hs[i].y)<R) return {rec:r,hid:hs[i].hid};
+  }
+  return null;
+}
+// Handle dot radius in world units — same screen-size reasoning.
+function handleScale(){ return Math.min(30,Math.max(10,14/(view.s||1))); }
 function render(){
-  ctx.clearRect(0,0,W,H);
+  fitCanvas();
+  const cw=canvas.width||1, ch=canvas.height||1;
+  const cssW=canvas.clientWidth||W, cssH=canvas.clientHeight||H;
+  const v=fitView();
+  const k=(cw/cssW)*v.s; // device px per world px
+  ctx.setTransform(1,0,0,1,0,0);
+  ctx.fillStyle='#0d0a06';ctx.fillRect(0,0,cw,ch); // letterbox
+  ctx.setTransform(k,0,0,k,v.ox*(cw/cssW),v.oy*(ch/cssH));
   // backdrop grid + floor
   ctx.fillStyle='#1c160e';ctx.fillRect(0,0,W,H);
   ctx.strokeStyle='rgba(230,194,128,.12)';ctx.lineWidth=1;
@@ -626,8 +1380,12 @@ function render(){
   for(let y=0;y<=H;y+=40){ctx.beginPath();ctx.moveTo(0,y);ctx.lineTo(W,y);ctx.stroke();}
   ctx.fillStyle='#3a2f1f';ctx.fillRect(0,H-6,W,6);
   ctx.strokeStyle='#6b5636';ctx.lineWidth=2;ctx.strokeRect(1,1,W-2,H-2);
-  drawSpawn();
   for(const r of records.values()) drawRecord(r);
+  // placement ghost
+  if(draft){
+    const g=draftPreview(draft);
+    if(g){ ctx.save();ctx.globalAlpha=.6; drawRecord(g); ctx.restore(); }
+  }
   // draft polyline
   if(draftPts.length>1){
     ctx.save();ctx.strokeStyle='#ffe9a8';ctx.lineWidth=7;ctx.lineCap='round';ctx.lineJoin='round';
@@ -639,13 +1397,13 @@ function render(){
 }
 let myCursor=null;
 function renderCursors(){
-  const box=$('cursors'); const wrapR=$('stage-wrap').getBoundingClientRect();
-  const cr=canvas.getBoundingClientRect();
+  const box=$('cursors');
+  const v=fitView();
   box.innerHTML='';
   for(const k of Object.keys(remoteCursors)){
     const c=remoteCursors[k]; if(!c) continue;
     const d=document.createElement('div');d.className='cur';
-    d.style.left=((c.x/W)*cr.width)+'px';d.style.top=((c.y/H)*cr.height)+'px';
+    d.style.left=(v.ox+c.x*v.s)+'px';d.style.top=(v.oy+c.y*v.s)+'px';
     d.textContent='▸ '+(c.name||'guest');box.appendChild(d);
   }
 }
@@ -663,8 +1421,8 @@ function loop(t){
     return;
   }
   if(isHost&&engine&&isRunning){
+    try{ tickParts(); }catch(e){}
     try{ Matter.Engine.update(engine,1000/60); }catch(e){}
-    // celebrate check happens in broadcastTick
   }
   if(!isHost) guestRenderAt(Date.now());
   render();
@@ -678,48 +1436,82 @@ function hitRecord(px,py){
     const dx=px-r.x,dy=py-r.y;
     const c=Math.cos(-(r.angle||0)),s=Math.sin(-(r.angle||0));
     const lx=dx*c-dy*s,ly=dx*s+dy*c;
-    if(r.kind==='ball'){ if(Math.hypot(dx,dy)<=(r.r||14)+4) return r; }
-    else if(r.kind==='block'||r.kind==='plank'||r.kind==='ramp'){
-      if(Math.abs(lx)<=(r.w||48)/2+4&&Math.abs(ly)<=(r.h||14)/2+6) return r;
-    }else if(r.kind==='drawn'&&r.verts){
-      for(const v of r.verts){ if(Math.hypot(lx-v.x,ly-v.y)<10) return r; }
+    const K=r.kind;
+    if(K==='ball'||K==='peg'||K==='bell'||K==='turntable'){
+      if(Math.hypot(dx,dy)<=(r.r||18)+6) return r;
+    }else if(K==='balloon'){
+      if(Math.hypot(dx,dy)<=(r.r||20)+6) return r;
+      const bp=bobPos(r);
+      if(Math.hypot(px-bp.x,py-bp.y)<16) return r;
+    }else if(K==='pendulum'){
+      if(Math.hypot(dx,dy)<=(r.r||16)+6) return r;
+      if(r.ax!==undefined&&Math.hypot(px-r.ax,py-r.ay)<18) return r;
+    }else if(K==='fan'){
+      if(Math.abs(lx)<=34&&Math.abs(ly)<=34) return r;
+    }else if(K==='catapult'){
+      const w=r.w||260;
+      if(lx>=-w*0.25-8&&lx<=w*0.75+8&&Math.abs(ly)<=16) return r;
+      if(r.ax!==undefined&&Math.abs(px-r.ax)<62&&Math.abs(py-(r.ay+52))<26) return r;
+    }else if(K==='bucket'){
+      const w=r.w||110;
+      if(Math.abs(lx)<=w/2+6&&Math.abs(ly)<=40) return r;
+    }else if(K==='block'||K==='plank'||K==='ramp'||K==='domino'||K==='bouncer'||K==='conveyor'||K==='lever'){
+      if(Math.abs(lx)<=(r.w||48)/2+6&&Math.abs(ly)<=(r.h||16)/2+8) return r;
+    }else if(K==='drawn'&&r.verts){
+      for(const v of r.verts){ if(Math.hypot(lx-v.x,ly-v.y)<12) return r; }
     }
   }
   return null;
 }
 
-function drawSpawn(){
-  const x=spawnPt.x,y=spawnPt.y;
-  ctx.save();
-  ctx.strokeStyle='rgba(255,233,168,.9)';ctx.lineWidth=2;ctx.setLineDash([6,4]);
-  ctx.beginPath();ctx.arc(x,y,20,0,7);ctx.stroke();
-  ctx.setLineDash([]);
-  ctx.fillStyle='#ffe9a8';ctx.font='bold 13px system-ui';ctx.textAlign='center';
-  ctx.fillText('⚪',x,y+5);
-  ctx.font='bold 10px monospace';
-  ctx.fillText('SPAWN',x,y-28);
-  ctx.strokeStyle='rgba(255,233,168,.18)';ctx.lineWidth=1;
-  ctx.beginPath();ctx.moveTo(x,y+20);ctx.lineTo(x,H-6);ctx.stroke();
-  ctx.restore();
-}
-
 /* ---------- mutations (route through host) ---------- */
-function doSpawn(x,y){
-  const s=clampSpawn(x,y);
-  if(isHost) hostSpawn(s.x,s.y);
-  else { spawnPt=s; Hub.up('intent',{a:'spawn',x:s.x,y:s.y}); }
+// Placement: press = one corner, drag = length + angle. Per kind the drag
+// means whatever is natural (a pendulum's press is its anchor, a fan's
+// drag is its blow direction + strength, ...). A plain tap = default size.
+function clampN(v,a,b){ return Math.max(a,Math.min(b,v)); }
+function draftFor(kind,x0,y0,x1,y1){
+  const dx=x1-x0, dy=y1-y0, len=Math.hypot(dx,dy), ang=Math.atan2(dy,dx);
+  const d=KIND_DEF[kind]||{};
+  const o={angle:0};
+  if(kind==='ball'){ o.x=x0;o.y=y0; if(len>=8) o.r=clampN(len,8,70); }
+  else if(kind==='turntable'){ o.x=x0;o.y=y0; if(len>=8) o.r=clampN(len,16,95); }
+  else if(kind==='block'){ o.x=x0;o.y=y0; if(len>=8) o.w=o.h=clampN(len,24,400); }
+  else if(kind==='bucket'){ o.x=x0;o.y=y0; if(len>=8) o.w=clampN(len,60,220); }
+  else if(kind==='plank'||kind==='domino'||kind==='bouncer'||kind==='conveyor'||kind==='lever'){
+    if(len<8){ o.x=x0;o.y=y0; o.angle=(kind==='plank'||kind==='lever')?-0.3:0; }
+    else{ o.x=(x0+x1)/2; o.y=(y0+y1)/2; o.w=len; o.angle=ang; }
+  }
+  else if(kind==='fan'){ o.x=x0;o.y=y0; if(len>=8){ o.angle=ang; o.u=clampN(0.5+len/300,0.3,2); } }
+  else if(kind==='pendulum'){
+    o.ax=x0; o.ay=y0;
+    if(len<8){ o.x=x0; o.y=y0+220; } else { o.x=x1; o.y=y1; }
+  }
+  else if(kind==='catapult'){
+    const w=len<8?260:clampN(len,120,600), a=len<8?-0.12:ang;
+    o.w=w; o.angle=a; o.a0=a; o.ax=x0; o.ay=y0;
+    o.x=x0+Math.cos(a)*w*0.25; o.y=y0+Math.sin(a)*w*0.25;
+  }
+  else{ o.x=x0; o.y=y0; } // peg, bell, balloon: fixed size, drag ignored
+  return o;
 }
-function doAdd(kind,x,y){
+function draftPreview(d){
+  const rec=makeRecord(d.kind,d.x0,d.y0,Object.assign({},draftFor(d.kind,d.x0,d.y0,d.x1,d.y1)));
+  rec.id='ghost'; rec.color='#8a7a5c'; // fixed ghost colour (no palette cycling)
+  return rec;
+}
+function doAdd(kind,x0,y0,x1,y1){
   if(kind==='ramp')kind='plank'; // legacy button id, just in case
-  const rec=makeRecord(kind,x,y);
-  if(isHost) hostAdd(rec);
-  else Hub.up('intent',{a:'add',rec});
+  const o=draftFor(kind,x0,y0,(x1===undefined?x0:x1),(y1===undefined?y0:y1));
+  const rec=makeRecord(kind,o.x,o.y,o);
+  if(isHost){ hostAdd(rec); return rec; }
+  Hub.up('intent',{a:'add',rec});
+  return null;
 }
 function doMove(id,x,y,done){
   x=Math.max(0,Math.min(W,x));y=Math.max(0,Math.min(H,y));
   if(isHost){
     const rec=records.get(id);
-    if(rec&&!rec.locked) hostMove(id,x,y);
+    if(rec&&(!rec.locked||LINKED.includes(rec.kind))) hostMove(id,x,y);
   }else{
     const r=records.get(id);
     if(r){ r.x=x;r.y=y; optimisticId=done?null:id; }
@@ -731,8 +1523,69 @@ function doRot(id,delta){
   const r=records.get(id); if(!r) return;
   const na=(r.angle||0)+delta;
   if(isHost) hostRot(id,na);
-  else{ r.angle=na; Hub.up('intent',{a:'rot',id,angle:na}); }
+  else{
+    if(r.kind==='catapult'&&r.ax!==undefined){
+      const len=(r.w||260)*0.25;
+      r.angle=na; r.x=Math.round(r.ax+Math.cos(na)*len); r.y=Math.round(r.ay+Math.sin(na)*len);
+    }else r.angle=na;
+    Hub.up('intent',{a:'rot',id,angle:na});
+  }
   updateSel();
+}
+function doSize(id,patch){
+  const r=records.get(id); if(!r) return;
+  const o=clampSize(r.kind,patch);
+  if(isHost) hostSize(id,o);
+  else{
+    if(o.angle!==undefined){
+      if(r.kind==='catapult'&&r.ax!==undefined){
+        const len=(r.w||260)*0.25;
+        r.angle=o.angle; r.x=Math.round(r.ax+Math.cos(o.angle)*len); r.y=Math.round(r.ay+Math.sin(o.angle)*len);
+      }else r.angle=o.angle;
+    }
+    if(o.w!==undefined)r.w=o.w; if(o.h!==undefined)r.h=o.h;
+    if(o.r!==undefined)r.r=o.r; if(o.u!==undefined)r.u=o.u;
+    Hub.up('intent',Object.assign({a:'size',id},o));
+  }
+  updateSel();
+}
+function doAnchor(id,ax,ay){
+  const r=records.get(id); if(!r||!ANCHOR_KINDS.includes(r.kind)) return;
+  ax=Math.max(0,Math.min(W,ax)); ay=Math.max(0,Math.min(H,ay));
+  if(isHost) hostAnchor(id,ax,ay);
+  else{ r.ax=ax; r.ay=ay; Hub.up('intent',{a:'anchor',id,ax:Math.round(ax),ay:Math.round(ay)}); }
+}
+function doFlip(id){
+  const r=records.get(id); if(!r||!FLIP_KINDS.includes(r.kind)) return;
+  if(isHost) hostFlip(id);
+  else{
+    if(r.kind==='fan') r.angle=(r.angle||0)+Math.PI;
+    else r.u=((r.u===undefined?1:r.u)>=0)?-1:1;
+    Hub.up('intent',{a:'flip',id});
+  }
+  updateSel();
+}
+function handleDragTo(rec,hid,wx,wy){
+  const dx=wx-rec.x, dy=wy-rec.y;
+  if(hid==='ring'){ doRot(rec.id,Math.atan2(dy,dx)+Math.PI/2-(rec.angle||0)); return; }
+  if(hid==='anchor'){ doAnchor(rec.id,wx,wy); return; }
+  if(hid==='rad'){ doSize(rec.id,{r:Math.hypot(dx,dy)}); return; }
+  if(hid==='corner'){
+    const c=Math.cos(-(rec.angle||0)), s=Math.sin(-(rec.angle||0));
+    doSize(rec.id,{w:Math.abs(dx*c-dy*s)*2,h:Math.abs(dx*s+dy*c)*2});
+    return;
+  }
+  if(hid==='str'){ doSize(rec.id,{u:(Math.hypot(dx,dy)-40)/60}); return; }
+  if(hid==='e0'||hid==='e1'){
+    if(rec.kind==='bucket'){
+      const c=Math.cos(-(rec.angle||0)), s=Math.sin(-(rec.angle||0));
+      doSize(rec.id,{w:Math.abs(dx*c-dy*s)*2});
+      return;
+    }
+    let na=Math.atan2(dy,dx);
+    if(hid==='e0') na+=Math.PI; // fixed centre: symmetric parts can't flip
+    doSize(rec.id,{w:Math.hypot(dx,dy)*2,angle:na});
+  }
 }
 function doLock(id){
   const r=records.get(id); if(!r) return;
@@ -744,8 +1597,10 @@ function doDel(id){
   else Hub.up('intent',{a:'del',id});
 }
 function doReset(){
-  records.clear();bodies.clear();snaps.length=0;selectedId=null;draftPts=[];heldFrozen.clear();
-  if(engine){ try{Matter.Composite.clear(engine.world,false,true);}catch(e){} ensureEngine(); }
+  records.clear();bodies.clear();snaps.length=0;selectedId=null;pillOpen=false;draft=null;draftPts=[];
+  heldFrozen.clear();links.clear();latch.clear();rungAt.clear();
+  try{ localStorage.removeItem(SAVE_KEY); }catch(e){}
+  if(engine){ try{Matter.Composite.clear(engine.world,false,true);}catch(e){} addWalls(); }
   updateSel();reportHeight();
 }
 
@@ -764,44 +1619,51 @@ function bindPointer(){
       return;
     }
     if(mode==='place'&&placeKind){
-      // Tap-to-place: the part lands exactly where tapped, locked in place.
-      doAdd(placeKind,p.x,p.y);
-      placeKind=null; setMode('select');
-      return;
-    }
-    const hit=hitRecord(p.x,p.y);
-    if(!hit&&hitSpawn(p.x,p.y)){
-      // Grab the spawn marker itself and drag it anywhere.
-      // Parts win ties: tapping a ball sitting on the marker grabs the ball.
-      selectedId=null;updateSel();
-      dragging={spawn:true};
+      // Press-and-drag draws the part out; a plain tap drops the default.
+      draft={kind:placeKind,x0:p.x,y0:p.y,x1:p.x,y1:p.y};
       try{canvas.setPointerCapture(e.pointerId);}catch(err){}
-      doSpawn(p.x,p.y);
+      dragging={draft:true};
       return;
     }
     if(mode==='erase'){
+      const hit=hitRecord(p.x,p.y);
       if(hit) doDel(hit.id);
       return;
     }
+    // Handles first: reshaping never grabs the body by accident.
+    const h=hitHandle(p.x,p.y);
+    if(h){
+      selectedId=h.rec.id; pillOpen=false; updateSel();
+      dragging={handle:h,sx:p.x,sy:p.y};
+      try{canvas.setPointerCapture(e.pointerId);}catch(err){}
+      if(!isHost) optimisticId=h.rec.id;
+      return;
+    }
+    const hit=hitRecord(p.x,p.y);
     if(hit){
-      // Select immediately, but don't grab yet: a plain tap only selects.
-      // The drag (freeze + follow) starts once the finger actually moves,
-      // and keeps the original finger offset so the part never snaps its
-      // center onto the cursor.
-      selectedId=hit.id;updateSel();
-      dragging={id:hit.id,moved:false,held:false,sx:p.x,sy:p.y,ox:hit.x-p.x,oy:hit.y-p.y};
+      // Select immediately, but don't grab yet: a plain tap only selects
+      // (tap again to open the lock/delete pill). The drag (freeze +
+      // follow) starts once the finger actually moves, and keeps the
+      // original finger offset so the part never snaps onto the cursor.
+      const was=(selectedId===hit.id);
+      selectedId=hit.id; pillOpen=false; updateSel();
+      dragging={id:hit.id,moved:false,held:false,sx:p.x,sy:p.y,ox:hit.x-p.x,oy:hit.y-p.y,t0:Date.now(),was};
       try{canvas.setPointerCapture(e.pointerId);}catch(err){}
       if(!isHost){ optimisticId=hit.id; }
       else { draggedBy.set(hit.id,{by:myId||'host',until:Date.now()+2000}); }
-    }else{ selectedId=null;updateSel(); }
+    }else{ selectedId=null; pillOpen=false; updateSel(); }
   });
   canvas.addEventListener('pointermove',(e)=>{
     const p=toWorld(e);
     myCursor=p;
     const now=Date.now();
     if(now-cursorT>120){cursorT=now;Hub.up('intent',{a:'cursor',x:Math.round(p.x),y:Math.round(p.y)});}
-    if(dragging&&dragging.spawn){
-      doSpawn(p.x,p.y);
+    if(dragging&&dragging.draft&&draft){
+      draft.x1=p.x; draft.y1=p.y;
+      return;
+    }
+    if(dragging&&dragging.handle){
+      handleDragTo(dragging.handle.rec,dragging.handle.hid,p.x,p.y);
       return;
     }
     if(mode==='draw'&&dragging&&dragging.draw){
@@ -822,10 +1684,19 @@ function bindPointer(){
     }
   });
   const up=(e)=>{
-    if(dragging&&dragging.spawn){
-      const p=toWorld(e);
-      doSpawn(p.x,p.y);
-      dragging=null;return;
+    if(dragging&&dragging.draft){
+      // Commit the drawn-out part, then keep it selected for adjusting.
+      const d=draft; draft=null; dragging=null;
+      if(d){
+        const rec=doAdd(d.kind,d.x0,d.y0,d.x1,d.y1);
+        placeKind=null; setMode('select');
+        if(rec){ selectedId=rec.id; pillOpen=false; updateSel(); }
+      }
+      return;
+    }
+    if(dragging&&dragging.handle){
+      dragging=null; optimisticId=null;
+      return;
     }
     if(mode==='draw'&&dragging&&dragging.draw){
       finishDraw();
@@ -836,6 +1707,12 @@ function bindPointer(){
         // Let go dead-still: no leftover velocity, no pop.
         const p=toWorld(e);
         doMove(dragging.id,p.x+dragging.ox,p.y+dragging.oy,true);
+      }else if(dragging.was){
+        // A clean second tap on the same part opens the actions pill.
+        const p=toWorld(e);
+        if(Math.hypot(p.x-dragging.sx,p.y-dragging.sy)<8&&Date.now()-(dragging.t0||0)<600){
+          selectedId=dragging.id; pillOpen=!pillOpen; updateSel();
+        }
       }
       if(isHost){ draggedBy.delete(dragging.id); if(dragging.held) hostRelease(dragging.id); }
       dragging=null;optimisticId=null;
@@ -844,7 +1721,7 @@ function bindPointer(){
   canvas.addEventListener('pointerup',up);
   canvas.addEventListener('pointercancel',()=>{
     if(dragging&&dragging.id&&dragging.held&&isHost){ draggedBy.delete(dragging.id); hostRelease(dragging.id); }
-    dragging=null;draftPts=[];optimisticId=null;
+    dragging=null;draft=null;draftPts=[];optimisticId=null;
   });
   overlay.addEventListener('click',()=>{
     overlay.classList.add('hide');
@@ -886,19 +1763,32 @@ function refreshHint(){
   const h=$('hint'); if(!h) return;
   if(mode==='draw'){h.textContent='draw a track — release to drop it';return;}
   if(mode==='erase'){h.textContent='tap a part to remove it';return;}
-  if(mode==='place'){h.textContent='tap where to put the '+(placeKind||'part')+' — it starts locked in place';return;}
+  if(mode==='place'){h.textContent='drag on the stage to draw out the '+(placeKind||'part')+' — or tap for the default size (Esc cancels)';return;}
   const r=selectedId&&records.get(selectedId);
-  h.textContent=r?(`${r.kind} selected${r.locked?' 🔒 locked — unlock (L) to drop it':''} — drag to move · ⟲/⟳ or R rotate · 🔒 or L lock · 🗑 or Del delete`)
-                 :'tap a part to select it · R rotate · L lock · Del delete · drag the 📍 marker to move new balls';
+  if(!r){ h.textContent='press a part above, then drag it out on the table · tap a part to select it'; return; }
+  const bits=[];
+  if(LEN_KINDS.includes(r.kind)||r.kind==='bucket') bits.push('drag the end dots to reshape');
+  if(RAD_KINDS.includes(r.kind)) bits.push('drag the edge dot to resize');
+  if(r.kind==='block') bits.push('drag the corner to resize');
+  if(r.kind==='fan') bits.push('drag the end dot for strength');
+  if(ANCHOR_KINDS.includes(r.kind)) bits.push('drag the ✛ to move the '+(r.kind==='lever'?'pivot':(r.kind==='catapult'?'hinge':'anchor')));
+  bits.push('drag the middle to move');
+  if(ROT_KINDS.includes(r.kind)) bits.push('the ring (or R) turns it');
+  if(!pillOpen) bits.push('tap again for lock / delete');
+  h.textContent=r.kind+' — '+bits.join(' · ');
 }
 function updateSel(){
   const r=selectedId&&records.get(selectedId);
   $('sel').textContent=r?('selected '+r.kind+' '+(r.locked?'🔒':'')+' '+r.id.slice(-4)):'nothing selected';
-  $('selbar').classList.toggle('hidden',!r);
+  $('selbar').classList.toggle('hidden',!(r&&pillOpen));
   if(r){
     $('sel-label').textContent=r.kind+' '+(r.locked?'🔒':'')+' '+r.id.slice(-4);
     $('btn-lock').classList.toggle('on',!!r.locked);
     $('btn-lock').textContent=r.locked?'🔓':'🔒';
+    const canRot=ROT_KINDS.includes(r.kind);
+    $('btn-rot-cw').disabled=!canRot;
+    $('btn-rot-ccw').disabled=!canRot;
+    $('btn-flip').style.display=FLIP_KINDS.includes(r.kind)?'':'none';
   }
   refreshHint();
 }
@@ -910,9 +1800,8 @@ function bindToolbar(){
   document.querySelectorAll('[data-add]').forEach(b=>b.addEventListener('click',()=>{
     unlockAudio();
     const kind=b.getAttribute('data-add');
-    if(kind==='ball'){ doAdd('ball',spawnPt.x,spawnPt.y); return; }
-    // Planks/blocks arm placement: tap the stage to put the part exactly
-    // there, locked in place. Re-press the button to cancel.
+    // Every part arms placement: drag on the stage to draw it out, tap for
+    // the default size. Re-press the button to cancel.
     if(placeKind===kind&&mode==='place'){ placeKind=null; setMode('select'); return; }
     placeKind=kind; setMode('place');
   }));
@@ -920,6 +1809,7 @@ function bindToolbar(){
   $('btn-erase').addEventListener('click',()=>setMode(mode==='erase'?'select':'erase'));
   $('btn-rot-cw').addEventListener('click',()=>{unlockAudio();if(selectedId)doRot(selectedId,Math.PI/12);});
   $('btn-rot-ccw').addEventListener('click',()=>{unlockAudio();if(selectedId)doRot(selectedId,-Math.PI/12);});
+  $('btn-flip').addEventListener('click',()=>{unlockAudio();if(selectedId)doFlip(selectedId);});
   $('btn-lock').addEventListener('click',()=>{unlockAudio();if(selectedId)doLock(selectedId);});
   $('btn-del').addEventListener('click',()=>{unlockAudio();const id=selectedId;selectedId=null;updateSel();if(id)doDel(id);});
   $('btn-hide').addEventListener('click',()=>{fadeOutStop();Hub.up('close');});
@@ -951,8 +1841,9 @@ function bindKeys(){
     }else if((k==='Delete'||k==='Backspace')&&selectedId){
       const id=selectedId;selectedId=null;updateSel();doDel(id);
       e.preventDefault();
-    }else if(k==='Escape'&&mode==='place'){
-      placeKind=null;setMode('select');
+    }else if(k==='Escape'){
+      if(mode==='place'){ placeKind=null; draft=null; setMode('select'); }
+      else if(pillOpen){ pillOpen=false; updateSel(); }
     }
   });
 }
@@ -1019,18 +1910,61 @@ function toggleMusic(){
     else{ try{ if(music) music.pause(); }catch(e){} musicOn=false; $('btn-music').textContent='Music: off'; }
   }catch(e){}
 }
-function playClink(v){
+function playSfx(s){
+  if(!s) return;
+  const t=s.t||'clink', v=(s.v===undefined?0.5:s.v);
+  if(t==='bell') playBell(v);
+  else if(t==='boing') playBoing(v);
+  else if(t==='knock') playKnock(v);
+  else if(t==='thud') playThud(v);
+  else if(t==='click') playClick(v);
+  else if(t==='whoosh') playWhoosh(v);
+  else playClink(v); // legacy {i,v} payloads
+}
+function tone(freq,type,dur,vol,slideTo,delay){
+  if(!audioCtx) return;
   try{
-    if(!audioCtx) return;
-    const t0=audioCtx.currentTime;
+    const t0=audioCtx.currentTime+(delay||0);
     const o=audioCtx.createOscillator(),g=audioCtx.createGain();
-    o.type='triangle';o.frequency.value=1400+Math.random()*800;
-    const vol=Math.max(0.001,Math.min(0.25,0.08*(v||0.4)));
-    g.gain.setValueAtTime(vol,t0);
-    g.gain.exponentialRampToValueAtTime(0.0001,t0+0.12);
+    o.type=type||'triangle'; o.frequency.setValueAtTime(freq,t0);
+    if(slideTo) o.frequency.exponentialRampToValueAtTime(Math.max(20,slideTo),t0+dur);
+    g.gain.setValueAtTime(Math.max(0.001,vol),t0);
+    g.gain.exponentialRampToValueAtTime(0.0001,t0+dur);
     o.connect(g);g.connect(audioCtx.destination);
-    o.start(t0);o.stop(t0+0.13);
+    o.start(t0);o.stop(t0+dur+0.02);
   }catch(e){}
+}
+function playBell(v){
+  // A small brass bell: detuned partials, long decay.
+  const base=660+Math.random()*60, vol=Math.min(0.3,0.1+0.2*v);
+  tone(base,'sine',1.6,vol);
+  tone(base*2.01,'sine',1.2,vol*0.5);
+  tone(base*2.74,'sine',0.9,vol*0.25);
+  tone(base*4.2,'sine',0.5,vol*0.12);
+}
+function playBoing(v){ tone(180+Math.random()*40,'sine',0.35,Math.min(0.3,0.12+0.2*v),520); }
+function playKnock(v){ tone(320+Math.random()*120,'triangle',0.09,Math.min(0.25,0.1+0.15*v),140); }
+function playThud(v){ tone(110+Math.random()*30,'sine',0.14,Math.min(0.25,0.1+0.15*v),55); }
+function playClick(v){ tone(1900,'square',0.04,Math.min(0.12,0.05+0.07*v)); }
+function playWhoosh(v){
+  if(!audioCtx) return;
+  try{ // filtered noise puff for the catapult release
+    const t0=audioCtx.currentTime, dur=0.35;
+    const len=Math.max(1,Math.floor(audioCtx.sampleRate*dur));
+    const buf=audioCtx.createBuffer(1,len,audioCtx.sampleRate);
+    const ch=buf.getChannelData(0);
+    for(let i=0;i<len;i++) ch[i]=(Math.random()*2-1)*(1-i/len);
+    const src=audioCtx.createBufferSource(); src.buffer=buf;
+    const f=audioCtx.createBiquadFilter(); f.type='bandpass'; f.frequency.value=900; f.Q.value=0.8;
+    const g=audioCtx.createGain();
+    g.gain.setValueAtTime(Math.min(0.25,0.1+0.15*v),t0);
+    g.gain.exponentialRampToValueAtTime(0.0001,t0+dur);
+    src.connect(f);f.connect(g);g.connect(audioCtx.destination);
+    src.start(t0);
+  }catch(e){}
+}
+function playClink(v){
+  tone(1400+Math.random()*800,'triangle',0.12,Math.max(0.001,Math.min(0.25,0.08*(v||0.4))));
 }
 
 Hub.init();
