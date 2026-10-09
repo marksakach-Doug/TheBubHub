@@ -3,7 +3,7 @@
 // Loaded with a plain script tag (not fetch) so double-clicking index.html works.
 window.BUB_GAMES = [
   { id: 'goldberg', file: 'goldberg.html', title: 'Goldberg', players: '2-5', color: '#e6c280', fill: true, lobby: true },
-  { id: 'daltadka', file: 'tadka.html', title: 'Dal Tadka', players: 'solo', color: '#d9b26f', solo: true, lobby: true, fill: true },
+  { id: 'daltadka', file: 'daltadka.html', title: 'Dal Tadka', players: 'solo', color: '#d9b26f', solo: true, lobby: true, fill: true },
   { id: 'warp', file: 'warpfront.html', title: 'Warp Front', players: '2-3', color: '#00ffcc' },
   { id: 'lotr', file: 'lotr.html', title: 'LOTR Cards', players: '2-6', color: '#b9c98a' },
   { id: 'blastoff', file: 'blastoff.html', title: 'Blast Off!', players: '2-6', color: '#00f2ff' },
