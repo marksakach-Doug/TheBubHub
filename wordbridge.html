@@ -70,7 +70,8 @@ button.go[disabled]{background:var(--paper);color:#8c8c8c}
 .whyline .wn{color:var(--ash);font-size:.8em;margin-right:.6em}
 .whyline .caret{display:inline-block;width:.6em;height:1.1em;background:var(--ink);vertical-align:-0.15em;margin-left:2px;animation:blink 1s steps(1) infinite}
 @keyframes blink{50%{opacity:0}}
-.silence{text-align:center;color:var(--ash);font-size:14px;margin:14px 0 4px;padding:10px 0;border-top:1px solid var(--rule);border-bottom:1px solid var(--rule)}
+.beat{margin:12px 0 0}
+.beatword{font-weight:700;line-height:1.05;font-size:clamp(30px,7vw,56px);overflow-wrap:anywhere}
 
 .table{display:flex;justify-content:space-between;align-items:center;flex-wrap:wrap;gap:8px 18px;margin-top:14px;padding-top:10px;border-top:1px solid var(--rule)}
 .people{list-style:none;margin:0;padding:0;display:flex;flex-wrap:wrap;gap:4px 18px;font-size:15px}
@@ -101,9 +102,6 @@ button.go[disabled]{background:var(--paper);color:#8c8c8c}
     <h1>Word Bridge</h1>
     <div id="menu" class="menu hidden">
       <button id="b-new" class="small">New game</button>
-      <button id="b-invite" class="small">Show table</button>
-      <button id="b-sync" class="small">Sync</button>
-      <button id="b-hide" class="small">Hide</button>
     </div>
   </header>
 
@@ -113,11 +111,11 @@ button.go[disabled]{background:var(--paper);color:#8c8c8c}
   </section>
 
   <p id="status" class="status" role="status" aria-live="polite">Connecting to the table...</p>
-  <p id="lead" class="lead hidden">Everyone writes one word that fits both meanings, folds the paper, and waits. Open them together. Words that match are bridges.</p>
+  <p id="lead" class="lead hidden">Everyone writes one word that fits both meanings, folds the paper, and waits. Open them together.</p>
 
   <section id="hub-ui" class="hidden">
     <div id="play" class="play hidden">
-      <label for="in" id="in-label">One word that fits both meanings.<span>Write the same word as someone else and you have built a bridge.</span></label>
+      <label for="in" id="in-label">One word that fits both meanings.</label>
       <div id="entry" class="entry">
         <input id="in" type="text" maxlength="24" autocomplete="off" autocapitalize="none" autocorrect="off" spellcheck="false" enterkeyhint="done" placeholder="your word">
         <button id="b-lock" class="go">Lock in</button>
@@ -255,8 +253,7 @@ function clearRevealTimers(){
 function resetRevealStaging(){
     clearRevealTimers();
     lastRevealKey = '';
-    revealStage = 'words';
-    typedLines = 0; typedChars = 0;
+    cerIdx = 0; cerPhase = 'typing'; typedChars = 0;
 }
 window.addEventListener('error', function(e){
     try {
@@ -277,7 +274,8 @@ var deck = [];
 var L = null;                
 var myWord = '', myWhy = '', myWordKey = '', lastKey = '', editing = false;
 var lastResend = 0, toastText = '', noteT = null, rulesOpened = false;
-var revealStage = 'words', lastRevealKey = '', typedLines = 0, typedChars = 0, typeTimer = null, silenceTimer = null;
+var cerIdx = 0, cerPhase = 'typing', lastRevealKey = '', typedChars = 0, typeTimer = null, silenceTimer = null;
+var TYPE_MS = 45, PAUSE_MS = 1000, GAP_MS = 500;
 
 function keyOf(){ return S ? (S.inst + ':' + S.round) : ''; }
 
@@ -350,7 +348,7 @@ function newGame(){
     var order = Hub.roster.map(function(m){ return m.id; });
     S = { inst: Date.now() + '-' + Math.floor(Math.random() * 1e6), round: 0, phase: 'play', word: null,
         order: order, names: names, arbiter: order[0] || null, arbiterPos: 0,
-        locked: {}, groups: null, revealWhys: null, missing: [], found: 0, played: 0, bridgeScored: false };
+        locked: {}, groups: null, reveal: null, missing: [], found: 0, played: 0, bridgeScored: false };
     deck = [];
     startRound();
 }
@@ -362,7 +360,7 @@ function startRound(){
     else S.arbiterPos++;
     if (S.order.length) S.arbiter = S.order[S.arbiterPos % S.order.length];
     else S.arbiter = null;
-    S.locked = {}; S.groups = null; S.revealWhys = null; S.missing = [];
+    S.locked = {}; S.groups = null; S.reveal = null; S.missing = [];
     S.bridgeScored = false;
     hostWords = {};
     resetRevealStaging();
@@ -388,17 +386,14 @@ function reveal(){
     });
     if (entries.length < 2) return false;
     S.groups = groupWords(entries);
-    var whys = [];
-    entries.forEach(function(e){ if (e.why) whys.push({ id: e.id, why: e.why }); });
-    whys.sort(function(a, b){ return S.order.indexOf(a.id) - S.order.indexOf(b.id); });
-    S.revealWhys = whys;
+    var beats = [];
+    entries.forEach(function(e){ beats.push({ id: e.id, w: e.w, why: e.why || '' }); });
+    beats.sort(function(a, b){ return S.order.indexOf(a.id) - S.order.indexOf(b.id); });
+    S.reveal = beats;
     S.missing = missing;
     S.phase = 'reveal';
     S.played++;
-    
-    S.bridgeScored = S.groups.some(function(g){ return g.ids.length > 1; });
-    if (S.bridgeScored) S.found++;
-    
+    S.bridgeScored = false;
     hostWords = {};
     return true;
 }
@@ -477,7 +472,7 @@ function maybeResend(){
 }
 function doApprove(i){
     var g = S.groups && S.groups[i];
-    if (!g || g.ids.length > 1) return 'That bridge is already counted.';
+    if (!g) return 'Nothing there.';
     g.approved = !g.approved;
     var nowHasBridge = S.groups.some(function(x){ return x.ids.length > 1 || x.approved; });
     if (nowHasBridge && !S.bridgeScored) {
@@ -610,12 +605,6 @@ function actReveal(){
         Hub.up('intent', { a: 'reveal' });
     }
 }
-function actSync(){
-    Hub.up('hello');
-    if (isHost()){ if (S) broadcast(); }
-    else Hub.up('intent', { a: 'hello' });
-    toast('Synced.');
-}
 
 // ---------- local table card (no hub: for playing in person) ----------
 function goLocal(){
@@ -657,10 +646,6 @@ function statusText(){
         if (iLocked()) return waiting.length ? 'Locked in. Waiting for ' + listNames(waiting) + '.' : 'Everyone is in.';
         return '';
     }
-    if (S.phase === 'reveal'){
-        var any = S.groups && S.groups.some(function(g){ return g.ids.length > 1 || g.approved; });
-        return any ? '' : 'No bridge this time. Talk about the near misses.';
-    }
     return '';
 }
 function drawCard(pair, small){
@@ -677,71 +662,96 @@ function drawCard(pair, small){
         box.appendChild(p);
     });
 }
-function orderedWhys(){
-    var list = (S && S.revealWhys) || [];
+function cerBeats(){
+    var list = (S && S.reveal) || [];
     var pos = {};
     (S.order || []).forEach(function(id, i){ pos[id] = i; });
-    return list.filter(function(e){ return e && e.why; }).sort(function(a, b){
+    return list.filter(function(e){ return e && e.id && e.w; }).sort(function(a, b){
         return (pos[a.id] == null ? 999 : pos[a.id]) - (pos[b.id] == null ? 999 : pos[b.id]);
     });
+}
+function cerValid(){
+    return !!(S && S.phase === 'reveal' && lastRevealKey === keyOf());
 }
 function ensureRevealStaging(){
     var k = keyOf();
     if (lastRevealKey === k) return;
     clearRevealTimers();
     lastRevealKey = k;
-    typedLines = 0; typedChars = 0;
-    var n = orderedWhys().length;
-    if (!n || reducedMotion()) revealStage = n ? 'words' : 'silence';
-    else revealStage = 'whys';
-    if (revealStage === 'whys') stepTyping();
-    else if (revealStage === 'silence') goSilence();
+    cerIdx = 0; cerPhase = 'typing'; typedChars = 0;
+    if (reducedMotion()){ cerIdx = cerBeats().length; cerPhase = 'done'; }
+    else cerStep();
 }
-function stepTyping(){
-    if (revealStage !== 'whys' || !S || S.phase !== 'reveal') return;
-    var list = orderedWhys();
-    if (typedLines >= list.length){ revealStage = 'silence'; render(); goSilence(); return; }
-    var cur = list[typedLines];
-    var full = String(cur.why || '');
+function cerStep(){
+    if (cerPhase !== 'typing' || !S || S.phase !== 'reveal') return;
+    var beats = cerBeats();
+    if (cerIdx >= beats.length){ cerPhase = 'done'; render(); return; }
+    var full = String(beats[cerIdx].why || '');
+    if (!full){ cerToPause(); return; }
     if (typedChars < full.length){
         typedChars++;
-        typeTimer = setTimeout(function(){ typeTimer = null; stepTyping(); render(); }, 18);
         render();
-    } else {
-        typedLines++; typedChars = 0;
-        render();
-        typeTimer = setTimeout(function(){ typeTimer = null; stepTyping(); }, 250);
-    }
+        typeTimer = setTimeout(function(){ typeTimer = null; cerStep(); }, TYPE_MS);
+    } else cerToPause();
     reportHeight();
 }
-function goSilence(){
-    clearRevealTimers();
-    if (reducedMotion()){ revealStage = 'words'; render(); return; }
-    render();
+function cerToPause(){
+    if (!S || S.phase !== 'reveal') return;
+    cerPhase = 'pause'; render(); reportHeight();
     silenceTimer = setTimeout(function(){
         silenceTimer = null;
-        if (S && S.phase === 'reveal' && lastRevealKey === keyOf()){
-            revealStage = 'words';
-            render();
-        }
-    }, 1500);
+        if (cerValid()) cerToWord();
+    }, PAUSE_MS);
+}
+function cerToWord(){
+    if (!S || S.phase !== 'reveal') return;
+    cerPhase = 'word'; render(); reportHeight();
+    silenceTimer = setTimeout(function(){
+        silenceTimer = null;
+        if (cerValid()) cerToNext();
+    }, GAP_MS);
+}
+function cerToNext(){
+    if (!cerValid()) return;
+    cerIdx++; cerPhase = 'typing'; typedChars = 0;
+    render();
+    cerStep();
 }
 function skipReveal(){
     if (!S || S.phase !== 'reveal') return;
-    if (revealStage === 'words') return;
+    if (cerPhase === 'done') return;
     clearRevealTimers();
-    revealStage = 'words';
-    typedLines = orderedWhys().length; typedChars = 0;
-    render();
+    if (!cerValid()) return;
+    var beats = cerBeats();
+    if (cerIdx >= beats.length){ cerPhase = 'done'; render(); return; }
+    if (cerPhase === 'typing'){
+        typedChars = String(beats[cerIdx].why || '').length;
+        cerToPause();
+    } else if (cerPhase === 'pause'){
+        cerToWord();
+    } else if (cerPhase === 'word'){
+        cerToNext();
+    }
+}
+function renderBeat(box, b, showWord, partial){
+    var beat = el('div', 'beat');
+    var line = el('div', 'whyline');
+    line.appendChild(el('span', 'wn', nm(b.id) + ':'));
+    var full = String(b.why || '');
+    line.appendChild(document.createTextNode(partial != null ? full.slice(0, partial) : full));
+    if (partial != null) line.appendChild(el('span', 'caret'));
+    beat.appendChild(line);
+    if (showWord) beat.appendChild(el('div', 'beatword', String(b.w)));
+    box.appendChild(beat);
 }
 function renderRevealWords(box){
     var groups = S.groups || [];
-    var bridges = groups.filter(function(g){ return g.ids.length > 1 || g.approved; });
-    var singles = groups.filter(function(g){ return g.ids.length === 1 && !g.approved; });
-    
-    if (bridges.length){
+    var blessed = groups.filter(function(g){ return g.approved; });
+    var plain = groups.filter(function(g){ return !g.approved; });
+
+    if (blessed.length){
         var gw = el('div', 'groups');
-        bridges.forEach(function(g){
+        blessed.forEach(function(g){
             var b = el('div', 'bridge');
             var txt = g.words.join(' / ');
             var big = el('div', 'big fit', txt);
@@ -749,23 +759,20 @@ function renderRevealWords(box){
             big.setAttribute('data-min', '24');
             big.setAttribute('data-max', '72');
             b.appendChild(big);
-            
-            var label = joinNames(g.ids);
-            if (g.approved) label += ' (approved)';
-            
-            b.appendChild(el('div', 'who', label));
+            b.appendChild(el('div', 'who', joinNames(g.ids) + ' (approved)'));
             gw.appendChild(b);
         });
         box.appendChild(gw);
     }
-    
-    if (singles.length){
-        var al = el('div', 'alone' + (bridges.length ? '' : ' solo'));
+
+    if (plain.length){
+        var al = el('div', 'alone' + (blessed.length ? '' : ' solo'));
         var canApprove = iAmArbiter();
         groups.forEach(function(g, idx){
-            if (g.ids.length !== 1 || g.approved) return;
+            if (g.approved) return;
+            var txt = g.words.join(' / ');
             var d = canApprove ? el('button') : el('div');
-            d.appendChild(document.createTextNode(g.words[0]));
+            d.appendChild(document.createTextNode(txt));
             d.appendChild(el('small', null, joinNames(g.ids)));
             if (canApprove){
                 d.addEventListener('click', function(ev){ ev.stopPropagation(); actApprove(idx); });
@@ -773,52 +780,28 @@ function renderRevealWords(box){
             al.appendChild(d);
         });
         box.appendChild(al);
-        if (canApprove) box.appendChild(el('p', 'miss', 'Close enough? Tap a word to approve it as a valid bridge.'));
     }
     if (S.missing && S.missing.length) box.appendChild(el('p', 'miss', 'No word from ' + listNames(S.missing) + '.'));
 }
 function renderReveal(){
     var box = $('reveal'); clear(box);
     ensureRevealStaging();
-    var list = orderedWhys();
-    if (revealStage !== 'words' && (revealStage === 'whys' || (revealStage === 'silence' && list.length))){
-        if (list.length){
-            var wbox = el('div', 'whys');
-            for (var i = 0; i < list.length; i++){
-                if (revealStage === 'whys' && i > typedLines) break;
-                var line = el('div', 'whyline');
-                line.appendChild(el('span', 'wn', nm(list[i].id) + ':'));
-                var shown = (i < typedLines) ? String(list[i].why) : String(list[i].why).slice(0, typedChars);
-                line.appendChild(document.createTextNode(shown));
-                if (revealStage === 'whys' && i === typedLines){
-                    line.appendChild(el('span', 'caret'));
-                }
-                wbox.appendChild(line);
-            }
-            box.appendChild(wbox);
+    var beats = cerBeats();
+    var done = (cerPhase === 'done');
+    var i, n;
+    if (done){
+        for (i = 0; i < beats.length; i++) renderBeat(box, beats[i], true, null);
+    } else {
+        n = (cerPhase === 'word') ? cerIdx + 1 : cerIdx;
+        for (i = 0; i < n && i < beats.length; i++) renderBeat(box, beats[i], true, null);
+        if (cerIdx < beats.length && cerPhase !== 'word'){
+            var b = beats[cerIdx];
+            var full = String(b.why || '');
+            if (cerPhase === 'typing' && typedChars < full.length) renderBeat(box, b, false, typedChars);
+            else renderBeat(box, b, false, null);
         }
-        if (revealStage === 'silence'){
-            box.appendChild(el('div', 'silence', 'A moment of silence.'));
-            box.appendChild(el('p', 'miss', 'Tap to reveal words.'));
-        } else {
-            box.appendChild(el('p', 'miss', 'Tap to reveal words.'));
-        }
+        box.appendChild(el('p', 'miss', 'Tap to move on.'));
         return;
-    }
-    if (revealStage === 'silence'){
-        box.appendChild(el('div', 'silence', 'A moment of silence.'));
-        box.appendChild(el('p', 'miss', 'Tap to reveal words.'));
-        return;
-    }
-    if (list.length){
-        var wbox2 = el('div', 'whys');
-        list.forEach(function(e){
-            var line2 = el('div', 'whyline');
-            line2.appendChild(el('span', 'wn', nm(e.id) + ':'));
-            line2.appendChild(document.createTextNode(String(e.why)));
-            wbox2.appendChild(line2);
-        });
-        box.appendChild(wbox2);
     }
     renderRevealWords(box);
 }
@@ -870,8 +853,6 @@ function renderHub(){
     $('b-next').classList.toggle('hidden', !revealing);
     $('wait-note').classList.toggle('hidden', arb || !revealing);
     $('people').classList.toggle('hidden', revealing);
-    $('b-new').disabled = !host;
-    $('b-invite').disabled = !host;
 }
 function fitAll(){
     var nodes = document.querySelectorAll('.fit');
@@ -888,7 +869,7 @@ function fitAll(){
 }
 function render(){
     var hub = (mode === 'hub'), local = (mode === 'local');
-    $('menu').classList.toggle('hidden', !hub);
+    $('menu').classList.toggle('hidden', !(hub && isHost()));
     $('hub-ui').classList.toggle('hidden', !hub);
     $('local-ui').classList.toggle('hidden', !local);
     $('lead').classList.toggle('hidden', !(local || (hub && !S)));
@@ -901,6 +882,7 @@ function render(){
         drawCard(pair, hub && !!S && S.phase === 'reveal');
     }
     if (hub) renderHub();
+    $('rules').classList.toggle('hidden', hub && !!S);
     fitAll();
     reportHeight();
 }
@@ -908,9 +890,6 @@ function render(){
 // ---------- wire up ----------
 $('b-new').addEventListener('click', newGame);
 $('b-start').addEventListener('click', newGame);
-$('b-invite').addEventListener('click', function(){ Hub.up('invite'); });
-$('b-hide').addEventListener('click', function(){ Hub.up('close'); });
-$('b-sync').addEventListener('click', actSync);
 $('b-lock').addEventListener('click', actLock);
 $('in').addEventListener('keydown', function(e){ if (e.key === 'Enter'){ e.preventDefault(); actLock(); } });
 if ($('in-why')) $('in-why').addEventListener('keydown', function(e){ if (e.key === 'Enter'){ e.preventDefault(); actLock(); } });
