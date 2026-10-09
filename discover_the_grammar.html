@@ -96,6 +96,7 @@ main{max-width:1400px;margin:20px auto;padding:0 16px}
         <label class="row" style="gap:8px;margin-top:10px"><input type="checkbox" id="announceSetup" checked>
           <span><b>Announce active features</b> <span class="sub">— Uncheck to guess what is active yourselves.</span></span></label>
         <div id="setup-note" class="sub"></div>
+        <div id="setup-solo-note" class="sub hidden" style="margin-top:6px">Solo table — you are the Knower, the Analyst and the only Verifier. Nothing is hidden from you that a guest wouldn't also see.</div>
         <button class="primary" style="margin-top:16px;width:100%;padding:16px;font-size:20px;font-weight:bold" onclick="uiStartGame()">Start Game</button>
       </div>
     </div>
@@ -169,11 +170,32 @@ const Hub = {
   init(){
     window.addEventListener('message', onDown);
     this.up('hello');
+    // Opened straight off disk (no hub at all): run the same solo table rather
+    // than dead-ending on a "join a room" note.
     setTimeout(() => {
-      if (!Hub.me){ $('standalone-note').classList.remove('hidden'); $('setup').classList.add('hidden'); reportHeight(); }
+      if (!Hub.me){ goSoloLocal(); }
     }, 1500);
   }
 };
+/* ---- solo table ----
+   Pre-room the hub reports room:'' and isHost:false. With nobody to hand the
+   rules to, we promote ourselves to local host and play a one-seat table:
+   you are Analyst, you ask, you propose, and the proposal is graded at once
+   (there are no Verifiers to vote it through). The hidden grammar stays
+   hidden — the host view is redacted in solo, same as it is for guests. */
+let localSolo = false;
+// Claim the solo seat. `quiet` skips the render so the roster path can let
+// onRoster() do it once, with the roster it just received.
+function goSoloLocal(quiet){
+  localSolo = true;
+  if (!Hub.me) Hub.me = { id: 'solo', name: 'Player', isHost: true };
+  if (!Hub.room) Hub.room = '';
+  const note = $('standalone-note');
+  if (note) note.classList.add('hidden');
+  const setup = $('setup');
+  if (setup) setup.classList.remove('hidden');
+  if (!quiet){ reportHeight(); render(); }
+}
 let heightT = null;
 function reportHeight(){
   clearTimeout(heightT);
@@ -189,7 +211,14 @@ window.addEventListener('error', (e) => {
 function onDown(e){
   const m = e.data;
   if (!m || m.t !== 'gd' || m.game !== GAME_ID) return;
-  if (m.k === 'roster'){ Hub.me = m.p.you; Hub.roster = m.p.roster; Hub.room = m.p.room; onRoster(); return; }
+  if (m.k === 'roster'){
+    Hub.me = m.p.you; Hub.roster = m.p.roster; Hub.room = m.p.room;
+    // Solo is derived from "no room", never latched: if the player opens a
+    // game pre-room and then creates a room, the next roster has a real room id
+    // and solo mode must stand down. (See goSoloLocal.)
+    if (!Hub.room) goSoloLocal(true); else localSolo = false;
+    onRoster(); return;
+  }
   if (m.k === 'state'){ onState(m.p); return; }
   if (m.k === 'intent'){ onIntent(m.p, m.from); return; }
   if (m.k === 'denied'){ toast(m.p.text); return; }
@@ -197,7 +226,7 @@ function onDown(e){
 }
 const myId = () => Hub.me && Hub.me.id;
 const myName = () => (Hub.me && Hub.me.name) || 'Player';
-const isHost = () => !!(Hub.me && Hub.me.isHost);
+const isHost = () => localSolo || !!(Hub.me && Hub.me.isHost);
 const rosterHasHost = () => Hub.roster.some(m => m.host);
 const paused = () => !!S && !isHost() && !rosterHasHost();
 function toast(t){ const el = $('toast'); el.textContent = t; el.classList.add('show'); clearTimeout(el._t); el._t = setTimeout(() => el.classList.remove('show'), 3200); }
@@ -288,13 +317,20 @@ function seatFromRoster(){
 function startGame(level, announced){
   if(!isHost()) return;
   const seats = seatFromRoster();
-  if(seats.length<2 || seats.length>4){ $('setup-note').textContent = `Need 2–4 players in the room (have ${seats.length}).`; return; }
+  // Solo table: one seat is the whole game. With a room, keep 2–4 so a lone
+  // host can't strand later joiners on a 1-seat table.
+  const minSeats = localSolo ? 1 : 2;
+  if(seats.length<minSeats || seats.length>4){ $('setup-note').textContent = `Need ${minSeats}–4 players in the room (have ${seats.length}).`; return; }
   remembered = { level, announced };
-  S = {cfg:{level,announced},round:1,phase:'play',seats,turnIndex:0,analystIdx:0,inst:++gramInst};
+  // A table born in solo stays a solo table: whoever joins the room later is a
+  // spectator, never silently seated into the middle of an in-progress game.
+  S = {cfg:{level,announced},round:1,phase:'play',seats,turnIndex:0,analystIdx:0,soloOrigin:localSolo,inst:++gramInst};
   Object.assign(S, newRoundState());
   S.phase = 'play';
   sel = {}; myPick = null;
-  say(`Discover the Grammar begins — ${seats.length} players, Level ${level}. ${analyst().name} is the first Analyst.`);
+  say(localSolo
+    ? `Solo table begins — Level ${level}. You are the Analyst; ask and deduce alone.`
+    : `Discover the Grammar begins — ${seats.length} players, Level ${level}. ${analyst().name} is the first Analyst.`);
   broadcast(); Hub.up('invite');
 }
 // Per-round Knower state (grammar + seed are host-only until revealed):
@@ -388,6 +424,9 @@ function hPropose(d, from){
   }
   if(new Set(d.rows.map(r=>r.feature)).size!==3) return "Propose exactly one rule per feature.";
   S.pending = {rows:d.rows.map(r=>({feature:r.feature,rule:r.rule})), votes:{}};
+  // Solo: the Analyst is also the only Verifier, so there is nobody to wait
+  // for — grade it now. In a room, keep the voting phase.
+  if(localSolo){ gradeProposal(); return null; }
   S.phase = 'voting';
   say(`${from.name} (Analyst) proposes — Verifiers, approve or reject.`);
   return null;
@@ -491,9 +530,12 @@ function onRoster(){
     let changed=false;
     // add newcomers
     const minLives = Math.min(...S.seats.map(s=>s.lives));
-    Hub.roster.forEach(m=>{
-      if(!S.seats.some(s=>s.id===m.id)){ S.seats.push({id:m.id,name:m.name,lives:minLives}); changed=true; say(`${m.name} joins the table (waits for the next round to act).`); }
-    });
+    // Don't seat newcomers into a solo-originated table — they watch instead.
+    if(!S.soloOrigin){
+      Hub.roster.forEach(m=>{
+        if(!S.seats.some(s=>s.id===m.id)){ S.seats.push({id:m.id,name:m.name,lives:minLives}); changed=true; say(`${m.name} joins the table (waits for the next round to act).`); }
+      });
+    }
     // remove leavers
     const before=S.seats.length;
     S.seats=S.seats.filter(s=>have.has(s.id));
@@ -693,6 +735,8 @@ function render(){
   const inGame=!!S;
   $('setup').classList.toggle('hidden', inGame||!Hub.me);
   if(Hub.me){ $('hostSetup').classList.toggle('hidden', !isHost()); $('guestSetup').classList.toggle('hidden', isHost()); }
+  const soloNote=$('setup-solo-note');
+  if(soloNote) soloNote.classList.toggle('hidden', !localSolo);
   if(!inGame){ $('table').classList.add('hidden'); $('roundBadge').textContent='Setup'; $('livesBadge').classList.add('hidden'); reportHeight(); return; }
   $('table').classList.remove('hidden');
   $('roundBadge').textContent=`Level ${S.cfg.level} · Round ${S.round}`;
@@ -716,8 +760,8 @@ function render(){
 window.uiStartGame=function(){
   const level=+$('startLevel').value, announced=$('announceSetup').checked;
   if(!isHost())return;
-  const n=1+Hub.roster.filter(m=>m.id!==(Hub.me&&Hub.me.id)).length;
-  if(n<2||n>4){$('setup-note').textContent=`Need 2–4 players in the room (have ${n}).`;return;}
+  // startGame owns the seat-count gate (it allows a 1-seat solo table), so
+  // don't second-guess it here or we'd block solo behind a stale 2-player rule.
   startGame(level,announced);
 };
 window.uiRematch=function(){ if(isHost()&&S) startGame(S.cfg.level,S.cfg.announced); };

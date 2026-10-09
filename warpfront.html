@@ -86,7 +86,7 @@ body{margin:0;background:var(--bg);color:var(--ink);font:15px/1.45 system-ui,san
         <span class="wf-sub">HOST SETUP — chosen once, then remembered. Starting needs everyone present.</span>
         <div style="display:flex;gap:8px;flex-wrap:wrap;align-items:center">
             <label class="wf-sub" style="margin:0">Players
-                <select id="warp-players"><option value="2" selected>2 players</option><option value="3">3 players</option></select>
+                <select id="warp-players"><option value="1">1 player — solo (all three crews)</option><option value="2" selected>2 players</option><option value="3">3 players</option></select>
             </label>
             <label class="wf-sub" style="margin:0">Difficulty
                 <select id="warp-diff"><option value="ensign">ENSIGN (hand 4)</option><option value="standard" selected>STANDARD (hand 3)</option></select>
@@ -99,7 +99,7 @@ body{margin:0;background:var(--bg);color:var(--ink);font:15px/1.45 system-ui,san
 
     <div id="warp-game" class="hidden" style="flex-direction:column;gap:12px">
         <div>
-            <span class="wf-sub">FACTIONS — claim yours. With two players, someone must take two; every faction needs a player or its turns wait.</span>
+            <span class="wf-sub" id="wf-claims-help">FACTIONS — claim yours. With two players, someone must take two; every faction needs a player or its turns wait.</span>
             <div class="wf-frow" id="warp-claims"></div>
         </div>
         <div class="wf-hud">
@@ -112,7 +112,7 @@ body{margin:0;background:var(--bg);color:var(--ink);font:15px/1.45 system-ui,san
             <div id="wf-board" class="wf-grid"></div>
         </div>
         <div>
-            <span class="wf-sub">COMMAND — you see only your own cards; teammates' hands are face-down. Plan in chat, Scan to reveal a card to everyone. Talk rule: never name the rank of a face-down card.</span>
+            <span class="wf-sub" id="wf-command-help">COMMAND — you see only your own cards; teammates' hands are face-down. Plan in chat, Scan to reveal a card to everyone. Talk rule: never name the rank of a face-down card.</span>
             <div class="wf-cmdrow">
                 <button id="btn-wf-scan" class="wf-btn amber" disabled>Scan a card (reveal)</button>
                 <button id="btn-wf-regroup" class="wf-btn amber" disabled>Confirm regroup</button>
@@ -140,15 +140,36 @@ const Hub = {
     init(){
         window.addEventListener('message', onDown);
         this.up('hello');
+        // Opened straight off disk (no hub): run the solo table instead of
+        // dead-ending on a "join a room" note.
         setTimeout(() => {
-            if (!Hub.me){
-                $('warp-panel').classList.add('hidden');
-                $('standalone-note').classList.remove('hidden');
-                reportHeight();
-            }
+            if (!Hub.me) goSoloLocal();
         }, 1500);
     }
 };
+/* ---- solo table ----
+   Pre-room the hub reports room:'' and isHost:false. There is nobody to hand
+   the rules to, so we take the local host seat — and instead of inventing AI
+   crewmates, the player simply commands all three factions in turn order
+   against the Borg. Every hand is yours, so all of them render face-up. */
+let localSolo = false;
+// Take the solo seat. A solo table is a 1-player game, so default the setup
+// dropdown to that rather than making the player pick it and then wonder why
+// Start refuses. Shared by the roster path and the no-hub fallback.
+function claimSolo(){
+    localSolo = true;
+    remembered.players = 1;
+}
+function goSoloLocal(){
+    claimSolo();
+    if (!Hub.me) Hub.me = { id: 'solo', name: 'Player', isHost: true };
+    if (!Hub.room) Hub.room = '';
+    const panel = $('warp-panel'), note = $('standalone-note');
+    if (panel) panel.classList.remove('hidden');
+    if (note) note.classList.add('hidden');
+    reportHeight();
+    render();
+}
 let heightT = null;
 function reportHeight(){
     clearTimeout(heightT);
@@ -162,6 +183,9 @@ function onDown(e){
     if (!m || m.t !== 'gd' || m.game !== GAME_ID) return;
     if (m.k === 'roster'){
         Hub.me = m.p.you; Hub.roster = m.p.roster; Hub.room = m.p.room;
+        // Solo is derived from "no room", never latched: a roster with a real
+        // room id (the player joined or hosted after opening) turns solo off.
+        if (!Hub.room) claimSolo(); else { localSolo = false; if (remembered.players < 2) remembered.players = 2; }
         onRoster();
         return;
     }
@@ -172,7 +196,7 @@ function onDown(e){
 }
 const myId = () => Hub.me && Hub.me.id;
 const myName = () => (Hub.me && Hub.me.name) || 'Player';
-const isHost = () => !!(Hub.me && Hub.me.isHost);
+const isHost = () => localSolo || !!(Hub.me && Hub.me.isHost);
 const peerCount = () => Hub.roster.length;
 const rosterHasHost = () => Hub.roster.some(m => m.host);
 
@@ -283,8 +307,16 @@ function startBattle(diff, players){
     S.inst = ++warpInst;
     S.claims['♦'] = { id: myId(), name: myName() };
     seatGuests();
+    // Solo: you are the whole alliance, so the other two crews are yours too.
+    // Every hand then renders face-up (iControl is true for all three) and the
+    // turn order plays out exactly as it does with friends — just alone.
+    if (localSolo){
+        ['♥', '♣'].forEach((f) => { S.claims[f] = { id: myId(), name: myName() }; });
+    }
     sel = null; scanMode = false;
-    say(`Warp Front started — ${players} players, ${diff === 'ensign' ? 'Ensign (hand 4)' : 'Standard (hand 3)'}. ${myName()} takes Federation.`);
+    say(localSolo
+        ? `Warp Front started — solo, ${diff === 'ensign' ? 'Ensign (hand 4)' : 'Standard (hand 3)'}. All three crews answer to you.`
+        : `Warp Front started — ${players} players, ${diff === 'ensign' ? 'Ensign (hand 4)' : 'Standard (hand 3)'}. ${myName()} takes Federation.`);
     beginTurn();
     broadcast();
     Hub.up('invite');
@@ -669,9 +701,11 @@ function render(){
             if (showSetup){
                 $('warp-players').value = String(remembered.players);
                 $('warp-diff').value = remembered.diff;
-                $('warp-setup-note').textContent = peerCount() < remembered.players
-                    ? `Waiting for ${remembered.players} players (${peerCount()} here).`
-                    : 'Everyone is here. Press Start battle.';
+                $('warp-setup-note').textContent = localSolo
+                    ? 'Solo table — pick "1 player" and all three crews answer to you.'
+                    : peerCount() < remembered.players
+                        ? `Waiting for ${remembered.players} players (${peerCount()} here).`
+                        : 'Everyone is here. Press Start battle.';
             }
         }
         if (waitingEl) waitingEl.classList.toggle('hidden', !(!isHost() && Hub.me));
@@ -687,6 +721,14 @@ function render(){
     if (setupEl) setupEl.classList.add('hidden');
     if (waitingEl) waitingEl.classList.add('hidden');
     if (gameEl){ gameEl.classList.remove('hidden'); gameEl.style.display = 'flex'; }
+    // The help lines describe teamwork, which is meaningless on a solo table.
+    const ch = $('wf-claims-help'), mh = $('wf-command-help');
+    if (ch) ch.textContent = localSolo
+        ? 'YOUR THREE CREWS — Federation, Klingons and Ferengi all answer to you. Play each one on its turn.'
+        : 'FACTIONS — claim yours. With two players, someone must take two; every faction needs a player or its turns wait.';
+    if (mh) mh.textContent = localSolo
+        ? 'COMMAND — all three hands are yours and fully visible. One card per faction turn beside a planet.'
+        : 'COMMAND — you see only your own cards; teammates\' hands are face-down. Plan in chat, Scan to reveal a card to everyone. Talk rule: never name the rank of a face-down card.';
     if (newBtn) newBtn.style.display = isHost() ? '' : 'none';
 
     $('wf-score-a').textContent = `ALLIANCE ${S.scores.players}/5`;
@@ -701,7 +743,8 @@ function render(){
         const holder = S.claims[f];
         b.className = 'wf-pill' + (holder && holder.id === myId() ? ' mine' : (holder ? ' theirs' : ''));
         b.textContent = `${FACTIONS[f]} ${f}` + (holder ? ` — ${holder.name}` : ' — open');
-        if ((!holder || holder.id === myId()) && !paused()) b.addEventListener('click', () => toggleClaim(f));
+        // In solo the claims are already fixed, so the pills are just a roster.
+        if (!localSolo && (!holder || holder.id === myId()) && !paused()) b.addEventListener('click', () => toggleClaim(f));
         cc.appendChild(b);
     });
 

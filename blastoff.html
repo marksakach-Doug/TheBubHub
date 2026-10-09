@@ -107,7 +107,7 @@ body{margin:0;background:var(--space);color:var(--ink);font:15px/1.45 'Segoe UI'
     <div id="bo-status">Preparing for launch…</div>
     <div id="bo-feed" style="position:absolute;inset:0;pointer-events:none;z-index:100"></div>
     <div id="bo-setup" class="wf-setup hidden">
-        <span class="bo-lbl">HOST SETUP — Everyone plays (2–6). Most red cards win.</span>
+        <span class="bo-lbl" id="bo-setup-title">HOST SETUP — Everyone plays (2–6). Most red cards win.</span>
         <div style="display:flex;align-items:center;gap:8px"><button id="btn-bo-start" class="bo-b">Ignite Engines</button><span id="bo-setup-note" class="bo-lbl"></span></div>
     </div>
     <div id="bo-waiting" class="hidden bo-lbl" style="background:rgba(0,0,0,.28);border:1px solid #334155;border-radius:12px;padding:10px">Waiting for the mission commander to start.</div>
@@ -141,15 +141,31 @@ const Hub = {
     init(){
         window.addEventListener('message', onDown);
         this.up('hello');
+        // Opened straight off disk (no hub): run the solo table rather than
+        // dead-ending on a "join a room" note.
         setTimeout(() => {
-            if (!Hub.me){
-                $('bo-panel').classList.add('hidden');
-                $('standalone-note').classList.remove('hidden');
-                reportHeight();
-            }
+            if (!Hub.me) goSoloLocal();
         }, 1500);
     }
 };
+/* ---- solo table ----
+   Pre-room the hub reports room:'' and isHost:false, so nobody would ever run
+   the rules and the setup button would sit dead. We take the local host seat
+   and fill the empty chairs with two local bot pilots. The bots are 1999
+   autopilot: every candidate action is offered to the real handle(), and the
+   first one it doesn't reject wins. No scoring, no lookahead, no cleverness —
+   just legal. Bots never exist in a real room. */
+let localSolo = false;
+function goSoloLocal(){
+    localSolo = true;
+    if (!Hub.me) Hub.me = { id: 'solo', name: 'Player', isHost: true };
+    if (!Hub.room) Hub.room = '';
+    const panel = $('bo-panel'), note = $('standalone-note');
+    if (panel) panel.classList.remove('hidden');
+    if (note) note.classList.add('hidden');
+    reportHeight();
+    render();
+}
 let heightT = null;
 function reportHeight(){
     clearTimeout(heightT);
@@ -161,7 +177,7 @@ function reportHeight(){
 function onDown(e){
     const m = e.data;
     if (!m || m.t !== 'gd' || m.game !== GAME_ID) return;
-    if (m.k === 'roster'){ Hub.me = m.p.you; Hub.roster = m.p.roster; Hub.room = m.p.room; Hub.names = rosterNames(); rosterAdopt(); return; }
+    if (m.k === 'roster'){ Hub.me = m.p.you; Hub.roster = m.p.roster; Hub.room = m.p.room; Hub.names = rosterNames(); localSolo = !Hub.room; rosterAdopt(); return; }
     if (m.k === 'hostmove'){ toast('host moved to ' + ((m.p && m.p.name) || 'someone')); if (!isHost()) act('hello'); else if (S) broadcast(); render(); return; }
     if (m.k === 'state'){ if (m.p) { S = m.p; render(); } return; }
     if (m.k === 'intent'){ onIntent(m.p, m.from); return; }
@@ -170,7 +186,7 @@ function onDown(e){
 }
 const myId = () => Hub.me && Hub.me.id;
 const myName = () => (Hub.names && Hub.names[myId()]) || (Hub.me && cleanName(Hub.me.name)) || 'Player';
-const isHost = () => !!(Hub.me && Hub.me.isHost);
+const isHost = () => localSolo || !!(Hub.me && Hub.me.isHost);
 const peerCount = () => Hub.roster.length;
 const hostPresent = () => Hub.roster.some(m => m.host);
 // rosterAdopt: hosting (or newly hosting after a takeover) means the table
@@ -256,8 +272,15 @@ function say(t){
 function fresh(){
     const nm = rosterNames();
     Hub.names = nm;
-    const ids = [myId()].concat(Hub.roster.filter(m => m.id !== myId()).map(m => m.id));
+    let ids = [myId()].concat(Hub.roster.filter(m => m.id !== myId()).map(m => m.id));
     const ps = ids.map(id => ({ id, name: nm[id] || cleanName(id), ship: null, score: 0 }));
+    // Solo: two bot pilots take the empty chairs. Local state only — they live
+    // in this session's S.pl and are never sent to the hub as roster entries.
+    if (localSolo){
+        for (let i = 0; i < 2; i++){
+            ps.push({ id: BOT_IDS[i], name: BOT_NAMES[i], ship: null, score: 0, bot: true });
+        }
+    }
     S = {
         pl: ps,
         redDeck: deck('R'), redDisco: [],
@@ -266,6 +289,10 @@ function fresh(){
         currentDest: null, extraDest: null,
         pend: null, pend_p: null, pend_path: null,
         feed: [], feedN: 0, msg: '',
+        // A table born in solo keeps its bots even after the player invites
+        // someone and a room appears — the invite is for watching, not for
+        // stealing a chair. Fresh multiplayer starts set this false.
+        soloOrigin: localSolo,
         inst: Date.now()
     };
     S.pl.forEach(p => {
@@ -279,11 +306,22 @@ function fresh(){
     });
     S.msg = `${pn(cur())}'s turn.`;
 }
+const BOT_IDS = ['bot-1', 'bot-2'];
+const BOT_NAMES = ['Rookie 🤖', 'Rusty 🤖'];
+const isBot = (p) => !!(p && p.bot);
+
 function startGame(){
     if (!isHost()) return false;
-    if (peerCount() < 2 || peerCount() > 6){ $('bo-setup-note').textContent = 'Need 2–6 players in the room.'; return false; }
+    if (localSolo){
+        if (!Hub.names || !Hub.names[myId()]) Hub.names = Object.assign(rosterNames(), { [myId()]: cleanName(Hub.me && Hub.me.name) });
+    } else if (peerCount() < 2 || peerCount() > 6){
+        $('bo-setup-note').textContent = 'Need 2–6 players in the room.';
+        return false;
+    }
     fresh();
-    say(`Blast Off begins! ${S.pl.length} pilots ready. ${pn(cur())} takes the helm.`);
+    say(localSolo
+        ? `Blast Off begins! You plus two bot pilots. ${pn(cur())} takes the helm.`
+        : `Blast Off begins! ${S.pl.length} pilots ready. ${pn(cur())} takes the helm.`);
     broadcast();
     Hub.up('invite');
     return true;
@@ -421,6 +459,7 @@ function broadcast(){
     render();
     if (!S || !isHost()) return;
     Hub.up('state', S);
+    scheduleBot();      // hand the turn on if it's a bot's (solo only)
 }
 function act(action, x){
     const d = Object.assign({ action, pid: myId(), name: myName() }, x || {});
@@ -443,6 +482,50 @@ function onIntent(d, from){
     if (!S) return;
     const e = handle(d);
     if (e) Hub.up('denied', { to: from.id, text: e });
+    broadcast();
+}
+
+/* ---------- bot pilots (solo only) ----------
+   These are deliberately as dumb as a 1999 autoplayer: no scoring, no
+   planning, no lookahead. Each turn the bot simply tries one of the actions
+   the phase allows and hands the move to the real handle(), which is the
+   single source of truth for legality. If handle() rejects the move (no ship
+   to launch, nobody to ask for help, game over) the bot simply does nothing
+   and waits — it never retries, never blocks, and never sends anything over
+   the hub. A bot can therefore do nothing at all, which is fine and funny. */
+let botT = null;
+// Bots belong to a SOLO-ORIGINATED table (S.soloOrigin), not to "am I
+// pre-room right now". Once a room appears under the player's feet the bots
+// must keep flying, otherwise the game silently freezes mid-round.
+function botTableActive(){ return !!(S && S.soloOrigin); }
+function scheduleBot(){
+    if (!botTableActive() || !isHost() || !S || S.over){ clearTimeout(botT); botT = null; return; }
+    clearTimeout(botT);
+    botT = setTimeout(botTurn, 700);   // a beat, so the player can read the log
+}
+function botTurn(){
+    botT = null;
+    if (!botTableActive() || !isHost() || !S || S.over) return;
+    const pick = (arr) => arr[(Math.random() * arr.length) | 0];
+    let pid = null, move = null;
+    const actor = cur();
+    if (S.phase === 'decide' && S.pend){
+        // someone asked for help: the responder answers, not the pilot on turn
+        const responder = S.pl.find(x => x.id === S.pend.who);
+        if (isBot(responder)){ pid = responder.id; move = { action: 'decide', i: Math.random() < 0.6 ? 'yes' : 'no' }; }
+    } else if (isBot(actor)){
+        pid = actor.id;
+        if (S.phase === 'choose'){
+            // nothing to launch without a ship, so 'newship' is the only option then
+            move = { action: pick(actor.ship ? ['newship', 'blastoff'] : ['newship']) };
+        } else if (S.phase === 'fight'){
+            move = { action: pick(['pathA', 'pathB', 'pathC']) };
+        }
+    }
+    if (!move) return;                                  // it's your move
+    const who = S.pl.find(x => x.id === pid);
+    const err = handle(Object.assign({ pid, name: who && who.name }, move));
+    if (err) return;                                    // no legal move: idle
     broadcast();
 }
 
@@ -480,8 +563,14 @@ function render(){
     };
     sh('bo-setup', isHost() && !S); sh('bo-waiting', !isHost() && !S); sh('bo-game', !!S);
     $('btn-bo-new').classList.toggle('hidden', !(isHost() && S));
+    const setupTitle = $('bo-setup-title');
+    if (setupTitle) setupTitle.textContent = (S && S.soloOrigin) || localSolo
+        ? 'SOLO FLIGHT — you plus two bot pilots. Most red cards wins.'
+        : 'HOST SETUP — Everyone plays (2–6). Most red cards win.';
     if (!S){
-        st.textContent = 'Ready for launch? Gather your crew and blast off!';
+        st.textContent = localSolo
+            ? 'Solo flight: two simple bot pilots fly with you. They pick at random.'
+            : 'Ready for launch? Gather your crew and blast off!';
         return;
     }
     
@@ -502,7 +591,13 @@ function render(){
     } else if (paused){
         st.innerHTML = `Game paused — host disconnected.<small>It resumes when they return.</small>`;
     } else {
-        st.innerHTML = `${esc(S.msg)}<small>${S.phase === 'decide' ? 'Waiting for a pilot' : 'Prepare for maneuvers'}</small>`;
+        // A guest watching a solo-originated table has no seat, so say so
+        // instead of showing "Waiting for a pilot" forever.
+        const watching = !me() && S.soloOrigin;
+        const sub = watching
+            ? "👁 watching — this is someone's solo game (bots flying)"
+            : (S.phase === 'decide' ? 'Waiting for a pilot' : 'Prepare for maneuvers');
+        st.innerHTML = `${esc(S.msg)}<small>${sub}</small>`;
     }
 
     $('bo-feed').innerHTML = S.feed.slice(0, 1).map(e =>

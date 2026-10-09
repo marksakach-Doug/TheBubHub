@@ -272,8 +272,7 @@
         </div>
 
         <div id="lobby-games-card" class="hidden md:col-span-2 bg-slate-800/90 backdrop-blur p-5 rounded-2xl border border-slate-700 card-glow">
-            <h2 class="text-lg font-bold text-white mb-1">🎯 Solo Corner — while you wait</h2>
-            <p class="text-slate-400 text-xs mb-3">Solo games. No room needed.</p>
+            <h2 class="text-lg font-bold text-white mb-3">🎯 Solo Corner — while you wait</h2>
             <div id="lobby-game-buttons" class="flex flex-wrap gap-2"></div>
         </div>
 
@@ -507,7 +506,10 @@
             const w = document.getElementById('welcome-landing');
             const input = document.getElementById('welcome-name');
             if (!w || !input) return;
-            input.value = loadSavedName() || randomAnimalName();
+            // Reuse the animal already dealt to the header box. Drawing a
+            // second one here burned two of the 24 before the player even
+            // rolled, which shortened the no-repeat run.
+            input.value = (ui.nameInput.value || '').trim() || loadSavedName() || randomAnimalName();
             w.classList.remove('hidden'); w.classList.add('flex');
             setTimeout(() => { try { input.focus(); input.select(); } catch (e) {} }, 250);
         }
@@ -711,6 +713,8 @@
             GB.closeAll();
             // Invite-link guests go straight to the game: one auto-open,
             // consumed here so reloads/rejoins never loop.
+            // Also used when the Invite button spins up a room from a solo
+            // table: closeAll above dropped the game, so reopen the same one.
             if (pendingInviteGame) {
                 const gid = pendingInviteGame;
                 pendingInviteGame = null;
@@ -981,7 +985,10 @@
         // "unavailable-id"). We never silently swap in a random room here.
         // keepRoom (takeover): same id, same room — frames, games and tables
         // stay exactly as they are, only the crown moves.
-        function hostCreate(roomId, attempt, keepRoom) {
+        // afterOpen (optional): runs once the room id is actually held. The
+        // invite button uses it to create a room on demand and only then copy
+        // a link that already contains the room.
+        function hostCreate(roomId, attempt, keepRoom, afterOpen) {
             if (!keepRoom) {
                 cleanup();
                 isHost = true;
@@ -1004,6 +1011,9 @@
                 saveSession();
                 if (keepRoom) onTakeoverOpen(roomId);
                 else showRoom(roomId);
+                // the room id is genuinely held now, so anything waiting on a
+                // usable invite link (the Invite button) can proceed
+                if (afterOpen) { try { afterOpen(); } catch (e) {} }
             });
             peer.on('connection', (conn) => { wireConnection(conn); });
             peer.on('disconnected', () => { try { peer.reconnect(); } catch(e){} });
@@ -1011,7 +1021,7 @@
                 const msg = err && err.type ? err.type : (err && err.message) || 'error';
                 if ((String(msg).includes('unavailable-id') || String(msg).includes('taken')) && attempt < 5) {
                     setStatus(ui.hostStatus, `room “${roomId}” still releasing — retry ${attempt + 1}/5…`);
-                    setTimeout(() => hostCreate(roomId, attempt + 1, keepRoom), 1200 * (attempt + 1));
+                    setTimeout(() => hostCreate(roomId, attempt + 1, keepRoom, afterOpen), 1200 * (attempt + 1));
                     return;
                 }
                 if ((String(msg).includes('unavailable-id') || String(msg).includes('taken')) && keepRoom) {
@@ -1172,6 +1182,24 @@
             const dr = document.getElementById('drawer-room');
             if (dr) dr.textContent = id ? ('Room ' + id) : 'Room —';
             if (inRoom) ui.activeRoom.textContent = id;
+            renderInviteButton();
+        }
+        // A `solo: true` game (Waltz, Dal Tadka, Write Something True) never
+        // talks to the hub, so there is no shared table to invite anyone to —
+        // the button would only hand out a link that can't do anything. Hide
+        // it rather than pretend. `soloable` games DO have a real table, so
+        // they keep it.
+        function renderInviteButton(){
+            const btn = document.getElementById('btn-invite');
+            if (!btn) return;
+            let gid = null;
+            try { gid = openGameId(); } catch (e) {}
+            const g = gid ? GAMES.find(x => x.id === gid) : null;
+            const shareable = !g || !g.solo;
+            btn.classList.toggle('hidden', !shareable);
+            btn.title = shareable
+                ? 'Copy invite link for this room + game'
+                : `${g ? g.title : 'This game'} is single-player — no table to share`;
         }
         ui.activeRoom.addEventListener('click', () => copyId(ui.activeRoom, currentRoomId));
         document.getElementById('focus-room').addEventListener('click', (e) => copyId(e.currentTarget, currentRoomId));
@@ -1232,6 +1260,27 @@
         //   up:   { t:'gu', game, k:'hello'|'intent'|'say'|'result'|'invite'|'denied'|'height'|'close', p }
         //   down: { t:'gd', game, k:'roster'|'state'|'invite'|'denied'|'reset', p }
         // PeerJS envelope: { type:'game', game, k:'intent'|'state'|'say'|'result'|'invite', from:{id,name}, p }
+
+        // Button ink is decided from the chip's brightness rather than
+        // hard-coded: Word Bridge's near-black chip used to get the dark text
+        // meant for light chips, i.e. black on black.
+        function inkOn(hex){
+            const m = /^#?([0-9a-f]{6})$/i.exec(String(hex || '').trim());
+            if (!m) return '#ffffff';
+            const n = parseInt(m[1], 16);
+            const r = (n >> 16) & 255, g = (n >> 8) & 255, b = n & 255;
+            const lum = (0.299 * r + 0.587 * g + 0.114 * b) / 255;  // 0 = black, 1 = white
+            return lum > 0.45 ? '#0f172a' : '#ffffff';
+        }
+        // games.js can rename a button (menuLabel) without touching the title
+        // used for invites, chat, and the record. Truths is a guest book, not
+        // something you "Play", so a renamed button gets no Play/Hide verb at
+        // all when closed.
+        function labelFor(g, open){
+            if (g.menuLabel) return open ? ('Hide ' + g.menuLabel) : g.menuLabel;
+            return (open ? 'Hide ' : 'Play ') + g.title;
+        }
+
         const GB = {
             frames: {},   // gameId -> { el, ready }
             pending: {},  // gameId -> [down messages waiting for child hello]
@@ -1240,8 +1289,8 @@
             init(){
                 ui.gameButtons.innerHTML = '';
                 ui.soloGameButtons.innerHTML = '';
-                // One button factory so the in-room and lobby lists stay in
-                // step: icon, title, and a tooltip carrying the player count
+                // One button factory so the in-room and pre-room lists stay in
+                // step: icon, label, and a tooltip carrying the player count
                 // plus the one-liner from games.js.
                 const gameButton = (g, opts) => {
                     const o = opts || {};
@@ -1250,7 +1299,7 @@
                     b.className = 'btn-bouncy text-white text-sm font-bold rounded-xl ' +
                         (o.big ? 'py-2 px-4' : 'py-1.5 px-4 mt-1');
                     b.style.background = g.color || '#334155';
-                    if (g.color) b.style.color = '#0f172a';
+                    if (g.color) b.style.color = inkOn(g.color);
                     if (g.icon) {
                         const ic = document.createElement('span');
                         ic.className = 'ic mr-1';
@@ -1261,7 +1310,7 @@
                     // this text and must not wipe the icon next to it
                     const lbl = document.createElement('span');
                     lbl.className = 'lbl';
-                    lbl.textContent = g.title;
+                    lbl.textContent = labelFor(g, false);
                     b.appendChild(lbl);
                     const who = g.players === 'solo' ? 'solo' : (g.players + ' players');
                     b.title = `${g.icon ? g.icon + ' ' : ''}${g.title} — ${who}` + (g.desc ? '. ' + g.desc : '');
@@ -1270,13 +1319,11 @@
                 };
                 // Multiplayer games are grouped by how many players they need,
                 // so a group of friends can see at a glance what fits.
-                // The lobby list mixes solo and multiplayer, so it groups too.
                 const ends = (key) => {
                     const n = String(key).match(/\d+/g) || [0];
                     return [parseInt(n[0], 10) || 0, parseInt(n[1] || n[0], 10) || 0];
                 };
                 const renderGrouped = (container, list, opts) => {
-                    const o = opts || {};
                     container.innerHTML = '';
                     const groups = [];
                     list.forEach(g => {
@@ -1297,11 +1344,7 @@
                         h.className = 'text-[11px] font-mono uppercase tracking-wide text-slate-400 mt-2 mb-1 w-full';
                         h.textContent = grp.label;
                         container.appendChild(h);
-                        grp.games.forEach(g => {
-                            const b = gameButton(g, o);
-                            if (o.note) b.title += o.note;
-                            container.appendChild(b);
-                        });
+                        grp.games.forEach(g => container.appendChild(gameButton(g, opts)));
                     });
                 };
                 const multi = GAMES.filter(g => !g.solo);
@@ -1317,12 +1360,19 @@
                 const soloSec = document.getElementById('solo-section');
                 if (mpSec) mpSec.style.display = hasMulti ? '' : 'none';
                 if (soloSec) soloSec.style.display = hasSoloInRoom ? '' : 'none';
-                // Solo waiting-room games also get buttons in the lobby.
-                const lobbyGames = GAMES.filter(g => g.lobby);
+                // The pre-room list is every game you can start alone — the
+                // always-solo ones plus the `soloable` bridge games — as one
+                // flat set. No group headers here: they're for picking a game
+                // out of a crowd, and this list is just "play something".
+                const lobbyGames = GAMES.filter(g => g.lobby || g.soloable);
                 if (ui.lobbyGamesCard) ui.lobbyGamesCard.classList.toggle('hidden', !lobbyGames.length);
                 if (ui.lobbyGameButtons){
-                    renderGrouped(ui.lobbyGameButtons, lobbyGames,
-                        { prefix: 'lobby', big: true, note: ' — no room needed' });
+                    ui.lobbyGameButtons.innerHTML = '';
+                    lobbyGames.forEach(g => {
+                        const b = gameButton(g, { prefix: 'lobby', big: true });
+                        b.title += ' — no room needed';
+                        ui.lobbyGameButtons.appendChild(b);
+                    });
                 }
                 window.addEventListener('message', GB.onChild);
                 ['lobby', 'room'].forEach(s => {
@@ -1456,9 +1506,9 @@
                     const f = this.frames[g.id];
                     const open = f && !f.el.classList.contains('hidden');
                     const b = document.getElementById('btn-play-' + g.id);
-                    if (b) setLabel(b, (open ? 'Hide ' : 'Play ') + g.title);
+                    if (b) setLabel(b, labelFor(g, open));
                     const lb = document.getElementById('btn-lobby-' + g.id);
-                    if (lb) setLabel(lb, (open ? 'Hide ' : 'Play ') + g.title);
+                    if (lb) setLabel(lb, labelFor(g, open));
                 });
             },
 
@@ -1588,12 +1638,16 @@
                 return;
             }
             if (m.k === 'invite'){
-                showInvite(game, m.from && m.from.name);
+                showInvite(game, m.from && m.from.name, m.from && m.from.id);
                 return;
             }
         }
 
-        function showInvite(game, from){
+        function hostPlayerId(){
+            const host = rosterList().find(m => m.host);
+            return host ? host.id : null;
+        }
+        function showInvite(game, from, fromId){
             let bar = document.getElementById('inv-' + game);
             if (!bar){
                 const g = GAMES.find(x => x.id === game);
@@ -1615,6 +1669,18 @@
             bar.querySelector('span').textContent = (from || 'Host') + ` started ${gameTitle(game)} — open your table to play.`;
             bar.classList.remove('hidden');
             bar.classList.add('flex');
+            // If the room host (not some guest, not me) opened a game that
+            // actually shares state, and I'm not already in a game, just open
+            // it — that's the "forced join". If I'm mid-game, keep the manual
+            // bar so nothing yanks me out of what I'm doing.
+            let midGame = false;
+            try { midGame = !!openGameId(); } catch (e) {}
+            const g = GAMES.find(x => x.id === game);
+            const shares = !!(g && g.soloable) || !!(g && !g.solo);
+            const fromHost = !isHost && !!(fromId && fromId === hostPlayerId());
+            if (fromHost && shares && !midGame) {
+                try { GB.open(game); return; } catch (e) {}
+            }
         }
 
         function hideInvite(game){
@@ -1656,6 +1722,7 @@
                 t.style.color = (g && g.color) || '#e2e8f0';
             }
             sizeStageFrames();
+            renderInviteButton();
         }
         function exitFocus(){
             if (!document.body.classList.contains('focus-mode')) return;
@@ -1724,10 +1791,9 @@
             } catch (e) {}
             return base + (q.length ? '?' + q.join('&') : '');
         }
-        document.getElementById('btn-invite').addEventListener('click', async (e) => {
-            const btn = e.currentTarget;
+        // Copy the invite link, with a visible confirmation on the button.
+        async function copyInviteLink(btn, old) {
             const link = buildInviteLink();
-            const old = btn.textContent;
             try {
                 await navigator.clipboard.writeText(link);
                 btn.textContent = 'copied!';
@@ -1736,6 +1802,30 @@
                 btn.textContent = 'copied?';
             }
             setTimeout(() => { btn.textContent = old; }, 1200);
+            return link;
+        }
+        document.getElementById('btn-invite').addEventListener('click', async (e) => {
+            const btn = e.currentTarget;
+            const old = btn.textContent;
+            // Pre-room (a solo table) there's no room to join, so a link would
+            // just be a dead "?game=" URL. Make a room on the spot, then copy
+            // a link that actually works.
+            if (!currentRoomId) {
+                if (!nameConfirmed) { renderNameGate(); setStatus(ui.hostStatus, 'confirm your name first'); return; }
+                btn.textContent = 'room…';
+                // Remember which game we're in: showRoom() closes every frame,
+                // so it has to be reopened before the link is built or the
+                // link loses its &game= and the guest lands in an empty lobby.
+                let keep = null;
+                try { keep = openGameId(); } catch (e) {}
+                if (keep) pendingInviteGame = keep;
+                const roomId = ui.hostInput.value.trim() || randomRoomName();
+                ui.hostInput.value = roomId;
+                // give showRoom()'s 350ms reopen a moment to land first
+                hostCreate(roomId, 0, false, () => { setTimeout(() => copyInviteLink(btn, old), 500); });
+                return;
+            }
+            copyInviteLink(btn, old);
         });
         (function () {
             let room = '', game = '';
@@ -1745,9 +1835,10 @@
                 game = (q.get('game') || '').trim();
             } catch (e) {}
             if (!room) {
-                // Game-only link (copied from a solo table with no room):
-                // open it directly if it's a room-less game.
-                const solo = GAMES.find(x => x.id === game && x.solo);
+                // Game-only link (no room): open it directly if it can be run
+                // without one — both `solo` games and `soloable` ones (chess,
+                // grammar, warp, eggs, blastoff all have a solo table).
+                const solo = GAMES.find(x => x.id === game && (x.solo || x.soloable));
                 if (solo) { try { GB.open(game); } catch (e) {} }
                 return; // otherwise — normal lobby
             }

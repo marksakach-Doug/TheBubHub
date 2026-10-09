@@ -1,0 +1,766 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
+<title>Chess</title>
+<style>
+:root{
+  --frame-1:#8a5a2b; --frame-2:#5e3a17;
+  --light:#e8cfa0; --dark:#a9713f;
+  --ink:#2b1a0d; --panel:#3a2716; --panel-2:#2a1b0e;
+  --cream:#f4e6cd; --dim:#c3a97f;
+  --good:#8fb35e; --bad:#e0705a;
+}
+*{box-sizing:border-box;-webkit-tap-highlight-color:transparent}
+html,body{margin:0;padding:0}
+body{
+  min-height:100vh; display:flex; align-items:center; justify-content:center;
+  padding:12px; background:#1d1208; color:var(--cream);
+  font-family:ui-sans-serif,system-ui,-apple-system,"Segoe UI",sans-serif;
+  overscroll-behavior:contain;
+}
+#app{width:100%;max-width:740px;display:flex;flex-direction:column;gap:12px}
+
+#boardwrap{
+  align-self:center; padding:10px; border-radius:12px;
+  background:linear-gradient(145deg,var(--frame-1),var(--frame-2));
+  box-shadow:0 10px 28px rgba(0,0,0,.5), inset 0 1px 0 rgba(255,255,255,.22);
+}
+#board{
+  position:relative; display:grid; grid-template-columns:repeat(8,1fr);
+  width:min(80vw,440px); aspect-ratio:1; touch-action:none;
+  border-radius:4px; overflow:hidden; box-shadow:0 0 0 1px rgba(0,0,0,.4);
+}
+.sq{position:relative; display:flex; align-items:center; justify-content:center; user-select:none}
+.sq.light{background:var(--light)}
+.sq.dark{background:var(--dark)}
+.sq.last::after{content:""; position:absolute; inset:0; background:rgba(255,240,180,.35); pointer-events:none}
+.sq.sel::after{content:""; position:absolute; inset:0; background:rgba(255,235,140,.45); pointer-events:none}
+.sq.check{background:#e05a42}
+.pc{position:relative; z-index:2; font-size:min(8vw,38px); line-height:1;
+  cursor:grab; filter:drop-shadow(0 2px 2px rgba(0,0,0,.45)); transform:translateY(-2%)}
+.pc.w{color:#fbf3e4; text-shadow:0 0 2px #2b1a0d,0 1px 2px rgba(0,0,0,.75)}
+.pc.b{color:#22150a; text-shadow:0 0 1.5px rgba(255,240,215,.5),0 1px 2px rgba(0,0,0,.4)}
+.pc.drag{opacity:.3}
+.pc.ghost{position:fixed; z-index:60; pointer-events:none; font-size:44px; transform:none}
+.dot{position:absolute; z-index:3; width:26%; height:26%; border-radius:50%; background:rgba(20,10,0,.42); pointer-events:none}
+.ring{position:absolute; z-index:3; inset:6%; border-radius:50%; border:5px solid rgba(20,10,0,.42); pointer-events:none}
+.cord{position:absolute; font-size:min(1.8vw,10px); font-weight:700; color:rgba(40,25,10,.5); pointer-events:none; z-index:1}
+.cord.b{right:3px; bottom:1px}
+.cord.t{left:3px; top:1px}
+
+.card{background:linear-gradient(180deg,var(--panel),var(--panel-2));
+  border:1px solid #4a3018; border-radius:12px; padding:10px 12px;
+  box-shadow:0 4px 14px rgba(0,0,0,.35), inset 0 1px 0 rgba(255,255,255,.07)}
+.bar{display:flex; align-items:center; gap:10px; flex-wrap:wrap}
+.pname{font-weight:800; font-size:14px; display:flex; align-items:center; gap:6px}
+.chip{font-size:11px; font-family:ui-monospace,monospace; padding:2px 7px; border-radius:999px;
+  background:rgba(0,0,0,.3); border:1px solid #5a3c1e; color:var(--dim)}
+.status{flex:1; text-align:center; font-weight:700; font-size:14px; min-width:130px}
+.status.good{color:var(--good)} .status.bad{color:var(--bad)}
+#captured{font-size:19px; min-height:24px; letter-spacing:1px}
+#captured .cw{color:#fdf6e8; text-shadow:0 0 2px #2b1a0d}
+#captured .cb{color:#241609; text-shadow:0 0 2px rgba(255,240,220,.3)}
+#captured .lab{font-size:10px; font-family:ui-monospace,monospace; color:var(--dim); letter-spacing:0}
+button{font:inherit; font-weight:800; cursor:pointer; color:#22160a;
+  background:linear-gradient(180deg,#d8b57c,#b78f52); border:1px solid #7a5628;
+  border-radius:9px; padding:10px 13px; box-shadow:0 2px 0 #6d4c1f,0 3px 8px rgba(0,0,0,.3)}
+button:active{transform:translateY(1px); box-shadow:0 1px 0 #6d4c1f}
+button:disabled{opacity:.4; cursor:not-allowed; box-shadow:none}
+button.ghost{background:linear-gradient(180deg,#5b3f22,#412c15); color:var(--cream); border-color:#6d4c1f}
+button.good{background:linear-gradient(180deg,#9dc36a,#7fa650); border-color:#5d7d3a}
+#setup{display:flex; flex-direction:column; gap:10px; align-items:center; text-align:center}
+#setup h1{margin:0; font-size:32px; letter-spacing:2px}
+#setup p{margin:0; color:var(--dim); font-size:13px; max-width:46ch; line-height:1.5}
+.row{display:flex; gap:8px; flex-wrap:wrap; justify-content:center}
+#note{font-size:12px; font-family:ui-monospace,monospace; color:var(--dim); min-height:16px}
+#thinking{font-size:11px; font-family:ui-monospace,monospace; color:var(--dim)}
+#err{color:#e8846f; font-size:11px; font-family:ui-monospace,monospace; white-space:pre-wrap}
+.hidden{display:none !important}
+@media (max-width:430px){
+  body{padding:8px}
+  #board{width:min(94vw,430px)}
+  .status{min-width:100%; order:-1}
+  button{padding:11px 12px}
+}
+</style>
+</head>
+<body>
+<div id="app">
+  <div id="setup" class="card">
+    <h1>♞ CHESS</h1>
+    <p id="setup-sub">Full rules — castling, en passant, checkmate, stalemate.</p>
+    <div class="row">
+      <button id="btn-solo">Play the bot</button>
+      <button id="btn-two" class="ghost">Play a friend</button>
+    </div>
+    <div id="note"></div>
+  </div>
+
+  <div id="play" class="hidden" style="display:flex;flex-direction:column;gap:12px">
+    <div class="card">
+      <div class="bar">
+        <div class="pname"><span class="dotc" style="width:9px;height:9px;border-radius:50%;background:#eaeaea;display:inline-block"></span><span id="pn1">You</span></div>
+        <div class="status" id="status">White to move</div>
+        <div class="pname"><span id="pn2">Bot</span><span class="dotc" style="width:9px;height:9px;border-radius:50%;background:#2b1a0d;display:inline-block"></span></div>
+      </div>
+    </div>
+    <div id="boardwrap"><div id="board"></div></div>
+    <div class="card">
+      <div id="captured"></div>
+      <div class="row" style="margin-top:8px">
+        <button id="btn-new">New game</button>
+        <button id="btn-takeback" class="ghost">Take back</button>
+        <button id="btn-draw" class="ghost">Offer draw</button>
+        <button id="btn-resign" class="ghost">Resign</button>
+        <button id="btn-accept" class="good hidden">Accept draw</button>
+        <button id="btn-decline" class="ghost hidden">Decline</button>
+      </div>
+      <div class="row" style="margin-top:6px"><span id="thinking"></span></div>
+    </div>
+  </div>
+  <div id="err"></div>
+</div>
+
+<script>
+(function(){
+'use strict';
+const GAME_ID = 'chess';
+const $ = (id) => document.getElementById(id);
+const note = (t) => { $('note').textContent = t || ''; };
+
+/* =====================================================================
+   RULES — original implementation. Board is 64 slots, 0 = a8 .. 63 = h1
+   (rank 8 first). Pieces are letters, uppercase = White.
+   ===================================================================== */
+const WHITE = 'w', BLACK = 'b';
+const START = 'rnbqkbnrpppppppp................................PPPPPPPPRNBQKBNR';
+const GLYPH = { K:'♔', Q:'♕', R:'♖', B:'♗', N:'♘', P:'♙' };   // white: hollow glyphs
+const GLYPH_B = { K:'♚', Q:'♛', R:'♜', B:'♝', N:'♞', P:'♟' }; // black: solid glyphs
+const glyphOf = (piece) => (isWhite(piece) ? GLYPH[typeOf(piece)] : GLYPH_B[typeOf(piece)]);
+const VAL = { P:1, N:3, B:3, R:5, Q:9, K:200 };
+const FILES = 'abcdefgh';
+const R1 = 56, R8 = 0;
+const HOME_COUNT = { P:8, N:2, B:2, R:2, Q:1, K:1 };
+
+const opponent = (c) => (c === WHITE ? BLACK : WHITE);
+const sqName = (s) => FILES[s % 8] + (8 - (s >> 3));
+const isWhite = (p) => p !== '.' && p === p.toUpperCase();
+const colourOf = (p) => (p === '.' ? null : (isWhite(p) ? WHITE : BLACK));
+const typeOf = (p) => (p === '.' ? '' : p.toUpperCase());
+
+function makeState(){
+  return { b: START.split(''), turn: WHITE,
+    cw: { w:[true,true], b:[true,true] },
+    ep: -1, half: 0, full: 1 };
+}
+function copy(st){
+  return { b: st.b.slice(), turn: st.turn,
+    cw: { w: st.cw.w.slice(), b: st.cw.b.slice() },
+    ep: st.ep, half: st.half, full: st.full };
+}
+// Repetition signature (board + side + rights + ep), threefold-safe.
+function posKey(st){
+  let c = '';
+  for (let i = 0; i < 64; i++){
+    const p = st.b[i];
+    c += p === '.' ? '.' : (isWhite(p) ? p : p.toLowerCase());
+  }
+  const r = (st.cw.w[0]?'K':'') + (st.cw.w[1]?'Q':'') + (st.cw.b[0]?'k':'') + (st.cw.b[1]?'q':'');
+  return c + '|' + st.turn + '|' + r + '|' + st.ep;
+}
+
+function kingSq(st, c){
+  const k = c === WHITE ? 'K' : 'k';
+  for (let i = 0; i < 64; i++) if (st.b[i] === k) return i;
+  return -1;
+}
+function attackedBy(st, sq, by){
+  const f0 = sq % 8, r0 = sq >> 3;
+  // pawns
+  const pr = r0 + (by === WHITE ? -1 : 1);
+  for (const df of [-1, 1]){
+    const f = f0 + df;
+    if (f < 0 || f > 7 || pr < 0 || pr > 7) continue;
+    const p = st.b[pr * 8 + f];
+    if (p !== '.' && colourOf(p) === by && typeOf(p) === 'P') return true;
+  }
+  // knights
+  for (const [df, dr] of [[-2,-1],[-2,1],[-1,-2],[-1,2],[1,-2],[1,2],[2,-1],[2,1]]){
+    const f = f0 + df, r = r0 + dr;
+    if (f < 0 || f > 7 || r < 0 || r > 7) continue;
+    const p = st.b[r * 8 + f];
+    if (p !== '.' && colourOf(p) === by && typeOf(p) === 'N') return true;
+  }
+  // king
+  for (let df = -1; df <= 1; df++) for (let dr = -1; dr <= 1; dr++){
+    if (!df && !dr) continue;
+    const f = f0 + df, r = r0 + dr;
+    if (f < 0 || f > 7 || r < 0 || r > 7) continue;
+    const p = st.b[r * 8 + f];
+    if (p !== '.' && colourOf(p) === by && typeOf(p) === 'K') return true;
+  }
+  // sliders
+  for (const [df, dr] of [[1,0],[-1,0],[0,1],[0,-1],[1,1],[1,-1],[-1,1],[-1,-1]]){
+    let f = f0 + df, r = r0 + dr;
+    while (f >= 0 && f <= 7 && r >= 0 && r <= 7){
+      const p = st.b[r * 8 + f];
+      if (p !== '.'){
+        if (colourOf(p) === by){
+          const t = typeOf(p);
+          if (df === 0 || dr === 0) { if (t === 'R' || t === 'Q') return true; }
+          else if (t === 'B' || t === 'Q') return true;
+        }
+        break;
+      }
+      f += df; r += dr;
+    }
+  }
+  return false;
+}
+const inCheck = (st, c) => { const k = kingSq(st, c); return k >= 0 && attackedBy(st, k, opponent(c)); };
+
+/* ---------- pseudo-legal generation ---------- */
+// Promotions are generated queen-first so "first match wins" = auto-queen.
+function pseudo(st, c){
+  const out = [];
+  const promo = (from, to) => { out.push({from,to,promo:'Q'}); out.push({from,to,promo:'R'}); out.push({from,to,promo:'B'}); out.push({from,to,promo:'N'}); };
+  for (let i = 0; i < 64; i++){
+    const p = st.b[i];
+    if (p === '.' || colourOf(p) !== c) continue;
+    const t = typeOf(p), f = i % 8, r = i >> 3;
+    if (t === 'P'){
+      const fwd = c === WHITE ? -1 : 1;
+      const startRow = c === WHITE ? 6 : 1, lastRow = c === WHITE ? 0 : 7;
+      const nr = r + fwd;
+      if (nr >= 0 && nr <= 7){
+        const one = nr * 8 + f;
+        if (st.b[one] === '.'){
+          // En passant lands on the square DIRECTLY ahead (the one the double
+          // push skipped over); the captured pawn is the diagonal neighbour.
+          if (one === st.ep) out.push({ from:i, to:one, promo:null, ep:true });
+          else if (nr === lastRow) promo(i, one);
+          else out.push({ from:i, to:one, promo:null });
+          if (r === startRow){
+            const two = (r + 2 * fwd) * 8 + f;
+            if (st.b[two] === '.') out.push({ from:i, to:two, promo:null });
+          }
+        }
+      }
+      for (const df of [-1, 1]){
+        const nf = f + df;
+        if (nf < 0 || nf > 7) continue;
+        const tc = nr;
+        if (tc < 0 || tc > 7) continue;
+        const ts = tc * 8 + nf, tp = st.b[ts];
+        if (tp !== '.' && colourOf(tp) === opponent(c)) promo(i, ts);   // capture-promotion
+      }
+    } else if (t === 'N'){
+      for (const [df, dr] of [[-2,-1],[-2,1],[-1,-2],[-1,2],[1,-2],[1,2],[2,-1],[2,1]]){
+        const nf = f + df, nr = r + dr;
+        if (nf < 0 || nf > 7 || nr < 0 || nr > 7) continue;
+        const ts = nr * 8 + nf;
+        if (st.b[ts] === '.') out.push({ from:i, to:ts, promo:null });
+      }
+    } else if (t === 'K'){
+      for (let df = -1; df <= 1; df++) for (let dr = -1; dr <= 1; dr++){
+        if (!df && !dr) continue;
+        const nf = f + df, nr = r + dr;
+        if (nf < 0 || nf > 7 || nr < 0 || nr > 7) continue;
+        const ts = nr * 8 + nf;
+        if (st.b[ts] === '.') out.push({ from:i, to:ts, promo:null });
+      }
+    } else {
+      const rays = t === 'R' ? [[1,0],[-1,0],[0,1],[0,-1]]
+                 : t === 'B' ? [[1,1],[1,-1],[-1,1],[-1,-1]]
+                 : [[1,0],[-1,0],[0,1],[0,-1],[1,1],[1,-1],[-1,1],[-1,-1]];
+      for (const [df, dr] of rays){
+        let nf = f + df, nr = r + dr;
+        while (nf >= 0 && nf <= 7 && nr >= 0 && nr <= 7){
+          const ts = nr * 8 + nf, tp = st.b[ts];
+          if (tp === '.') out.push({ from:i, to:ts, promo:null });
+          else { if (colourOf(tp) === opponent(c)) out.push({ from:i, to:ts, promo:null }); break; }
+          nf += df; nr += dr;
+        }
+      }
+    }
+  }
+  // castling
+  const back = c === WHITE ? R1 : R8;
+  const kr = c === WHITE ? 'R' : 'r';
+  if (!inCheck(st, c)){
+    if (st.cw[c][0] && st.b[back + 7] === kr && st.b[back + 5] === '.' && st.b[back + 6] === '.'
+        && !attackedBy(st, back + 5, opponent(c)) && !attackedBy(st, back + 6, opponent(c)))
+      out.push({ from: back + 4, to: back + 6, promo:null, castle:'K' });
+    if (st.cw[c][1] && st.b[back] === kr && st.b[back + 1] === '.' && st.b[back + 2] === '.' && st.b[back + 3] === '.'
+        && !attackedBy(st, back + 3, opponent(c)) && !attackedBy(st, back + 2, opponent(c)))
+      out.push({ from: back + 4, to: back + 2, promo:null, castle:'Q' });
+  }
+  return out;
+}
+
+/* Apply on a state the caller owns (mutates). */
+function applyMove(st, m){
+  const p = st.b[m.from], c = colourOf(p), t = typeOf(p);
+  const k = c === WHITE ? 'K' : 'k', rk = c === WHITE ? 'R' : 'r';
+  if (m.castle === 'K'){
+    st.b[m.from] = '.'; st.b[m.to] = k;
+    st.b[m.to + 1] = '.'; st.b[m.to - 1] = rk;
+  } else if (m.castle === 'Q'){
+    st.b[m.from] = '.'; st.b[m.to] = k;
+    st.b[m.to - 2] = '.'; st.b[m.to + 1] = rk;
+  } else {
+    // En passant: the captured pawn is NOT on the destination — it sits one
+    // rank behind the capturing pawn's path. With rank 8 at index 0, both
+    // colours' captured pawns land two rows before the destination.
+    if (m.ep) st.b[m.to - 16] = '.';
+    st.b[m.to] = m.promo ? (c === WHITE ? m.promo : m.promo.toLowerCase()) : p;
+    st.b[m.from] = '.';
+  }
+  const back = c === WHITE ? R1 : R8;
+  if (m.from === back || m.to === back) st.cw[c][1] = false;
+  if (m.from === back + 7 || m.to === back + 7) st.cw[c][0] = false;
+  if (m.from === back + 4) { st.cw[c][0] = false; st.cw[c][1] = false; }
+  const ob = opponent(c) === WHITE ? R1 : R8;
+  if (m.to === ob) st.cw[opponent(c)][1] = false;
+  if (m.to === ob + 7) st.cw[opponent(c)][0] = false;
+
+  st.ep = (t === 'P' && Math.abs(m.to - m.from) === 16) ? (m.from + m.to) / 2 : -1;
+  st.half = (t === 'P' || m.ep) ? 0 : st.half + 1;
+  if (c === BLACK) st.full++;
+  st.turn = opponent(c);
+}
+
+function legal(st, c){
+  const out = [];
+  for (const m of pseudo(st, c)){
+    const ns = copy(st);
+    applyMove(ns, m);
+    if (!inCheck(ns, c)) out.push(m);
+  }
+  return out;
+}
+
+/* ---------- game over? ---------- */
+function outcome(st){
+  const c = st.turn;
+  if (!legal(st, c).length){
+    return inCheck(st, c)
+      ? { over:true, result:opponent(c), why:(c === WHITE ? 'Black' : 'White') + ' wins by checkmate' }
+      : { over:true, result:'draw', why:'Stalemate — draw' };
+  }
+  if (st.half >= 100) return { over:true, result:'draw', why:'Fifty-move rule — draw' };
+  if (!hasMatingMaterial(st)) return { over:true, result:'draw', why:'Not enough material — draw' };
+  return null;
+}
+function hasMatingMaterial(st){
+  const seen = { w:{}, b:{} };
+  for (const p of st.b){
+    if (p === '.') continue;
+    const c = colourOf(p), t = typeOf(p);
+    if (t === 'P' || t === 'R' || t === 'Q') return true;
+    seen[c][t] = (seen[c][t] || 0) + 1;
+  }
+  const minors = (s) => (s.N || 0) + (s.B || 0);
+  // K vs K, K+single minor vs K, and K+minor vs K+same-colour minor cannot mate
+  return !(minors(seen.w) <= 1 && minors(seen.b) <= 1);
+}
+
+/* =====================================================================
+   BOT — 1-ply greedy. Values material swings, dodges a free capture next
+   move, likes checks, jitters so it isn't identical every game. Black.
+   ===================================================================== */
+function botMove(st, c){
+  const ms = legal(st, c);
+  if (!ms.length) return null;
+  let best = null, bestSc = -Infinity;
+  for (const m of ms){
+    const ns = copy(st);
+    applyMove(ns, m);
+    let sc = Math.random() * 0.8;
+    const tookWhite = (st.b[m.to] !== '.' && colourOf(st.b[m.to]) === WHITE) || (m.ep && colourOf(st.b[m.to + 8]) === WHITE);
+    const lostOwn = (st.b[m.to] !== '.' && colourOf(st.b[m.to]) === c) || (m.ep && colourOf(st.b[m.to + 8]) === c);
+    if (tookWhite) sc += VAL[typeOf(st.b[m.to])] || 0;
+    if (lostOwn) sc -= (VAL[typeOf(st.b[m.to])] || 0) * 1.1;
+    if (m.castle) sc += 1.5;
+    if (m.promo === 'Q') sc += 2;
+    if (inCheck(ns, c)) sc += 2.5;
+    // would the opponent just take this piece for free?
+    let hangs = false;
+    for (const om of legal(ns, opponent(c))){
+      if (om.to === m.from) { hangs = true; break; }
+      if (om.ep && om.to + (opponent(c) === WHITE ? 8 : -8) === m.from) { hangs = true; break; }
+    }
+    if (hangs) sc -= (VAL[typeOf(st.b[m.from])] || 0);
+    if (sc > bestSc){ bestSc = sc; best = m; }
+  }
+  return best;
+}
+
+/* =====================================================================
+   Hub bridge
+   ===================================================================== */
+const Hub = {
+  me: null, roster: [], room: '',
+  up(k, p){ try { window.parent.postMessage({ t:'gu', game: GAME_ID, k, p }, '*'); } catch(e){} },
+  init(){
+    window.addEventListener('message', onDown);
+    this.up('hello');
+    setTimeout(() => { if (!Hub.me) startSolo(); }, 1200);   // opened off disk
+  }
+};
+let localSolo = false;
+function onDown(e){
+  const m = e.data;
+  if (!m || m.t !== 'gd' || m.game !== GAME_ID) return;
+  if (m.k === 'roster'){ Hub.me = m.p.you; Hub.roster = m.p.roster || []; Hub.room = m.p.room || ''; onRoster(); return; }
+  if (m.k === 'state'){ onState(m.p); return; }
+  if (m.k === 'intent'){ onIntent(m.p, m.from); return; }
+  if (m.k === 'denied'){ flash('Not allowed: ' + ((m.p && m.p.text) || '')); return; }
+  if (m.k === 'reset'){ toSetup(); return; }
+}
+const myId = () => Hub.me && Hub.me.id;
+const myName = () => (Hub.me && Hub.me.name) || 'Player';
+const isHost = () => localSolo || !!(Hub.me && Hub.me.isHost);
+const inRoom = () => !!Hub.room;
+const others = () => (Hub.roster || []).filter(m => m.id !== myId());
+window.addEventListener('error', (ev) => { $('err').textContent = 'Error: ' + (ev.message || ev) + ' — reload (Ctrl+Shift+R).'; });
+
+/* =====================================================================
+   Session
+   ===================================================================== */
+let S = null;            // live state
+let stack = [];          // previous states, for takeback
+let seen = {};           // posKey counts, for threefold
+let over = null;         // {result, why}
+let mode = 'setup';      // setup | solo | two
+let lastMove = null;
+let sel = -1;
+let offer = null;        // {by}
+let botT = null;
+let flashT = null;
+
+// Which side YOU are. Solo: always White (the bot is Black). Two-player: the
+// host is White and the guest is Black, so a guest has to move the black
+// pieces — this must not be hard-coded to White.
+const HUMAN = () => (mode === 'two' && inRoom() && !isHost()) ? BLACK : WHITE;
+const BOT = () => (mode === 'two' ? null : BLACK);
+
+function reset(){
+  S = makeState(); stack = []; seen = {}; over = null;
+  lastMove = null; sel = -1; offer = null;
+  seen[posKey(S)] = 1;
+}
+function toSetup(){ S = null; mode = 'setup'; $('play').classList.add('hidden'); $('setup').classList.remove('hidden'); renderSetup(); }
+function begin(which){
+  mode = which; reset();
+  $('setup').classList.add('hidden'); $('play').classList.remove('hidden');
+  render();
+  if (inRoom() && isHost()) send();
+}
+function send(){ render(); if (inRoom() && isHost() && S) Hub.up('state', pack()); }
+function pack(){
+  return { b:S.b.slice(), turn:S.turn, cw:S.cw, ep:S.ep, half:S.half, full:S.full,
+    over, lastMove, offer };
+}
+function onState(p){
+  if (!p || !p.b) return;
+  S = { b:p.b, turn:p.turn, cw:p.cw, ep:p.ep, half:p.half, full:p.full };
+  over = p.over || null; lastMove = p.lastMove || null; offer = p.offer || null;
+  seen = {}; stack = []; sel = -1;
+  if (mode === 'setup'){ mode = 'two'; }
+  $('setup').classList.add('hidden'); $('play').classList.remove('hidden');
+  render();
+}
+function onRoster(){
+  const hadRoom = !!Hub.room;
+  localSolo = !Hub.room;                 // derived, never latched
+  // A room appeared while we were playing the bot (this is what the Invite
+  // button does from a solo table). Drop the bot and set up a real two-player
+  // table: the guest arrives as Black and the host stays White.
+  if (hadRoom && mode === 'solo' && isHost()){
+    clearTimeout(botT);
+    mode = 'two';
+    reset();
+    $('setup').classList.add('hidden'); $('play').classList.remove('hidden');
+    send();
+    return;
+  }
+  renderSetup();
+  if (S) render();
+}
+function flash(t){ $('err').textContent = t || ''; clearTimeout(flashT); if (t) flashT = setTimeout(() => { $('err').textContent = ''; }, 2600); }
+
+/* ---------- host-side intent handling (two-player) ---------- */
+function onIntent(d, from){
+  if (!isHost() || !S) return;
+  if (d.a === 'new'){ reset(); send(); return; }
+  // the host owns White, so a guest intent can only ever be a Black move
+  if (d.a === 'move'){ doMove(d.from, d.to, BLACK); send(); return; }
+  if (d.a === 'resign'){ over = { result: WHITE, why: (from.name || 'Guest') + ' resigned' }; send(); return; }
+  if (d.a === 'draw'){ offer = { by: from.id }; send(); return; }
+  if (d.a === 'accept'){ if (offer){ over = { result:'draw', why:'Draw agreed' }; offer = null; } send(); return; }
+  if (d.a === 'decline'){ offer = null; send(); return; }
+}
+/* One place where a human move becomes a real move (host validates). */
+function doMove(from, to, side){
+  if (!S || over) return false;
+  if (S.turn !== side) return false;
+  const m = legal(S, side).find(x => x.from === from && x.to === to);
+  if (!m) return false;
+  const before = copy(S);
+  applyMove(S, m);
+  stack.push(before);
+  lastMove = { from, to };
+  offer = null;
+  const k = posKey(S);
+  seen[k] = (seen[k] || 0) + 1;
+  const o = outcome(S);
+  if (o) over = o;
+  return true;
+}
+
+/* ---------- the bot's turn ---------- */
+function driveBot(){
+  clearTimeout(botT);
+  const side = BOT();                    // null in two-player: no bot there
+  if (!side || !S || over || S.turn !== side){ $('thinking').textContent = ''; return; }
+  $('thinking').textContent = 'bot thinking…';
+  botT = setTimeout(() => {
+    const m = botMove(S, side);
+    if (m){
+      const before = copy(S);
+      applyMove(S, m);
+      stack.push(before);
+      lastMove = { from:m.from, to:m.to };
+      const k = posKey(S); seen[k] = (seen[k] || 0) + 1;
+      if (seen[k] === 3) over = { result:'draw', why:'Threefold repetition — draw' };
+      else { const o = outcome(S); if (o) over = o; }
+    }
+    $('thinking').textContent = '';
+    render();
+  }, 380);
+}
+
+/* =====================================================================
+   Render
+   ===================================================================== */
+function renderSetup(){
+  const o = others();
+  $('setup-sub').textContent = inRoom()
+    ? 'You are White. Start a game and share the room with a friend.'
+    : 'Full rules — castling, en passant, checkmate, stalemate. You are White.';
+  $('btn-solo').disabled = false;
+  $('btn-two').disabled = !(inRoom() && isHost() && o.length > 0);
+  note(inRoom()
+    ? (o.length ? (isHost() ? 'Ready — press Play a friend.' : 'Waiting for the host to start.')
+                : 'Waiting for someone to join the room.')
+    : 'No room — the bot is Black.');
+}
+function render(){
+  if (!S) return;
+  const board = $('board');
+  board.innerHTML = '';
+  // legal moves + check computed ONCE, not per square
+  const side = HUMAN();
+  const myTurnNow = !over && S.turn === side;
+  const moves = (sel >= 0 && myTurnNow) ? legal(S, side) : [];
+  const destSet = new Map();
+  for (const m of moves) if (m.from === sel) destSet.set(m.to, S.b[m.to] === '.' ? 'dot' : 'ring');
+  const chkSq = (!over && inCheck(S, S.turn)) ? kingSq(S, S.turn) : -1;
+
+  for (let vr = 0; vr < 8; vr++){
+    const row = vr;                       // row 0 = rank 8, so White sits at the bottom
+    for (let col = 0; col < 8; col++){
+      const sq = row * 8 + col;
+      const el = document.createElement('div');
+      el.className = 'sq ' + (((row + col) % 2 === 0) ? 'light' : 'dark');
+      el.dataset.sq = sq;
+      if (lastMove && (sq === lastMove.from || sq === lastMove.to)) el.classList.add('last');
+      if (sel === sq) el.classList.add('sel');
+      if (sq === chkSq) el.classList.add('check');
+      if (col === 0){ const c = document.createElement('span'); c.className = 'cord b'; c.textContent = 8 - row; el.appendChild(c); }
+      if (vr === 7){ const c = document.createElement('span'); c.className = 'cord t'; c.textContent = FILES[col]; el.appendChild(c); }
+      const p = S.b[sq];
+      if (p !== '.'){
+        const g = document.createElement('span');
+        g.className = 'pc ' + (isWhite(p) ? 'w' : 'b');
+        g.dataset.sq = sq;
+        g.textContent = glyphOf(p);
+        el.appendChild(g);
+      }
+      const kind = destSet.get(sq);
+      if (kind){ const d = document.createElement('span'); d.className = kind; el.appendChild(d); }
+      board.appendChild(el);
+    }
+  }
+  // hud
+  const o = others();
+  // Name labels follow YOUR side, so a guest (playing Black) sees themselves
+  // on the bottom row and the host on top.
+  const you = myName();
+  const opp = (o[0] && o[0].name) || 'Guest';
+  if (mode === 'two'){
+    if (HUMAN() === WHITE){ $('pn1').textContent = you + ' (you)'; $('pn2').textContent = opp; }
+    else { $('pn1').textContent = opp; $('pn2').textContent = you + ' (you)'; }
+  } else {
+    $('pn1').textContent = 'You (White)';
+    $('pn2').textContent = 'Bot (Black)';
+  }
+  const st = $('status');
+  st.className = 'status';
+  if (over){
+    st.textContent = over.why;
+    if (over.result !== 'draw') st.classList.add('good');
+  } else if (offer){
+    st.textContent = 'Draw offered — ' + ((offer.by === myId()) ? 'waiting for them' : 'accept or decline');
+  } else {
+    st.textContent = (S.turn === WHITE ? 'White' : 'Black') + ' to move';
+  }
+  // captured: pieces a side has LOST, grouped per colour
+  const miss = (c) => {
+    const have = { P:0,N:0,B:0,R:0,Q:0,K:0 };
+    for (const p of S.b) if (p !== '.' && colourOf(p) === c) have[typeOf(p)]++;
+    const g = c === WHITE ? GLYPH : GLYPH_B;
+    let h = '';
+    for (const t of ['Q','R','B','N','P']){
+      const d = HOME_COUNT[t] - have[t];
+      for (let i = 0; i < d; i++) h += '<span class="' + (c === WHITE ? 'cw' : 'cb') + '">' + g[t] + '</span>';
+    }
+    return h;
+  };
+  const mb = miss(BLACK), mw = miss(WHITE);
+  $('captured').innerHTML =
+    (mb ? '<span class="lab">black lost </span>' + mb + '&nbsp;&nbsp;' : '') +
+    (mw ? '<span class="lab">white lost </span>' + mw : '');
+  // buttons
+  $('btn-accept').classList.toggle('hidden', !(offer && !over));
+  $('btn-decline').classList.toggle('hidden', !(offer && !over));
+  $('btn-takeback').disabled = mode !== 'solo' || stack.length < 2 || !!over;
+  $('btn-draw').disabled = !!over;
+  $('btn-resign').disabled = !!over;
+  $('btn-new').disabled = mode === 'two' && !isHost() && inRoom();
+  driveBot();
+}
+
+/* =====================================================================
+   Input: click-click and drag, pointer events so touch works too.
+   ===================================================================== */
+function sqAt(ev){
+  const el = document.elementFromPoint(ev.clientX, ev.clientY);
+  const s = el && el.closest ? el.closest('.sq') : null;
+  return s ? parseInt(s.dataset.sq, 10) : -1;
+}
+function humanMove(from, to){
+  if (!S || over) return false;
+  const side = HUMAN();
+  if (S.turn !== side) return false;
+  if (!legal(S, side).some(x => x.from === from && x.to === to)) return false;
+  if (mode === 'two' && inRoom() && !isHost()){
+    // guest: ask the host to validate, it applies and broadcasts
+    Hub.up('intent', { a:'move', from, to });
+    return true;
+  }
+  doMove(from, to, side);
+  send();
+  return true;
+}
+
+let dragFrom = -1, ghost = null, downSq = -1;
+$('board').addEventListener('pointerdown', (ev) => {
+  if (!S || over) return;
+  const sq = sqAt(ev);
+  if (sq < 0) return;
+  downSq = sq;
+  if (sel >= 0 && sel !== sq && humanMove(sel, sq)){ sel = -1; downSq = -1; render(); return; }
+  const p = S.b[sq];
+  // you may only pick up your OWN pieces on your OWN turn
+  if (p !== '.' && colourOf(p) === HUMAN() && S.turn === HUMAN()){
+    sel = sq; dragFrom = sq;
+    const pc = ev.target.closest('.pc');
+    if (pc){
+      try { $('board').setPointerCapture(ev.pointerId); } catch(_){}
+      ghost = document.createElement('span');
+      ghost.className = 'pc ghost ' + (isWhite(p) ? 'w' : 'b');
+      ghost.textContent = glyphOf(p);
+      document.body.appendChild(ghost);
+      pc.classList.add('drag');
+      dragTo(ev);
+    }
+  } else { sel = -1; dragFrom = -1; }
+  render();
+});
+function dragTo(ev){
+  if (!ghost) return;
+  ghost.style.left = (ev.clientX - 21) + 'px';
+  ghost.style.top = (ev.clientY - 30) + 'px';
+}
+$('board').addEventListener('pointermove', (ev) => { if (ghost) dragTo(ev); });
+function endDrag(){
+  if (ghost){ ghost.remove(); ghost = null; }
+  document.querySelectorAll('.pc.drag').forEach(e => e.classList.remove('drag'));
+}
+$('board').addEventListener('pointerup', (ev) => {
+  const up = sqAt(ev);
+  const from = dragFrom;
+  endDrag();
+  if (from >= 0 && up >= 0 && up !== from) humanMove(from, up);
+  dragFrom = -1; downSq = -1; render();
+});
+$('board').addEventListener('pointercancel', () => { endDrag(); dragFrom = -1; downSq = -1; render(); });
+
+/* ---------- buttons ---------- */
+$('btn-solo').addEventListener('click', () => begin('solo'));
+$('btn-two').addEventListener('click', () => { if (inRoom() && isHost()) begin('two'); });
+$('btn-new').addEventListener('click', () => {
+  if (mode === 'solo'){ begin('solo'); return; }
+  if (!inRoom()){ begin('two'); return; }
+  if (isHost()){ reset(); send(); } else Hub.up('intent', { a:'new' });
+});
+$('btn-takeback').addEventListener('click', () => {
+  // solo: undo a full round (your move + the bot's reply)
+  if (mode !== 'solo' || !S || over) return;
+  const n = Math.min(2, stack.length);
+  for (let i = 0; i < n; i++){
+    const prev = stack.pop();
+    if (!prev) break;
+    S = prev;
+    lastMove = null;
+  }
+  over = null; offer = null;
+  render();
+});
+$('btn-resign').addEventListener('click', () => {
+  if (!S || over) return;
+  // resigning always hands the win to the other side
+  const mine = HUMAN();
+  if (mode !== 'two'){ over = { result: mine, why: 'You resigned — ' + (mine === WHITE ? 'Black' : 'White') + ' wins' }; render(); return; }
+  if (isHost()){ over = { result: BLACK, why: myName() + ' resigned — Black wins' }; send(); }
+  else Hub.up('intent', { a:'resign' });
+});
+$('btn-draw').addEventListener('click', () => {
+  if (!S || over) return;
+  if (mode === 'solo'){ over = { result:'draw', why:'Draw by agreement' }; render(); return; }
+  if (isHost()){ offer = { by: myId() }; send(); }
+  else Hub.up('intent', { a:'draw' });
+});
+$('btn-accept').addEventListener('click', () => {
+  if (!offer) return;
+  if (mode === 'solo'){ over = { result:'draw', why:'Draw agreed' }; render(); }
+  else if (isHost()){ over = { result:'draw', why:'Draw agreed' }; offer = null; send(); }
+  else Hub.up('intent', { a:'accept' });
+});
+$('btn-decline').addEventListener('click', () => {
+  if (mode === 'solo'){ offer = null; render(); }
+  else if (isHost()){ offer = null; send(); }
+  else Hub.up('intent', { a:'decline' });
+});
+
+Hub.init();
+renderSetup();
+render();
+})();
+</script>
+</body>
+</html>

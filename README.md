@@ -32,7 +32,7 @@ No build step. No server. Double-click `index.html` and play. Multiplayer runs o
 |---|---|---|---|
 | 🎲 **Multiplayer Arcade** | Room UI only | Entry has **no** `solo` flag | Warp Front, LOTR Cards |
 | 🎯 **Solo Corner** | Room UI + lobby (if `lobby: true`) | Entry has `solo: true` | Waltz Engine |
-| Lobby card | Lobby only | Entry has `lobby: true` | Waltz Engine ("while you wait") |
+| Lobby card | Lobby only | Entry has `lobby: true` **or** `soloable: true` | Waltz Engine ("while you wait") |
 
 Sections render from the registry — a section with zero games hides itself automatically.
 
@@ -71,6 +71,8 @@ window.BUB_GAMES = [
 | `fill` | – | `true` → viewport-fill game. The hub sizes the frame to the stage (focus mode) instead of trusting the game's reported height. For canvas worlds (Goldberg, Waltz Engine). |
 | `icon` | – | Emoji shown before the button label (e.g. `'🔔'`). |
 | `desc` | – | One sentence shown in the button's tooltip after the player count. |
+| `soloable` | – | `true` → a bridge game that also runs a real solo table, so it appears in the pre-room **Solo Corner** list. It keeps its real `players` count for in-room grouping. See "Solo modes" below. |
+| `menuLabel` | – | Button text only (title, invites, chat and the record are untouched), with no Play/Hide verb. For things that aren't "played" — e.g. the guest book. |
 
 ### Solo vs multiplayer criteria
 
@@ -79,6 +81,65 @@ Ask two questions:
 1. **Does it need another human?** No → `solo: true` (+ `lobby: true`, `height`).
 2. **Does it need shared state?** Yes → multiplayer: exactly one **host** runs the rules,
    everyone else sends **intents**. The hub relays bytes and never reads rules.
+
+### Solo modes
+
+Two kinds of "playable alone", and they live differently:
+
+- `solo: true` — the game never needed a hub. It ignores the bridge entirely
+  (`daltadka`, `waltz`, `truth`).
+- `soloable: true` — a normal multiplayer game that *also* runs a one-seat
+  table (`grammar`, `warp`, `blastoff`, `eggs`).
+
+A `soloable` game is listed in the pre-room Solo Corner, which is one **flat**
+set with no player-count headings (in-room lists stay grouped — that's where
+you're picking for a group). Opening one pre-room, the hub sends a roster with
+an empty `room`, and the game promotes itself to local host:
+
+```js
+if (!Hub.room) claimSolo();   // derived from the room, never latched
+const isHost = () => localSolo || !!(Hub.me && Hub.me.isHost);
+```
+
+Two rules keep this safe:
+
+- **Derived, not latched.** Re-derive solo on every roster, so opening a game
+  pre-room and *then* joining a room correctly drops back to multiplayer.
+- **Solo is additive.** Room seats, player gates and turn flow are untouched;
+  only the minimum is relaxed. In a room the games still demand 2–4 (grammar),
+  2–6 (blastoff), 2–3 (warp), so a lone host can't strand later joiners.
+
+| Game | Solo table |
+|---|---|
+| `grammar` | You are Analyst and the only Verifier — proposals grade immediately, the voting phase never opens. |
+| `warp` | You command all three factions in turn order against the Borg (no AI crewmates); every hand is yours and face-up. |
+| `blastoff` | You plus two local bot pilots. Bots are deliberately dumb: each turn they try one phase-legal action, and `handle()` (the single legality gate) decides whether it counts. They never send anything over the hub and never appear in a real room. |
+| `eggs` | The `m.length===1` branch already spawns you plus a throwable dummy. |
+| `chess` | You are always White. Solo = a greedy 1-ply bot as Black; in a room the host is White and the guest is Black (no bot). |
+| `wordbridge` | Has its own in-game Solo button; not listed pre-room. |
+| `lotr` | Multiplayer only — "monsters hunt the leader" needs real rivals. |
+
+### Chess rules engine
+
+`chess.html` carries its own move generator (no library, no build step). Board is
+64 slots with **index 0 = a8**, so `sq = file + (8 - rank) * 8`; the renderer
+draws `row = vr` so White sits at the bottom.
+
+- `pseudo()` generates king-moves-legal moves including castling, en passant and
+  all four promotion pieces; `legal()` runs each one through `applyMove()` on a
+  clone and drops any that leave your own king attacked.
+- En passant lands on the square **directly ahead** (the one the double push
+  skipped), and the captured pawn sits at `to - 16` — both for White *and*
+  Black, since rank 8 is index 0. Getting this wrong is easy and invisible.
+- Promotions are generated queen-first so "first match wins" = auto-queen.
+- Draws: stalemate, fifty-move, threefold repetition, and insufficient material
+  (K/K, K+minor/K, K+B/K+B — a lone bishop or knight pair can't mate).
+- The bot is intentionally 1-ply: material swing, a "will this hang?" check,
+  a bonus for checks, plus jitter. It never returns an illegal move, because it
+  only ever picks from `legal()`.
+- Tests live in `/tmp/opencode/chess_rules_test.py` (extracts the real
+  functions and runs them against Scholar's/Fool's mate, castling, en passant,
+  promotion, stalemate, pins and 40 full games).
 
 
 ## The game ↔ hub bridge (multiplayer)

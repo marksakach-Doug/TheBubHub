@@ -97,7 +97,11 @@ function onDown(e){var m=e.data;if(!m||m.t!=='gd'||m.game!==GAME_ID)return;
  else if(m.k==='intent')onIntent(m.p,m.from);
  else if(m.k==='reset')resetLocal();}
 function onRoster(p){Hub.me=p.you;Hub.roster=p.roster||[];Hub.room=p.room||'';
- myId=Hub.me.id;myName=Hub.me.name||'Player';isHost=!!Hub.me.isHost;roster=Hub.roster.slice();
+ myId=Hub.me.id;myName=Hub.me.name||'Player';roster=Hub.roster.slice();
+ // Pre-room the hub reports an empty room and isHost:false — nobody to hand the
+ // physics to, so the table would sit frozen waiting for input that never comes.
+ // Promote ourselves to local host (same trick Goldberg uses) and run solo.
+ isHost=!!Hub.me.isHost||!Hub.room;
  if(!booted){booted=true;bootAll();}renderRole();reportHeight();}
 setTimeout(function(){if(!booted){amSolo=true;isHost=true;booted=true;bootAll();
  document.getElementById('role').textContent='solo · local nest';}},1800);
@@ -1211,7 +1215,9 @@ function render(){
 
 function renderRole(){var r=document.getElementById('role');
  var m=rosterPlusMe();
- if(r)r.textContent=(isHost?'host':'guest')+' · '+myName+' · '+m.length+' eggs'+(amSolo?' · solo':'');
+ // pre-room we're the local host but nobody is playing with us: say "solo"
+ var soloish=amSolo||!Hub.room;
+ if(r)r.textContent=(soloish?'solo':(isHost?'host':'guest'))+' · '+myName+' · '+m.length+' eggs';
  var s=document.getElementById('stat');
  if(s&&!booted)s.textContent='tap to enter the nest';}
 function resetLocal(){plats=[];eggs=[];decals=[];parts=[];pu=null;newWorld();}
