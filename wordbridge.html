@@ -837,7 +837,7 @@ function renderReveal(){
     for (i = 0; i < beats.length; i++){
         renderBeat(box, beats[i], { wordShown: true, divShown: true });
     }
-    if (iAmArbiter()) box.appendChild(el('p', 'miss', 'Click to approve merge(s).'));
+    if (iAmArbiter()) box.appendChild(el('p', 'miss', 'Click to approve Word Bridge(s).'));
     if (S.missing && S.missing.length) box.appendChild(el('p', 'miss', 'No word from ' + listNames(S.missing) + '.'));
 }
 function renderPeople(){
