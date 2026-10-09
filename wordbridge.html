@@ -30,14 +30,16 @@ button.go[disabled]{background:var(--paper);color:#8c8c8c}
 @media (pointer:coarse){button{min-height:44px}button.small{min-height:40px}}
 
 .word{margin:clamp(10px,2.5vw,16px) 0 clamp(6px,1.5vw,10px);font-weight:700;line-height:1;font-size:clamp(48px,18vw,120px);overflow-wrap:anywhere}
-.senses{display:grid;grid-template-columns:1fr;margin:0 0 clamp(10px,2vw,16px)}
-.sense{margin:0;font-size:clamp(16px,2.4vw,21px);line-height:1.3}
-.sense + .sense{border-top:1px solid var(--rule);margin-top:10px;padding-top:10px}
-.pos{font-style:italic;color:var(--ash);font-size:.7em;margin-right:.6em}
+.senses{display:grid;grid-template-columns:1fr 1fr;margin:0 0 clamp(10px,2vw,16px)}
+.sense{margin:0;min-width:0;font-size:14px;line-height:1.3;overflow-wrap:anywhere}
+.sense:first-child{padding-right:12px}
+.sense + .sense{border-left:1px solid var(--rule);padding-left:12px}
+.pos{display:block;font-style:italic;color:var(--ash);font-size:.85em;margin:0 0 2px}
 @media (min-width:640px){
-  .senses{grid-template-columns:1fr 1fr}
+  .sense{font-size:clamp(16px,2.4vw,21px)}
   .sense:first-child{padding-right:28px}
-  .sense + .sense{border-top:0;margin-top:0;padding-top:0;border-left:1px solid var(--rule);padding-left:28px}
+  .sense + .sense{padding-left:28px}
+  .pos{display:inline;font-size:.7em;margin:0 .6em 0 0}
 }
 
 .lead{margin:6px 0 10px;font-size:15px;max-width:62ch}
@@ -73,6 +75,9 @@ button.go[disabled]{background:var(--paper);color:#8c8c8c}
 @keyframes blink{50%{opacity:0}}
 .beat{margin:12px 0 0}
 .beatword{font-weight:700;line-height:1.05;font-size:clamp(30px,7vw,56px);overflow-wrap:anywhere}
+.beatword.fade{animation:wordIn 2600ms cubic-bezier(.3,0,.2,1) both}
+.beatword.ghost{visibility:hidden}
+@keyframes wordIn{0%{opacity:0;filter:blur(10px)}55%{opacity:.5;filter:blur(3px)}100%{opacity:1;filter:blur(0)}}
 .beatword.clickable{cursor:pointer;border:1px solid var(--ink);padding:2px 10px;}
 .beatword.on{background:var(--ink);color:var(--paper);padding:2px 10px;}
 .divider{color:var(--ash);font-size:clamp(15px,2.4vw,20px);margin:12px 0 0;overflow-wrap:anywhere}
@@ -86,11 +91,16 @@ button.go[disabled]{background:var(--paper);color:#8c8c8c}
 .tally{color:var(--ash);font-size:14px}
 #wait-note{border-left:1px solid var(--rule);padding-left:12px}
 .hostbtns{display:flex;gap:6px;flex-wrap:wrap;align-items:center}
-.start{margin-top:8px}
+.homebtns{display:flex;gap:8px;flex-wrap:wrap;margin-top:10px}
+.homebtns button{font-weight:700;font-size:17px;padding:8px 20px}
+.homebtns button.go{background:var(--ink);color:var(--paper)}
+.homebtns button.go:hover:not([disabled]){background:var(--paper);color:var(--ink)}
 .hint{color:var(--ash);font-size:13px;margin:12px 0 0;max-width:52ch}
 
 .rules{margin-top:12px;border-top:1px solid var(--rule);padding-top:6px}
 .rules summary{cursor:pointer;font-size:14px;padding:3px 0}
+.rules h3{margin:12px 0 0;font-size:14px}
+.rules ol + h3{margin-top:14px}
 .rules ol{margin:8px 0 0;padding-left:1.4em;max-width:60ch;font-size:14px}
 .rules li{margin:5px 0}
 .rules p{margin:8px 0 0;max-width:60ch;font-size:14px}
@@ -107,6 +117,7 @@ button.go[disabled]{background:var(--paper);color:#8c8c8c}
     <h1>Word Bridge</h1>
     <div id="menu" class="menu hidden">
       <button id="b-new" class="small">New game</button>
+      <button id="b-home" class="small hidden">Home</button>
     </div>
   </header>
   <div id="arbnote" class="arbnote hidden">You are the arbiter</div>
@@ -117,11 +128,16 @@ button.go[disabled]{background:var(--paper);color:#8c8c8c}
   </section>
 
   <p id="status" class="status" role="status" aria-live="polite">Connecting to the table...</p>
-  <p id="lead" class="lead hidden">Everyone writes one word that fits both meanings, folds the paper, and waits. Open them together.</p>
+  <p id="lead" class="lead hidden">Everyone writes one word that fits both meanings and locks it in. Then the words are opened together.</p>
+
+  <div id="homebtns" class="homebtns hidden">
+    <button id="b-start" class="go hidden">New game</button>
+    <button id="b-solo">Solo game</button>
+  </div>
 
   <section id="hub-ui" class="hidden">
     <div id="play" class="play hidden">
-      <label for="in" id="in-label">One word that fits both meanings.</label>
+      <label for="in" id="in-label">Write one word that fits both meanings:</label>
       <div id="entry" class="entry">
         <input id="in" type="text" maxlength="24" autocomplete="off" autocapitalize="none" autocorrect="off" spellcheck="false" enterkeyhint="done" placeholder="your word">
         <button id="b-lock" class="go">Lock in</button>
@@ -136,8 +152,6 @@ button.go[disabled]{background:var(--paper);color:#8c8c8c}
     </div>
 
     <div id="reveal" class="hidden"></div>
-
-    <button id="b-start" class="go start hidden">New game</button>
 
     <div id="table" class="table">
       <ul id="people" class="people" aria-label="Players"></ul>
@@ -154,21 +168,25 @@ button.go[disabled]{background:var(--paper);color:#8c8c8c}
   </section>
 
   <section id="local-ui" class="hidden">
-    <button id="b-deal" class="go">Next word</button>
-    <p class="hint">Playing online? Open Bub Hub, join a room and start Word Bridge there.</p>
+    <p class="hint">To play with friends, open Bub Hub, join a room and start Word Bridge there.</p>
   </section>
 
   <details id="rules" class="rules">
-    <summary>Play without a screen</summary>
-    <p>You need a dictionary, some paper, and a little patience.</p>
+    <summary>Instructions</summary>
     <ol>
-      <li>Open the dictionary and find a word that is both a noun and a verb and has several meanings. Bank, pitch and cover would all do.</li>
-      <li>Pick two meanings that feel far apart. Read them aloud.</li>
-      <li>Everyone writes one word that fits both meanings, folds the paper, and waits.</li>
-      <li>Open them together. Words that match are bridges. Talk about the near misses.</li>
-      <li>The person on the left chooses the next word.</li>
-      <li>If you want to add depth, write an explanation sentence along with the words. Read the explanation first.</li>
+      <li>Each round shows one big word, and below are two real meanings for that word that are very different.</li>
+      <li>Everyone tries to think of a new word that matches the two meanings. That word is your bridge. You can add a line on why you chose that word, if you want. You can change your word until the last person locks in.</li>
+      <li>When everyone is in, the words and their reasoning are revealed one at a time, around the table. Each person's reason comes first, then the word arrives.</li>
+      <li>Freely discuss which words are bridges. Talk about the near misses.</li>
+      <li>One player is the arbiter each round, and the role passes around the table. They have the final say about which word is a true bridge. If your word turns black it means it is a bridge. Once the words are all decided on, arbiter pushes Next Word to reveal the next big word.</li>
+      <li>The score at the bottom is how many words got bridged out of how many were played.</li>
     </ol>
+    <h3>Example Bridge</h3>
+    <p><b>beat</b><br>noun: the steady pulse of music<br>verb: to hit again and again<br>Bridge: <b>drum</b></p>
+    <h3>Solo</h3>
+    <p>Same cards, but you are the whole table. Write a word, see it come in, and tap it if it really does fit both meanings. Be honest with yourself.</p>
+    <h3>On paper</h3>
+    <p>This also works with a dictionary, a pencil, and some patience. Pick a word with two far-apart meanings, everyone writes a bridge, fold, and open together.</p>
   </details>
 </div>
 
@@ -179,7 +197,7 @@ var GAME_ID = 'wordbridge';
 var MAXLEN = 20;
 var WHYMAX = 80;
 
-var POOL = [["ace","n","a playing card marked with a single spot","v","to do extremely well on a test"],["act","n","one main division of a play","v","to do something; take action"],["address","n","the street and number where someone lives","v","to speak formally to an audience"],["aim","n","the goal you are working toward","v","to point something at a target"],["air","n","the mixture of gases we breathe","v","to broadcast on radio or television"],["appeal","n","a quality that attracts people","v","to ask a higher court to review a decision"],["back","n","the rear part of your body","v","to support someone"],["bag","n","a soft container for carrying things","v","to catch or win something"],["balance","n","the amount of money left in an account","v","to keep steady without falling"],["band","n","a group of musicians","n","a thin strip worn around something"],["bank","n","land along the edge of a river","n","a place that keeps and lends money"],["bar","n","a place that serves drinks","v","to block the way"],["bark","n","the tough outer covering of a tree","v","to make the sharp sound a dog makes"],["bat","n","a small flying mammal that comes out at night","n","a club for hitting a ball"],["bear","n","a large, heavy, furry animal","v","to carry or put up with something"],["beat","n","the steady pulse of music","v","to hit again and again"],["bed","n","a piece of furniture for sleeping","n","a patch of ground for planting flowers"],["bill","n","a bird's beak","n","a written statement of money owed"],["block","n","a section of a city between streets","v","to get in the way of something"],["blow","n","a hard hit","v","to push out air through your mouth"],["bluff","n","a steep cliff or headland","v","to pretend to be stronger than you are"],["board","n","a flat, thin piece of wood","n","a group of people who oversee an organization"],["bolt","n","a metal pin that screws into a nut","v","to run away suddenly"],["bond","n","a close tie between people","n","a certificate you buy that pays interest"],["book","n","pages bound together in a cover","v","to reserve a room or ticket"],["boom","n","a period of rapid economic growth","v","to make a loud, deep sound"],["bounce","n","a sudden springing back","v","to be refused by the bank, as a check can"],["bow","n","a ribbon tied in loops","v","to bend forward to show respect"],["bowl","n","a deep, round dish for food","v","to roll a ball to knock down pins"],["box","n","a container with a lid","v","to fight with your fists as a sport"],["brace","n","a support that holds something steady","v","to get ready for something unpleasant"],["branch","n","a limb growing from a tree trunk","n","a local office of a larger organization"],["brand","n","the name a company gives its product","v","to burn a mark into skin or hide"],["break","n","a short rest from work","v","to split or smash into pieces"],["bridge","n","a structure that carries a road over water","n","a card game for four players"],["brush","n","a tool with bristles for painting or cleaning","v","to touch lightly in passing"],["buck","n","a male deer","n","a dollar"],["bug","n","a small creeping insect","v","to annoy someone"],["bump","n","a small raised lump","v","to knock into something"],["burn","n","an injury caused by heat or fire","v","to copy data onto a disc"],["call","n","a cry made by a bird or animal","v","to telephone someone"],["can","n","a sealed metal container for food or drink","v","to fire someone from a job"],["cap","n","a soft hat with a peak","n","an upper limit on an amount"],["card","n","a small stiff piece of paper, such as for a greeting","v","to ask someone to show proof of age"],["case","n","a box or covering that holds something","n","a matter decided in a court of law"],["cast","n","a hard wrap that protects a broken bone","n","the actors in a play or film"],["catch","n","a hidden drawback","v","to grab something moving through the air"],["chain","n","a line of linked metal rings","n","a group of stores under one owner"],["change","n","coins given back after you pay","v","to become different"],["charge","n","electrical energy stored in a battery","v","to rush forward in an attack"],["charm","n","an attractive quality that pleases people","n","a small ornament worn on a bracelet"],["check","n","a restaurant bill","v","to examine something to make sure it is right"],["chip","n","a thin, crisp slice of fried potato","n","a tiny electronic circuit"],["clip","n","a small fastener that holds things together","n","a short excerpt from a film or video"],["cloud","n","a mass of water droplets floating in the sky","v","to make something less clear"],["club","n","a group of people who meet for a shared interest","n","a stick for hitting a golf ball"],["coach","n","a person who trains a sports team","n","a long-distance bus"],["coat","n","a long outer garment worn for warmth","v","to cover with a thin layer"],["comb","n","a toothed tool for tidying hair","v","to search a place thoroughly"],["contract","n","a legal agreement between people","v","to become smaller or tighter"],["copy","n","one printed book from an edition","v","to imitate or reproduce something"],["count","n","a European nobleman, like a British earl","v","to say numbers in order"],["counter","n","a flat work surface in a kitchen or shop","v","to respond to an attack with one of your own"],["court","n","a place where legal cases are decided","n","a marked area for playing tennis or basketball"],["cover","n","a lid or wrapping that goes over something","n","a new version of a song first made by someone else"],["crack","n","a narrow gap or split in a surface","v","to solve a code or puzzle"],["cradle","n","a baby's small rocking bed","v","to hold gently in your arms"],["crash","n","a violent collision between vehicles","v","to stay the night at someone's home"],["crop","n","plants grown in large amounts for food","v","to trim the edges off a photo"],["cross","n","two lines meeting at right angles, like a plus sign","v","to go from one side to the other"],["crown","n","a jeweled headpiece worn by a king or queen","n","an artificial cap fitted over a tooth"],["cup","n","a small bowl-shaped container for drinking","n","a trophy awarded to a winner"],["curl","n","a coil of hair","v","to lift a weight by bending your arm"],["curse","n","a spell meant to bring bad luck","v","to swear or use rude language"],["cut","n","a share of money or profits","v","to slice with a knife"],["cycle","n","a series of events that repeat","v","to ride a bicycle"],["dash","n","a long horizontal mark used in punctuation","v","to run quickly"],["date","n","a sweet, sticky fruit from a palm tree","v","to go out romantically with someone"],["deal","n","an agreement between people","v","to hand out cards to players"],["deck","n","a pack of playing cards","n","the floor of a ship"],["deposit","n","a layer of sediment left by water","v","to put money in a bank"],["dig","n","a jab or sarcastic remark","v","to break up and move earth"],["dip","n","a creamy sauce for chips or vegetables","n","a short swim"],["dish","n","a shallow container for serving food","n","a particular food prepared for eating"],["dive","n","a shabby, inexpensive bar","v","to plunge headfirst into water"],["dock","n","a platform where boats tie up","v","to take money off someone's pay"],["down","n","the soft feathers of a bird","v","to swallow quickly"],["draft","n","an early rough version of a piece of writing","n","a current of cool air in a room"],["drag","n","a boring or tiresome thing","v","to pull something heavy along the ground"],["drain","n","a pipe or opening that lets water flow away","v","to tire or use up completely"],["draw","n","a game that ends level, with no winner","v","to make a picture with a pencil or pen"],["dress","n","a one-piece garment for a woman or girl","v","to season a salad with oil and vinegar"],["drift","n","a pile of snow heaped by the wind","v","to be carried slowly along by water or air"],["drill","n","a tool that makes holes","v","to teach by repeated practice"],["drive","n","a strong inner push to succeed","n","a device that stores computer files"],["drop","n","a single bead of liquid","v","to let something fall"],["drum","n","a hollow instrument you beat with sticks","n","a large metal container for oil"],["duck","n","a water bird with a flat bill","v","to lower your head quickly to avoid something"],["dump","n","a place where garbage is left","v","to end a relationship with someone"],["dust","n","fine dry particles lying on surfaces","v","to sprinkle lightly with powder or sugar"],["edge","n","the sharp cutting side of a blade","n","a slight advantage over a rival"],["entrance","n","a door or way into a place","v","to fill with wonder and delight"],["express","n","a fast train or delivery service","v","to put a thought or feeling into words"],["fall","n","the season between summer and winter","v","to drop down to a lower place"],["fan","n","a device that stirs the air to cool you","n","an enthusiastic supporter of a team or star"],["fence","n","a barrier around a yard or field","v","to fight with thin swords as a sport"],["field","n","an open stretch of grass or farmland","n","a branch of study or work"],["figure","n","a number written as a symbol","n","the shape of a person's body"],["file","n","a folder or digital record of documents","v","to smooth a surface with a rough tool"],["film","n","a movie shown in a theater","n","a very thin layer covering a surface"],["fire","n","flames, light and heat from burning","v","to dismiss someone from a job"],["fit","n","a sudden outburst, as of rage or laughter","v","to be the right size or shape"],["fix","n","a difficult situation you cannot easily escape","v","to repair something broken"],["flag","n","a piece of cloth used as an emblem or signal","v","to grow tired or weak"],["flap","n","a hinged piece that covers an opening","v","to move wings up and down"],["flash","n","a sudden bright light, as from a camera","v","to show something briefly"],["flip","n","a somersault in the air","v","to toss a coin"],["float","n","a decorated vehicle in a parade","v","to rest on the surface of water"],["flush","n","a poker hand with all cards of one suit","v","to turn red in the face"],["fly","n","a small insect with wings","v","to travel through the air"],["fold","n","a pen where sheep are kept","v","to bend something over on itself"],["foot","n","the part of the body you stand on","v","to pay the cost of something"],["fork","n","a utensil with prongs for eating","n","a point where a road splits in two"],["form","n","a document with blanks to fill in","v","to shape or create something"],["frame","n","a border that holds a picture","v","to make an innocent person look guilty"],["grade","n","a mark given for schoolwork","n","the steepness of a slope"],["grain","n","a small hard seed of a cereal plant","n","the pattern of fibers in wood"],["ground","n","the solid surface of the earth","v","to forbid a teenager from going out"],["hammer","n","a tool for driving nails","v","to defeat or criticize severely"],["hand","n","the cards held by a player","v","to pass something to someone"],["harbor","n","a sheltered place where ships anchor","v","to hold on to a feeling or secret"],["hatch","n","a small door or opening in a floor or ship","v","to break out of an egg"],["head","n","the part of the body that holds the brain","v","to go in a certain direction"],["heat","n","a preliminary round of a race","v","to make something warm"],["heel","n","the back part of your foot","v","to lean over to one side, as a ship does"],["hit","n","a very popular song or show","v","to strike with force"],["hold","n","the cargo space inside a ship","v","to keep something in your hands"],["hook","n","a curved piece of metal for hanging or catching","n","the catchy part of a song"],["issue","n","one edition of a magazine","n","a problem that needs dealing with"],["jam","n","a sweet spread made of fruit","v","to play music together without a plan"],["jar","n","a glass container with a lid","v","to give a sudden shock or jolt"],["jet","n","a fast aircraft with powerful engines","n","a narrow stream of liquid or gas shot out"],["key","n","a metal tool that opens a lock","n","a button on a piano or keyboard"],["kick","n","a thrill or burst of excitement","v","to strike something with your foot"],["kid","n","a young goat","v","to tease or joke with someone"],["kite","n","a light frame flown in the wind on a string","n","a bird of prey with long wings"],["knot","n","a fastening made by tying rope or string","n","a unit of speed at sea"],["label","n","a tag that gives information about something","n","a company that produces recorded music"],["lace","n","fine fabric with a pattern of holes","v","to tie up with a cord, as shoes"],["land","n","a country or nation","v","to come down to the ground after a flight"],["lap","n","the flat area made by your thighs when you sit","n","one full circuit of a race track"],["lead","n","a soft, heavy, gray metal","v","to guide others by going in front"],["leaf","n","a flat green part of a plant","v","to turn the pages of a book"],["leak","n","a small hole where liquid or gas escapes","v","to secretly reveal information"],["leave","n","time off work for rest or illness","v","to go away from a place"],["letter","n","a symbol in the alphabet","n","a written message sent in an envelope"],["level","n","one floor of a building","v","to flatten or knock down"],["lie","n","a statement you know is false","v","to rest flat on a surface"],["lift","n","a free ride in someone's car","v","to raise something to a higher position"],["light","n","brightness that lets you see","v","to set fire to something"],["line","n","a row of people waiting their turn","v","to cover the inside of something with a layer"],["list","n","a series of items written one under another","v","to lean over to one side, as a ship does"],["litter","n","trash left lying around","n","puppies or kittens born at the same time"],["load","n","a heavy thing carried by a vehicle or person","v","to put data or software into a computer"],["lock","n","a fastening that needs a key","n","a curl or strand of hair"],["log","n","a thick section of a fallen tree","n","an official record of events"],["mail","n","letters and packages delivered by post","n","armor made of linked metal rings"],["mark","n","a visible spot or stain","v","to grade a student's work"],["market","n","an open place where goods are bought and sold","v","to promote something for sale"],["match","n","a small stick that makes fire when struck","n","a sports contest between two players or teams"],["mind","n","the part of you that thinks","v","to object to something"],["miss","v","to fail to hit or catch","v","to long for someone who is gone"],["model","n","a small-scale copy of something larger","v","to wear clothes to show them off"],["mold","n","a fuzzy fungus that grows on old food","n","a hollow container that gives shape to something that sets"],["mount","n","a mountain","v","to climb onto a horse or a bicycle"],["mouse","n","a small gray rodent with a long tail","n","a hand-held device for moving a cursor"],["mouth","n","the opening in your face used for eating","n","the place where a river flows into the sea"],["nail","n","a thin metal spike hammered into wood","n","the hard plate at the tip of a finger"],["net","n","a mesh of cord used for catching fish","n","the amount left after expenses are subtracted"],["nose","n","the part of your face used for smelling","v","to push forward carefully, as a boat or car does"],["note","n","a short written message","n","a single musical sound"],["notice","n","a written announcement put up for people to read","v","to become aware of something"],["nurse","n","a person trained to look after the sick","v","to make a drink last a long time"],["object","n","a thing you can see or touch","v","to say that you disagree"],["order","n","a request for food or goods","n","a neat arrangement"],["pace","n","the speed at which you move","v","to walk back and forth"],["pack","n","a group of wolves or dogs that hunt together","v","to put things into a suitcase"],["pad","n","a block of sheets of paper fastened at one edge","v","to add extra material to make something longer"],["page","n","one side of a sheet of paper in a book","v","to call someone over a loudspeaker or pager"],["pan","n","a shallow cooking vessel with a handle","v","to criticize something harshly"],["panel","n","a flat section of a wall or door","n","a group of people chosen to discuss or judge"],["paper","n","a thin sheet for writing or printing on","v","to cover walls with decorative sheets"],["park","n","a public area of grass and trees","v","to leave a vehicle in a spot"],["pass","n","a narrow route through mountains","v","to hand something to someone"],["patch","n","a piece of cloth sewn over a hole","n","a small plot of ground, as for vegetables"],["pick","n","a small flat piece for plucking guitar strings","v","to gather fruit from a tree"],["pile","n","a heap of things stacked up","n","the soft raised surface of a carpet"],["pilot","n","a person who flies an aircraft","n","a first trial episode of a TV series"],["pin","n","one of the standing targets knocked down in bowling","v","to hold someone down in wrestling"],["pinch","n","a small amount you can hold between finger and thumb","v","to squeeze painfully"],["pipe","n","a tube that carries water or gas","n","a small bowl with a stem for smoking"],["pit","n","a large hole dug in the ground","n","the hard seed inside a cherry or peach"],["pitch","n","how high or low a musical sound is","v","to set up a tent"],["plane","n","a flying vehicle with wings and engines","n","a hand tool for smoothing wood"],["plant","n","a factory where goods are made","v","to put seeds into the ground"],["play","n","a story performed by actors on stage","v","to make music with an instrument"],["plot","n","a small piece of land set aside for a use","n","the main events of a story"],["plug","n","a device that connects to an electrical outlet","v","to promote something publicly"],["pocket","n","a small pouch sewn into clothing","v","to sink a ball in billiards"],["point","n","a sharp tip","v","to show a direction with a finger"],["pole","n","a long slender rod","n","one of the two ends of a magnet or planet's axis"],["pool","n","a place filled with water for swimming","n","a game played with balls and a cue on a table"],["pop","n","a fizzy soft drink","v","to burst with a sharp sound"],["port","n","a harbor where ships dock","n","a sweet dark red wine"],["post","n","a strong upright pole set in the ground","v","to publish a message online"],["pound","n","a place where stray dogs are kept","v","to hit again and again"],["present","n","a gift wrapped for a special occasion","v","to give or introduce formally to an audience"],["press","n","newspapers and the people who write them","v","to push something firmly down"],["print","n","a mark left by pressing something into a soft surface","v","to produce words on paper with a machine"],["project","n","a planned piece of work","v","to throw an image onto a screen"],["pump","n","a machine that moves liquid or air","n","a light, low-cut shoe"],["punch","n","a sweet drink of fruit juice served at parties","v","to hit with a closed fist"],["quarter","n","a coin worth twenty-five cents","v","to give someone a place to live, as soldiers"],["rack","n","a frame or shelf for holding things","v","to strain hard to remember something"],["rail","n","a bar you hold for safety","v","to complain angrily"],["rake","n","a long-handled tool with teeth for gathering leaves","v","to search through thoroughly"],["ram","n","a male sheep","v","to crash into with great force"],["range","n","a row of connected mountains","n","a kitchen stove with an oven"],["rate","n","the speed at which something happens","v","to judge how good something is"],["record","n","a flat vinyl disc that plays music","n","the best result ever achieved in a sport"],["reel","n","a spool for winding fishing line or film","v","to stagger as if dizzy"],["rest","n","what is left over; the remainder","v","to stop working and relax"],["ring","n","a band worn on a finger","v","to make the sound of a bell"],["roast","n","a piece of meat cooked in an oven","v","to tease someone with humorous insults"],["rock","n","a lump of hard mineral material","n","loud guitar-driven popular music"],["roll","n","a small round piece of bread","v","to turn over and over along a surface"],["root","n","the part of a plant that grows underground","v","to cheer for a team"],["round","n","one stage of a contest","v","to change a number to the nearest whole number"],["rub","n","a hitch or snag that spoils a plan","v","to press and move your hand back and forth"],["run","n","a point scored in baseball","v","to manage or operate a business"],["rush","n","a grassy plant growing in wet places","v","to move quickly in a hurry"],["sack","n","a large rough bag for carrying goods","v","to dismiss someone from a job"],["sail","n","a large piece of cloth that catches the wind on a boat","v","to glide smoothly through the air"],["scale","n","a thin, hard plate covering a fish or reptile","n","a device for weighing things"],["school","n","a place where children are taught","n","a large group of fish swimming together"],["score","n","the written notation of a piece of music","v","to earn a point in a game"],["scrap","n","a small leftover piece of something","v","to get rid of or cancel a plan"],["scratch","n","a thin mark or cut made by something sharp","v","to withdraw from a competition"],["screen","n","a flat surface where images are displayed","v","to check people or things for danger or illness"],["seal","n","a sleek sea mammal with flippers","v","to close something tightly so nothing escapes"],["season","n","one of the four parts of the year","v","to add salt or spices to food"],["seat","n","a place to sit down","n","a position as an elected member of a legislature"],["second","n","a very short unit of time","v","to support a proposal formally"],["seed","n","a small grain from which a plant grows","v","to give a top player an easier path in a tournament"],["set","n","a group of matching things sold together","v","to put something in a particular place"],["shade","n","a dark area out of the sun","n","a slightly different tone of a color"],["shake","n","a thick drink of milk and ice cream","v","to move quickly back and forth"],["share","n","one part of something divided among people","n","one unit of ownership in a company"],["sheet","n","a large rectangle of cloth for a bed","n","a single piece of paper"],["shell","n","the hard outer covering of a nut or egg","v","to hand over money, usually with 'out'"],["shift","n","a scheduled period of work","v","to move from one place to another"],["shock","n","a sudden, upsetting surprise","n","a thick untidy mass of hair"],["shop","n","a workshop where things are made or repaired","v","to look for things to buy"],["shower","n","a short fall of rain","n","a party where gifts are given to a bride or new parent"],["sign","n","a board with words giving information","v","to write your name on something"],["sink","n","a basin with a tap for washing","v","to go down below the surface of water"],["slice","n","a thin piece cut from something","v","to hit a golf ball so it curves off course"],["slide","n","a slope that children glide down in a playground","n","a single page of a presentation"],["slip","n","a small piece of paper","v","to lose your footing and slide"],["snap","n","a button-like fastener that clicks shut","v","to speak sharply in anger"],["sound","n","anything you can hear","n","a narrow stretch of water connecting larger seas"],["spell","n","a magic charm or incantation","v","to name the letters of a word in order"],["spike","n","a long sharp piece of metal","n","a sudden sharp rise in a graph"],["spin","n","a slanted way of presenting news","v","to turn round and round quickly"],["spot","n","a small round mark on a surface","v","to catch sight of something"],["spray","n","a fine mist of liquid","n","a small bunch of flowers"],["spring","n","the season after winter","n","a coil of metal that returns to its shape"],["square","n","an open public space in a town","v","to settle a debt or make things agree"],["staff","n","a long stick used for support or as a symbol of authority","n","the five lines on which music is written"],["stage","n","a raised platform where performers appear","n","one step in a series of events"],["stake","n","a pointed post driven into the ground","n","money risked on a bet"],["stall","n","a small stand where goods are sold in a market","v","to stop running suddenly, as an engine does"],["stamp","n","a small paper label stuck on an envelope","v","to bring your foot down hard"],["stand","n","a small table or rack for holding something","v","to put up with something unpleasant"],["star","n","a bright point of light in the night sky","n","a famous performer"],["steer","n","a young male ox raised for beef","v","to guide a vehicle"],["stem","n","the main stalk of a plant","v","to stop the flow of something"],["stick","n","a thin piece of wood","v","to attach with glue or tape"],["still","n","a device for distilling liquor","v","to make quiet or calm"],["stock","n","a rich liquid used as a base for soups","n","a share of ownership in a company"],["stone","n","a small piece of rock","n","a British unit of weight equal to fourteen pounds"],["store","n","a place that sells goods","v","to keep something for later use"],["storm","n","violent weather with strong wind and rain","v","to attack a place suddenly with force"],["stream","n","a small river","v","to watch a video online as it downloads"],["strike","n","a stoppage of work by employees","n","knocking down all the pins with the first ball in bowling"],["string","n","thin cord or thread","n","a series of connected things, like a run of wins"],["strip","n","a long, narrow piece of something","v","to remove the covering from"],["stroke","n","a single sweep of a brush or pen","v","to pet or rub gently"],["stuff","n","miscellaneous things or belongings","v","to fill something tightly with material"],["suit","n","one of the four groups in a deck of cards","v","to be right or convenient for someone"],["swallow","n","a small, fast-flying bird with a forked tail","v","to take food or drink down your throat"],["swing","n","a hanging seat that moves back and forth","n","a sharp shift in opinion or mood"],["switch","n","a small control that turns a device on or off","v","to change from one thing to another"],["tack","n","a small sharp nail with a broad head","n","a boat's course relative to the wind"],["tackle","n","equipment used for fishing","v","to bring down a player in football"],["tag","n","a small label attached to something","n","a children's game where one player chases the others"],["tail","n","the long part at the back of an animal's body","v","to follow someone secretly"],["tank","n","a large container for liquid or gas","v","to fail badly"],["tap","n","a valve you turn to let water flow","v","to hit lightly with your fingers"],["tape","n","a strip of sticky material for fastening","v","to record sound or video"],["taste","n","a person's sense of what is stylish or beautiful","v","to try the flavor of food"],["tear","n","a drop of salty water from the eye","v","to pull apart or rip"],["thumb","n","the short, thick digit of your hand","v","to hitchhike"],["ticket","n","a slip of paper that lets you enter a place","v","to give a driver a fine"],["tie","n","a strip of cloth worn around the collar","n","a result where both sides have equal scores"],["tip","n","extra money given to a waiter","n","the very end of something pointed"],["toast","n","sliced bread browned by heat","v","to raise a glass in someone's honor"],["top","n","a toy that spins on its point","v","to do better than; surpass"],["track","n","a running course for races","n","a single song on an album"],["trade","n","a job that needs skilled manual work","v","to swap one thing for another"],["train","n","a line of railway carriages pulled by an engine","n","the long trailing part of a formal dress"],["trap","n","a device that catches animals","n","a bend in a drain pipe that holds water"],["trip","n","a short journey","v","to catch your foot and stumble"],["tune","n","a melody that is easy to remember","v","to adjust a machine so it runs well"],["turn","n","your chance to play in a game","v","to rotate around a center"],["twist","n","an unexpected change in a story","v","to turn or wring something around itself"],["type","n","a kind or sort of thing","v","to write using a keyboard"],["vault","n","a locked room for storing valuables","v","to jump over something using your hands or a pole"],["wake","n","a trail of waves left behind a moving boat","v","to stop sleeping"],["watch","n","a small clock worn on the wrist","v","to look at something carefully"],["water","n","the clear liquid in rivers and rain","v","to give plants a drink"],["wave","n","a moving ridge on the surface of water","v","to move your hand back and forth in greeting"],["wedge","n","a V-shaped piece of wood or metal","v","to squeeze tightly into a gap"],["whip","n","a cord or strap used for striking animals","v","to beat cream until it thickens"],["wind","n","moving air outdoors","v","to wrap or turn something around and around"],["wire","n","a thin strand of metal","v","to send money electronically"],["work","n","a job you do for pay","v","to function properly"],["wrap","n","a sandwich rolled in a flatbread","v","to cover something with paper or cloth"]];
+var POOL = [["ace","n","a playing card marked with a single spot","v","to do extremely well on a test"],["act","n","one main division of a play","v","to do something; take action"],["address","n","the street and number where someone lives","v","to speak formally to an audience"],["aim","n","the goal you are working toward","v","to point something at a target"],["air","n","the mixture of gases we breathe","v","to broadcast on radio or television"],["appeal","n","a quality that attracts people","v","to ask a higher court to review a decision"],["back","n","the rear part of your body","v","to support someone"],["bag","n","a soft container for carrying things","v","to catch or win something"],["balance","n","the amount of money left in an account","v","to keep steady without falling"],["band","n","a group of musicians","n","a thin strip worn around something"],["bank","n","land along the edge of a river","n","a place that keeps and lends money"],["bar","n","a place that serves drinks","v","to block the way"],["bark","n","the tough outer covering of a tree","v","to make the sharp sound a dog makes"],["bat","n","a small flying mammal that comes out at night","n","a club for hitting a ball"],["bear","n","a large, heavy, furry animal","v","to carry or put up with something"],["beat","n","the steady pulse of music","v","to hit again and again"],["bed","n","a piece of furniture for sleeping","n","a patch of ground for planting flowers"],["bill","n","a bird's beak","n","a written statement of money owed"],["block","n","a section of a city between streets","v","to get in the way of something"],["blow","n","a hard hit","v","to push out air through your mouth"],["bluff","n","a steep cliff or headland","v","to pretend to be stronger than you are"],["board","n","a flat, thin piece of wood","n","a group of people who oversee an organization"],["bolt","n","a metal pin that screws into a nut","v","to run away suddenly"],["bond","n","a close tie between people","n","a certificate you buy that pays interest"],["book","n","pages bound together in a cover","v","to reserve a room or ticket"],["boom","n","a period of rapid economic growth","v","to make a loud, deep sound"],["bounce","n","a sudden springing back","v","to be refused by the bank, as a check can"],["bow","n","a ribbon tied in loops","v","to bend forward to show respect"],["bowl","n","a deep, round dish for food","v","to roll a ball to knock down pins"],["box","n","a container with a lid","v","to fight with your fists as a sport"],["brace","n","a support that holds something steady","v","to get ready for something unpleasant"],["branch","n","a limb growing from a tree trunk","n","a local office of a larger organization"],["brand","n","the name a company gives its product","v","to burn a mark into skin or hide"],["break","n","a short rest from work","v","to split or smash into pieces"],["bridge","n","a structure that carries a road over water","n","a card game for one to four players"],["brush","n","a tool with bristles for painting or cleaning","v","to touch lightly in passing"],["buck","n","a male deer","n","a dollar"],["bug","n","a small creeping insect","v","to annoy someone"],["bump","n","a small raised lump","v","to knock into something"],["burn","n","an injury caused by heat or fire","v","to copy data onto a disc"],["call","n","a cry made by a bird or animal","v","to telephone someone"],["can","n","a sealed metal container for food or drink","v","to fire someone from a job"],["cap","n","a soft hat with a peak","n","an upper limit on an amount"],["card","n","a small stiff piece of paper, such as for a greeting","v","to ask someone to show proof of age"],["case","n","a box or covering that holds something","n","a matter decided in a court of law"],["cast","n","a hard wrap that protects a broken bone","n","the actors in a play or film"],["catch","n","a hidden drawback","v","to grab something moving through the air"],["chain","n","a line of linked metal rings","n","a group of stores under one owner"],["change","n","coins given back after you pay","v","to become different"],["charge","n","electrical energy stored in a battery","v","to rush forward in an attack"],["charm","n","an attractive quality that pleases people","n","a small ornament worn on a bracelet"],["check","n","a restaurant bill","v","to examine something to make sure it is right"],["chip","n","a thin, crisp slice of fried potato","n","a tiny electronic circuit"],["clip","n","a small fastener that holds things together","n","a short excerpt from a film or video"],["cloud","n","a mass of water droplets floating in the sky","v","to make something less clear"],["club","n","a group of people who meet for a shared interest","n","a stick for hitting a golf ball"],["coach","n","a person who trains a sports team","n","a long-distance bus"],["coat","n","a long outer garment worn for warmth","v","to cover with a thin layer"],["comb","n","a toothed tool for tidying hair","v","to search a place thoroughly"],["contract","n","a legal agreement between people","v","to become smaller or tighter"],["copy","n","one printed book from an edition","v","to imitate or reproduce something"],["count","n","a European nobleman, like a British earl","v","to say numbers in order"],["counter","n","a flat work surface in a kitchen or shop","v","to respond to an attack with one of your own"],["court","n","a place where legal cases are decided","n","a marked area for playing tennis or basketball"],["cover","n","a lid or wrapping that goes over something","n","a new version of a song first made by someone else"],["crack","n","a narrow gap or split in a surface","v","to solve a code or puzzle"],["cradle","n","a baby's small rocking bed","v","to hold gently in your arms"],["crash","n","a violent collision between vehicles","v","to stay the night at someone's home"],["crop","n","plants grown in large amounts for food","v","to trim the edges off a photo"],["cross","n","two lines meeting at right angles, like a plus sign","v","to go from one side to the other"],["crown","n","a jeweled headpiece worn by a king or queen","n","an artificial cap fitted over a tooth"],["cup","n","a small bowl-shaped container for drinking","n","a trophy awarded to a winner"],["curl","n","a coil of hair","v","to lift a weight by bending your arm"],["curse","n","a spell meant to bring bad luck","v","to swear or use rude language"],["cut","n","a share of money or profits","v","to slice with a knife"],["cycle","n","a series of events that repeat","v","to ride a bicycle"],["dash","n","a long horizontal mark used in punctuation","v","to run quickly"],["date","n","a sweet, sticky fruit from a palm tree","v","to go out romantically with someone"],["deal","n","an agreement between people","v","to hand out cards to players"],["deck","n","a pack of playing cards","n","the floor of a ship"],["deposit","n","a layer of sediment left by water","v","to put money in a bank"],["dig","n","a jab or sarcastic remark","v","to break up and move earth"],["dip","n","a creamy sauce for chips or vegetables","n","a short swim"],["dish","n","a shallow container for serving food","n","a particular food prepared for eating"],["dive","n","a shabby, inexpensive bar","v","to plunge headfirst into water"],["dock","n","a platform where boats tie up","v","to take money off someone's pay"],["down","n","the soft feathers of a bird","v","to swallow quickly"],["draft","n","an early rough version of a piece of writing","n","a current of cool air in a room"],["drag","n","a boring or tiresome thing","v","to pull something heavy along the ground"],["drain","n","a pipe or opening that lets water flow away","v","to tire or use up completely"],["draw","n","a game that ends level, with no winner","v","to make a picture with a pencil or pen"],["dress","n","a one-piece garment for a woman or girl","v","to season a salad with oil and vinegar"],["drift","n","a pile of snow heaped by the wind","v","to be carried slowly along by water or air"],["drill","n","a tool that makes holes","v","to teach by repeated practice"],["drive","n","a strong inner push to succeed","n","a device that stores computer files"],["drop","n","a single bead of liquid","v","to let something fall"],["drum","n","a hollow instrument you beat with sticks","n","a large metal container for oil"],["duck","n","a water bird with a flat bill","v","to lower your head quickly to avoid something"],["dump","n","a place where garbage is left","v","to end a relationship with someone"],["dust","n","fine dry particles lying on surfaces","v","to sprinkle lightly with powder or sugar"],["edge","n","the sharp cutting side of a blade","n","a slight advantage over a rival"],["entrance","n","a door or way into a place","v","to fill with wonder and delight"],["express","n","a fast train or delivery service","v","to put a thought or feeling into words"],["fall","n","the season between summer and winter","v","to drop down to a lower place"],["fan","n","a device that stirs the air to cool you","n","an enthusiastic supporter of a team or star"],["fence","n","a barrier around a yard or field","v","to fight with thin swords as a sport"],["field","n","an open stretch of grass or farmland","n","a branch of study or work"],["figure","n","a number written as a symbol","n","the shape of a person's body"],["file","n","a folder or digital record of documents","v","to smooth a surface with a rough tool"],["film","n","a movie shown in a theater","n","a very thin layer covering a surface"],["fire","n","flames, light and heat from burning","v","to dismiss someone from a job"],["fit","n","a sudden outburst, as of rage or laughter","v","to be the right size or shape"],["fix","n","a difficult situation you cannot easily escape","v","to repair something broken"],["flag","n","a piece of cloth used as an emblem or signal","v","to grow tired or weak"],["flap","n","a hinged piece that covers an opening","v","to move wings up and down"],["flash","n","a sudden bright light, as from a camera","v","to show something briefly"],["flip","n","a somersault in the air","v","to toss a coin"],["float","n","a decorated vehicle in a parade","v","to rest on the surface of water"],["flush","n","a poker hand with all cards of one suit","v","to turn red in the face"],["fly","n","a small insect with wings","v","to travel through the air"],["fold","n","a pen where sheep are kept","v","to bend something over on itself"],["foot","n","the part of the body you stand on","v","to pay the cost of something"],["fork","n","a utensil with prongs for eating","n","a point where a road splits in two"],["form","n","a document with blanks to fill in","v","to shape or create something"],["frame","n","a border that holds a picture","v","to make an innocent person look guilty"],["grade","n","a mark given for schoolwork","n","the steepness of a slope"],["grain","n","a small hard seed of a cereal plant","n","the pattern of fibers in wood"],["ground","n","the solid surface of the earth","v","to forbid a teenager from going out"],["hammer","n","a tool for driving nails","v","to defeat or criticize severely"],["hand","n","the cards held by a player","v","to pass something to someone"],["harbor","n","a sheltered place where ships anchor","v","to hold on to a feeling or secret"],["hatch","n","a small door or opening in a floor or ship","v","to break out of an egg"],["head","n","the part of the body that holds the brain","v","to go in a certain direction"],["heat","n","a preliminary round of a race","v","to make something warm"],["heel","n","the back part of your foot","v","to lean over to one side, as a ship does"],["hit","n","a very popular song or show","v","to strike with force"],["hold","n","the cargo space inside a ship","v","to keep something in your hands"],["hook","n","a curved piece of metal for hanging or catching","n","the catchy part of a song"],["issue","n","one edition of a magazine","n","a problem that needs dealing with"],["jam","n","a sweet spread made of fruit","v","to play music together without a plan"],["jar","n","a glass container with a lid","v","to give a sudden shock or jolt"],["jet","n","a fast aircraft with powerful engines","n","a narrow stream of liquid or gas shot out"],["key","n","a metal tool that opens a lock","n","a button on a piano or keyboard"],["kick","n","a thrill or burst of excitement","v","to strike something with your foot"],["kid","n","a young goat","v","to tease or joke with someone"],["kite","n","a light frame flown in the wind on a string","n","a bird of prey with long wings"],["knot","n","a fastening made by tying rope or string","n","a unit of speed at sea"],["label","n","a tag that gives information about something","n","a company that produces recorded music"],["lace","n","fine fabric with a pattern of holes","v","to tie up with a cord, as shoes"],["land","n","a country or nation","v","to come down to the ground after a flight"],["lap","n","the flat area made by your thighs when you sit","n","one full circuit of a race track"],["lead","n","a soft, heavy, gray metal","v","to guide others by going in front"],["leaf","n","a flat green part of a plant","v","to turn the pages of a book"],["leak","n","a small hole where liquid or gas escapes","v","to secretly reveal information"],["leave","n","time off work for rest or illness","v","to go away from a place"],["letter","n","a symbol in the alphabet","n","a written message sent in an envelope"],["level","n","one floor of a building","v","to flatten or knock down"],["lie","n","a statement you know is false","v","to rest flat on a surface"],["lift","n","a free ride in someone's car","v","to raise something to a higher position"],["light","n","brightness that lets you see","v","to set fire to something"],["line","n","a row of people waiting their turn","v","to cover the inside of something with a layer"],["list","n","a series of items written one under another","v","to lean over to one side, as a ship does"],["litter","n","trash left lying around","n","puppies or kittens born at the same time"],["load","n","a heavy thing carried by a vehicle or person","v","to put data or software into a computer"],["lock","n","a fastening that needs a key","n","a curl or strand of hair"],["log","n","a thick section of a fallen tree","n","an official record of events"],["mail","n","letters and packages delivered by post","n","armor made of linked metal rings"],["mark","n","a visible spot or stain","v","to grade a student's work"],["market","n","an open place where goods are bought and sold","v","to promote something for sale"],["match","n","a small stick that makes fire when struck","n","a sports contest between two players or teams"],["mind","n","the part of you that thinks","v","to object to something"],["miss","v","to fail to hit or catch","v","to long for someone who is gone"],["model","n","a small-scale copy of something larger","v","to wear clothes to show them off"],["mold","n","a fuzzy fungus that grows on old food","n","a hollow container that gives shape to something that sets"],["mount","n","a mountain","v","to climb onto a horse or a bicycle"],["mouse","n","a small gray rodent with a long tail","n","a hand-held device for moving a cursor"],["mouth","n","the opening in your face used for eating","n","the place where a river flows into the sea"],["nail","n","a thin metal spike hammered into wood","n","the hard plate at the tip of a finger"],["net","n","a mesh of cord used for catching fish","n","the amount left after expenses are subtracted"],["nose","n","the part of your face used for smelling","v","to push forward carefully, as a boat or car does"],["note","n","a short written message","n","a single musical sound"],["notice","n","a written announcement put up for people to read","v","to become aware of something"],["nurse","n","a person trained to look after the sick","v","to make a drink last a long time"],["object","n","a thing you can see or touch","v","to say that you disagree"],["order","n","a request for food or goods","n","a neat arrangement"],["pace","n","the speed at which you move","v","to walk back and forth"],["pack","n","a group of wolves or dogs that hunt together","v","to put things into a suitcase"],["pad","n","a block of sheets of paper fastened at one edge","v","to add extra material to make something longer"],["page","n","one side of a sheet of paper in a book","v","to call someone over a loudspeaker or pager"],["pan","n","a shallow cooking vessel with a handle","v","to criticize something harshly"],["panel","n","a flat section of a wall or door","n","a group of people chosen to discuss or judge"],["paper","n","a thin sheet for writing or printing on","v","to cover walls with decorative sheets"],["park","n","a public area of grass and trees","v","to leave a vehicle in a spot"],["pass","n","a narrow route through mountains","v","to hand something to someone"],["patch","n","a piece of cloth sewn over a hole","n","a small plot of ground, as for vegetables"],["pick","n","a small flat piece for plucking guitar strings","v","to gather fruit from a tree"],["pile","n","a heap of things stacked up","n","the soft raised surface of a carpet"],["pilot","n","a person who flies an aircraft","n","a first trial episode of a TV series"],["pin","n","one of the standing targets knocked down in bowling","v","to hold someone down in wrestling"],["pinch","n","a small amount you can hold between finger and thumb","v","to squeeze painfully"],["pipe","n","a tube that carries water or gas","n","a small bowl with a stem for smoking"],["pit","n","a large hole dug in the ground","n","the hard seed inside a cherry or peach"],["pitch","n","how high or low a musical sound is","v","to set up a tent"],["plane","n","a flying vehicle with wings and engines","n","a hand tool for smoothing wood"],["plant","n","a factory where goods are made","v","to put seeds into the ground"],["play","n","a story performed by actors on stage","v","to make music with an instrument"],["plot","n","a small piece of land set aside for a use","n","the main events of a story"],["plug","n","a device that connects to an electrical outlet","v","to promote something publicly"],["pocket","n","a small pouch sewn into clothing","v","to sink a ball in billiards"],["point","n","a sharp tip","v","to show a direction with a finger"],["pole","n","a long slender rod","n","one of the two ends of a magnet or planet's axis"],["pool","n","a place filled with water for swimming","n","a game played with balls and a cue on a table"],["pop","n","a fizzy soft drink","v","to burst with a sharp sound"],["port","n","a harbor where ships dock","n","a sweet dark red wine"],["post","n","a strong upright pole set in the ground","v","to publish a message online"],["pound","n","a place where stray dogs are kept","v","to hit again and again"],["present","n","a gift wrapped for a special occasion","v","to give or introduce formally to an audience"],["press","n","newspapers and the people who write them","v","to push something firmly down"],["print","n","a mark left by pressing something into a soft surface","v","to produce words on paper with a machine"],["project","n","a planned piece of work","v","to throw an image onto a screen"],["pump","n","a machine that moves liquid or air","n","a light, low-cut shoe"],["punch","n","a sweet drink of fruit juice served at parties","v","to hit with a closed fist"],["quarter","n","a coin worth twenty-five cents","v","to give someone a place to live, as soldiers"],["rack","n","a frame or shelf for holding things","v","to strain hard to remember something"],["rail","n","a bar you hold for safety","v","to complain angrily"],["rake","n","a long-handled tool with teeth for gathering leaves","v","to search through thoroughly"],["ram","n","a male sheep","v","to crash into with great force"],["range","n","a row of connected mountains","n","a kitchen stove with an oven"],["rate","n","the speed at which something happens","v","to judge how good something is"],["record","n","a flat vinyl disc that plays music","n","the best result ever achieved in a sport"],["reel","n","a spool for winding fishing line or film","v","to stagger as if dizzy"],["rest","n","what is left over; the remainder","v","to stop working and relax"],["ring","n","a band worn on a finger","v","to make the sound of a bell"],["roast","n","a piece of meat cooked in an oven","v","to tease someone with humorous insults"],["rock","n","a lump of hard mineral material","n","loud guitar-driven popular music"],["roll","n","a small round piece of bread","v","to turn over and over along a surface"],["root","n","the part of a plant that grows underground","v","to cheer for a team"],["round","n","one stage of a contest","v","to change a number to the nearest whole number"],["rub","n","a hitch or snag that spoils a plan","v","to press and move your hand back and forth"],["run","n","a point scored in baseball","v","to manage or operate a business"],["rush","n","a grassy plant growing in wet places","v","to move quickly in a hurry"],["sack","n","a large rough bag for carrying goods","v","to dismiss someone from a job"],["sail","n","a large piece of cloth that catches the wind on a boat","v","to glide smoothly through the air"],["scale","n","a thin, hard plate covering a fish or reptile","n","a device for weighing things"],["school","n","a place where children are taught","n","a large group of fish swimming together"],["score","n","the written notation of a piece of music","v","to earn a point in a game"],["scrap","n","a small leftover piece of something","v","to get rid of or cancel a plan"],["scratch","n","a thin mark or cut made by something sharp","v","to withdraw from a competition"],["screen","n","a flat surface where images are displayed","v","to check people or things for danger or illness"],["seal","n","a sleek sea mammal with flippers","v","to close something tightly so nothing escapes"],["season","n","one of the four parts of the year","v","to add salt or spices to food"],["seat","n","a place to sit down","n","a position as an elected member of a legislature"],["second","n","a very short unit of time","v","to support a proposal formally"],["seed","n","a small grain from which a plant grows","v","to give a top player an easier path in a tournament"],["set","n","a group of matching things sold together","v","to put something in a particular place"],["shade","n","a dark area out of the sun","n","a slightly different tone of a color"],["shake","n","a thick drink of milk and ice cream","v","to move quickly back and forth"],["share","n","one part of something divided among people","n","one unit of ownership in a company"],["sheet","n","a large rectangle of cloth for a bed","n","a single piece of paper"],["shell","n","the hard outer covering of a nut or egg","v","to hand over money, usually with 'out'"],["shift","n","a scheduled period of work","v","to move from one place to another"],["shock","n","a sudden, upsetting surprise","n","a thick untidy mass of hair"],["shop","n","a workshop where things are made or repaired","v","to look for things to buy"],["shower","n","a short fall of rain","n","a party where gifts are given to a bride or new parent"],["sign","n","a board with words giving information","v","to write your name on something"],["sink","n","a basin with a tap for washing","v","to go down below the surface of water"],["slice","n","a thin piece cut from something","v","to hit a golf ball so it curves off course"],["slide","n","a slope that children glide down in a playground","n","a single page of a presentation"],["slip","n","a small piece of paper","v","to lose your footing and slide"],["snap","n","a button-like fastener that clicks shut","v","to speak sharply in anger"],["sound","n","anything you can hear","n","a narrow stretch of water connecting larger seas"],["spell","n","a magic charm or incantation","v","to name the letters of a word in order"],["spike","n","a long sharp piece of metal","n","a sudden sharp rise in a graph"],["spin","n","a slanted way of presenting news","v","to turn round and round quickly"],["spot","n","a small round mark on a surface","v","to catch sight of something"],["spray","n","a fine mist of liquid","n","a small bunch of flowers"],["spring","n","the season after winter","n","a coil of metal that returns to its shape"],["square","n","an open public space in a town","v","to settle a debt or make things agree"],["staff","n","a long stick used for support or as a symbol of authority","n","the five lines on which music is written"],["stage","n","a raised platform where performers appear","n","one step in a series of events"],["stake","n","a pointed post driven into the ground","n","money risked on a bet"],["stall","n","a small stand where goods are sold in a market","v","to stop running suddenly, as an engine does"],["stamp","n","a small paper label stuck on an envelope","v","to bring your foot down hard"],["stand","n","a small table or rack for holding something","v","to put up with something unpleasant"],["star","n","a bright point of light in the night sky","n","a famous performer"],["steer","n","a young male ox raised for beef","v","to guide a vehicle"],["stem","n","the main stalk of a plant","v","to stop the flow of something"],["stick","n","a thin piece of wood","v","to attach with glue or tape"],["still","n","a device for distilling liquor","v","to make quiet or calm"],["stock","n","a rich liquid used as a base for soups","n","a share of ownership in a company"],["stone","n","a small piece of rock","n","a British unit of weight equal to fourteen pounds"],["store","n","a place that sells goods","v","to keep something for later use"],["storm","n","violent weather with strong wind and rain","v","to attack a place suddenly with force"],["stream","n","a small river","v","to watch a video online as it downloads"],["strike","n","a stoppage of work by employees","n","knocking down all the pins with the first ball in bowling"],["string","n","thin cord or thread","n","a series of connected things, like a run of wins"],["strip","n","a long, narrow piece of something","v","to remove the covering from"],["stroke","n","a single sweep of a brush or pen","v","to pet or rub gently"],["stuff","n","miscellaneous things or belongings","v","to fill something tightly with material"],["suit","n","one of the four groups in a deck of cards","v","to be right or convenient for someone"],["swallow","n","a small, fast-flying bird with a forked tail","v","to take food or drink down your throat"],["swing","n","a hanging seat that moves back and forth","n","a sharp shift in opinion or mood"],["switch","n","a small control that turns a device on or off","v","to change from one thing to another"],["tack","n","a small sharp nail with a broad head","n","a boat's course relative to the wind"],["tackle","n","equipment used for fishing","v","to bring down a player in football"],["tag","n","a small label attached to something","n","a children's game where one player chases the others"],["tail","n","the long part at the back of an animal's body","v","to follow someone secretly"],["tank","n","a large container for liquid or gas","v","to fail badly"],["tap","n","a valve you turn to let water flow","v","to hit lightly with your fingers"],["tape","n","a strip of sticky material for fastening","v","to record sound or video"],["taste","n","a person's sense of what is stylish or beautiful","v","to try the flavor of food"],["tear","n","a drop of salty water from the eye","v","to pull apart or rip"],["thumb","n","the short, thick digit of your hand","v","to hitchhike"],["ticket","n","a slip of paper that lets you enter a place","v","to give a driver a fine"],["tie","n","a strip of cloth worn around the collar","n","a result where both sides have equal scores"],["tip","n","extra money given to a waiter","n","the very end of something pointed"],["toast","n","sliced bread browned by heat","v","to raise a glass in someone's honor"],["top","n","a toy that spins on its point","v","to do better than; surpass"],["track","n","a running course for races","n","a single song on an album"],["trade","n","a job that needs skilled manual work","v","to swap one thing for another"],["train","n","a line of railway carriages pulled by an engine","n","the long trailing part of a formal dress"],["trap","n","a device that catches animals","n","a bend in a drain pipe that holds water"],["trip","n","a short journey","v","to catch your foot and stumble"],["tune","n","a melody that is easy to remember","v","to adjust a machine so it runs well"],["turn","n","your chance to play in a game","v","to rotate around a center"],["twist","n","an unexpected change in a story","v","to turn or wring something around itself"],["type","n","a kind or sort of thing","v","to write using a keyboard"],["vault","n","a locked room for storing valuables","v","to jump over something using your hands or a pole"],["wake","n","a trail of waves left behind a moving boat","v","to stop sleeping"],["watch","n","a small clock worn on the wrist","v","to look at something carefully"],["water","n","the clear liquid in rivers and rain","v","to give plants a drink"],["wave","n","a moving ridge on the surface of water","v","to move your hand back and forth in greeting"],["wedge","n","a V-shaped piece of wood or metal","v","to squeeze tightly into a gap"],["whip","n","a cord or strap used for striking animals","v","to beat cream until it thickens"],["wind","n","moving air outdoors","v","to wrap or turn something around and around"],["wire","n","a thin strand of metal","v","to send money electronically"],["work","n","a job you do for pay","v","to function properly"],["wrap","n","a sandwich rolled in a flatbread","v","to cover something with paper or cloth"]];
 
 var SAMPLE = { w: 'bridge',
     a: { p: 'noun', d: 'a structure that carries a road over water' },
@@ -223,9 +241,10 @@ function onDown(e){
     if (m.k === 'denied'){ onDenied(m.p && m.p.text); return; }
     if (m.k === 'reset'){ doReset(); return; }
 }
-function myId(){ return Hub.me && Hub.me.id; }
+function myId(){ return soloOn ? 'solo' : (Hub.me && Hub.me.id); }
 function myName(){ return (Hub.me && Hub.me.name) || 'Player'; }
-function isHost(){ return !!(Hub.me && Hub.me.isHost); }
+function isHost(){ return soloOn || !!(Hub.me && Hub.me.isHost); }
+function minPlayers(){ return soloOn ? 1 : 2; }
 function hostPresent(){ return Hub.roster.some(function(m){ return m.host; }); }
 function paused(){ return !!S && !isHost() && !hostPresent(); }
 function nameOf(id){
@@ -276,11 +295,16 @@ var S = null;
 var mode = 'wait';           
 var hostWords = {};          
 var deck = [];               
-var L = null;                
+var soloOn = false, wordStart = 0;                
 var myWord = '', myWhy = '', myWordKey = '', lastKey = '', editing = false;
-var lastResend = 0, toastText = '', noteT = null, rulesOpened = false;
+var lastResend = 0, toastText = '', noteT = null;
 var cerIdx = 0, cerPhase = 'typing', lastRevealKey = '', typedChars = 0, typeTimer = null, silenceTimer = null;
-var TYPE_MS = 45, NAME_MS = 700, PAUSE_MS = 2000, GAP_MS = 500;
+// Ceremony timing (ms). Slow on purpose.
+var TYPE_MS = 58;      // base speed per character of the "why" (see whyPace for the rest)
+var NAME_MS = 900;     // the player's name stands alone before the reason
+var PAUSE_MS = 2400;   // the three dashes, one per third
+var WORD_MS = 2600;    // the word fading in
+var HOLD_MS = 2200;    // the word sits before the next person
 
 function keyOf(){ return S ? (S.inst + ':' + S.round) : ''; }
 
@@ -340,7 +364,7 @@ function pickPair(){
 // ---------- host: table and rounds ----------
 function broadcast(){
     render();
-    if (!S || !isHost()) return;
+    if (!S || !isHost() || soloOn) return;
     Hub.up('state', S);
 }
 function deny(to, text){ Hub.up('denied', { to: to, text: text }); }
@@ -356,6 +380,24 @@ function newGame(){
         locked: {}, groups: null, reveal: null, missing: [], found: 0, played: 0, bridgeScored: false };
     deck = [];
     startRound();
+}
+function startSolo(){
+    if (soloOn || (S && mode === 'hub')) return;
+    soloOn = true;
+    S = { inst: 'solo-' + Date.now(), round: 0, phase: 'play', word: null,
+        order: ['solo'], names: { solo: 'You' }, arbiter: 'solo', arbiterPos: 0,
+        locked: {}, groups: null, reveal: null, missing: [], found: 0, played: 0, bridgeScored: false };
+    deck = [];
+    startRound();
+}
+function endSolo(){
+    if (!soloOn) return;
+    soloOn = false; S = null; hostWords = {}; deck = [];
+    resetRevealStaging();
+    myWord = ''; myWhy = ''; myWordKey = ''; lastKey = ''; editing = false;
+    $('in').value = '';
+    if ($('in-why')) $('in-why').value = '';
+    render();
 }
 function startRound(){
     S.round++;
@@ -380,7 +422,7 @@ function lockedCount(){
     return S.order.filter(function(id){ return S.locked[id]; }).length;
 }
 function allLocked(){
-    return !!S && S.order.length >= 2 && lockedCount() === S.order.length;
+    return !!S && S.order.length >= minPlayers() && lockedCount() === S.order.length;
 }
 function reveal(){
     if (!S || S.phase !== 'play') return false;
@@ -389,7 +431,7 @@ function reveal(){
         if (hostWords[id] && hostWords[id].w) entries.push({ id: id, w: hostWords[id].w, why: hostWords[id].why || '' });
         else missing.push(id);
     });
-    if (entries.length < 2) return false;
+    if (entries.length < minPlayers()) return false;
     S.groups = groupWords(entries);
     var beats = [];
     entries.forEach(function(e){ beats.push({ id: e.id, w: e.w, why: e.why || '' }); });
@@ -443,6 +485,7 @@ function reconcileHost(){
     Object.keys(S.locked).forEach(function(id){ if (!hostWords[id] || !hostWords[id].w) delete S.locked[id]; });
 }
 function onRoster(){
+    if (soloOn){ render(); return; }
     if (isHost()){
         if (S){ reconcileHost(); syncTable(); }
         broadcast();
@@ -452,7 +495,13 @@ function onRoster(){
     }
 }
 function onState(state){
-    if (!state || isHost()) return;
+    if (!state) return;
+    if (soloOn){
+        soloOn = false; S = null; hostWords = {}; deck = [];
+        resetRevealStaging();
+        myWord = ''; myWhy = ''; myWordKey = ''; lastKey = ''; editing = false;
+    }
+    if (isHost()) return;
     S = state;
     mode = 'hub';
     var k = keyOf();
@@ -531,6 +580,7 @@ function onDenied(text){
     toast(text);
 }
 function doReset(){
+    soloOn = false;
     S = null; hostWords = {}; deck = [];
     resetRevealStaging();
     myWord = ''; myWhy = ''; myWordKey = ''; lastKey = ''; editing = false;
@@ -544,7 +594,7 @@ function iLocked(){
     return (!!myWord && myWordKey === keyOf()) || !!(S && S.locked && S.locked[myId()]);
 }
 function actLock(){
-    if (mode !== 'hub') return;
+    if (mode !== 'hub' && !soloOn) return;
     if (!S || S.phase !== 'play'){ toast('Not taking words right now.'); return; }
     if (paused()){ toast('The host has left. Waiting for them.'); return; }
     var c = cleanWord($('in').value);
@@ -615,8 +665,6 @@ function actReveal(){
 function goLocal(){
     if (Hub.me) return;
     mode = 'local';
-    L = pickPair();
-    if (!rulesOpened){ $('rules').open = true; rulesOpened = true; }
     render();
 }
 
@@ -634,6 +682,7 @@ function listNames(ids){
 }
 function statusText(){
     if (mode === 'wait') return 'Connecting to the table...';
+    if (soloOn) return toastText || '';
     if (mode === 'local') return '';
     if (toastText) return toastText;
     if (paused()) return 'The host has left. Waiting for them to come back.';
@@ -698,6 +747,87 @@ function cerToName(){
         cerStep();
     }, NAME_MS);
 }
+// ---------- speech cadence for the "why" ----------
+function wset(str){ var o = {}; str.split(' ').forEach(function(w){ o[w] = true; }); return o; }
+var W_FUNC = wset('a an the of to in on at by for from with and or but so as is it its be are was were i you he she we they me my your our their this that these those do does did if than then too up out off');
+var W_CONJ = wset('and but or so because since while when whenever if though although which who whom whose whereas until unless yet where whether');
+var W_PREP = wset('in on at with for from about into through under over after before during without within among between against toward onto upon across around beyond');
+var W_EMPH = wset('not never always only just really very exactly literally actually totally completely absolutely entirely nothing everything nobody none both');
+var W_OPEN = wset('well so okay ok honestly basically actually anyway look listen hmm um uh yeah yes right plus also still maybe personally technically obviously apparently frankly sure');
+var EDGE;
+try { EDGE = new RegExp('^[^\\p{L}\\p{N}]+|[^\\p{L}\\p{N}]+$', 'gu'); } catch(e) { EDGE = /^[^A-Za-z0-9]+|[^A-Za-z0-9]+$/g; }
+var ABBR = /^(?:[a-z]\.){2,}$|^(?:vs|etc|mr|mrs|ms|dr|st|approx)\.$/i;
+function jitter(n){ return Math.round((Math.random() * 2 - 1) * n); }
+// Returns an array: out[i] = ms to wait after character i appears, before character i+1.
+function whyPace(text){
+    var n = text.length, out = [], i, k;
+    for (i = 0; i < n; i++) out.push(30);
+    var words = [], re = /\S+/g, m;
+    while ((m = re.exec(text))) words.push({ s: m.index, e: m.index + m[0].length, raw: m[0], core: m[0].replace(EDGE, '').toLowerCase() });
+    if (!words.length) return out;
+
+    // pass 1: how long to rest after each word
+    var gap = words.map(function(){ return 0; });
+    var sentEnd = words.map(function(){ return false; });
+    var since = 0, sentStart = true;
+    for (k = 0; k < words.length; k++){
+        var w = words[k], next = words[k + 1], g = 0;
+        var tail = w.raw.replace(/[)\]"'\u201d\u2019\u00bb]+$/, '');
+        var last = tail.slice(-1), punct = 0;
+        if (/^[-\u2013\u2014]+$/.test(w.raw)){ punct = 380; if (k) gap[k - 1] = Math.max(gap[k - 1], 120); }
+        else if (/(\.\.\.|\u2026)$/.test(tail)) punct = 950;
+        else if (ABBR.test(tail)) punct = 140;
+        else if (last === '.' || last === '!' || last === '?'){ punct = 750; sentEnd[k] = true; }
+        else if (last === ';' || last === ':') punct = 480;
+        else if (last === ',') punct = 360;
+        else if (/[\u2013\u2014]$/.test(tail)) punct = 380;
+        if (/^[("\u201c\[]/.test(w.raw) && k) gap[k - 1] = Math.max(gap[k - 1], 140);
+        if (punct){ g = punct; since = 0; }
+        else {
+            since++;
+            if (sentStart && W_OPEN[w.core]){ g = 280; since = 0; }
+            else if (next){
+                var nc = next.core, caps = next.raw.length > 1 && next.raw === next.raw.toUpperCase() && /[A-Z]/.test(next.raw);
+                if (W_CONJ[nc] && since >= 2) g = 230;
+                else if (W_PREP[nc] && since >= 3) g = 150;
+                else if (caps && since >= 1) g = 260;
+                else if (W_EMPH[nc] && since >= 1) g = 200;
+                else if (nc.length >= 9 && since >= 2) g = 130;
+                else if (since >= 5) g = 170;
+                if (g) since = 0;
+            }
+        }
+        sentStart = !!sentEnd[k];
+        gap[k] = Math.max(gap[k], g);
+    }
+
+    // pass 2: per-letter speed, then the rests
+    for (k = 0; k < words.length; k++){
+        var wd = words[k];
+        var func = !!W_FUNC[wd.core];
+        var caps2 = wd.raw.length > 1 && wd.raw === wd.raw.toUpperCase() && /[A-Z]/.test(wd.raw);
+        var emph = !func && (W_EMPH[wd.core] || caps2 || wd.core.length >= 9);
+        var closing = sentEnd[k] || k === words.length - 1;
+        for (i = wd.s; i < wd.e; i++){
+            var ms = func ? TYPE_MS * 0.62 : TYPE_MS;
+            if (emph) ms += 28;
+            if (i === wd.s && !func) ms += 22;                 // a word has an onset
+            if (closing && i >= wd.e - 3) ms += 18;            // the voice drops at the end
+            out[i] = Math.max(22, Math.round(ms + jitter(9)));
+        }
+        if (wd.e < n) out[wd.e] = 30;                          // the space
+        out[wd.e - 1] += gap[k];
+    }
+    out[n - 1] = Math.max(out[n - 1], 800);                    // let the last word land before the dashes
+    for (i = 0; i < n; i++) out[i] = Math.min(out[i], 1100);
+    return out;
+}
+var pace = null, paceKey = '';
+function paceFor(b){
+    var k = keyOf() + ':' + b.id;
+    if (paceKey !== k){ pace = whyPace(String(b.why || '')); paceKey = k; }
+    return pace;
+}
 function cerStep(){
     if (cerPhase !== 'why' || !S || S.phase !== 'reveal') return;
     var beats = cerBeats();
@@ -705,9 +835,10 @@ function cerStep(){
     var full = String(beats[cerIdx].why || '');
     if (!full){ cerToPause(); return; }
     if (typedChars < full.length){
+        var pc = paceFor(beats[cerIdx]);
         typedChars++;
         render();
-        typeTimer = setTimeout(function(){ typeTimer = null; cerStep(); }, TYPE_MS);
+        typeTimer = setTimeout(function(){ typeTimer = null; cerStep(); }, pc[typedChars - 1] || TYPE_MS);
     } else cerToPause();
     reportHeight();
 }
@@ -727,28 +858,20 @@ function cerPauseTick(){
 }
 function cerToWordType(){
     if (!S || S.phase !== 'reveal') return;
-    cerPhase = 'word'; typedChars = 0; render();
-    cerWordStep();
-}
-function cerWordStep(){
-    if (cerPhase !== 'word' || !S || S.phase !== 'reveal') return;
-    var beats = cerBeats();
-    if (cerIdx >= beats.length){ cerPhase = 'done'; render(); return; }
-    var full = String(beats[cerIdx].w || '');
-    if (typedChars < full.length){
-        typedChars++;
-        render();
-        typeTimer = setTimeout(function(){ typeTimer = null; cerWordStep(); }, TYPE_MS);
-    } else cerAfterWord();
+    cerPhase = 'word'; typedChars = 0; wordStart = Date.now(); render();
+    silenceTimer = setTimeout(function(){
+        silenceTimer = null;
+        if (cerValid()) cerAfterWord();
+    }, WORD_MS);
     reportHeight();
 }
 function cerAfterWord(){
     if (!S || S.phase !== 'reveal') return;
-    render(); reportHeight();
+    cerPhase = 'hold'; render(); reportHeight();
     silenceTimer = setTimeout(function(){
         silenceTimer = null;
         if (cerValid()) cerToNext();
-    }, GAP_MS);
+    }, HOLD_MS);
 }
 function cerToNext(){
     if (!cerValid()) return;
@@ -771,8 +894,9 @@ function skipReveal(){
     } else if (cerPhase === 'pause'){
         cerToWordType();
     } else if (cerPhase === 'word'){
-        typedChars = String(beats[cerIdx].w || '').length;
         cerAfterWord();
+    } else if (cerPhase === 'hold'){
+        cerToNext();
     }
 }
 function renderBeat(box, b, opts){
@@ -784,16 +908,21 @@ function renderBeat(box, b, opts){
     line.appendChild(document.createTextNode(opts.whyPartial != null ? fullWhy.slice(0, opts.whyPartial) : fullWhy));
     if (opts.whyCaret) line.appendChild(el('span', 'caret'));
     beat.appendChild(line);
-    if (opts.wordPartial != null || opts.wordShown){
+    if (opts.wordShown || opts.wordFade != null || opts.wordGhost){
         var fullW = String(b.w || '');
         var gi = groupOf(b.id);
         var approved = gi !== -1 && S.groups[gi].approved;
         var cls = 'beatword';
-        var mine = iAmArbiter() && (opts.wordShown || (opts.wordPartial != null && opts.wordPartial >= fullW.length));
+        var mine = iAmArbiter() && !!opts.wordShown;
         if (approved) cls += ' on';
         if (mine) cls += ' clickable';
-        var wdiv = el('div', cls, opts.wordPartial != null && !opts.wordShown ? fullW.slice(0, opts.wordPartial) : fullW);
-        if (opts.wordCaret) wdiv.appendChild(el('span', 'caret'));
+        if (opts.wordGhost) cls += ' ghost';
+        var wdiv = el('div', cls, fullW);
+        if (opts.wordFade != null){
+            wdiv.classList.add('fade');
+            // resume mid-fade if something re-renders while the word is arriving
+            wdiv.style.animationDelay = '-' + Math.max(0, Math.min(opts.wordFade, WORD_MS)) + 'ms';
+        }
         if (mine){
             (function(idx){
                 wdiv.addEventListener('click', function(ev){ ev.stopPropagation(); actApprove(idx); });
@@ -826,10 +955,11 @@ function renderReveal(){
                 if (typedChars < fullWhy.length) renderBeat(box, b, { whyPartial: typedChars, whyCaret: true });
                 else renderBeat(box, b, {});
             } else if (cerPhase === 'pause'){
-                renderBeat(box, b, { divPartial: typedChars, divCaret: typedChars < 3 });
+                renderBeat(box, b, { divPartial: typedChars, divCaret: typedChars < 3, wordGhost: true });
             } else if (cerPhase === 'word'){
-                var fullW = String(b.w || '');
-                renderBeat(box, b, { wordPartial: typedChars, wordCaret: typedChars < fullW.length, divShown: true });
+                renderBeat(box, b, { wordFade: Date.now() - wordStart, divShown: true });
+            } else if (cerPhase === 'hold'){
+                renderBeat(box, b, { wordShown: true, divShown: true });
             }
         }
         return;
@@ -837,7 +967,7 @@ function renderReveal(){
     for (i = 0; i < beats.length; i++){
         renderBeat(box, beats[i], { wordShown: true, divShown: true });
     }
-    if (iAmArbiter()) box.appendChild(el('p', 'miss', 'Click to approve Word Bridge(s).'));
+    if (iAmArbiter()) box.appendChild(el('p', 'miss', soloOn ? 'Does it fit both meanings? Click the word to count it.' : 'Click to approve Word Bridge(s).'));
     if (S.missing && S.missing.length) box.appendChild(el('p', 'miss', 'No word from ' + listNames(S.missing) + '.'));
 }
 function renderPeople(){
@@ -879,14 +1009,13 @@ function renderHub(){
     var t = '';
     if (S && S.played) t = 'Bridged ' + S.found + ' of ' + S.played + (S.played === 1 ? ' word' : ' words');
     $('tally').textContent = t;
-    $('b-start').classList.toggle('hidden', !(host && !S));
     $('hostbtns').classList.toggle('hidden', !(arb && S));
     $('b-skip').classList.toggle('hidden', !playing);
-    $('b-reveal').classList.toggle('hidden', !playing);
-    $('b-reveal').disabled = !playing || lockedCount() < 2;
+    $('b-reveal').classList.toggle('hidden', !playing || soloOn);
+    $('b-reveal').disabled = !playing || lockedCount() < minPlayers();
     $('b-next').classList.toggle('hidden', !revealing);
     $('wait-note').classList.toggle('hidden', arb || !revealing);
-    $('people').classList.toggle('hidden', revealing);
+    $('people').classList.toggle('hidden', revealing || soloOn);
 }
 function fitAll(){
     var nodes = document.querySelectorAll('.fit');
@@ -903,21 +1032,26 @@ function fitAll(){
 }
 function render(){
     var hub = (mode === 'hub'), local = (mode === 'local');
-    $('menu').classList.toggle('hidden', !(hub && isHost()));
-    $('arbnote').classList.toggle('hidden', !(hub && S && iAmArbiter()));
-    $('hub-ui').classList.toggle('hidden', !hub);
-    $('local-ui').classList.toggle('hidden', !local);
-    $('lead').classList.toggle('hidden', !(local || (hub && !S)));
+    var home = !soloOn && (local || (hub && !S));
+    $('menu').classList.toggle('hidden', !(soloOn || (hub && isHost())));
+    $('b-new').classList.toggle('hidden', soloOn);
+    $('b-home').classList.toggle('hidden', !soloOn);
+    $('arbnote').classList.toggle('hidden', !(hub && S && iAmArbiter() && !soloOn));
+    $('hub-ui').classList.toggle('hidden', !(hub || soloOn));
+    $('local-ui').classList.toggle('hidden', !(local && !soloOn));
+    $('homebtns').classList.toggle('hidden', !home);
+    $('b-start').classList.toggle('hidden', !(hub && isHost() && !S));
+    $('lead').classList.toggle('hidden', !home);
     var st = statusText();
     $('status').textContent = st;
     $('status').classList.toggle('hidden', !st);
     $('card').classList.toggle('hidden', mode === 'wait');
     if (mode !== 'wait'){
-        var pair = local ? L : (S && S.word) ? S.word : SAMPLE;
-        drawCard(pair, hub && !!S && S.phase === 'reveal');
+        var pair = (S && S.word) ? S.word : SAMPLE;
+        drawCard(pair, (hub || soloOn) && !!S && S.phase === 'reveal');
     }
-    if (hub) renderHub();
-    $('rules').classList.toggle('hidden', hub && !!S);
+    if (hub || soloOn) renderHub();
+    $('rules').classList.toggle('hidden', soloOn || (hub && !!S));
     fitAll();
     reportHeight();
 }
@@ -933,7 +1067,8 @@ $('b-change').addEventListener('click', actChange);
 $('b-skip').addEventListener('click', actSkip);
 $('b-reveal').addEventListener('click', actReveal);
 $('b-next').addEventListener('click', actNext);
-$('b-deal').addEventListener('click', function(){ L = pickPair(); render(); });
+$('b-solo').addEventListener('click', startSolo);
+$('b-home').addEventListener('click', endSolo);
 $('rules').addEventListener('toggle', reportHeight);
 window.addEventListener('resize', function(){ fitAll(); reportHeight(); });
 document.addEventListener('visibilitychange', function(){ if (!document.hidden && mode === 'hub') Hub.up('hello'); });
