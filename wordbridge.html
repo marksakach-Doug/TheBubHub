@@ -62,6 +62,7 @@ button.go[disabled]{background:var(--paper);color:#8c8c8c}
 .alone > button{text-align:left;padding:5px 12px;min-height:0;border-width:1px;transition:background 0.2s}
 .alone > button small{color:inherit;opacity:.75}
 .miss{margin:10px 0 0;color:var(--ash);font-size:14px}
+.arbnote{color:#b00000;font-size:13px;text-align:right;margin:6px 0 0;}
 .whybox{margin-top:8px}
 .whybox input{width:100%;font-family:inherit;font-size:15px;line-height:1.4;padding:6px 12px;border:1px solid var(--ink);border-radius:0;background:var(--paper);color:var(--ink)}
 .whybox input::placeholder{color:#8c8c8c}
@@ -108,6 +109,7 @@ button.go[disabled]{background:var(--paper);color:#8c8c8c}
       <button id="b-new" class="small">New game</button>
     </div>
   </header>
+  <div id="arbnote" class="arbnote hidden">You are the arbiter</div>
 
   <section id="card" class="hidden">
     <h2 id="word" class="word fit" data-min="48" data-max="120"></h2>
@@ -711,11 +713,17 @@ function cerStep(){
 }
 function cerToPause(){
     if (!S || S.phase !== 'reveal') return;
-    cerPhase = 'pause'; render(); reportHeight();
-    silenceTimer = setTimeout(function(){
-        silenceTimer = null;
-        if (cerValid()) cerToWordType();
-    }, PAUSE_MS);
+    cerPhase = 'pause'; typedChars = 0; render(); reportHeight();
+    cerPauseTick();
+}
+function cerPauseTick(){
+    if (cerPhase !== 'pause' || !S || S.phase !== 'reveal') return;
+    if (typedChars < 3){
+        typedChars++;
+        render();
+        silenceTimer = setTimeout(function(){ silenceTimer = null; cerPauseTick(); }, PAUSE_MS / 3);
+    } else cerToWordType();
+    reportHeight();
 }
 function cerToWordType(){
     if (!S || S.phase !== 'reveal') return;
@@ -731,27 +739,16 @@ function cerWordStep(){
         typedChars++;
         render();
         typeTimer = setTimeout(function(){ typeTimer = null; cerWordStep(); }, TYPE_MS);
-    } else cerToDivider();
+    } else cerAfterWord();
     reportHeight();
 }
-function cerToDivider(){
+function cerAfterWord(){
     if (!S || S.phase !== 'reveal') return;
-    cerPhase = 'divider'; typedChars = 0; render();
-    cerDivStep();
-}
-function cerDivStep(){
-    if (cerPhase !== 'divider' || !S || S.phase !== 'reveal') return;
-    if (typedChars < 3){
-        typedChars++;
-        render();
-        typeTimer = setTimeout(function(){ typeTimer = null; cerDivStep(); }, TYPE_MS);
-    } else {
-        silenceTimer = setTimeout(function(){
-            silenceTimer = null;
-            if (cerValid()) cerToNext();
-        }, GAP_MS);
-    }
-    reportHeight();
+    render(); reportHeight();
+    silenceTimer = setTimeout(function(){
+        silenceTimer = null;
+        if (cerValid()) cerToNext();
+    }, GAP_MS);
 }
 function cerToNext(){
     if (!cerValid()) return;
@@ -775,10 +772,7 @@ function skipReveal(){
         cerToWordType();
     } else if (cerPhase === 'word'){
         typedChars = String(beats[cerIdx].w || '').length;
-        cerToDivider();
-    } else if (cerPhase === 'divider'){
-        typedChars = 3;
-        cerToNext();
+        cerAfterWord();
     }
 }
 function renderBeat(box, b, opts){
@@ -807,12 +801,12 @@ function renderBeat(box, b, opts){
         }
         beat.appendChild(wdiv);
     }
+    if (opts.divPartial != null || opts.divShown){
+        var dd = el('div', 'divider', '---'.slice(0, opts.divPartial != null && !opts.divShown ? opts.divPartial : 3));
+        if (opts.divCaret) dd.appendChild(el('span', 'caret'));
+        beat.appendChild(dd);
+    }
     box.appendChild(beat);
-}
-function renderDivider(box, partial){
-    var d = el('div', 'divider', '---'.slice(0, partial == null ? 3 : partial));
-    if (partial != null && partial < 3) d.appendChild(el('span', 'caret'));
-    box.appendChild(d);
 }
 function renderReveal(){
     var box = $('reveal'); clear(box);
@@ -821,8 +815,7 @@ function renderReveal(){
     var i;
     if (cerPhase !== 'done'){
         for (i = 0; i < cerIdx && i < beats.length; i++){
-            renderBeat(box, beats[i], { wordShown: true });
-            renderDivider(box);
+            renderBeat(box, beats[i], { wordShown: true, divShown: true });
         }
         if (cerIdx < beats.length){
             var b = beats[cerIdx];
@@ -833,22 +826,18 @@ function renderReveal(){
                 if (typedChars < fullWhy.length) renderBeat(box, b, { whyPartial: typedChars, whyCaret: true });
                 else renderBeat(box, b, {});
             } else if (cerPhase === 'pause'){
-                renderBeat(box, b, {});
+                renderBeat(box, b, { divPartial: typedChars, divCaret: typedChars < 3 });
             } else if (cerPhase === 'word'){
                 var fullW = String(b.w || '');
-                renderBeat(box, b, { wordPartial: typedChars, wordCaret: typedChars < fullW.length });
-            } else if (cerPhase === 'divider'){
-                renderBeat(box, b, { wordShown: true });
-                renderDivider(box, typedChars);
+                renderBeat(box, b, { wordPartial: typedChars, wordCaret: typedChars < fullW.length, divShown: true });
             }
         }
-        box.appendChild(el('p', 'miss', 'Tap to move on.'));
         return;
     }
     for (i = 0; i < beats.length; i++){
-        renderBeat(box, beats[i], { wordShown: true });
-        if (i < beats.length - 1) renderDivider(box);
+        renderBeat(box, beats[i], { wordShown: true, divShown: true });
     }
+    if (iAmArbiter()) box.appendChild(el('p', 'miss', 'Click to approve merge(s).'));
     if (S.missing && S.missing.length) box.appendChild(el('p', 'miss', 'No word from ' + listNames(S.missing) + '.'));
 }
 function renderPeople(){
@@ -915,6 +904,7 @@ function fitAll(){
 function render(){
     var hub = (mode === 'hub'), local = (mode === 'local');
     $('menu').classList.toggle('hidden', !(hub && isHost()));
+    $('arbnote').classList.toggle('hidden', !(hub && S && iAmArbiter()));
     $('hub-ui').classList.toggle('hidden', !hub);
     $('local-ui').classList.toggle('hidden', !local);
     $('lead').classList.toggle('hidden', !(local || (hub && !S)));
