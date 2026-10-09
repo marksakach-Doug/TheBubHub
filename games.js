@@ -12,7 +12,7 @@ window.BUB_GAMES = [
   // in the lobby so there is something to play while waiting for others.
   // `fill` lets the stage own the viewport (solo games never report a height,
   // so the hub sizes the frame itself instead of pinning it).
-  //{ id: 'waltz', file: 'LobbyWaltzEngine.html', title: 'Waltz Engine', players: 'solo', color: '#d9b26f', solo: true, lobby: true, fill: true },
+  { id: 'waltz', file: 'LobbyWaltzEngine.html', title: 'Waltz Engine', players: 'solo', color: '#d9b26f', solo: true, lobby: true, fill: true },
   //{ id: 'DrawDrive', file: 'DrawDrive.html', title: 'Draw and Drive', players: '1-4', color: '#3cc3d4', fill: true },
   { id: 'eggs', file: 'eggs.html', title: 'eggs', players: '1-4', color: '#ffd23f', fill: true },
 ];
