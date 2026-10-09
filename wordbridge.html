@@ -630,13 +630,6 @@ function listNames(ids){
     if (ids.length > 2) return ids.length + ' players';
     return ids.map(nm).join(' and ');
 }
-function joinNames(ids){
-    var me = myId();
-    var list = ids.slice().sort(function(a, b){ return (a === me ? -1 : 0) - (b === me ? -1 : 0); })
-        .map(function(id){ return id === me ? 'You' : nm(id); });
-    if (list.length === 1) return list[0];
-    return list.slice(0, -1).join(', ') + ' and ' + list[list.length - 1];
-}
 function statusText(){
     if (mode === 'wait') return 'Connecting to the table...';
     if (mode === 'local') return '';
@@ -821,41 +814,6 @@ function renderDivider(box, partial){
     if (partial != null && partial < 3) d.appendChild(el('span', 'caret'));
     box.appendChild(d);
 }
-function renderRevealWords(box){
-    var groups = S.groups || [];
-    var blessed = groups.filter(function(g){ return g.approved; });
-    var plain = groups.filter(function(g){ return !g.approved; });
-
-    if (blessed.length){
-        var gw = el('div', 'groups');
-        blessed.forEach(function(g){
-            var b = el('div', 'bridge');
-            var txt = g.words.join(' / ');
-            var big = el('div', 'big fit', txt);
-            big.setAttribute('data-chars', String(txt.length));
-            big.setAttribute('data-min', '24');
-            big.setAttribute('data-max', '72');
-            b.appendChild(big);
-            b.appendChild(el('div', 'who', joinNames(g.ids) + ' (approved)'));
-            gw.appendChild(b);
-        });
-        box.appendChild(gw);
-    }
-
-    if (plain.length){
-        var al = el('div', 'alone' + (blessed.length ? '' : ' solo'));
-        groups.forEach(function(g){
-            if (g.approved) return;
-            var txt = g.words.join(' / ');
-            var d = el('div');
-            d.appendChild(document.createTextNode(txt));
-            d.appendChild(el('small', null, joinNames(g.ids)));
-            al.appendChild(d);
-        });
-        box.appendChild(al);
-    }
-    if (S.missing && S.missing.length) box.appendChild(el('p', 'miss', 'No word from ' + listNames(S.missing) + '.'));
-}
 function renderReveal(){
     var box = $('reveal'); clear(box);
     ensureRevealStaging();
@@ -891,7 +849,7 @@ function renderReveal(){
         renderBeat(box, beats[i], { wordShown: true });
         if (i < beats.length - 1) renderDivider(box);
     }
-    renderRevealWords(box);
+    if (S.missing && S.missing.length) box.appendChild(el('p', 'miss', 'No word from ' + listNames(S.missing) + '.'));
 }
 function renderPeople(){
     var ul = $('people'); clear(ul);
