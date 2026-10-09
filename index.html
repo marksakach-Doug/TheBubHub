@@ -175,9 +175,31 @@
         <button id="btn-focus-exit" title="Leave the stage (Esc)" class="btn-bouncy bg-slate-700 hover:bg-slate-600 text-white text-sm font-bold py-1 px-3 rounded-xl">✕ Stage</button>
         <span id="focus-title"></span>
         <button id="focus-room" title="Room ID — click to copy"></button>
+        <button id="btn-invite" title="Copy invite link for this room + game" class="btn-bouncy bg-teal-600 hover:bg-teal-500 text-white text-sm font-bold py-1 px-3 rounded-xl flex-none">📩 Invite</button>
     </div>
     <div id="drawer-scrim" title="Tap to close chat"></div>
     <button id="chat-pill" class="btn-bouncy" title="Open chat">💬<span id="chat-unread" class="hidden"></span></button>
+
+    <!-- Invite landing: guests arriving via ?room=&game= see ONLY this page
+         first — one question, one button, no lobby complexity. -->
+    <div id="invite-landing" class="hidden fixed inset-0 z-[60] items-center justify-center p-4" style="background:rgba(2,6,23,.92);">
+        <div class="bg-slate-800/95 backdrop-blur px-6 py-7 rounded-2xl border border-teal-500/40 card-glow w-full max-w-sm text-center flex flex-col gap-4 pop-in">
+            <div>
+                <p class="text-teal-300 text-xs font-mono uppercase tracking-widest">You've been invited to</p>
+                <h2 id="invite-game-title" class="text-3xl font-black text-white mt-1">Bub Hub</h2>
+                <p id="invite-room-line" class="text-slate-400 text-xs font-mono mt-1"></p>
+            </div>
+            <div>
+                <label for="invite-name" class="text-white font-bold block mb-2">What's your name?</label>
+                <input type="text" id="invite-name" placeholder="Your name" maxlength="24" autocomplete="off"
+                    class="bg-slate-900 border border-slate-600 rounded-xl px-4 py-3 w-full text-center text-lg focus:outline-none focus:border-teal-400 font-bold text-teal-100">
+            </div>
+            <button id="btn-invite-join" class="btn-bouncy bg-teal-500 hover:bg-teal-400 text-slate-950 text-lg font-extrabold py-3 px-5 rounded-xl">Join the game</button>
+            <p id="invite-status" class="hidden text-blue-300 text-xs font-mono"></p>
+            <p class="text-slate-500 text-[11px]">Works while your friend's game tab is open.</p>
+            <button id="btn-invite-skip" class="text-slate-500 text-xs underline hover:text-slate-300">not now — take me to the lobby</button>
+        </div>
+    </div>
 
     <!-- Shared game stage (TOP LEVEL): Primary focus of the experience.
          Games render here as iframes. Empty placeholder shows until a game opens. -->
@@ -310,6 +332,9 @@
         let isHost = false;
         let inRoom = false;
         let currentRoomId = '';
+        // Invite links (?room=&game=): pendingInviteGame is consumed once by
+        // showRoom() so the guest auto-opens the game, then never again.
+        let pendingInviteGame = null;
         // Identity + session survive reloads: a player who gets kicked out keeps
         // the same player id (games like LOTR seat players by id), and the
         // lobby can offer "Rejoin <room> as host/guest".
@@ -580,6 +605,15 @@
             renderNameGate();
             saveSession();
             GB.closeAll();
+            // Invite-link guests go straight to the game: one auto-open,
+            // consumed here so reloads/rejoins never loop.
+            if (pendingInviteGame) {
+                const gid = pendingInviteGame;
+                pendingInviteGame = null;
+                if (GAMES.some(g => g.id === gid)) {
+                    setTimeout(() => GB.open(gid), 350);
+                }
+            }
         }
 
         function showLobby() {
@@ -1491,6 +1525,85 @@
             }
             renderResume();
             renderRoomChips();
+        })();
+
+        // ============ Invite links: copy in-game, land on a name page ============
+        // Anyone in a room can copy (host stays host). Guests opening the link
+        // see ONLY the name page — no lobby, no room IDs, no menus.
+        function buildInviteLink() {
+            let base = location.href.split('?')[0].split('#')[0];
+            if (!/^https?:/.test(base)) base = 'https://www.bubhub.us/index.html';
+            const q = [];
+            if (currentRoomId) q.push('room=' + encodeURIComponent(currentRoomId));
+            try {
+                const gid = openGameId();
+                if (gid) q.push('game=' + encodeURIComponent(gid));
+            } catch (e) {}
+            return base + (q.length ? '?' + q.join('&') : '');
+        }
+        document.getElementById('btn-invite').addEventListener('click', async (e) => {
+            const btn = e.currentTarget;
+            const link = buildInviteLink();
+            const old = btn.textContent;
+            try {
+                await navigator.clipboard.writeText(link);
+                btn.textContent = 'copied!';
+            } catch (err) {
+                try { window.prompt('Copy your invite link:', link); } catch (e2) {}
+                btn.textContent = 'copied?';
+            }
+            setTimeout(() => { btn.textContent = old; }, 1200);
+        });
+        (function () {
+            let room = '', game = '';
+            try {
+                const q = new URLSearchParams(location.search);
+                room = (q.get('room') || '').trim();
+                game = (q.get('game') || '').trim();
+            } catch (e) {}
+            if (!room) {
+                // Game-only link (copied from a solo table with no room):
+                // open it directly if it's a room-less game.
+                const solo = GAMES.find(x => x.id === game && x.solo);
+                if (solo) { try { GB.open(game); } catch (e) {} }
+                return; // otherwise — normal lobby
+            }
+            pendingInviteGame = game || null;
+            ui.joinInput.value = room;
+            const g = GAMES.find(x => x.id === game);
+            // The name page replaces the whole lobby for invite guests.
+            const landing = document.getElementById('invite-landing');
+            const title = document.getElementById('invite-game-title');
+            const roomLine = document.getElementById('invite-room-line');
+            const nameEl = document.getElementById('invite-name');
+            const joinBtn = document.getElementById('btn-invite-join');
+            const status = document.getElementById('invite-status');
+            if (title) title.textContent = g ? g.title : 'Bub Hub';
+            if (g && g.color) title.style.color = g.color;
+            if (roomLine) roomLine.textContent = 'room ' + room;
+            if (landing) { landing.classList.remove('hidden'); landing.classList.add('flex'); }
+            ui.lobby.classList.add('hidden');
+            ui.lobby.classList.remove('flex');
+            const say = (msg) => { if (status) { status.textContent = msg; status.classList.remove('hidden'); } };
+            const doJoin = () => {
+                const nm = (nameEl.value || '').trim().slice(0, 24);
+                if (!nm) { nameEl.focus(); say('type your name first 👆'); return; }
+                ui.nameInput.value = nm;
+                nameConfirmed = true;
+                saveName();
+                renderNameGate();
+                if (landing) { landing.classList.add('hidden'); landing.classList.remove('flex'); }
+                say('');
+                joinAsGuest(room);
+            };
+            joinBtn.addEventListener('click', doJoin);
+            nameEl.addEventListener('keydown', (ev) => { if (ev.key === 'Enter') doJoin(); });
+            document.getElementById('btn-invite-skip').addEventListener('click', () => {
+                pendingInviteGame = null;
+                if (landing) { landing.classList.add('hidden'); landing.classList.remove('flex'); }
+                ui.lobby.classList.remove('hidden');
+            });
+            setTimeout(() => { try { nameEl.focus(); } catch (e) {} }, 300);
         })();
     </script>
 
