@@ -180,6 +180,30 @@
     <div id="drawer-scrim" title="Tap to close chat"></div>
     <button id="chat-pill" class="btn-bouncy" title="Open chat">💬<span id="chat-unread" class="hidden"></span></button>
 
+    <!-- First-visit name gate: a centered modal in the same shape as the
+         invite landing, but blocking (no skip) and prefilled with an animal
+         name. Shown once, then the header name box takes over. -->
+    <div id="welcome-landing" class="hidden fixed inset-0 z-[70] items-center justify-center p-4" style="background:rgba(2,6,23,.94);">
+        <div class="bg-slate-800/95 backdrop-blur px-6 py-7 rounded-2xl border border-teal-500/40 card-glow w-full max-w-sm text-center flex flex-col gap-4 pop-in">
+            <div>
+                <p class="text-teal-300 text-xs font-mono uppercase tracking-widest">Welcome to</p>
+                <h2 class="text-3xl font-black text-white mt-1">BUB HUB</h2>
+                <p class="text-slate-400 text-xs font-mono mt-1">Pick a name — everyone at the table sees it</p>
+            </div>
+            <div>
+                <label for="welcome-name" class="text-white font-bold block mb-2">What's your name?</label>
+                <div class="flex gap-2">
+                    <input type="text" id="welcome-name" placeholder="Your name" maxlength="24" autocomplete="off"
+                        class="bg-slate-900 border border-slate-600 rounded-xl px-4 py-3 w-full text-center text-lg focus:outline-none focus:border-teal-400 font-bold text-teal-100">
+                    <button id="btn-welcome-shuffle" title="Deal me another animal name"
+                        class="btn-bouncy bg-slate-700 hover:bg-slate-600 text-white font-bold px-3 py-3 rounded-xl flex-none">🎲</button>
+                </div>
+                <p class="text-slate-500 text-[11px] mt-2">Don't like it? Roll for another animal, or type your own.</p>
+            </div>
+            <button id="btn-welcome-go" class="btn-bouncy bg-teal-500 hover:bg-teal-400 text-slate-950 text-lg font-extrabold py-3 px-5 rounded-xl">Let's play</button>
+        </div>
+    </div>
+
     <!-- Invite landing: guests arriving via ?room=&game= see ONLY this page
          first — one question, one button, no lobby complexity. -->
     <div id="invite-landing" class="hidden fixed inset-0 z-[60] items-center justify-center p-4" style="background:rgba(2,6,23,.92);">
@@ -374,8 +398,39 @@
         }
 
         const ANIMAL_NAMES = ['Fox','Otter','Badger','Hawk','Wolf','Bear','Lynx','Mole','Frog','Rabbit','Deer','Owl','Seal','Crab','Falcon','Newt','Bat','Goat','Boar','Wren','Panda','Koala','Tiger','Whale'];
+        // Rolling for a name shouldn't hand you the same animal twice in a
+        // row: keep the ones we've already offered and only reshuffle the
+        // rest, refilling the pool once it runs dry.
+        let recentAnimals = [];
         function randomAnimalName() {
-            return ANIMAL_NAMES[Math.floor(Math.random() * ANIMAL_NAMES.length)];
+            let pool = ANIMAL_NAMES.filter(n => !recentAnimals.includes(n));
+            if (!pool.length) { recentAnimals = []; pool = ANIMAL_NAMES.slice(); }
+            const pick = pool[Math.floor(Math.random() * pool.length)];
+            recentAnimals.push(pick);
+            if (recentAnimals.length > ANIMAL_NAMES.length) recentAnimals.shift();
+            return pick;
+        }
+
+        // ---- Room name collisions: two "john"s is a nightmare to tell apart,
+        // so the newcomer gets numbered — john1, john2, ... The stored name
+        // keeps the casing the player typed; only the suffix is appended.
+        function nameTaken(want, exceptId) {
+            const w = String(want || '').trim().toLowerCase();
+            if (!w) return false;
+            return rosterList().some(m => m.id !== exceptId && String(m.name || '').trim().toLowerCase() === w);
+        }
+        function claimName(want, exceptId) {
+            const skip = (exceptId === undefined) ? myId : exceptId;
+            let base = String(want || '').trim().slice(0, 24) || 'Player';
+            if (!inRoom || !nameTaken(base, skip)) return base;
+            // Room is 24 chars: reserve room for the suffix as we climb.
+            for (let n = 1; n < 1000; n++) {
+                const suffix = String(n);
+                const stem = base.slice(0, Math.max(1, 24 - suffix.length));
+                const candidate = stem + suffix;
+                if (!nameTaken(candidate, skip)) return candidate;
+            }
+            return base;
         }
 
         ui.hostInput.value = randomRoomName();
@@ -424,6 +479,9 @@
         });
         document.getElementById('btn-name-ok').addEventListener('click', () => {
             if (!getName()) { ui.nameInput.focus(); return; }
+            // Two Johns in one room is unplayable: take a numbered variant.
+            const claimed = claimName(getName());
+            if (claimed !== getName()) ui.nameInput.value = claimed;
             nameConfirmed = true;
             saveName();
             renderNameGate();
@@ -435,6 +493,45 @@
             if (inRoom) { saveName(); broadcastRename(); }
         });
         renderNameGate();
+
+        // ---- First visit: the centered name modal.
+        // Blocking on purpose — this is the one moment we get to ask, and an
+        // unnamed player is anonymous to everyone else in the room. Invite
+        // guests have their own landing page, so they skip this one.
+        function closeWelcome(){
+            const w = document.getElementById('welcome-landing');
+            if (!w) return;
+            w.classList.add('hidden'); w.classList.remove('flex');
+        }
+        function showWelcome(){
+            const w = document.getElementById('welcome-landing');
+            const input = document.getElementById('welcome-name');
+            if (!w || !input) return;
+            input.value = loadSavedName() || randomAnimalName();
+            w.classList.remove('hidden'); w.classList.add('flex');
+            setTimeout(() => { try { input.focus(); input.select(); } catch (e) {} }, 250);
+        }
+        function commitWelcome(){
+            const input = document.getElementById('welcome-name');
+            if (!input) return;
+            const nm = (input.value || '').trim().slice(0, 24);
+            if (!nm) { input.focus(); return; }
+            ui.nameInput.value = nm;
+            nameConfirmed = true;
+            saveName();
+            closeWelcome();
+            renderNameGate();
+        }
+        {
+            const wGo = document.getElementById('btn-welcome-go');
+            const wShuffle = document.getElementById('btn-welcome-shuffle');
+            const wInput = document.getElementById('welcome-name');
+            if (wGo) wGo.addEventListener('click', commitWelcome);
+            if (wShuffle) wShuffle.addEventListener('click', () => {
+                if (wInput) wInput.value = randomAnimalName();
+            });
+            if (wInput) wInput.addEventListener('keydown', (ev) => { if (ev.key === 'Enter') commitWelcome(); });
+        }
 
         document.getElementById('btn-shuffle').addEventListener('click', () => {
             ui.hostInput.value = randomRoomName();
@@ -522,6 +619,13 @@
         }
 
         // ============ BubHub Record (modular: see bub-record.js) ============
+        // NOTE: same Google Sheet backend as the Dal Tadka leaderboard.
+        // bub-record.js posts kind=bub rows to BUB_API; daltadka.html posts
+        // name/lentil/score rows to the SAME exec URL; truths.html posts
+        // book=truth rows to it too. The script stores all three shapes in
+        // one sheet and each reader filters what it needs — no separate DB.
+        // Games with `noRecord: true` (e.g. truth) never touch this log.
+        const noRec = (g) => { try { return !!(GAMES.find(x => x.id === g) || {}).noRecord; } catch(e){ return false; } };
         const Rec = window.BubRecord.create({
           getName: () => getName(),
           rosterList: () => rosterList(),
@@ -633,8 +737,19 @@
         function routeMessage(conn, data) {
             if (!data) return;
             if (data.type === 'hello') {
-                links.set(data.id, { conn, name: data.name, host: !!data.host });
-                if (data.game !== undefined) presence[data.id] = { name: data.name, game: data.game || null };
+                let nm = String(data.name || '').slice(0, 24) || 'Player';
+                links.set(data.id, { conn, name: nm, host: !!data.host });
+                // Two players with the same name in one room is unplayable, so
+                // the host hands the newcomer a numbered one (john -> john1)
+                // and tells them. The guest adopts it on the rename branch.
+                if (isHost && !data.host && nameTaken(nm, data.id)) {
+                    nm = claimName(nm, data.id);
+                    links.set(data.id, { conn, name: nm, host: !!data.host });
+                    sendTo(links.get(data.id), { type: 'rename', id: data.id, name: nm, host: !!data.host });
+                }
+                // record the name we actually settled on, so the roster and the
+                // admin report agree with what the player is called
+                if (data.game !== undefined) presence[data.id] = { name: nm, game: data.game || null };
                 if (isHost && !data.host) {
                     sendTo(links.get(data.id), { type: 'hello', id: myId, name: getName(), host: true, game: myGame() });
                     // catch the newcomer up on where everyone is
@@ -671,6 +786,18 @@
             if (data.type === 'rename') {
                 // Live rename: update without the "joined." chat spam.
                 const nm = String(data.name || '').slice(0, 24) || 'Player';
+                // A rename addressed to us is the host de-duplicating our name
+                // (john -> john1). Take it, otherwise the roster and the game
+                // keep showing the duplicate we were just moved off.
+                if (data.id === myId) {
+                    ui.nameInput.value = nm;
+                    nameConfirmed = true;
+                    saveName();
+                    renderNameGate();
+                    logChat("you're " + nm + " in this room — that name was taken", 'the room');
+                    refreshRoster();
+                    return;
+                }
                 if (links.has(data.id)) links.set(data.id, { conn, name: nm, host: !!data.host });
                 if (isHost) sendAll({ type: 'rename', id: data.id, name: nm, host: !!data.host }, data.id);
                 refreshRoster();
@@ -1113,24 +1240,78 @@
             init(){
                 ui.gameButtons.innerHTML = '';
                 ui.soloGameButtons.innerHTML = '';
-                GAMES.forEach(g => {
+                // One button factory so the in-room and lobby lists stay in
+                // step: icon, title, and a tooltip carrying the player count
+                // plus the one-liner from games.js.
+                const gameButton = (g, opts) => {
+                    const o = opts || {};
                     const b = document.createElement('button');
-                    b.id = 'btn-play-' + g.id;
-                    b.className = 'btn-bouncy text-white text-sm font-bold py-1.5 px-4 rounded-xl mt-1';
-                    b.style.background = '#334155';
-                    b.textContent = 'Play ' + g.title;
-                    b.title = `${g.title} (${g.players} players)`;
-                    b.addEventListener('click', () => GB.toggle(g.id));
-                    
-                    if (g.solo) {
-                        ui.soloGameButtons.appendChild(b);
-                    } else {
-                        ui.gameButtons.appendChild(b);
+                    b.id = 'btn-' + (o.prefix || 'play') + '-' + g.id;
+                    b.className = 'btn-bouncy text-white text-sm font-bold rounded-xl ' +
+                        (o.big ? 'py-2 px-4' : 'py-1.5 px-4 mt-1');
+                    b.style.background = g.color || '#334155';
+                    if (g.color) b.style.color = '#0f172a';
+                    if (g.icon) {
+                        const ic = document.createElement('span');
+                        ic.className = 'ic mr-1';
+                        ic.textContent = g.icon;
+                        b.appendChild(ic);
                     }
+                    // the label lives in its own span: updateButtons() swaps
+                    // this text and must not wipe the icon next to it
+                    const lbl = document.createElement('span');
+                    lbl.className = 'lbl';
+                    lbl.textContent = g.title;
+                    b.appendChild(lbl);
+                    const who = g.players === 'solo' ? 'solo' : (g.players + ' players');
+                    b.title = `${g.icon ? g.icon + ' ' : ''}${g.title} — ${who}` + (g.desc ? '. ' + g.desc : '');
+                    b.addEventListener('click', () => GB.toggle(g.id));
+                    return b;
+                };
+                // Multiplayer games are grouped by how many players they need,
+                // so a group of friends can see at a glance what fits.
+                // The lobby list mixes solo and multiplayer, so it groups too.
+                const ends = (key) => {
+                    const n = String(key).match(/\d+/g) || [0];
+                    return [parseInt(n[0], 10) || 0, parseInt(n[1] || n[0], 10) || 0];
+                };
+                const renderGrouped = (container, list, opts) => {
+                    const o = opts || {};
+                    container.innerHTML = '';
+                    const groups = [];
+                    list.forEach(g => {
+                        let grp = groups.find(x => x.key === g.players);
+                        if (!grp) {
+                            grp = { key: g.players, label: g.players === 'solo' ? 'Solo' : (g.players + ' players'), games: [] };
+                            groups.push(grp);
+                        }
+                        grp.games.push(g);
+                    });
+                    // sort by the small end of the range, then the big end
+                    groups.sort((a, b) => {
+                        const ea = ends(a.key), eb = ends(b.key);
+                        return (ea[0] - eb[0]) || (ea[1] - eb[1]);
+                    });
+                    groups.forEach(grp => {
+                        const h = document.createElement('div');
+                        h.className = 'text-[11px] font-mono uppercase tracking-wide text-slate-400 mt-2 mb-1 w-full';
+                        h.textContent = grp.label;
+                        container.appendChild(h);
+                        grp.games.forEach(g => {
+                            const b = gameButton(g, o);
+                            if (o.note) b.title += o.note;
+                            container.appendChild(b);
+                        });
+                    });
+                };
+                const multi = GAMES.filter(g => !g.solo);
+                renderGrouped(ui.gameButtons, multi);
+                GAMES.filter(g => g.solo).forEach(g => {
+                    ui.soloGameButtons.appendChild(gameButton(g));
                 });
                 // Hide a section entirely when the registry has no games for it.
                 // This keeps the hub modular: sections reflect games.js, not markup.
-                const hasMulti = GAMES.some(g => !g.solo);
+                const hasMulti = multi.length > 0;
                 const hasSoloInRoom = GAMES.some(g => g.solo);
                 const mpSec = document.getElementById('multiplayer-section');
                 const soloSec = document.getElementById('solo-section');
@@ -1140,18 +1321,8 @@
                 const lobbyGames = GAMES.filter(g => g.lobby);
                 if (ui.lobbyGamesCard) ui.lobbyGamesCard.classList.toggle('hidden', !lobbyGames.length);
                 if (ui.lobbyGameButtons){
-                    ui.lobbyGameButtons.innerHTML = '';
-                    lobbyGames.forEach(g => {
-                        const b = document.createElement('button');
-                        b.id = 'btn-lobby-' + g.id;
-                        b.className = 'btn-bouncy text-white text-sm font-bold py-2 px-4 rounded-xl';
-                        b.style.background = g.color || '#334155';
-                        b.style.color = '#0f172a';
-                        b.textContent = 'Play ' + g.title;
-                        b.title = `${g.title} (${g.players}) — no room needed`;
-                        b.addEventListener('click', () => GB.toggle(g.id));
-                        ui.lobbyGameButtons.appendChild(b);
-                    });
+                    renderGrouped(ui.lobbyGameButtons, lobbyGames,
+                        { prefix: 'lobby', big: true, note: ' — no room needed' });
                 }
                 window.addEventListener('message', GB.onChild);
                 ['lobby', 'room'].forEach(s => {
@@ -1199,9 +1370,9 @@
                 const already = this.frames[game];
                 if (already && !already.el.classList.contains('hidden')) return; // already open
                 if (game === 'goldberg') Rec.goldReset();
-                try { Rec.noteOpened(game); } catch(e){}
+                if (!noRec(game)) try { Rec.noteOpened(game); } catch(e){}
                 Object.entries(this.frames).forEach(([gid, f]) => {
-                    if (gid !== game) { try { Rec.flushUsage(gid); } catch(e){} f.el.classList.add('hidden'); }
+                    if (gid !== game) { if (!noRec(gid)) try { Rec.flushUsage(gid); } catch(e){} f.el.classList.add('hidden'); }
                 });
                 const f = this.frame(game);
                 if (!f) return;
@@ -1231,7 +1402,7 @@
                 // Tell the game it was hidden (Goldberg fades its music out).
                 this.down(game, { t: 'gd', game, k: 'hide' });
                 if (game === 'goldberg') Rec.flushGoldberg();
-                try { Rec.flushUsage(game); } catch(e){}
+                if (!noRec(game)) try { Rec.flushUsage(game); } catch(e){}
                 try { broadcastPresence(); } catch(e){}
                 this.updateButtons();
                 this.refreshStage();
@@ -1276,13 +1447,18 @@
             },
 
             updateButtons(){
+                // Swap only the label span so the icon survives (see gameButton)
+                const setLabel = (el, txt) => {
+                    const l = el.querySelector('.lbl');
+                    if (l) l.textContent = txt; else el.textContent = txt;
+                };
                 GAMES.forEach(g => {
                     const f = this.frames[g.id];
                     const open = f && !f.el.classList.contains('hidden');
                     const b = document.getElementById('btn-play-' + g.id);
-                    if (b) b.textContent = (open ? 'Hide ' : 'Play ') + g.title;
+                    if (b) setLabel(b, (open ? 'Hide ' : 'Play ') + g.title);
                     const lb = document.getElementById('btn-lobby-' + g.id);
-                    if (lb) lb.textContent = (open ? 'Hide ' : 'Play ') + g.title;
+                    if (lb) setLabel(lb, (open ? 'Hide ' : 'Play ') + g.title);
                 });
             },
 
@@ -1350,7 +1526,8 @@
                 if (m.k === 'result'){
                     // A game ended on this machine. Solo games always record
                     // locally; multiplayer games record on the host only.
-                    Rec.fromGame(game, m.p);
+                    // noRecord games (truth) keep their own book and stay out.
+                    if (!noRec(game)) Rec.fromGame(game, m.p);
                     return;
                 }
                 if (m.k === 'invite'){
@@ -1525,6 +1702,12 @@
             }
             renderResume();
             renderRoomChips();
+            // First visit, no saved name: put the centered modal up. Invite
+            // guests (?room=) get their own landing page further down, so
+            // leave the screen to them.
+            let inviteRoom = '';
+            try { inviteRoom = (new URL(location.href)).searchParams.get('room') || ''; } catch (e) {}
+            if (!loadSavedName() && !inviteRoom) showWelcome();
         })();
 
         // ============ Invite links: copy in-game, land on a name page ============

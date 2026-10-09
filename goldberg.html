@@ -1429,9 +1429,18 @@ function onState(p,from){
     }}
   }
   if(Array.isArray(p.del)){
-    let changed=false;
-    for(const id of p.del){ records.delete(id); if(selectedId===id){selectedId=null;pillOpen=false;changed=true;} }
+    let changed=false, rangBell=false;
+    for(const id of p.del){
+      const was=records.get(id);
+      if(was&&was.kind==='bell') rangBell=true;
+      records.delete(id);
+      rungAt.delete(id); lastSfx.delete(id+'|bell');
+      if(selectedId===id){selectedId=null;pillOpen=false;changed=true;}
+    }
     if(changed) updateSel();
+    // Deleting a bell must drop its tuner row too: the host re-renders the
+    // drawer in hostDel(), but a guest only learns about it through p.del.
+    if(rangBell) renderTune();
   }
   if(p.addFull){ records.clear(); for(const r of (p.add||[])){
     records.set(r.i,{id:r.i,kind:r.kind==='ramp'?'plank':r.kind,x:r.x,y:r.y,angle:r.a||0,color:r.c||r.color||'#8b5a2b',locked:!!r.l,w:r.w,h:r.h,r:r.r,u:r.u,ax:r.ax,ay:r.ay,a0:r.a0,verts:r.verts,note:r.n,lid:r.q||undefined,what:r.sw,auto:r.sa,bx:r.x,by:r.y});

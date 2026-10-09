@@ -58,7 +58,7 @@ button.eg.on{background:#ffd23f;color:#241b12;border-color:#ffd23f}
   </div>
   <div id="stage-wrap">
     <canvas id="cv" width="1400" height="900"></canvas>
-    <div id="overlay"><h1>eggs</h1><p>A chicken-coop sandbox for eggs. Bounce around the perches, splat, respawn. Jump twice for a double jump. Ride the teal elevator around its loop — hold up/down to drive it. Hop on the skateboard: tap jump for a flipping ollie (the board jumps too), hold jump to bail, mind the peg. One power-up at a time appears on a perch — a star (wrecking ball), a bean (grow BIG → HUGE → TITAN), or legs (touch someone to lift &amp; throw them).</p><p class="controls-hint" style="font-size:11px;opacity:.75">Arrows / WASD move · Space jumps (twice!) · brake hops off the board · you are the egg with your name on it</p></div>
+    <div id="overlay"><h1>eggs</h1><p>A chicken-coop sandbox for eggs. Bounce around the perches, splat, respawn. Jump twice for a double jump. Ride the teal elevator around its loop — hold up/down to drive it. Hop on the skateboard: tap jump for a flipping ollie (the board jumps too), hold jump to bail, mind the peg. Every hit you survive adds damage, and the more damage you carry the further you fly. One power-up at a time appears on a perch — a star (wrecking ball), a bean (grow BIG → HUGE → TITAN until someone hits you back down a size), or legs (touch someone to lift &amp; throw them).</p><p class="controls-hint" style="font-size:11px;opacity:.75">Arrows / WASD move · Space jumps (twice!) · brake hops off the board · you are the egg with your name on it</p></div>
     <div id="phone-controls">
       <div class="phone-dpad">
         <button class="phone-btn dpad-up" data-key="ArrowUp" aria-label="up / jump"><span class="ico">▲</span></button>
@@ -74,7 +74,7 @@ button.eg.on{background:#ffd23f;color:#241b12;border-color:#ffd23f}
     <input id="shout-input" maxlength="40" placeholder="Shout something at the eggs..." autocomplete="off">
     <button class="eg" id="btn-shout">Shout</button>
   </div>
-  <p class="hint">white, brown, baby-blue, easter. splat = white puddle, yellow middle (bigger egg = bigger mess). power-ups rest on the perches, one at a time: star = wrecking ball · bean = step up BIG → HUGE → TITAN (smash harder, die easier) · legs = touch someone to lift &amp; throw. held? mash jump to wiggle free. board = ride it, tap jump = flip-ollie (it jumps too), hold jump = bail, peg = wipeout. mover = ride it, hold up/down to drive. respawns are free.</p>
+  <p class="hint">white, brown, baby-blue, easter. splat = white puddle, yellow middle (bigger egg = bigger mess). damage % climbs with every hit you survive, and higher % = longer knockback. power-ups rest on the perches, one at a time: star = wrecking ball (smashes even a big egg) · bean = step up BIG → HUGE → TITAN and keep it — no timer, the next hit knocks you down a size instead of killing you (the pit still does) · legs = touch someone to lift &amp; throw. held? mash jump to wiggle free. board = ride it, tap jump = flip-ollie (it jumps too), hold jump = bail, peg = wipeout. mover = ride it, hold up/down to drive. respawns are free.</p>
   <div id="err"></div>
 </div>
 <script>
@@ -210,7 +210,7 @@ function newWorld(){
 }
 function spawnEgg(idx,pid,pname){
   var e={idx:idx,id:pid,name:pname,x:W/2+(idx-1.5)*60,y:60,vx:0,vy:0,r:17,ground:false,dead:0,deadT:0,
-   inv:0,starT:0,bigT:0,bigTier:0,legs:0,struggle:0,cracks:0,splats:0,kills:0,face:1,
+   inv:0,starT:0,bigTier:0,dmg:0,legs:0,struggle:0,cracks:0,splats:0,kills:0,face:1,
    holding:-1,heldBy:-1,holdT:0,throwCD:0,thrownT:0,thrownBy:null,
   jumps:0,prevJump:false,jumpBuf:0,riding:false,sq:0,onMover:false,lastInp:null,jumpHold:0,noBoard:0};
  return e;
@@ -224,7 +224,7 @@ function respawn(g,quiet){
  releaseHold(g);
  if(board&&board.rider===g.idx)board.rider=-1;
   g.x=rnd(160,W-160);g.y=50;g.vx=rnd(-80,80);g.vy=0;g.dead=0;g.inv=1.5;g.starT=Math.max(g.starT,0);
-  g.bigT=0;g.bigTier=0;g.legs=0;g.struggle=0;g.r=17;g.holding=-1;g.heldBy=-1;g.holdT=0;g.thrownT=0;g.thrownBy=null;
+  g.bigTier=0;g.dmg=0;g.legs=0;g.struggle=0;g.r=17;g.holding=-1;g.heldBy=-1;g.holdT=0;g.thrownT=0;g.thrownBy=null;
   g.jumps=0;g.prevJump=false;g.jumpBuf=0;g.riding=false;g.sq=0;g.jumpHold=0;g.noBoard=0;
  if(!quiet)burst(g.x,g.y,10,60,220,.5,3,['#fff','#fde68a'],0);
 }
@@ -258,7 +258,7 @@ function ensureEggs(){
  if(board&&board.rider>=0&&(!eggs[board.rider]||!eggs[board.rider].riding))board.rider=-1;
 }
  function snapshot(){return{plats:plats,level:levelName,
-  eggs:eggs.map(function(g){return{i:g.idx,x:Math.round(g.x),y:Math.round(g.y),vx:Math.round(g.vx),vy:Math.round(g.vy),dead:g.dead?1:0,inv:+g.inv.toFixed(2),starT:+g.starT.toFixed(2),big:+g.bigT.toFixed(2),tr:g.bigTier||0,leg:+g.legs.toFixed(2),sg:+g.struggle.toFixed(2),splats:g.splats,kills:g.kills,name:g.name,id:g.id,hold:g.holding,held:g.heldBy,thr:g.thrownT>0?1:0,ride:g.riding?1:0,sq:+g.sq.toFixed(2)}}),
+  eggs:eggs.map(function(g){return{i:g.idx,x:Math.round(g.x),y:Math.round(g.y),vx:Math.round(g.vx),vy:Math.round(g.vy),dead:g.dead?1:0,inv:+g.inv.toFixed(2),starT:+g.starT.toFixed(2),tr:g.bigTier||0,dm:Math.round(g.dmg||0),leg:+g.legs.toFixed(2),sg:+g.struggle.toFixed(2),splats:g.splats,kills:g.kills,name:g.name,id:g.id,hold:g.holding,held:g.heldBy,thr:g.thrownT>0?1:0,ride:g.riding?1:0,sq:+g.sq.toFixed(2)}}),
    decals:decals.slice(-24),pu:pu?{k:pu.k,x:Math.round(pu.x),y:Math.round(pu.y)}:null,
   bd:board?{x:Math.round(board.x),y:Math.round(board.y),r:board.rider,st:+board.stuck.toFixed(2),fl:+board.flip.toFixed(2)}:null,
   pg:peg?{x:Math.round(peg.x)}:null,
@@ -268,7 +268,8 @@ function onState(p,from){if(isHost||amSolo)return;if(!p)return;
   if(p.plats){plats=p.plats;if(p.level&&p.level!==levelName){levelName=p.level;buildCoop();}}
   if(p.eggs){ensureEggs();
    p.eggs.forEach(function(s){var g=eggs[s.i];if(!g)return;
-    g.x=s.x;g.y=s.y;g.vx=s.vx;g.vy=s.vy;g.dead=s.dead;g.inv=s.inv;g.starT=s.starT;    g.bigT=(typeof s.big==='number'?s.big:0);g.bigTier=s.tr||0;syncSize(g);g.legs=s.leg||0;g.struggle=s.sg||0;g.splats=s.splats;g.kills=s.kills;g.name=s.name||g.name;g.id=s.id||g.id;g.holding=(typeof s.hold==='number'?s.hold:-1);g.heldBy=(typeof s.held==='number'?s.held:-1);g.thrownT=s.thr?1:0;g.riding=!!s.ride;g.sq=(typeof s.sq==='number'?s.sq:0);});}
+     g.x=s.x;g.y=s.y;g.vx=s.vx;g.vy=s.vy;g.dead=s.dead;g.inv=s.inv;g.starT=s.starT;g.bigTier=s.tr||0;g.dmg=(typeof s.dm==='number'?s.dm:0);syncSize(g);g.legs=s.leg||0;g.struggle=s.sg||0;g.splats=s.splats;g.kills=s.kills;g.name=s.name||g.name;g.id=s.id||g.id;g.holding=(typeof s.hold==='number'?s.hold:-1);g.heldBy=(typeof s.held==='number'?s.held:-1);g.thrownT=s.thr?1:0;g.riding=!!s.ride;g.sq=(typeof s.sq==='number'?s.sq:0);});}
+
    if(p.decals)decals=p.decals;
    pu=p.pu||null;
   if(p.bd){if(!board)board={x:p.bd.x,y:(typeof p.bd.y==='number'?p.bd.y:H-63),w:90,h:10,vx:0,vy:0,ground:true,rider:-1,stuck:0,flip:0,air:0};else{board.x=p.bd.x;if(typeof p.bd.y==='number')board.y=p.bd.y;board.rider=p.bd.r;board.stuck=p.bd.st||0;board.flip=p.bd.fl||0;}}
@@ -305,22 +306,24 @@ function hitRect(g,p,inp){
  g.x+=h.nx*h.pen;g.y+=h.ny*h.pen;
  var vn=g.vx*h.nx+g.vy*h.ny;
   if(vn<0){
-   // thrown eggs splat easier: hurling someone into a wall should finish them.
-   // big eggs are fragile: the bigger they are, the harder they fall.
-   var tier=g.bigTier||0;
-   var lethal=950-180*tier, side=800-150*tier;
-   if(g.thrownT>0){lethal-=400;side-=300;}
-  var attacker=(g.thrownT>0&&g.thrownBy)?g.thrownBy:null;
-  // invincible eggs (star / spawn protection) skip ONLY the death —
-  // the bounce below always runs, so they can never get pinned.
-  var kill=!attacker&&(g.inv>0||g.starT>0)?false:true;
-  if(h.ny<-0.5){g.ground=true;g.jumps=0;
-   if(vn<-lethal&&kill){splat(g,'SPLAT!',attacker||undefined);return true;}
-   else if(vn<-650){g.cracks++;g.sq=1;burst(g.x,g.y,6,40,160,.4,2,['#fff'],0);}
-   g.vy*=-0.35;g.vx*=0.85;
+    // thrown eggs splat easier: hurling someone into a wall should finish them.
+    // big eggs are fragile: the bigger they are, the harder they fall.
+    var tier=g.bigTier||0;
+    var lethal=950-180*tier, side=800-150*tier;
+    if(g.thrownT>0){lethal-=400;side-=300;}
+   var attacker=(g.thrownT>0&&g.thrownBy)?g.thrownBy:null;
+   // invincible eggs (star / spawn protection) skip ONLY the death —
+   // the bounce below always runs, so they can never get pinned.
+   var kill=!attacker&&(g.inv>0||g.starT>0)?false:true;
+   if(h.ny<-0.5){g.ground=true;g.jumps=0;
+   if(vn<-lethal&&kill){hurt(g,attacker||undefined,'SPLAT!',26);return true;}
+    else if(vn<-650){g.cracks++;g.sq=1;addDmg(g,5);burst(g.x,g.y,6,40,160,.4,2,['#fff'],0);}
+    // knockback scales with banked damage: the same fall hits harder late on
+    g.vy*=-0.35*knockMul(g);g.vx*=0.85;
     if(g.jumpBuf>0){g.jumpBuf=0;g.vy=-660*(1-0.12*(g.bigTier||0));g.vx+=inp.ax*120;g.ground=false;g.jumps=1;}
-  }else{g.vx-=1.7*vn*h.nx;g.vy-=1.7*vn*h.ny;
-   if(Math.abs(vn)>side&&kill){splat(g,'SPLAT!',attacker||undefined);return true;}}
+   }else{g.vx-=1.7*vn*h.nx;g.vy-=1.7*vn*h.ny;
+    if(Math.abs(vn)>side&&kill){hurt(g,attacker||undefined,'SPLAT!',26);return true;}}
+
  } else if(h.ny<-0.5){g.ground=true;g.jumps=0;
   if(g.jumpBuf>0){g.jumpBuf=0;g.vy=-660;g.vx+=inp.ax*120;g.ground=false;g.jumps=1;}}
  return false;
@@ -516,35 +519,39 @@ function eggVsEgg(a,b){
  if(d>=min||d===0)return;dx/=d;dy/=d;
  var push=(min-d)/2;a.x-=dx*push;a.y-=dy*push;b.x+=dx*push;b.y+=dy*push;
  var rel=Math.abs((a.vx-b.vx)*dx+(a.vy-b.vy)*dy)+Math.abs(a.vy)+Math.abs(b.vy);
- var aStar=a.starT>0, bStar=b.starT>0;
- var aBig=a.bigT>0, bBig=b.bigT>0;
- if(aStar&&!bStar){splat(b,'STAR SMASH!',a);return;}
- if(bStar&&!aStar){splat(a,'STAR SMASH!',b);return;}
-  if(aStar&&bStar){burst((a.x+b.x)/2,(a.y+b.y)/2,16,100,300,.6,3,['#ffd23f','#fff'],0);return;}
-  // legs grab: lift them overhead instead of exploding on contact.
-  // legs beat size — a legged big egg grabs instead of squashing.
-  // no grabbing from a board, and grabbing a rider yanks them off it.
-  if(a.legs>0&&!a.riding&&a.holding<0&&b.heldBy<0&&b.legs<=0&&a.throwCD<=0&&b.thrownT<=0){grab(a,b);return;}
-  if(b.legs>0&&!b.riding&&b.holding<0&&a.heldBy<0&&a.legs<=0&&b.throwCD<=0&&a.thrownT<=0){grab(b,a);return;}
-  // big eggs squash normal eggs on contact (big vs big just bounces)
-  if(aBig&&!bBig&&!bStar){splat(b,'SQUASHED!',a);return;}
-  if(bBig&&!aBig&&!aStar){splat(a,'SQUASHED!',b);return;}
-  if(aBig&&bBig){burst((a.x+b.x)/2,(a.y+b.y)/2,12,60,220,.5,3,['#d6a05c','#fff'],0);}
-  // thrown bodies are missiles: they wreck whoever they hit (stars exempt —
-  // big eggs included. size is no armor against a hurled body).
-  var aSpd=Math.hypot(a.vx,a.vy),bSpd=Math.hypot(b.vx,b.vy);
-  if(a.thrownT>0&&!bStar&&aSpd>350){splat(b,'THROWN!',a.thrownBy||a);a.thrownT=0;a.thrownBy=null;return;}
-  if(b.thrownT>0&&!aStar&&bSpd>350){splat(a,'THROWN!',b.thrownBy||b);b.thrownT=0;b.thrownBy=null;return;}
-   if(a.thrownT>0&&b.thrownT>0){burst((a.x+b.x)/2,(a.y+b.y)/2,16,100,300,.6,3,['#fff','#fca5a5'],0);a.thrownT=0;b.thrownT=0;return;}
+  var aStar=a.starT>0, bStar=b.starT>0;
+  var aBig=a.bigTier>0, bBig=b.bigTier>0;
+  // the star outranks size: it still splats a big egg outright
+  if(aStar&&!bStar){splat(b,'STAR SMASH!',a);return;}
+  if(bStar&&!aStar){splat(a,'STAR SMASH!',b);return;}
+   if(aStar&&bStar){burst((a.x+b.x)/2,(a.y+b.y)/2,16,100,300,.6,3,['#ffd23f','#fff'],0);return;}
+   // legs grab: lift them overhead instead of exploding on contact.
+   // legs beat size — a legged big egg grabs instead of squashing.
+   // no grabbing from a board, and grabbing a rider yanks them off it.
+   if(a.legs>0&&!a.riding&&a.holding<0&&b.heldBy<0&&b.legs<=0&&a.throwCD<=0&&b.thrownT<=0){grab(a,b);return;}
+   if(b.legs>0&&!b.riding&&b.holding<0&&a.heldBy<0&&a.legs<=0&&b.throwCD<=0&&a.thrownT<=0){grab(b,a);return;}
+   // big eggs squash normal eggs on contact (big vs big just bounces)
+   if(aBig&&!bBig&&!bStar){splat(b,'SQUASHED!',a);return;}
+   if(bBig&&!aBig&&!aStar){splat(a,'SQUASHED!',b);return;}
+   if(aBig&&bBig){burst((a.x+b.x)/2,(a.y+b.y)/2,12,60,220,.5,3,['#d6a05c','#fff'],0);}
+   // thrown bodies are missiles: they wreck whoever they hit (stars exempt).
+   // a big egg still gets shrunk down instead of dying to the hit.
+   var aSpd=Math.hypot(a.vx,a.vy),bSpd=Math.hypot(b.vx,b.vy);
+   if(a.thrownT>0&&!bStar&&aSpd>350){hurt(b,a.thrownBy||a,'THROWN!',30);a.thrownT=0;a.thrownBy=null;return;}
+   if(b.thrownT>0&&!aStar&&bSpd>350){hurt(a,b.thrownBy||b,'THROWN!',30);b.thrownT=0;b.thrownBy=null;return;}
+    if(a.thrownT>0&&b.thrownT>0){burst((a.x+b.x)/2,(a.y+b.y)/2,16,100,300,.6,3,['#fff','#fca5a5'],0);a.thrownT=0;b.thrownT=0;return;}
   if(rel>700){
-   // hard mid-air crunch: faster (and bigger) one survives
-   var av=Math.hypot(a.vx,a.vy)*(aBig?1+0.6*(a.bigTier||0):1),bv=Math.hypot(b.vx,b.vy)*(bBig?1+0.6*(b.bigTier||0):1);
-  if(Math.abs(av-bv)<120){splat(a,'MID-AIR SPLAT!');splat(b,'MID-AIR SPLAT!');}
-  else if(av>bv)splat(b,'CRUNCHED!',a.thrownBy||a);else splat(a,'CRUNCHED!',b.thrownBy||b);
- }else{
-  var rv=(a.vx-b.vx)*dx+(a.vy-b.vy)*dy;
-  if(rv>0){a.vx-=dx*rv*0.6;a.vy-=dy*rv*0.6;b.vx+=dx*rv*0.6;b.vy+=dy*rv*0.6;}
- }
+    // hard mid-air crunch: faster (and bigger) one survives
+    var av=Math.hypot(a.vx,a.vy)*(aBig?1+0.6*(a.bigTier||0):1),bv=Math.hypot(b.vx,b.vy)*(bBig?1+0.6*(b.bigTier||0):1);
+   if(Math.abs(av-bv)<120){hurt(a,null,'MID-AIR SPLAT!',22);hurt(b,null,'MID-AIR SPLAT!',22);}
+   else if(av>bv)hurt(b,a.thrownBy||a,'CRUNCHED!',24);else hurt(a,b.thrownBy||b,'CRUNCHED!',24);
+  }else{
+   var rv=(a.vx-b.vx)*dx+(a.vy-b.vy)*dy;
+   if(rv>0){a.vx-=dx*rv*0.6;a.vy-=dy*rv*0.6;b.vx+=dx*rv*0.6;b.vy+=dy*rv*0.6;}
+   // glancing contact still chips damage, so late-game taps matter
+   if(rel>380){addDmg(a,Math.round(rel/120));addDmg(b,Math.round(rel/120));}
+  }
+
 }
 function grab(h,v){
  if(v.riding){v.riding=false;if(board&&board.rider===v.idx)board.rider=-1;}
@@ -576,7 +583,44 @@ function splat(g,text,by,force){
    for(var i=0;i<eggs.length;i++)if(eggs[i].id===g.id){respawn(eggs[i]);return;}
   },1300);
 }
-function popText(x,y,t){parts.push({k:'t',x:x,y:y,t:0,tx:t});}
+/* ---------- damage, knockback, and the mushroom rule ----------
+   Two ideas borrowed from the platform fighters (implemented our own way):
+   1. Damage %: every hit you survive banks damage, and knockback scales with
+      it, so late-game hits send you much further than early ones.
+   2. The bean is a mushroom, not a timer: BIG/HUGE/TITAN lasts until you get
+      hit. Damage that used to kill a normal egg now just knocks a tier off,
+      so you get popped back down instead of dying. The abyss still kills. */
+var DMG_CAP=400;      // damage ceiling (no runaway percentages)
+var DMG_KB=60;        // damage % that doubles knockback
+function knockMul(g){return 1+(g.dmg||0)/DMG_KB;}
+function addDmg(g,amount){g.dmg=Math.max(0,Math.min(DMG_CAP,(g.dmg||0)+amount));}
+// A hit that would have killed lands instead as a size loss. Returns true if
+// it shrank the egg (caller then keeps the egg alive).
+function shrinkEgg(g){
+  g.bigTier=Math.max(0,(g.bigTier||0)-1);syncSize(g);
+  g.inv=Math.max(g.inv,1.4);       // brief mercy window, like a hitstun reset
+  g.sq=-0.35;
+  var km=knockMul(g);
+  g.vy=Math.min(g.vy,-260*km*0.5);g.vx+=rnd(-160,160);
+  // "TITAN → HUGE!" while a size is left, plain "SHRUNK!" at the bottom
+  var was=g.bigTier+1;
+  popText(g.x,g.y-(g.r||17)-12,
+    (was&&g.bigTier>0)?((TIER_NAME[was]||'BIG')+' → '+(TIER_NAME[g.bigTier]||'')+'!'):'SHRUNK!');
+  burst(g.x,g.y,18,60,260,.5,3,['#fff','#d6a05c'],0);
+  return true;
+}
+// Central "this hit connected" gate: bank damage, then either spend a size
+// tier or splat. `power` is the damage the hit deals.
+function hurt(g,by,text,power){
+  if(g.dead)return false;
+  if(!by&&(g.inv>0||g.starT>0))return false;   // still invulnerable: no chip
+  addDmg(g,power==null?18:power);
+  if(g.bigTier>0)return shrinkEgg(g);
+  splat(g,text,by);
+  return false;
+}
+function popText(x,y,t){parts.push({k:'t',x:x,y:y,t:0,tx:t});
+}
 function burst(x,y,n,v0,v1,l,sz,cols,g){for(var k=0;k<n;k++){var a=Math.random()*6.283,v=v0+Math.random()*(v1-v0);
  if(parts.length<400)parts.push({k:'p',x:x,y:y,vx:Math.cos(a)*v,vy:Math.sin(a)*v,l:l*(0.6+Math.random()*0.8),m:l,s:sz*(0.6+Math.random()*0.8),c:cols[k%cols.length]});}}
 
@@ -634,10 +678,11 @@ function step(dt,now){
    }
    eggs.forEach(function(g){
     g.onMover=false; // re-set by the carry check during this tick's physics
-    if(g.inv>0)g.inv-=dt;
-    if(g.starT>0)g.starT-=dt;
-    if(g.bigT>0){g.bigT-=dt;if(g.bigT<=0){g.bigTier=0;syncSize(g);}}
-    if(g.legs>0)g.legs-=dt;
+     if(g.inv>0)g.inv-=dt;
+     if(g.starT>0)g.starT-=dt;
+     // no bigT countdown any more: size is spent by taking hits, not by a clock
+     if(g.legs>0)g.legs-=dt;
+
     if(g.struggle>0&&g.heldBy<0)g.struggle=Math.max(0,g.struggle-0.5*dt);
    syncSize(g);
    if(g.sq>0)g.sq=Math.max(0,g.sq-dt*4);
@@ -655,10 +700,11 @@ function step(dt,now){
       g.starT=10;
       Hub.up('say',(g.name||'An egg')+' grabbed the STAR at eggs');
       burst(g.x,g.y,30,100,400,1,4,['#ffd23f','#fff','#f472b6'],0);
-     }else if(pu.k==='bean'){
-      // a bean steps you up a tier: normal -> BIG -> HUGE -> TITAN.
-      // bigger smashes harder, dies from a shorter fall.
-      g.bigTier=Math.min(3,(g.bigTier||0)+1);g.bigT=20;syncSize(g);
+      }else if(pu.k==='bean'){
+       // a bean steps you up a tier: normal -> BIG -> HUGE -> TITAN, and it
+       // stays until you're hit (see hurt/shrinkEgg). no timer.
+       g.bigTier=Math.min(3,(g.bigTier||0)+1);syncSize(g);
+
       Hub.up('say',(g.name||'An egg')+' ate the BEAN and got '+(TIER_NAME[g.bigTier]||'BIG')+' at eggs');
       burst(g.x,g.y,24,60,320,1,4,['#d6a05c','#a16207','#fff'],0);
       popText(g.x,g.y-34,TIER_NAME[g.bigTier]+'!');
@@ -693,8 +739,11 @@ function step(dt,now){
     v.x=h.x;v.y=h.y-h.r-26;v.vx=h.vx;v.vy=h.vy;
    if(h.holdT>0.9){
     var dir=h.vx>60?1:(h.vx<-60?-1:(h.face||1));
+     // a damaged victim flies further: the throw scales off their own %
+     var km=knockMul(v);
      v.heldBy=-1;h.holding=-1;h.holdT=0;h.throwCD=1.2;
-     v.vx=h.vx+dir*620;v.vy=-560;v.inv=0;v.thrownT=1.4;v.thrownBy=h;v.jumps=1; // one air-jump left while flying
+     v.vx=h.vx+dir*620*km;v.vy=-560*km;v.inv=0;v.thrownT=1.4;v.thrownBy=h;v.jumps=1; // one air-jump left while flying
+
     popText(v.x,v.y-26,'THROW!');
     burst(v.x,v.y,10,80,260,.5,3,['#fff','#fca5a5'],0);
    }
@@ -761,12 +810,19 @@ function drawEgg(g){
   var isc=1/s;
   ctx.save();ctx.scale(isc,isc);
   ctx.globalAlpha=1;ctx.shadowBlur=0;
-  ctx.fillStyle='rgba(0,0,0,.6)';ctx.font='700 10px monospace';ctx.textAlign='center';
-  ctx.fillText(g.name||'',0,-27*s);
+   ctx.fillStyle='rgba(0,0,0,.6)';ctx.font='700 10px monospace';ctx.textAlign='center';
+   // name, plus the damage % above it: % climbs as you get hit and makes every
+   // knockback hit harder (see knockMul)
+   if(g.dmg>0){ctx.fillStyle=g.dmg>=180?'#f87171':'#f472b6';ctx.font='900 12px system-ui';
+    ctx.fillText(Math.round(g.dmg)+'%',0,-14*s);}
+   ctx.fillStyle='rgba(0,0,0,.6)';ctx.font='700 10px monospace';
+   ctx.fillText(g.name||'',0,-27*s);
    var tsub=34*s;
    if(g.starT>0){ctx.fillStyle='#ffd23f';ctx.font='900 12px system-ui';ctx.fillText('★'+Math.ceil(g.starT),0,tsub);tsub+=12;}
-   if(g.bigT>0){ctx.fillStyle='#d6a05c';ctx.font='900 12px system-ui';ctx.fillText((TIER_NAME[g.bigTier]||'BIG')+' '+Math.ceil(g.bigT),0,tsub);tsub+=12;}
+   // size has no timer left, so this is just the tier name
+   if(g.bigTier>0){ctx.fillStyle='#d6a05c';ctx.font='900 12px system-ui';ctx.fillText(TIER_NAME[g.bigTier]||'BIG',0,tsub);tsub+=12;}
    if(g.legs>0){ctx.fillStyle='#fca5a5';ctx.font='900 12px system-ui';ctx.fillText((g.holding>=0?'HOLDING ':'LEGS ')+Math.ceil(g.legs),0,tsub);}
+
   ctx.restore();
    if(g.thrownT>0){ctx.strokeStyle='rgba(255,255,255,.55)';ctx.lineWidth=2; // hurled-egg speed streaks
     for(var si2=0;si2<3;si2++){var bx2=-g.vx*0.03*(si2+1),by2=-g.vy*0.03*(si2+1);
@@ -1093,10 +1149,13 @@ function render(){
   ctx.fillStyle='#fff';
   ctx.fillText(stat,20,y0+51);
    var badges=[];
+   // damage % rides in front of the name so it's readable at a glance
+   if(g.dmg>0){ctx.fillStyle=g.dmg>=180?'#f87171':'#f472b6';ctx.font='900 17px system-ui,sans-serif';
+    ctx.fillText(Math.round(g.dmg)+'%',bw-4,y0+25);}
    if(g.legs>0&&!g.riding)badges.push(['LEGS','#fca5a5']);
    if(g.riding)badges.push(['BOARD','#3cc3d4']);
    if(g.starT>0)badges.push(['STAR '+Math.ceil(g.starT),'#ffd23f']);
-   if(g.bigT>0)badges.push([(TIER_NAME[g.bigTier]||'BIG')+' '+Math.ceil(g.bigT),'#d6a05c']);
+   if(g.bigTier>0)badges.push([TIER_NAME[g.bigTier]||'BIG','#d6a05c']);
   var bx=8+bw+8,by=y0+18;
   ctx.font='900 13px system-ui,sans-serif';
   badges.forEach(function(bd){

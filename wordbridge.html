@@ -938,8 +938,13 @@ function renderBeat(box, b, opts){
     box.appendChild(beat);
 }
 function renderReveal(){
-    var box = $('reveal'); clear(box);
+    // Order matters: ensureRevealStaging() can call cerToName(), which calls
+    // render() again. Clearing AFTER it means the outer pass wipes whatever
+    // the nested pass drew and re-draws each beat exactly once (otherwise the
+    // current beat's "Name:" line is appended twice).
+    var box = $('reveal');
     ensureRevealStaging();
+    clear(box);
     var beats = cerBeats();
     var i;
     if (cerPhase !== 'done'){

@@ -44,7 +44,8 @@ Sections render from the registry — a section with zero games hides itself aut
 ```js
 window.BUB_GAMES = [
   // Multiplayer (host-authoritative, needs a room):
-  { id: 'mygame', file: 'my-game.html', title: 'My Game', players: '2-4', color: '#00ffcc' },
+  { id: 'mygame', file: 'my-game.html', title: 'My Game', players: '2-4',
+    color: '#00ffcc', icon: '🎯', desc: 'One sentence for the button tooltip.' },
 
   // Solo (playable with no room; lobby:true also lists it pre-room):
   // { id: 'mygame', file: 'my-game.html', title: 'My Game', players: 'solo',
@@ -53,6 +54,7 @@ window.BUB_GAMES = [
 ```
 
 3. Reload `index.html`. Done — buttons, iframes, invites, and roster all derive from the registry.
+   Multiplayer buttons are grouped by the `players` string, smallest group first.
 
 ### Registry fields
 
@@ -67,6 +69,8 @@ window.BUB_GAMES = [
 | `lobby` | – | `true` → also listed in the pre-room lobby card. |
 | `height` | – | Fixed stage height (px). Solo games use this since they never report a height. |
 | `fill` | – | `true` → viewport-fill game. The hub sizes the frame to the stage (focus mode) instead of trusting the game's reported height. For canvas worlds (Goldberg, Waltz Engine). |
+| `icon` | – | Emoji shown before the button label (e.g. `'🔔'`). |
+| `desc` | – | One sentence shown in the button's tooltip after the player count. |
 
 ### Solo vs multiplayer criteria
 
