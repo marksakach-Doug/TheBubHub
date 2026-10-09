@@ -1,0 +1,694 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
+<title>Dal Tadka</title>
+<style>
+:root{--bg:#f4ead8;--panel:#fffaf0;--ink:#2a1d12;--line:#d6c4a4;--dim:#7a6a58;--acc:#c2410c;--good:#2e7d32;--bad:#c62828;--trk:#ebdfc6;--wat:#0288d1;--grit:#8d5524;box-sizing:border-box;padding-top:env(safe-area-inset-top,0px);padding-bottom:env(safe-area-inset-bottom,0px)}
+@media (prefers-color-scheme:dark){:root:not([data-theme="light"]){--bg:#120E0A;--panel:#1A140F;--ink:#F0E6D2;--line:#3A2C21;--dim:#A89B8D;--acc:#FF9900;--good:#4CAF50;--bad:#F44336;--trk:#0A0806;--wat:#29b6f6;--grit:#b8793a}}
+:root[data-theme="dark"]{--bg:#120E0A;--panel:#1A140F;--ink:#F0E6D2;--line:#3A2C21;--dim:#A89B8D;--acc:#FF9900;--good:#4CAF50;--bad:#F44336;--trk:#0A0806;--wat:#29b6f6;--grit:#b8793a}
+html{scroll-padding-top:env(safe-area-inset-top,0px);-webkit-text-size-adjust:100%;height:100%}
+*{box-sizing:border-box}
+body{margin:0;min-height:100%;background:var(--bg);color:var(--ink);font:15px/1.4 system-ui,-apple-system,"Segoe UI",Roboto,sans-serif;overflow-x:hidden}
+main{max-width:640px;margin:0 auto;padding:8px;display:flex;flex-direction:column;gap:8px}
+.pn{background:var(--panel);border:1px solid var(--line);border-radius:8px;padding:10px}
+h1,h2{margin:0 0 6px;font:700 16px Georgia,serif;color:var(--acc);display:flex;align-items:center}
+button{font:700 14px ui-monospace,Menlo,monospace;color:var(--ink);background:var(--trk);border:1px solid var(--line);border-radius:6px;padding:12px 6px;width:100%;cursor:pointer;touch-action:manipulation;user-select:none;-webkit-user-select:none;-webkit-touch-callout:none}
+button:active{transform:scale(.97);border-color:var(--acc)}
+button:disabled{opacity:.4}
+button small{display:block;font-weight:400;font-size:11px;opacity:.85}
+.row{display:flex;gap:6px;margin-top:6px}
+.grid{display:grid;grid-template-columns:1fr 1fr;gap:2px 12px;margin-bottom:6px}
+.hide{display:none!important}.off{opacity:.4;pointer-events:none}
+.dim{color:var(--dim)}
+.mr{margin:2px 0}.mr label{display:flex;justify-content:space-between;font:12px ui-monospace,monospace;color:var(--dim);align-items:center}
+.mt{position:relative;height:12px;background:var(--trk);border:1px solid var(--line);border-radius:6px;overflow:hidden}
+.mt i{position:absolute;top:0;bottom:0;background:var(--good);opacity:.4}
+.mt b{position:absolute;left:0;top:0;bottom:0;background:var(--acc);width:0}
+.mt.w b{background:var(--bad)}
+.mt.bl b{background:var(--wat)}.mt.bl i{background:var(--wat);opacity:.3}
+.mt.br b{background:var(--grit)}
+.top{display:flex;justify-content:space-between;align-items:center;position:sticky;top:env(safe-area-inset-top,8px);z-index:100;box-shadow:0 4px 12px rgba(0,0,0,.1)}
+#clk{font:700 26px ui-monospace,monospace}
+#hint{font-size:13px;border-left:4px solid var(--acc)}
+#al{min-height:22px;font-weight:700;text-align:center}
+#log div{font:12px ui-monospace,monospace;color:var(--dim);padding:2px 0}
+.lc{margin-top:8px;text-align:left;font-family:system-ui,sans-serif;font-weight:400}
+.ev{display:flex;justify-content:space-between;align-items:center;gap:8px;font:14px ui-monospace,monospace;border-bottom:1px dashed var(--line);padding:6px 0}
+.big{padding:16px;background:var(--acc);color:#fff;border-color:var(--acc)}
+.blu{background:var(--wat);color:#fff;border-color:var(--wat)}
+.ok{background:var(--good);color:#fff;border-color:var(--good)}
+.wb{background:var(--wat);color:#fff;border-color:var(--wat);padding:10px 2px}
+.wb span{display:block;font-size:18px;letter-spacing:-2px}
+.pulse{animation:pl 1s infinite}
+@keyframes pl{50%{box-shadow:0 0 0 7px rgba(2,136,209,.35)}}
+.bsn{display:flex;gap:10px;align-items:center}.bsn .grid{flex:1;grid-template-columns:1fr;margin:0}
+#bowl{width:104px;height:104px;flex:none}
+#sw{transform-origin:50px 50px;transform-box:view-box}
+.spin{animation:sp linear infinite}@keyframes sp{to{transform:rotate(360deg)}}
+.sl{margin-top:8px}.sl label{display:flex;justify-content:space-between;font:700 13px ui-monospace,monospace}
+input[type=range]{width:100%;height:30px;margin:2px 0;accent-color:var(--acc)}
+.sc{display:flex;justify-content:space-between;font:11px ui-monospace,monospace;color:var(--dim)}
+.tabs{display:flex;gap:4px}.tabs button{padding:8px 2px;font-size:12px}.tabs .on{background:var(--acc);color:#fff;border-color:var(--acc)}
+.lbr{display:flex;gap:8px;padding:4px 0;border-bottom:1px dashed var(--line);font:13px ui-monospace,monospace}.lbr b{flex:1}
+.gr{font:700 64px Georgia,serif;line-height:1}
+.cmp{display:flex;gap:8px;align-items:flex-start;padding:8px 0;border-bottom:1px dashed var(--line)}
+.cmp .ic{font:700 18px ui-monospace,monospace;width:22px;text-align:center}
+.cmp .bar{height:6px;background:var(--trk);border-radius:3px;margin:4px 0;overflow:hidden}.cmp .bar b{display:block;height:100%}
+input[type=text]{font:16px system-ui;padding:10px;border:1px solid var(--line);border-radius:6px;background:var(--trk);color:var(--ink);width:100%}
+textarea{width:100%;font:12px ui-monospace,monospace;background:var(--trk);color:var(--ink);border:1px solid var(--line);border-radius:6px;padding:6px}
+.vz{flex:none}
+.bub{transform-box:fill-box;transform-origin:center;fill:rgba(255,255,255,.75);animation:bu var(--bd,1.6s) ease-out infinite}
+@keyframes bu{0%{transform:scale(.2);opacity:0}40%{opacity:1}100%{transform:scale(1.3);opacity:0}}
+#cbu .bub{fill:rgba(255,230,140,.9)}
+#pfl,#pfl2,#cfl,#cfl2{animation:fk .16s infinite alternate}@keyframes fk{to{opacity:.75}}
+.mt b{z-index:1}
+.mt i,.mt.bl i{opacity:1;z-index:2;background:repeating-linear-gradient(135deg,rgba(46,160,67,.5) 0 3px,rgba(46,160,67,.12) 3px 6px);border-left:2px solid #35d058;border-right:2px solid #35d058;box-shadow:0 0 0 1px rgba(0,0,0,.35)}
+main{gap:6px;padding:6px}.pn{padding:8px}h2{font-size:14px}h1,h2{margin-bottom:4px}
+.top{padding:6px 10px;flex-wrap:wrap}#clk{font-size:22px}#al{min-height:18px;font-size:13px;width:100%;text-align:left}
+#hint{padding:6px 8px;font-size:12px}
+.mr{margin:1px 0}.mr label{font-size:10.5px}.mr svg{width:12px!important;height:12px!important;margin-right:2px!important;vertical-align:-2px!important}
+.mt{height:10px}.bsn .grid{gap:0}
+#potv{width:84px;height:84px}#panv{width:100px;height:77px}
+.sl{margin-top:6px}.sl label{display:flex;justify-content:space-between;align-items:center;font:700 12.5px ui-monospace,monospace;margin-bottom:4px}
+.bn{display:grid;grid-template-columns:repeat(11,minmax(0,1fr));gap:3px;border-radius:8px}
+.bn button{padding:0;height:46px;font-size:13px;border-radius:5px}
+.bn .lo{background:color-mix(in srgb,var(--acc) 28%,var(--trk));border-color:color-mix(in srgb,var(--acc) 50%,var(--line))}
+.bn .cur{background:var(--acc);color:#fff;border-color:var(--acc)}
+.row{margin-top:4px}.row button{padding:8px 4px}.big{padding:12px}
+.ph-wash .ck{display:none!important}.ph-cook .wo{display:none!important}.ph-cook button small{display:none}
+*{-webkit-tap-highlight-color:transparent}
+html,body{touch-action:manipulation}
+svg{user-select:none;-webkit-user-select:none;-webkit-touch-callout:none;cursor:default}
+.rb{touch-action:none}
+.mr label{font-size:11px}
+.vw{flex:none;text-align:center}.vw .cap{font:11px ui-monospace,monospace;color:var(--dim);margin-top:2px}
+.hl{font:700 13px ui-monospace,monospace;margin:10px 0 4px}.hl span{font-weight:400;font-size:12px;color:var(--dim)}
+.dir{margin:0 0 6px;padding-left:20px;font-size:12.5px;line-height:1.35;color:var(--dim)}.dir li{padding:1px 0}.dir li.now{color:var(--ink);font-weight:700}
+.lc{display:flex;align-items:center;gap:10px;margin-top:6px}.lc .sw{flex:none;width:34px;height:34px;border-radius:50%;border:2px solid var(--line)}.lc .lt{flex:1;line-height:1.35}.lc .go{flex:none;background:var(--acc);color:#fff;border-radius:6px;padding:9px 10px;font-size:13px}
+#stars{display:flex;justify-content:center;gap:4px;margin:4px 0}#stars i{display:block;width:46px;height:46px}
+#stars svg{width:100%;height:100%;fill:var(--trk);stroke:var(--line);stroke-width:1;stroke-linejoin:round;transform-origin:50% 50%}
+#stars i.on svg{fill:#f2b01e;stroke:#c98a00;animation:pop .5s cubic-bezier(.2,1.6,.4,1)}
+@keyframes pop{0%{transform:scale(2.1);filter:brightness(2.2) drop-shadow(0 0 8px #ffe08a)}100%{transform:scale(1);filter:none}}
+#verd{opacity:0;transition:opacity .5s}#verd.show{opacity:1}
+@media (prefers-reduced-motion:reduce){#stars i.on svg{animation:none}#verd{transition:none}}
+div.lc.locked{opacity:.65;border:2px solid var(--line);border-radius:8px;padding:10px 8px;background:var(--trk)}.lc.locked .go{background:var(--line);color:var(--dim)}
+.lc.sel{outline:3px solid var(--acc);outline-offset:-1px}.lc[data-p]:not(.sel) .go{opacity:.45}
+.mt u{position:absolute;top:0;bottom:0;width:3px;margin-left:-1px;background:var(--ink);z-index:3}
+.row .on{background:var(--acc);color:#fff;border-color:var(--acc)}
+a.kofi{display:flex;width:fit-content;align-items:center;gap:7px;min-height:38px;margin:18px auto 8px;padding:6px 16px;border-radius:19px;background:#e5e7eb;border:2px solid #c7cbd1;color:#2f343a;font:700 13px ui-monospace,monospace;text-decoration:none;box-shadow:0 2px 0 #c7cbd1;transition:transform .12s,box-shadow .12s}
+a.kofi:hover{filter:brightness(1.05)}a.kofi:active{transform:translateY(2px);box-shadow:none}
+a.kofi svg{width:18px;height:18px;flex:none;fill:none;stroke:#2a1a05;stroke-width:2;stroke-linecap:round;stroke-linejoin:round}
+.sec{border:2px solid #c98a00;background:color-mix(in srgb,#f2b01e 18%,transparent);border-radius:8px;padding:10px;margin-bottom:10px;font-size:14px}
+.guide{animation:gd 1s ease-in-out infinite;position:relative;z-index:1}@keyframes gd{0%,100%{box-shadow:0 0 0 0 transparent}50%{box-shadow:0 0 0 6px var(--acc)}}
+button.lk{width:auto;padding:6px 12px;font-size:12.5px}.tb{display:flex;justify-content:space-between;align-items:center;gap:8px}
+.chips{display:flex;flex-wrap:wrap;gap:4px;list-style:none;margin:0 0 6px;padding:0}.chips li{border:1px solid var(--line);border-radius:12px;padding:2px 9px;font-size:12px;color:var(--dim)}.chips li.now{background:var(--acc);border-color:var(--acc);color:#fff;font-weight:700}
+.info p,.info li{font-size:13px;line-height:1.45;margin:4px 0}.info ul{margin:4px 0;padding-left:18px}.info details{border-top:1px solid var(--line)}
+.tbl{width:100%;border-collapse:collapse;font-size:12.5px}.tbl td,.tbl th{padding:3px 4px;text-align:left;border-bottom:1px solid var(--line)}
+summary{cursor:pointer;font:700 13px ui-monospace,monospace;padding:10px 0;color:var(--dim)}
+.flash{animation:fl .5s ease-in-out 3}@keyframes fl{50%{box-shadow:0 0 0 5px var(--acc)}}
+</style>
+</head>
+<body>
+<main id="mn" class="ph-wash">
+<section id="setup" class="pn">
+  <div class="tb"><h1 style="margin:0">Dal Tadka</h1><button data-i="1" class="lk">Details</button></div>
+  <div style="margin:4px 0 2px">The people are hungry. Make the best dal you can.</div>
+  <div class="dim" style="margin:0 0 4px">Wash → Boil → Tadka → Serve</div>
+  <h2 id="pick_h" style="margin-top:10px">Pick a lentil</h2>
+  <div class="dim" id="pick_s"></div>
+  <div id="lents" style="margin-top:4px"></div>
+  <h2 style="margin-top:14px">Leaderboard</h2>
+  <div class="tabs" id="lbt"></div>
+  <div id="lb"></div>
+</section>
+
+<section id="play" class="hide" style="display:flex;flex-direction:column;gap:8px">
+  <div class="pn top"><b id="ln"></b><span id="clk">0:00.0</span><div id="al"></div></div>
+  <div class="pn" id="hint"></div>
+  <div class="pn wo" id="basp">
+    <h2 id="h_basin">Wash basin</h2>
+    <div class="bsn">
+      <div class="vw"><svg id="bowl" viewBox="0 0 100 100" aria-label="Wash bowl, top view">
+        <circle cx="50" cy="50" r="48" fill="#8a7a66"/>
+        <circle id="bw" cx="50" cy="50" r="41" fill="#8fd3f4"/>
+        <g id="sw"><g id="gn"></g><g id="gt"></g></g>
+        <circle cx="50" cy="50" r="45" fill="none" stroke="#b9a98f" stroke-width="5"/>
+      </svg><div class="cap">view only</div></div>
+      <div id="basin" class="grid"></div>
+    </div>
+    <div class="hl">HOLD to wash</div>
+    <div class="row" style="margin-top:0">
+      <button class="rb wb" data-l="0" id="b_gen" disabled><span>›</span>GENTLE<small>slow, safe</small></button>
+      <button class="rb wb" data-l="1" id="b_std" disabled><span>››</span>STEADY<small>balanced</small></button>
+      <button class="rb wb" data-l="2" id="b_rck" disabled><span>›››</span>FAST<small>quick, spills dal</small></button>
+    </div>
+    <button data-a="fill" id="b_fill" class="blu" style="margin-top:8px;padding:14px">CHANGE WATER <small>costs 2s</small></button>
+    <button data-a="wdone" class="ok" style="margin-top:12px;padding:14px">✓ DONE WASHING</button>
+  </div>
+  <div class="pn" id="potp">
+    <h2 id="h_pot" style="margin:0 0 6px">Dal pot</h2>
+    <div class="bsn"><svg id="potv" class="vz" viewBox="0 0 100 100" width="104" height="104" aria-label="Pot, top view"><path id="pfl" fill="#4aa8ff"/><path id="pfl2" fill="#ffd54a"/><circle cx="50" cy="50" r="36" fill="#7b7f86"/><circle cx="50" cy="50" r="31" fill="#3d3a37"/><clipPath id="pcp"><circle id="pcc" cx="50" cy="50" r="29"/></clipPath><circle id="plq" cx="50" cy="50" r="29" fill="#8fd3f4"/><g clip-path="url(#pcp)"><g id="pbl"></g><g id="pb"></g><g id="pbu"></g></g><circle id="pfo" cx="50" cy="50" r="28" fill="none" stroke="#fff" style="stroke-width:0;opacity:0"/><circle id="pst" cx="50" cy="50" r="29" fill="none" stroke="#2e1a0c" stroke-width="3" stroke-dasharray="7 10" style="opacity:0"/><circle cx="50" cy="50" r="34" fill="none" stroke="#9ea3ab" stroke-width="4"/></svg><div id="potm" class="grid"></div></div>
+    <div class="sl"><label><span id="pl">Burner</span><span id="pdial"></span></label><div class="bn" id="pbn" role="group" aria-label="Pot burner level"></div></div>
+    <div class="row"><button data-a="unwater" id="b_wm" class="blu">− WATER<small>1 cup</small></button><button data-a="water" id="b_wp" class="blu">+ WATER<small>1 cup</small></button><button data-a="stir" class="ck">STIR<small>unsticks</small></button></div>
+    <button data-a="add2" id="b_add2" class="big ck hide" style="margin-top:8px"></button>
+  </div>
+  <div class="pn">
+    <h2 id="h_pan" style="margin:0 0 6px">Tadka pan</h2>
+    <ul class="chips" id="dir"><li>Ghee 2-3</li><li>Heat</li><li>Spice</li><li>Cool + serve</li></ul>
+    <div class="bsn ck"><svg id="panv" class="vz" viewBox="0 0 130 100" width="122" height="94" aria-label="Tadka pan, top view"><path id="cfl" fill="#4aa8ff"/><path id="cfl2" fill="#ffd54a"/><rect x="78" y="45" width="48" height="10" rx="5" fill="#5b5b60"/><circle cx="46" cy="50" r="36" fill="#6b6e75"/><circle id="cpan" cx="46" cy="50" r="31" fill="#2f2c2a"/><clipPath id="ccp"><circle id="ccc" cx="46" cy="50" r="0"/></clipPath><circle id="cgh" cx="46" cy="50" r="0" fill="#f2c230" opacity=".9"/><g clip-path="url(#ccp)"><g id="cbu"></g></g><g id="csp" style="opacity:0;transition:opacity .4s"><g id="csd"></g><g id="chb"></g><g id="cch"></g></g><circle id="csm" cx="46" cy="50" r="30" fill="#bbb" style="opacity:0"/><circle cx="46" cy="50" r="34" fill="none" stroke="#8c9097" stroke-width="3"/></svg><div id="panm" class="grid"></div></div>
+    <div class="sl"><label><span id="cl">Burner</span><span id="cdial"></span></label><div class="bn" id="cbn" role="group" aria-label="Pan burner level"></div></div>
+    <div class="row"><button data-a="ghee" id="b_ghee">ADD GHEE</button><button data-a="spice" id="b_spice" class="ck">ADD SPICE</button></div>
+  </div>
+  <button class="big" id="serve" data-a="serve">SERVE</button>
+  
+</section>
+
+<section id="res" class="pn hide"></section>
+<section id="info" class="pn hide info"></section>
+<a class="kofi" id="foot" href="https://ko-fi.com/markdoug" target="_blank" rel="noopener"><svg viewBox="0 0 24 24"><path d="M3 11h18a9 9 0 0 1-18 0z"/><path d="M8 7c-1-1.2 1-2 0-3.5M12 7c-1-1.2 1-2 0-3.5M16 7c-1-1.2 1-2 0-3.5"/></svg>Buy the creator some lentils</a>
+</main>
+<script>
+const $=i=>document.getElementById(i),cl=(v,a,b)=>Math.min(b,Math.max(a,v));
+const LENT={
+ moong:{n:'Moong',look:'Small yellow split lentils',d:'Quick and forgiving.',need:25,stick:.03,w:[3.5,4.8],par:55},
+ masoor:{n:'Masoor',look:'Red-orange split lentils',d:'Cooks fastest, uses little water.',need:16,stick:.04,w:[3,4.2],par:45},
+ chana:{n:'Chana',look:'Split chickpeas, large and golden',d:'Slow and thirsty.',need:50,stick:.02,w:[4.5,6],par:90},
+ urad:{n:'Urad',look:'Small black lentils',d:'Sticky and demands attention.',need:34,stick:.085,w:[3.5,4.8],par:70},
+ toor:{n:'Toor',look:'Split pigeon peas, bright yellow',d:'The everyday classic. Patient and thirsty.',need:38,stick:.05,w:[4,5.4],par:75},
+ double:{n:'Double dal',tab:'Double',double:1,look:'Two lentils, one pot',d:'Mix any two.'}};
+const API='https://script.google.com/macros/s/AKfycbwhy40Gk_QPoVz-jEwe-I72_rqbudw_QeLxZcGz7e2BMH3kIYS0AWkBiRulJl-CfU5jyA/exec'; // Apps Script web app URL (see README)
+const RAW={moong:[110,150,60],masoor:[196,120,60],chana:[200,165,95],urad:[40,38,36],toor:[214,176,66]},COOK={moong:[233,196,60],masoor:[232,146,58],chana:[212,154,44],urad:[150,132,92],toor:[236,182,50]};
+const mixv=(a,b,t)=>a.map((v,i)=>Math.round(v+(b[i]-v)*t)),rgbs=a=>`rgb(${a})`;
+function flame(id,id2,cx,cy,r,len,t){
+ const mk=(L,w)=>{if(L<.6)return '';let d='';const p=(a,R)=>`${(cx+Math.cos(a)*R).toFixed(1)} ${(cy+Math.sin(a)*R).toFixed(1)}`;for(let i=0;i<14;i++){const a=i*6.2832/14;d+=`M${p(a-w,r-3)}Q${p(a-w*.8,r+L*.5)} ${p(a,r+L)}Q${p(a+w*.8,r+L*.5)} ${p(a+w,r-3)}Z`}return d};
+ $(id).setAttribute('d',mk(len,.2));$(id).setAttribute('fill','rgb('+[74+181*t,168-62*t,255-235*t].map(Math.round)+')');$(id2).setAttribute('d',mk(len*.55,.12));
+}
+(function(){let s=11,r=()=>(s=(s*16807)%2147483647)/2147483647;
+ const pt=(cx,cy,R)=>{const a=r()*6.283,d=Math.sqrt(r())*R;return [cx+Math.cos(a)*d,cy+Math.sin(a)*d]};
+ const el=(n,cx,cy,R,rx,ry)=>{let o='';for(let i=0;i<n;i++){const [x,y]=pt(cx,cy,R);o+=`<ellipse cx="${x.toFixed(1)}" cy="${y.toFixed(1)}" rx="${rx}" ry="${ry}" transform="rotate(${(r()*180).toFixed(0)} ${x.toFixed(1)} ${y.toFixed(1)})"/>`}return o};
+ const bu=(n,cx,cy,R)=>{let o='';for(let i=0;i<n;i++){const [x,y]=pt(cx,cy,R);o+=`<circle class="bub" cx="${x.toFixed(1)}" cy="${y.toFixed(1)}" r="${(1.8+r()*2.4).toFixed(1)}" style="animation-delay:-${(r()*2).toFixed(2)}s"/>`}return o};
+ let bl='';for(let i=0;i<9;i++){const [x,y]=pt(50,50,20);bl+=`<circle cx="${x.toFixed(1)}" cy="${y.toFixed(1)}" r="${(7+r()*5).toFixed(1)}"/>`}
+ $('pb').innerHTML=el(24,50,50,24,3.4,2.4);$('pbl').innerHTML=bl;$('pbu').innerHTML=bu(10,50,50,25);
+ $('cbu').innerHTML=bu(9,46,50,22);$('csd').innerHTML=el(18,46,50,24,2.6,1.2);$('chb').innerHTML=el(9,46,50,23,3,1.7);$('cch').innerHTML=el(3,46,50,20,2.4,2);
+})();
+let S=null,last=0,acc=0,raf=0,LB=[],lbk='moong';
+
+const ic=(p)=>`<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" style="width:16px;height:16px;vertical-align:-3px;margin-right:4px">${p}</svg>`;
+const iDr=ic('<path d="M12 2.69l5.66 5.66a8 8 0 1 1-11.31 0z"/>');
+const iWa=ic('<path d="M2 10h20v4a8 8 0 0 1-16 0z"/>');
+const iPo=ic('<path d="M4 8h16v8a4 4 0 0 1-4 4H8a4 4 0 0 1-4-4z"/><path d="M2 8h20"/>');
+const iPa=ic('<path d="M3 10h14v2a4 4 0 0 1-4 4H7a4 4 0 0 1-4-4z"/><path d="M17 11h5v2h-5"/>');
+const iTi=ic('<circle cx="12" cy="12" r="10"/><path d="M12 6v6l4 2"/>');
+const iFl=ic('<path d="M12 22s-8-4.5-8-11.8A8 8 0 0 1 12 2a8 8 0 0 1 8 8.2c0 7.3-8 11.8-8 11.8z"/>');
+const iRi=ic('<rect x="4" y="8" width="16" height="8" rx="2"/><path d="M4 12h16"/>');
+const iFi=ic('<path d="M12 2c0 0-5 4-5 10a5 5 0 0 0 10 0c0-6-5-10-5-10zm0 13a3 3 0 0 1-3-3c0-2 3-5 3-5s3 3 3 5a3 3 0 0 1-3 3z"/>');
+const iHe=ic('<path d="M20.8 4.6a5.5 5.5 0 0 0-7.8 0L12 5.7l-1-1.1a5.5 5.5 0 0 0-7.8 7.8l1 1.1L12 21l7.8-7.5 1-1.1a5.5 5.5 0 0 0 0-7.8z"/>');
+const iWr=ic('<path d="M12 2L2 22h20L12 2z"/><path d="M12 8v6"/><path d="M12 18v.01" stroke-width="3"/>');
+
+function mk(id,lb,mx,lo,hi,th){return `<div class="mr"><label>${lb}<em id="${id}v"></em></label><div class="mt ${th||''}"><b id="${id}f"></b>${hi>lo?`<i id="${id}b" style="left:${lo/mx*100}%;width:${(hi-lo)/mx*100}%"></i>`:''}</div></div>`}
+function sm(id,v,mx,t){$(id+'f').style.width=cl(v/mx*100,0,100)+'%';$(id+'v').textContent=t}
+function sb(id,mx,lo,hi){const e=$(id+'b');e.style.left=lo/mx*100+'%';e.style.width=(hi-lo)/mx*100+'%'}
+
+$('h_basin').innerHTML=iWa+'Wash basin';$('h_pot').innerHTML=iPo+'Dal pot';$('h_pan').innerHTML=iPa+'Tadka pan';
+$('pl').innerHTML=iFi+'Pot burner';$('cl').innerHTML=iFi+'Pan burner';
+
+$('basin').innerHTML=mk('sed',iDr+'GRIT REMOVED',100,0,0,'br')+mk('bd',iWa+'WATER DIRT',100,0,0,'bl')+mk('mass',iPo+'DAL SAVED',10,8,10);
+$('potm').innerHTML=mk('pt',iFi+'TEMP (70-90°)',120,70,90)+mk('pw',iDr+'WATER',10,3,5,'bl')+'<div class="ck">'+mk('pc',iTi+'COOKED',125,95,110)+'<div class="hide" id="pc2w">'+mk('pc2',iTi+'COOKED',125,95,110)+'</div>'+mk('pf',iWr+'BOIL-OVER',1,0,0,'w')+mk('ps',iWr+'STICKING',1,0,0,'w')+'</div>';
+$('panm').innerHTML=mk('ct',iFi+'TEMP (130-180°)',250,130,180)+mk('cr',iRi+'GHEE',5,2,3)+mk('cf',iFl+'FLAVOR',8,4,5)+mk('cb',iWr+'BURN',10,0,0,'w');
+
+// bowl grains (fixed pseudo-random layout)
+(function(){let s=7,r=()=>(s=(s*16807)%2147483647)/2147483647,g='',t='';
+ for(let i=0;i<46;i++){const a=r()*6.283,d=Math.sqrt(r())*33;g+=`<circle cx="${50+Math.cos(a)*d}" cy="${50+Math.sin(a)*d}" r="2.6" fill="#e3b448"/>`}
+ for(let i=0;i<34;i++){const a=r()*6.283,d=Math.sqrt(r())*35;t+=`<circle cx="${50+Math.cos(a)*d}" cy="${50+Math.sin(a)*d}" r="1.4" fill="#6b4423"/>`}
+ $('gn').innerHTML=g;$('gt').innerHTML=t})();
+
+// ---------- storage + leaderboard ----------
+const lget=(k,d)=>{try{return JSON.parse(localStorage.getItem(k))??d}catch(e){return d}};
+function best(k){try{return +localStorage.getItem('dal:'+k)||0}catch(e){return 0}}
+function save(k,v){try{localStorage.setItem('dal:'+k,v)}catch(e){}}
+const seen=k=>{try{return localStorage.getItem('dal:'+k)==='1'}catch(e){return false}},mark=k=>{try{localStorage.setItem('dal:'+k,'1')}catch(e){}};
+
+// unlocks: Toor = 5 stars on any one lentil. Double dal = 5 stars on 3 different lentils. (add ?unlock to the URL to test)
+const BASE=['moong','masoor','chana','urad','toor'],FREE=/[?&]unlock/.test(location.search);
+const sBest=k=>{try{return +localStorage.getItem('dal:stars:'+k)||0}catch(e){return 0}};
+const saveStars=(k,n)=>{try{localStorage.setItem('dal:stars:'+k,n)}catch(e){}};
+const fives=()=>BASE.filter(k=>sBest(k)>=5).length;
+const unlocked=k=>FREE||(k==='toor'?BASE.some(x=>x!=='toor'&&sBest(x)>=5):k==='double'?fives()>=3:k==='tadka'?allFive():true);
+const UNLOCK={toor:()=>'Unlock: 5 stars on any lentil.',double:()=>`Unlock: 5 stars on 3 lentils (${fives()}/3).`,tadka:()=>`Unlock: 5 stars on every lentil + double dal (${nFive()}/6).`};
+const starTxt=k=>{const n=sBest(k);return n?' · '+'★'.repeat(n)+'☆'.repeat(5-n):''};
+const comboName=c=>String(c).split('+').map(x=>esc((LENT[x]||{n:x}).n)).join(' + ');
+function mkL(k,combo){const L=LENT[k];if(k!=='double')return L;const A=LENT[combo[0]],B=LENT[combo[1]];return {...L,A,B,need:A.need,w:[(A.w[0]+B.w[0])/2,(A.w[1]+B.w[1])/2],stick:(A.stick+B.stick)/2*1.1,par:Math.max(A.par,B.par)+20}}
+let DP=[];
+const nFive=()=>BASE.filter(k=>sBest(k)>=5).length+(sBest('double')>=5?1:0),allFive=()=>nFive()>=6;
+let ADV=false;try{ADV=localStorage.getItem('dal:adv')==='1'}catch(e){}
+// Full tadka: cumin > hing > ginger > garlic > Kashmiri chili, pour over dal, garam masala, cilantro
+const SPICES=[{n:'Cumin seeds',btn:'ADD CUMIN SEEDS',need:4,cool:0},{n:'Hing',btn:'ADD HING',need:1.5,cool:0},{n:'Ginger',btn:'ADD GINGER',need:4.5,cool:12},{n:'Garlic',btn:'ADD GARLIC',need:2.5,cool:8},{n:'Kashmiri chili',btn:'ADD KASHMIRI CHILI',need:1.5,cool:0}];
+const ADVDIR=['Ghee + heat','Cumin','Hing','Ginger','Garlic','Chili','Pour','Garam masala','Cilantro'];
+function dalReady(){const p=S.pot,L=S.L,sc=scl();return S.phase==='cook'&&p.cooked>=L.need*sc*.95&&(!L.double||(p.in2&&p.cooked2>=L.B.need*sc*.95))}
+const rateAt=t=>t>=155&&t<=180?1:t>=130&&t<155?.4:t>=100&&t<130?.1:t>180?.3:0;
+const advScore=v=>v<90?Math.max(0,100-(90-v)*1.2):v>125?Math.max(0,100-(v-125)*2):100;
+const SIMPLE=$('dir').innerHTML,SERVE_T=$('serve').textContent;
+function advStep(){
+  const c=S.pan;if(c.st>=8||(c.st===5&&!dalReady()))return;
+  let msg='',col='';
+  if(c.st>=1&&c.st<=5){const sp=SPICES[c.st-1],v=c.prog/sp.need*100;c.pg[c.st-1]=v;msg=sp.n+': '+(v<90?'undercooked':v<=125?'perfect':v<=140?'a bit over':'burnt')+'. ';col=advScore(v)>=80?'g':'b'}
+  if(c.st<5){
+    if(c.st===0){c.spice=true;if(c.rich<=0){S.care.jam+=2;msg='No ghee to bloom them in! ';col='b'}}
+    const nx=SPICES[c.st];c.temp=Math.max(25,c.temp-nx.cool);c.st++;c.prog=0;msg+=nx.n+' in.';
+  }else if(c.st===5){c.st=6;msg+='Poured.'}
+  else if(c.st===6){c.st=7;c.gm=1;msg='Garam masala on top.';col='g'}
+  else if(c.st===7){c.st=8;c.ci=1;msg='Cilantro on top.';col='g'}
+  say(msg,col);
+}
+function advUI(c){
+  const st=c.st,act=st>=1&&st<=5?SPICES[st-1]:null,pct=act?c.prog/act.need*100:0,lab=act?act.n.toUpperCase():'SPICES',nv=$('cfv').previousSibling;
+  if(nv.nodeValue!==lab)nv.nodeValue=lab;
+  sb('cf',160,90,125);sm('cf',pct,160,act?(pct<90?'raw ':pct<=125?'READY ':pct<=140?'over ':'BURNT ')+Math.round(pct)+'%':'');
+  const bt=st<5?SPICES[st].btn:st===5?(dalReady()?'POUR TADKA OVER DAL':'HOLD: DAL STILL COOKING'):st===6?'SPRINKLE GARAM MASALA':st===7?'TOP WITH CILANTRO':'TADKA COMPLETE',b=$('b_spice');
+  if(b.dataset.t!==bt){b.dataset.t=bt;b.textContent=bt}b.disabled=st>=8||(st===5&&!dalReady());
+  const ds=st===0?0:st<=5?st:st===6?7:st===7?8:-1,sig=ds+'|'+c.pg.join(','),dr=$('dir');
+  if(dr.dataset.s!==sig){dr.dataset.s=sig;dr.innerHTML=ADVDIR.map((t,i)=>{const v=i>=1&&i<=5?c.pg[i-1]:null,q=v==null?-1:advScore(v),dn=i===6?st>=6:i===7?!!c.gm:i===8?!!c.ci:false;return `<li class="${i===ds?'now':''}">${t}${dn?' ✓':q<0?'':q>=80?' ✓':q>=50?' ~':' ✗'}</li>`}).join('')}
+}
+function pickDouble(){
+  const sel=[...DP].sort((a,b)=>LENT[b].need-LENT[a].need);
+  $('pick_h').textContent='Double dal';$('pick_s').textContent='Tap two lentils.';
+  $('lents').innerHTML=BASE.filter(unlocked).map(k=>{const l=LENT[k],o=sel.indexOf(k);return `<button class="lc${o>=0?' sel':''}" data-p="${k}"><i class="sw" style="background:${rgbs(RAW[k])}"></i><span class="lt"><b>${l.n}</b> <span class="dim">${l.look}</span><br>Cooks in ~${l.need}s</span><span class="go">${o===0?'IN FIRST':o===1?'ADD LATER':'TAP'}</span></button>`}).join('')
+  +(sel.length===2?`<div style="margin:8px 0;font-size:13.5px"><b>${LENT[sel[0]].n}</b> goes in first. Add <b>${LENT[sel[1]].n}</b> at the black mark on the meter.</div>`:'')
+  +`<button class="big" data-dgo="1" style="margin-top:8px"${DP.length<2?' disabled':''}>START</button><button data-m="1" style="margin-top:6px">Back</button>`;
+}
+let LBE=0;async function loadLB(){LBE=0;try{const r=await fetch(API,{cache:'no-store'});LB=(await r.json()).entries||[]}catch(e){LB=[];LBE=1}renderLB()}
+function board(k,n){const seen={},all=[...LB].filter(e=>e&&e.lentil===k&&e.score>=0);
+ return all.filter(e=>{const id=[e.name,e.score,String(e.date||'').slice(0,10)].join('|');return seen[id]?0:(seen[id]=1)}).sort((a,b)=>b.score-a.score).slice(0,n)}
+function boardHTML(k,n){const b=board(k,n);return b.length?b.map((e,i)=>`<div class="lbr"><span>${i+1}.</span><b>${esc(e.name)}${e.combo?` <span class="dim" style="font-weight:400;font-size:11px">${comboName(e.combo)}</span>`:''}${+e.adv?' <span style="font-weight:400;font-size:11px;color:var(--acc)">full tadka</span>':''}</b><span>${e.score}</span><span class="dim">${esc(String(e.date||'').slice(0,10))}</span></div>`).join(''):'<div class="dim" style="padding:6px 0">No scores yet. Be the first.</div>'}
+const esc=s=>String(s).replace(/[&<>"]/g,c=>({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;'}[c]));
+function renderLB(){$('lbt').innerHTML=Object.keys(LENT).filter(unlocked).map(k=>`<button data-lb="${k}" class="${k===lbk?'on':''}">${LENT[k].tab||LENT[k].n}</button>`).join('');$('lb').innerHTML=(LBE?`<div style="color:var(--bad);font-size:13px;margin:6px 0">${API?'Could not load the shared leaderboard. In Apps Script, check Deploy > Manage deployments: access must be "Anyone".':'Could not load the leaderboard.'} Showing local scores only.</div>`:'')+boardHTML(lbk,10)}
+
+function renderLents(){
+  $('lents').innerHTML=Object.keys(LENT).map(k=>{
+    const l=LENT[k],dbl=k==='double',sw=dbl?`linear-gradient(135deg,${rgbs(RAW.moong)} 50%,${rgbs(RAW.chana)} 50%)`:rgbs(RAW[k]);
+    if(!unlocked(k))return `<div class="lc locked"><i class="sw" style="background:var(--line)"></i><span class="lt"><b>${l.n}</b> <span class="dim">${l.look}</span><br>${UNLOCK[k]()}</span><span class="go">LOCKED</span></div>`;
+    const bs=best(k);
+    return `<button class="lc" ${dbl?'data-dp="1"':`data-k="${k}"`}><i class="sw" style="background:${sw}"></i><span class="lt"><b>${l.n}</b> <span class="dim">${l.look}</span><br>${l.d}${bs?`<br><span class="dim">Best ${bs.toLocaleString()}${starTxt(k)}</span>`:''}</span><span class="go">${dbl?'PICK 2':'START'}</span></button>`}).join('')
+  +(unlocked('tadka')
+   ?`<button class="lc" data-tg="1"><i class="sw" style="background:var(--acc)"></i><span class="lt"><b>Full tadka</b> <span class="dim">cumin to cilantro</span><br>Spices go in one at a time.</span><span class="go" style="${ADV?'':'background:var(--line);color:var(--dim)'}">${ADV?'ON':'OFF'}</span></button>`
+   :`<div class="lc locked"><i class="sw" style="background:var(--line)"></i><span class="lt"><b>Full tadka</b> <span class="dim">cumin to cilantro</span><br>${UNLOCK.tadka()}</span><span class="go">LOCKED</span></div>`);
+}
+let INFO_FROM='setup';
+function infoHTML(){
+  const stk=v=>v<.035?'low':v<.06?'medium':'high';
+  const lt=['moong','masoor','chana','urad','toor'].map(k=>{const l=LENT[k];return `<tr><td>${l.n}</td><td>${l.need}s</td><td>${l.w[0]}-${l.w[1]}</td><td>${stk(l.stick)}</td><td>${l.par}s</td></tr>`}).join('');
+  const sp=SPICES.map(x=>`<tr><td>${x.n}</td><td>${(x.need*.9).toFixed(1)}-${(x.need*1.25).toFixed(1)}s</td><td>${x.cool?'-'+x.cool+'°':''}</td></tr>`).join('');
+  return `<div class="tb"><h1 style="margin:0">Details</h1><button data-ib="1" class="lk">Back</button></div>
+  <p>Wash the lentils, boil them with the right amount of water, bloom spices in hot ghee, then serve. The people are hungry, but the best food is cooked with care. It never comes out better when cooked quickly.</p>
+  <details open><summary>How the score works</summary>
+   <p><b>Score = (10,000 + Pacing) × Multiplier</b><br>Multiplier = Quality² ÷ 10,000, never below 0.02 (so the lowest score is about 200).</p>
+   <p><b>Quality</b> = 60% average of the six areas + 40% weakest area, minus penalties.</p>
+   <p><b>Stars</b> come from Quality alone: 90+ is 5, 75+ is 4, 55+ is 3, 35+ is 2, below that 1.</p></details>
+  <details><summary>The six areas (0-100 each)</summary>
+   <p><b>Grit removal</b>: 100 minus the % of grit left.<br><b>Water, Doneness, Spice flavor, Ghee</b>: full marks anywhere in the green zone, then points drop in proportion to how far outside it you are. Green zones: water as in the lentil table, COOKED 95-110%, FLAVOR 4-5, ghee 2-3.<br><b>Care</b>: 100 minus the demerits below.</p></details>
+  <details><summary>Care demerits</summary><ul>
+   <li>Scrubbing in murky water: up to 3 per second.</li>
+   <li>Washing after the meter reads 100% (1.5s grace): 4 per second.</li>
+   <li>Changing water that is still clean: 4 each.</li>
+   <li>Leaving a boil-over, sticking or burning warning alone: 3 per second.</li>
+   <li>Heating an empty pot (over 110°) or empty pan (over 150°): 3 per second.</li>
+   <li>Pointless presses (water back and forth, stirring a calm pot, ghee when full): 3 each. Spice with no ghee: 6.</li></ul></details>
+  <details><summary>Penalties</summary>
+   <p>Taken off Quality. Burnt spices: 5 per burn point (max 50), building whenever the pan is over 180°. Mishaps cost 15 each: boil over, stuck and scorched, ghee smoke (ghee into a pan over 200°), pan fire (pan hits 240°). Boiled dry and spice burned cost 30.</p></details>
+  <details><summary>Pacing</summary>
+   <p>Worth about 710 to 1,025 points. Very fast runs (half of par or less) and very slow runs (2.5× par or more) earn the most. In between earns the least. Par per lentil is in the table below. The clock starts on your first action.</p></details>
+  <details><summary>Heat and water</summary>
+   <p><b>Pot:</b> water holds it at 100° at most. Dal cooks only with water and 70°+. Over 92° it foams and can boil over. An empty pot heats fast and the dal scorches. Water boils off when hot. Each cup you add cools the pot 10°.</p>
+   <p><b>Pan:</b> ghee buffers the heat. An empty pan heats much faster and hotter. Flavor builds slowly at 100-130°, steadily at 130-155°, fastest at 155-180°, and burns above 180°.</p>
+   <p>Washing spills dal. Less dal needs less water and less cooking time, so the green zones shrink to match.</p></details>
+  <details><summary>Lentils</summary><table class="tbl"><tr><th></th><th>Cooks</th><th>Water</th><th>Sticky</th><th>Par</th></tr>${lt}</table></details>
+  <details><summary>Double dal</summary>
+   <p>Any two lentils. The slower one goes in first. Add the other when COOKED reaches the black mark, so both finish together. Water range and stickiness are the average of the two. Both must be cooked to serve, and doneness is averaged. All combinations share one leaderboard.</p></details>
+  <details><summary>Full tadka</summary>
+   <p>Cumin, hing, ginger, garlic, then Kashmiri chili. Each tap of the spice button adds the next spice and scores the last one. Pour over the cooked dal, then add garam masala and cilantro. Spice flavor is the average of all seven steps.</p>
+   <table class="tbl"><tr><th>Spice</th><th>Green zone*</th><th>Cools pan</th></tr>${sp}</table>
+   <p class="dim">*At 155-180°. A cooler pan is slower, so the window is wider. Below the zone you lose 1.2 points per %, above it 2 points per %.</p></details>
+  <details><summary>Unlocks</summary>
+   <p>Toor: 5 stars on any one lentil. Double dal: 5 stars on 3 different lentils. Full tadka: 5 stars on every lentil and the double dal. Progress is saved on this device.</p></details>
+  <button data-ib="1" style="margin-top:10px">Back</button>`;
+}
+function showInfo(){INFO_FROM=$('res').classList.contains('hide')?'setup':'res';$(INFO_FROM).classList.add('hide');$('info').innerHTML=infoHTML();$('info').classList.remove('hide');top0()}
+function hideInfo(){$('info').classList.add('hide');$(INFO_FROM).classList.remove('hide');top0()}
+function menu(){
+  ['res','play','info'].forEach(i=>$(i).classList.add('hide'));$('setup').classList.remove('hide');
+  $('pick_h').textContent='Pick a lentil';$('pick_s').textContent='';
+  renderLents();renderLB();$('foot').classList.remove('hide');top0();
+}
+menu();loadLB();
+
+const mass=()=>Math.max(1,10-S.spill),scl=()=>.5+mass()/20;
+function say(m,c){
+  const a=$('al');a.textContent=m;a.style.color=c==='b'?'var(--bad)':c==='g'?'var(--good)':'var(--ink)';
+  clearTimeout(say.t);say.t=setTimeout(()=>{$('al').textContent=''},5000);
+}
+function spoil(n,sp){S.spoils.push({name:n,sp});say(n+'! Spoil '+sp,'b')}
+
+function start(k,combo){
+  if(combo)combo=[...combo].sort((a,b)=>LENT[b].need-LENT[a].need);
+  const adv=unlocked('tadka')&&ADV;let L=mkL(k,combo);if(adv)L={...L,par:L.par+25};
+  S={k,L,combo,adv,title:L.double?'Double dal: '+L.A.n+' + '+L.B.n:L.n,t:0,guided:!seen('done'),gt:null,go:false,phase:'wash',spill:0,grit:100,basin:'full',waterDirt:0,rinse:0,saved:false,
+     pot:{dial:0,temp:25,water:0,cooked:0,cooked2:0,in2:false,foam:0,stick:0},
+     pan:{dial:0,temp:25,rich:0,flav:0,burn:0,spice:false,st:0,prog:0,pg:[],gm:0,ci:0},spoils:[],care:{murk:0,over:0,clean:0,warn:0,dry:0,jam:0},nag:{},lw:''};
+  $('setup').classList.add('hide');$('res').classList.add('hide');$('play').classList.remove('hide');$('ln').textContent=L.double?L.A.n+' + '+L.B.n:L.n+' dal';$('al').textContent='';
+  $('b_spice').disabled=false;$('b_spice').textContent='ADD SPICE';$('b_spice').dataset.t='';$('b_spice').classList.remove('pulse');
+  document.querySelectorAll('.guide').forEach(e=>e.classList.remove('guide'));$('foot').classList.add('hide');
+  $('dir').dataset.s='';$('dir').innerHTML=adv?'':SIMPLE;$('serve').dataset.t='';
+  sb('cf',8,4,5);$('cfv').previousSibling.nodeValue='FLAVOR';if(adv)S.title+=' · full tadka';
+  const dd=!!L.double;$('pc2w').classList.toggle('hide',!dd);$('b_add2').classList.toggle('hide',!dd);$('b_add2').disabled=false;
+  $('pcv').previousSibling.nodeValue=dd?L.A.n.toUpperCase()+' COOKED':'COOKED';
+  const om=$('pcm');if(om)om.remove();$('b_add2').classList.remove('pulse');$('b_add2').dataset.t='';
+  if(dd){$('pc2v').previousSibling.nodeValue=L.B.n.toUpperCase()+' COOKED';$('pcf').parentNode.insertAdjacentHTML('beforeend','<u id="pcm" style="left:'+((L.A.need-L.B.need)/L.A.need*100/125*100).toFixed(1)+'%"></u>')}
+  last=performance.now();acc=0;cancelAnimationFrame(raf);raf=requestAnimationFrame(loop);R();top0();
+}
+
+function ff(secs){for(let i=0;i<secs*30;i++)step(1/30)}
+
+function step(dt){
+  if(!S.go)return;
+  S.t+=dt;const p=S.pot,c=S.pan,L=S.L;
+  if(S.phase==='wash'&&S.rinse&&S.basin==='full'){
+      const speeds=[[6,.02],[14,.12],[30,.4]];
+      const rate=speeds[S.rinse-1];
+      const efficiency=(100-S.waterDirt)/100;
+      const removed=rate[0]*efficiency*(S.grit/100)*dt*4;
+      S.grit=Math.max(0,S.grit-removed);
+      S.waterDirt=Math.min(100,S.waterDirt+removed*3.5);
+      S.spill+=rate[1]*dt;
+  }
+  const cDry=c.rich<=0; // ghee is the pan's buffer: an empty pan heats fast and runs far hotter
+  c.temp+=(25+c.dial*(cDry?34:21.5)-c.temp)*(cDry?.45:.22)*dt;
+  if(c.temp>=240){spoil('PAN FIRE',1);c.temp=150;c.dial=0}
+  if(c.spice){
+      const t=c.temp;
+      if(t>=100&&t<130)c.flav+=.1*dt;
+      else if(t>=130&&t<155)c.flav+=.4*dt;
+      else if(t>=155&&t<=180)c.flav+=1.0*dt;
+      else if(t>180){
+          c.flav+=.3*dt;
+          c.burn+=(t-180)*.15*dt;
+          if(c.burn>=10&&!S.spoils.find(x=>x.name==='SPICE BURNED'))spoil('SPICE BURNED',2);
+      }
+  }
+  if(S.adv&&c.st>=1&&c.st<=5)c.prog+=rateAt(c.temp)*dt;
+  const pDry=p.water<=0; // water caps the pot at boiling; an empty pot just keeps getting hotter
+  p.temp+=((pDry?25+p.dial*30:Math.min(100,25+p.dial*9.5))-p.temp)*(pDry?.3:.12)*dt;
+  if(!pDry&&p.temp>100)p.temp=100;
+  if(p.temp>=70)p.water-=(p.temp-65)/35*.02*dt;
+  p.water=Math.max(0,p.water);
+  if(S.phase==='cook'){
+    const wet=p.water>0;
+    if(wet)p.had=true;else if(p.had&&!S.spoils.find(x=>x.name==='BOILED DRY'))spoil('BOILED DRY',2);
+    if(wet&&p.temp>=70){
+      {const g=dt*(1+Math.min(.8,(p.temp-70)/50));p.cooked+=g;if(p.in2)p.cooked2+=g}
+      p.water-=(p.temp-65)/35*.08*dt;
+    }
+    p.foam=wet?Math.max(0,p.foam+(p.temp>=92?.3:-.4)*dt):0;
+    if(p.foam>=1){spoil('BOIL OVER',1);p.foam=.3;p.water-=.4}
+    p.stick+=wet?(p.temp>=70?1:.3)*L.stick*dt:Math.max(.02,(p.temp-60)/250)*dt; // dry dal scorches fast once hot
+    if(p.stick>=1){spoil('STUCK AND SCORCHED',1);p.stick=.3}
+    p.water=Math.max(0,p.water);
+  }
+  // care: track heedless play (feeds the Care score)
+  const K=S.care;
+  if(S.phase==='wash'&&S.rinse&&S.basin==='full'){
+    if(S.waterDirt>50){K.murk+=dt*(S.waterDirt-50)/50;if(S.waterDirt>75)nag('murk','Water is murky. Change it.')}
+    if(S.grit<.5){S.zt=(S.zt||0)+dt;if(S.zt>1.5)K.over+=dt}
+  }
+  if(S.phase==='cook'&&(p.foam>.6||p.stick>.6||c.burn>6))K.warn+=dt;
+  if(c.rich<=0&&c.temp>150){K.dry+=dt;nag('dryc','Empty pan overheating. Add ghee or turn it down.')}
+  if(pDry&&p.temp>110){K.dry+=dt;nag('dryp','Dry pot overheating. Add water or turn it down.')}
+}
+function nag(k,m){if(S.t-(S.nag[k]??-99)>12){S.nag[k]=S.t;say(m,'b')}}
+
+function loop(n){
+  if(!S||S.phase==='done')return;
+  const d=Math.min(.1,(n-last)/1000);last=n;
+  if(!document.hidden){acc+=d;while(acc>=1/30){step(1/30);acc-=1/30;if(S.phase==='done')return}}
+  R();raf=requestAnimationFrame(loop);
+}
+
+function guideTarget(){
+  const p=S.pot,c=S.pan,L=S.L,sc=scl(),q=x=>document.querySelector(x);
+  if(S.phase==='wash'){
+    if(S.waterDirt>50)return $('b_fill');
+    if(S.grit<.5)return q('[data-a="wdone"]');
+    return $('b_std');
+  }
+  if(p.stick>.5||p.foam>.5)return q('[data-a="stir"]');
+  if(L.double&&!p.in2&&p.cooked>=(L.A.need-L.B.need)*sc*.97)return $('b_add2');
+  if(p.water<L.w[0]*sc)return $('b_wp');
+  if(p.dial===0)return q('#pbn [data-d="6"]');
+  if(c.rich<2)return $('b_ghee');
+  if(c.dial===0&&(S.adv?c.st===0:!c.spice))return q('#cbn [data-d="6"]');
+  if(S.adv){
+    const st=c.st;
+    if(st===0)return c.temp>=130?$('b_spice'):null;
+    if(st<5)return c.prog/SPICES[st-1].need*100>=90?$('b_spice'):null;
+    if(st===5)return dalReady()?$('b_spice'):null;
+    if(st<8)return $('b_spice');
+    return dalReady()?$('serve'):null;
+  }
+  if(!c.spice)return c.temp>=130?$('b_spice'):null;
+  if(c.flav>=4&&c.dial>0)return q('#cbn [data-d="0"]');
+  return c.flav>=4&&dalReady()?$('serve'):null;
+}
+function guideUpdate(){
+  const t=S.phase==='done'?null:guideTarget();
+  if(S.gt===t)return;
+  if(S.gt)S.gt.classList.remove('guide');
+  if(t)t.classList.add('guide');
+  S.gt=t;
+}
+function R(){
+  if(S.guided)guideUpdate();
+  const p=S.pot,c=S.pan,L=S.L,sc=scl(),m=mass(),t=S.t;
+  $('clk').textContent=Math.floor(t/60)+':'+(t%60).toFixed(1).padStart(4,'0');
+  sm('sed',100-S.grit,100,(100-S.grit).toFixed(0)+'%');
+  sm('bd',S.waterDirt,100,S.waterDirt>90?'FILTHY':S.waterDirt>50?'MURKY':'CLEAN');
+  sm('mass',m,10,m.toFixed(1)+' / 10');
+  const need=L.need*sc,need2=L.double?L.B.need*sc:1;
+  sm('pt',p.temp,120,Math.round(p.temp)+'°');
+  sb('pw',10,L.w[0]*sc,L.w[1]*sc);sm('pw',p.water,10,p.water.toFixed(1));
+  sm('pc',p.cooked/need*100,125,Math.floor(p.cooked)+' / '+Math.ceil(need)+'s');sm('pc2',p.cooked2/need2*100,125,p.in2?Math.floor(p.cooked2)+' / '+Math.ceil(need2)+'s':'not in pot');
+  if(L.double&&!p.in2&&S.phase==='cook'){const go=p.cooked>=(L.A.need-L.B.need)*sc*.97,tx=go?'ADD '+L.B.n.toUpperCase()+' NOW!':'ADD '+L.B.n.toUpperCase()+' at the mark',be=$('b_add2');be.classList.toggle('pulse',go);if(be.dataset.t!==tx){be.dataset.t=tx;be.textContent=tx}}
+  sm('pf',p.foam,1,p.foam>.6?'⚠':'');sm('ps',p.stick,1,p.stick>.6?'⚠':'');
+  sm('ct',c.temp,250,Math.round(c.temp)+'°');sm('cr',c.rich,5,c.rich.toFixed(1));
+  if(S.adv)advUI(c);else sm('cf',c.flav,8,c.flav.toFixed(1));sm('cb',c.burn,10,c.burn>6?'⚠':'');
+  $('pdial').textContent=p.dial+' / 10 · '+Math.round(p.temp)+'°';$('cdial').textContent=c.dial+' / 10 · '+Math.round(c.temp)+'°';paintBn('pbn',p.dial);paintBn('cbn',c.dial);
+  if(!S.adv){const ds=c.spice?(c.flav>=4?3:2):(c.rich<2?0:1),dr=$('dir');if(dr.dataset.s!==String(ds)){dr.dataset.s=ds;[...dr.children].forEach((l,i)=>l.classList.toggle('now',i===ds))}}
+  $('basp').classList.toggle('off',S.phase!=='wash');{const rd=dalReady(),sv=$('serve'),tx=rd?'SERVE':S.phase==='wash'?'SERVE WASHED DAL (raw)':'SERVE · dal not cooked yet';sv.disabled=false;if(sv.dataset.t!==tx){sv.dataset.t=tx;sv.textContent=tx}}
+  // bowl: water colour goes from clear blue to muddy brown; grit specks fade as grit is removed
+  const d=S.waterDirt/100,mixc=(a,b)=>Math.round(a+(b-a)*d);
+  $('bw').setAttribute('fill',S.basin==='full'?`rgb(${mixc(143,128)},${mixc(211,98)},${mixc(244,58)})`:'#6e6252');
+  $('bw').style.opacity=S.basin==='full'?.9:.6;
+  $('gt').style.opacity=S.grit/100;
+  $('sw').classList.toggle('spin',!!S.rinse);$('sw').style.animationDuration=[0,3,1.5,.7][S.rinse]+'s';
+  $('mn').className='ph-'+(S.phase==='wash'?'wash':'cook');
+  const gt='ADD GHEE<small>'+c.rich.toFixed(1)+' (aim 2-3)</small>';if($('b_ghee').dataset.t!==gt){$('b_ghee').dataset.t=gt;$('b_ghee').innerHTML=gt}
+  // pot + pan visuals
+  const dbl=L.double,raw=dbl?mixv(RAW[S.combo[0]],RAW[S.combo[1]],.5):RAW[S.k],ckd=dbl?mixv(COOK[S.combo[0]],COOK[S.combo[1]],.5):COOK[S.k],f=dbl&&p.in2?(p.cooked/need+p.cooked2/need2)/2:p.cooked/need,tt=cl(f,0,1),wet=S.phase!=='wash';
+  let lc=mixv([143,211,244],ckd,tt*tt*(3-2*tt));
+  if(f>1.1)lc=mixv(lc,[88,54,26],cl((f-1.1)/.8,0,.7));
+  const lr=p.water<=.05?0:cl(12+p.water*1.7,10,29);
+  $('plq').setAttribute('r',lr);$('pcc').setAttribute('r',lr||(wet?22:0));$('plq').setAttribute('fill',rgbs(lc));
+  $('pb').setAttribute('fill',rgbs(raw));$('pb').style.opacity=wet?cl(1-f*1.25,0,1):0;
+  $('pbl').setAttribute('fill',rgbs(mixv(lc,[255,255,255],.12)));$('pbl').style.opacity=wet?cl(f*1.25-.15,0,.8):0;
+  $('pbu').style.opacity=lr?cl((p.temp-68)/26,0,1):0;$('pbu').style.setProperty('--bd',(2.4-cl((p.temp-70)/30,0,1)*1.6).toFixed(2)+'s');
+  $('pfo').setAttribute('r',Math.max(lr-1,1));$('pfo').style.strokeWidth=p.foam*7;$('pfo').style.opacity=cl(p.foam*1.3,0,1);
+  $('pst').setAttribute('r',lr||24);$('pst').style.opacity=cl(p.stick,0,1);
+  const bt=cl(c.flav/5.5,0,1),bn=cl(c.burn/10,0,1),gr=c.rich>0?cl(7+c.rich*4.6,0,29):0,dk=[20,12,6];
+  $('csd').setAttribute('fill',rgbs(mixv(mixv([226,196,120],[112,66,26],bt),dk,bn)));
+  $('chb').setAttribute('fill',rgbs(mixv(mixv([96,170,70],[74,58,28],cl(bt*1.1,0,1)),dk,bn)));
+  $('cch').setAttribute('fill',rgbs(mixv(mixv([200,48,40],[90,30,18],bt),dk,bn)));
+  $('csp').style.opacity=c.spice?1:0;
+  ['cgh','ccc'].forEach(i=>$(i).setAttribute('r',gr));$('cgh').setAttribute('fill',rgbs(mixv([242,194,48],[120,70,20],bn)));
+  $('cpan').setAttribute('fill',rgbs(mixv([47,44,42],[120,42,20],cl((c.temp-100)/140,0,1))));
+  $('cbu').style.opacity=c.rich>0?cl((c.temp-110)/60,0,1):0;$('cbu').style.setProperty('--bd',(1.8-cl((c.temp-120)/60,0,1)*1.2).toFixed(2)+'s');
+  $('csm').style.opacity=cl((c.temp-190)/50,0,.6);
+  flame('pfl','pfl2',50,50,34,p.dial*1.15,p.dial/10);flame('cfl','cfl2',46,50,34,c.dial*1.15,c.dial/10);
+  $('hint').innerHTML=S.phase==='wash'?'<b>1 · Wash.</b> Hold a button. Change the water when murky.':'<b>2 · Cook.</b> Keep meters in the green.'+(S.L.double&&!S.pot.in2?' Add '+S.L.B.n+' at the black mark.':'')+(S.adv?' Tap the spice button when its meter is green.':'');
+  if(S.phase==='wash'){
+      const isF=S.basin==='full';
+      $('b_fill').firstChild.nodeValue=isF?'CHANGE WATER ':'FILL WATER ';
+      $('b_fill').classList.toggle('pulse',isF&&S.waterDirt>50);
+      ['b_gen','b_std','b_rck'].forEach(i=>$(i).disabled=!isF);
+  }
+}
+
+document.querySelectorAll('.rb').forEach(b=>{
+  b.onpointerdown=(e)=>{
+      if(S&&S.phase==='wash'&&S.basin==='full'){S.go=true;S.rinse=+b.dataset.l+1;try{b.setPointerCapture(e.pointerId)}catch(_){}}
+  };
+  ['pointerup','pointerleave','pointercancel'].forEach(t=>b.addEventListener(t,(e)=>{
+      if(S){S.rinse=0;try{b.releasePointerCapture(e.pointerId)}catch(_){}}
+  }));
+  b.oncontextmenu=e=>e.preventDefault();
+});
+['pbn','cbn'].forEach(id=>{$(id).innerHTML=Array.from({length:11},(_,i)=>`<button data-d="${i}" aria-label="Level ${i}">${i}</button>`).join('')});
+function paintBn(id,v){const g=$(id);if(g.dataset.v===String(v))return;g.dataset.v=v;[...g.children].forEach((b,i)=>{b.classList.toggle('cur',i===v);b.classList.toggle('lo',i<v);b.setAttribute('aria-pressed',i===v)})}
+
+function flash(ids){ids.forEach(i=>{const e=$(i);e.classList.remove('flash');void e.offsetWidth;e.classList.add('flash');e.addEventListener('animationend',()=>e.classList.remove('flash'),{once:true})})}
+// the bowl, pot and pan are gauges, not controls: explain that and point at the real buttons
+const NUDGE={
+ bowl:['Just a view. Use the buttons below.',['b_gen','b_std','b_rck','b_fill']],
+ potv:['Just a view. Use the burner and water buttons.',['pbn','b_wm','b_wp']],
+ panv:['Just a view. Use the burner and buttons.',['cbn']]};
+Object.keys(NUDGE).forEach(id=>$(id).addEventListener('click',()=>{
+ if(!S||S.phase==='done')return;
+ say(NUDGE[id][0]);
+ flash(NUDGE[id][1]);
+}));
+
+document.addEventListener('click',e=>{
+  const b=e.target.closest('button');if(!b)return;
+  if(b.dataset.tg){ADV=!ADV;try{localStorage.setItem('dal:adv',ADV?1:0)}catch(e){}return renderLents()}
+  if(b.dataset.i)return showInfo();
+  if(b.dataset.ib)return hideInfo();
+  if(b.dataset.dp)return pickDouble();
+  if(b.dataset.p){const k=b.dataset.p,i=DP.indexOf(k);if(i>=0)DP.splice(i,1);else if(DP.length<2)DP.push(k);else DP[1]=k;return pickDouble()}
+  if(b.dataset.dgo)return DP.length===2?start('double',DP.slice()):0;
+  if(b.dataset.k)return start(b.dataset.k,b.dataset.c&&b.dataset.c.split(','));
+  if(b.dataset.m)return menu();
+  if(b.dataset.lb){lbk=b.dataset.lb;return renderLB()}
+  if(b.dataset.x==='save')return saveScore();
+  if(!S||S.phase==='done')return;
+  S.go=true;
+  if(b.dataset.d!==undefined){(b.parentNode.id==='pbn'?S.pot:S.pan).dial=+b.dataset.d;return R()}
+  const a=b.dataset.a,p=S.pot,c=S.pan;
+  if(a==='fill'){if(S.waterDirt<35)S.care.clean++;S.basin='full';S.waterDirt=0;ff(2);say('Fresh water.')}
+  else if(a==='wdone'&&S.phase==='wash'){
+      S.phase='cook';S.rinse=0;top0();
+      if(p.water<=0){say('Dry pot! Add water now.','b');flash(['b_wp'])}else say(S.L.double?S.L.A.n+' is in. Add '+S.L.B.n+' at the mark.':'Dal is in the pot.','g');
+  }
+  else if(a==='water'){if(p.water>=10||S.lw==='-')S.care.jam++;S.lw='+';p.water=Math.min(10,p.water+1);p.temp=Math.max(25,p.temp-10);say('+1 cup of water.')}
+  else if(a==='add2'&&S.L.double&&S.phase==='cook'&&!p.in2){p.in2=true;$('b_add2').classList.remove('pulse');$('b_add2').disabled=true;$('b_add2').textContent=S.L.B.n+' added';say(S.L.B.n+' added to the pot.','g')}
+  else if(a==='unwater'){const fl=S.phase==='cook'?.5:0;if(p.water<=fl||S.lw==='+')S.care.jam++;S.lw='-';p.water=Math.max(Math.min(p.water,fl),p.water-1);say('−1 cup of water.')}
+  else if(a==='stir'&&S.phase==='cook'){if(p.stick<.2&&p.foam<.2)S.care.jam++;p.stick=0;p.foam=Math.max(0,p.foam-.2);say('Stirred.')}
+  else if(a==='ghee'){
+    if(c.rich>=4.2)S.care.jam++;
+    c.rich=Math.min(5,c.rich+.8);c.temp-=15;
+    if(c.temp+15>200){spoil('GHEE SMOKE',1);c.temp-=30}else say('Ghee melting in.')
+  }
+  else if(a==='spice'){
+    if(S.adv){advStep();return R()}
+    if(c.rich<=0){S.care.jam+=2;say('No ghee to bloom them in!','b')}
+    else say('Spice added.');
+    c.spice=true;b.disabled=true;
+  }
+  else if(a==='serve')return finish();
+  R();
+});
+
+function grade(q){return q>=90?['S','var(--good)']:q>=75?['A','var(--good)']:q>=60?['B','var(--acc)']:q>=40?['C','var(--acc)']:q>=20?['D','var(--bad)']:['F','var(--bad)']}
+
+function top0(){window.scrollTo(0,0);requestAnimationFrame(()=>window.scrollTo(0,0))}
+const STAR='<i><svg viewBox="0 0 24 24"><path d="M12 2l3.1 6.3 6.9 1-5 4.9 1.2 6.8L12 17.8 5.8 21l1.2-6.8-5-4.9 6.9-1z"/></svg></i>';
+const starsOf=q=>q>=90?5:q>=75?4:q>=55?3:q>=35?2:1;
+const LBL={5:'Restaurant-quality dal.',4:'Really good dal.',3:'Pretty good dal.',2:'Edible dal. Getting there.',1:'Rough dal, but you cooked it.'};
+// score runs up, then the stars flash in one by one, then the verdict fades in
+function reveal(score,n){
+  const el=$('sc'),st=[...document.querySelectorAll('#stars i')],v=$('verd');
+  const fin=()=>{if(!document.body.contains(el))return;el.textContent=score.toLocaleString();st.forEach((x,i)=>{if(i<n)setTimeout(()=>x.classList.add('on'),i*260)});setTimeout(()=>v.classList.add('show'),n*260+250)};
+  if(matchMedia('(prefers-reduced-motion: reduce)').matches){el.textContent=score.toLocaleString();st.forEach((x,i)=>{if(i<n)x.classList.add('on')});v.classList.add('show');return}
+  const t0=performance.now();
+  (function f(t){if(!document.body.contains(el))return;const k=Math.min(1,(t-t0)/1300);el.textContent=Math.round(score*(1-Math.pow(1-k,3))).toLocaleString();k<1?requestAnimationFrame(f):fin()})(t0);
+}
+const GL={S:'Perfect',A:'Great',B:'Good',C:'Okay',D:'Needs work',F:'Rough'};
+function finish(){
+  S.phase='done';S.rinse=0;const L=S.L,sc=scl(),p=S.pot,c=S.pan;
+  const idealW=(L.w[0]+L.w[1])/2*sc,need=L.need*sc,need2=L.double?L.B.need*sc:0,idealF=4.5,idealR=2.5;
+  const dev=(v,i)=>Math.max(0,100-Math.abs(v-i)/i*100);
+  const devB=(v,lo,hi)=>Math.max(0,100-(v<lo?lo-v:v>hi?v-hi:0)/((lo+hi)/2)*100); // 100 anywhere inside the green band
+  const advItems=S.adv?SPICES.map((sp,i)=>{let v=c.pg[i];if(v==null&&c.st===i+1)v=c.prog/sp.need*100;return [sp.n,v,v==null?0:advScore(v)]}).concat([['Garam masala',null,c.gm?100:0],['Cilantro',null,c.ci?100:0]]):[];
+  const advQ=S.adv?advItems.reduce((a,x)=>a+x[2],0)/advItems.length:0;
+  const flavMsg=S.adv?advItems.filter(x=>x[2]<80).map(x=>x[1]==null?`${x[0]}: never added.`:`${x[0]}: ${x[1]<90?'undercooked':x[1]>140?'burnt':'overcooked'}.`).join(' '):'';
+  const qGrit=100-S.grit,qWater=devB(p.water,L.w[0]*sc,L.w[1]*sc),qCook=L.double?(devB(p.cooked,need*.95,need*1.1)+devB(p.cooked2,need2*.95,need2*1.1))/2:devB(p.cooked,need*.95,need*1.1),qFlav=S.adv?advQ:devB(c.flav,4,5),qRich=devB(c.rich,2,3);
+  const cookD=()=>[[L.A.n,p.cooked,need],[L.B.n,p.cooked2,need2]].filter(x=>devB(x[1],x[2]*.95,x[2]*1.1)<85).map(x=>`${x[0]} ${x[1]<x[2]?'undercooked':'overcooked'} (${Math.floor(x[1])}s of ${Math.ceil(x[2])}s).`).join(' ');
+  const comps=[
+   [iDr,'Grit removal',qGrit,qGrit>=90?'Spotless dal.':`${S.grit.toFixed(0)}% of the grit stayed in. Wash longer.`],
+   [iWa,'Water level',qWater,qWater>=85?'Right amount of water.':p.water<L.w[0]*sc?`Too little water (${p.water.toFixed(1)}, aim for ${(L.w[0]*sc).toFixed(1)}-${(L.w[1]*sc).toFixed(1)}).`:`Too much water (${p.water.toFixed(1)}, aim for ${(L.w[0]*sc).toFixed(1)}-${(L.w[1]*sc).toFixed(1)}). Soupy.`],
+   [iTi,'Texture / doneness',qCook,qCook>=85?'Cooked just right.':L.double?cookD():p.cooked<need?`Undercooked (${Math.floor(p.cooked)}s of ${Math.ceil(need)}s). Keep the pot hot until COOKED is green.`:`Overcooked (${Math.floor(p.cooked)}s of ${Math.ceil(need)}s). Serve sooner.`],
+   [iFl,'Spice flavor',qFlav,qFlav>=85?'Spices fully bloomed.':S.adv?flavMsg:c.flav<idealF?(c.spice?'Spices barely bloomed. Keep the pan at 130-180°.':'You never added spice.'):'Spices overcooked.'],
+   [iRi,'Ghee',qRich,qRich>=85?'Good amount of ghee.':c.rich<idealR?`Not enough ghee (${c.rich.toFixed(1)}, aim for 2-3).`:`Too much ghee (${c.rich.toFixed(1)}, aim for 2-3).`]];
+  const K=S.care,causes=[
+   [K.murk*3,`Scrubbed murky water (~${K.murk.toFixed(0)}s). Change it sooner.`],
+   [K.over*4,'Kept washing clean dal.'],
+   [K.clean*4,`Changed clean water (${K.clean}x).`],
+   [K.warn*3,`Ignored a warning for ${K.warn.toFixed(0)}s.`],
+   [K.dry*3,`Heated an empty pot or pan (${K.dry.toFixed(0)}s).`],
+   [K.jam*3,`${K.jam} pointless presses.`]];
+  const qCare=cl(100-causes.reduce((a,x)=>a+x[0],0),0,100);
+  comps.push([iHe,'Care',qCare,qCare>=85?'Attentive from start to finish.':causes.filter(x=>x[0]>=3).sort((a,b)=>b[0]-a[0]).slice(0,2).map(x=>x[1]).join(' ')]);
+  const vals=comps.map(x=>x[2]),avg=vals.reduce((a,b)=>a+b,0)/vals.length,weak=Math.min(...vals);
+  let q=avg*.6+weak*.4;const pens=[];
+  if(c.burn>0){const bp=Math.min(50,c.burn*5);q-=bp;pens.push(['Burnt spices',bp])}
+  const grp={};S.spoils.forEach(s=>{grp[s.name]=(grp[s.name]||0)+s.sp});
+  Object.keys(grp).forEach(n=>{const sp=grp[n]*15;q-=sp;pens.push([n.toLowerCase().replace(/^./,x=>x.toUpperCase()),sp])});
+  q=cl(q,0,100);
+  const mult=Math.max(.02,q*q/10000);
+  const x=cl((S.t-L.par*.5)/(L.par*2),0,1);
+  const pace=Math.round(1000*Math.pow(1-x,.6)+1025*Math.pow(x,4));
+  const score=Math.round((10000+pace)*mult);
+  S.final=score;mark('done');document.querySelectorAll('.guide').forEach(e=>e.classList.remove('guide'));$('foot').classList.remove('hide');
+  const prev=best(S.k);if(score>prev)save(S.k,score);
+  const [g,gc]=grade(q);
+  const TIPS={'ghee smoke':'Add ghee before the pan gets very hot.','pan fire':'Turn the pan down. An empty pan overheats fast.','boil over':'Lower the pot burner, or stir, when BOIL-OVER climbs.','stuck and scorched':'Keep water in the pot and stir when STICKING climbs.','boiled dry':'Top up the water before the pot runs dry.','spice burned':'Keep the pan under 180° once the spice is in.','burnt spices':'Keep the pan under 180° once the spice is in.'};
+  const sum=a=>a.reduce((x,y)=>x+y,0),qOf=(v,pp)=>sum(v)/v.length*.6+Math.min(...v)*.4-sum(pp);
+  const fv=vals.slice(),fp=pens.map(x=>x[1]),open=vals.map((v,i)=>v<85?{i}:null).filter(Boolean).concat(pens.map((_,j)=>({j}))),picks=[];
+  for(let n=0;n<3&&open.length;n++){
+    const base=qOf(fv,fp);let bk=-1,bg=0;
+    open.forEach((o,k)=>{const v=fv.slice(),pp=fp.slice();if(o.i!==undefined)v[o.i]=90;else pp[o.j]=0;const gn=qOf(v,pp)-base;if(gn>bg){bg=gn;bk=k}});
+    if(bk<0)break;
+    const o=open.splice(bk,1)[0];
+    if(o.i!==undefined){fv[o.i]=90;picks.push([comps[o.i][1],comps[o.i][3]])}else{fp[o.j]=0;picks.push([pens[o.j][0],TIPS[pens[o.j][0].toLowerCase()]||'Avoid this next time.'])}
+  }
+  const q2=cl(qOf(fv,fp),0,100),score2=Math.round((10000+pace)*Math.max(.02,q2*q2/10000)),st2=starsOf(q2),nStars=starsOf(q);
+  const was=['toor','double','tadka'].map(unlocked);
+  if(nStars>sBest(S.k))saveStars(S.k,nStars);
+  const news=['toor','double','tadka'].filter((k,i)=>!was[i]&&unlocked(k)).map(k=>k==='tadka'?'Full tadka':LENT[k].n);
+  const slow=S.t>=L.par*1.5;let secret='';
+  if(slow&&nStars>=4&&!seen('found')){mark('found');mark('psst');secret='<div class="sec"><b>You found the secret.</b> Slow and careful wins.</div>'}
+  else if(!slow&&nStars<=3&&!seen('psst')){mark('psst');secret='<div class="sec"><b>Psst.</b> The clock barely matters. Care does. Try one slowly.</div>'}
+  const nx=(LB||[]).filter(e=>e.lentil===S.k&&+e.score>score).sort((a,b)=>a.score-b.score)[0];
+  let me='';try{me=localStorage.getItem('dal:name')||''}catch(e){}
+  const near=nx?(()=>{const gap=nx.score-score,who=nx.name===me?'your own score':esc(nx.name)+"'s score",pts=gap.toLocaleString();return `<div style="margin-top:8px;font-size:14px">${gap<=Math.max(300,nx.score*.2)?`You almost beat <b>${who}</b> (${(+nx.score).toLocaleString()})! Only ${pts} points to go.`:`Next score to beat: <b>${who}</b> at ${(+nx.score).toLocaleString()}.`}</div>`})():'';
+  const row=(r)=>{const ok=r[2]>=80,mid=r[2]>=50,col=ok?'--good':mid?'--acc':'--bad';return `<div class="cmp" style="padding:4px 0"><span class="ic" style="color:var(${col})">${ok?'✓':mid?'~':'✗'}</span><div style="flex:1"><div style="display:flex;justify-content:space-between;font-size:13px"><b>${r[0]}${r[1]}</b><b style="color:var(${col})">${r[2].toFixed(0)}%</b></div><div class="bar" style="margin:2px 0"><b style="width:${r[2]}%;background:var(${col})"></b></div>${r[2]<85?`<div class="dim" style="font-size:12px;line-height:1.3">${r[3]}</div>`:''}</div></div>`};
+  $('play').classList.add('hide');$('res').classList.remove('hide');
+  $('res').innerHTML=`<h1>Taste test: ${S.title}</h1>
+  <div style="text-align:center;margin:6px 0 12px"><div id="sc" style="font:700 42px ui-monospace,monospace">0</div><div id="stars" role="img" aria-label="${nStars} out of 5 stars">${STAR.repeat(5)}</div>
+   <div id="verd"><div style="font:700 20px Georgia,serif;color:var(--acc);margin-top:2px">${LBL[nStars]}</div><div class="dim" style="font-size:13px;margin-top:2px">${score>prev?'New personal best!':'Your best: '+prev}</div>${near}</div></div>
+  ${secret}
+  ${news.length?`<div style="border:2px solid var(--good);border-radius:8px;padding:10px;margin-bottom:10px;font-size:14px"><b style="color:var(--good)">Unlocked: ${news.join(' and ')}!</b></div>`:''}
+  <div style="border:2px solid var(--acc);border-radius:8px;padding:10px;margin-bottom:10px">
+    ${picks.length?`<div style="font:700 14px ui-monospace,monospace">Fix ${picks.length>1?'these first':'this first'}</div><ol class="dir" style="color:var(--ink);font-size:13px;margin:6px 0">${picks.map(p=>`<li><b>${p[0]}:</b> ${p[1]}</li>`).join('')}</ol>${score2>score*1.1?`<div class="dim" style="font-size:13px">Nail ${picks.length>1?'these':'this'} and you'd score about <b style="color:var(--ink)">${score2}</b> (${st2} star${st2>1?'s':''}).</div>`:''}`:`<div style="font-size:13px">Clean run. Go faster or slower to beat it.</div>`}
+  </div>
+  <button class="big" data-k="${S.k}"${L.double?` data-c="${S.combo}"`:''}>TRY ${L.double?'THIS MIX':L.n.toUpperCase()} AGAIN</button>
+  <button data-m="1" style="margin-top:6px">Pick a different lentil</button>
+  <div id="sv" style="display:flex;gap:6px"><input type="text" id="nm" maxlength="20" placeholder="Your name" value="${esc((()=>{try{return localStorage.getItem('dal:name')||''}catch(e){return ''}})())}"><button class="ok" data-x="save" style="width:auto;padding:8px 12px;white-space:nowrap">SAVE SCORE</button></div>
+  <div id="lbr" style="font-size:12px">${boardHTML(S.k,3)}</div>
+  <details><summary>Full breakdown</summary>
+  ${comps.map(row).join('')}
+  ${pens.map(p=>`<div class="ev" style="padding:3px 0;font-size:13px"><span style="color:var(--bad)">${iWr}${p[0]}</span><b style="color:var(--bad)">-${p[1].toFixed(0)}</b></div>`).join('')}
+  <div class="dim" style="font-size:12px;margin:6px 0">Quality ${q.toFixed(0)}% · ×${mult.toFixed(2)} · pacing +${pace} · ${S.t.toFixed(0)}s <button data-i="1" class="lk" style="margin-left:6px">How scoring works</button></div>
+  </details>`;
+  top0();reveal(score,nStars);
+}
+
+function saveScore(){
+  if(S.saved)return;S.saved=true;
+  const name=($('nm').value.trim()||'Anon').slice(0,20);
+  try{localStorage.setItem('dal:name',name)}catch(e){}
+  const en={name,lentil:S.k,score:S.final,date:new Date().toISOString().slice(0,10),...(S.L.double?{combo:S.combo.join('+')}:{}),...(S.adv?{adv:1}:{})};
+  $('lbr').innerHTML=boardHTML(S.k,3);
+  if(API){$('sv').innerHTML='<div class="dim" style="font-size:13px">Saving to the shared leaderboard...</div>';fetch(API+'?'+new URLSearchParams(en)).then(r=>r.json()).then(j=>{LB=j.entries||[];if(!LB.some(x=>x.name===en.name&&x.score===en.score))throw 0;if($('lbr'))$('lbr').innerHTML=boardHTML(S.k,3);$('sv').innerHTML='<div class="dim" style="font-size:13px">Saved to the shared leaderboard.</div>'}).catch(()=>{$('sv').innerHTML='<div style="color:var(--bad);font-size:13px">The shared leaderboard did not record this score. Check that the latest script is deployed as a New version with access set to Anyone.</div>'});return}
+}
+</script>
+</body>
+</html>
