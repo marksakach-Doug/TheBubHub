@@ -179,6 +179,15 @@ const LENT={
  toor:{n:'Toor',look:'Split pigeon peas, bright yellow',d:'The everyday classic. Patient and thirsty.',need:38,stick:.05,w:[4,5.4],par:75},
  double:{n:'Double dal',tab:'Double',double:1,look:'Two lentils, one pot',d:'Mix any two.'}};
 const API='https://script.google.com/macros/s/AKfycbwhy40Gk_QPoVz-jEwe-I72_rqbudw_QeLxZcGz7e2BMH3kIYS0AWkBiRulJl-CfU5jyA/exec'; // Apps Script web app URL (see README)
+
+// ---- BubHub Record ----------------------------------------------------
+// Dal Tadka is a self-contained solo game with no bridge at all, so the hub
+// never heard about a finished cook and only the generic "played Dal Tadka"
+// usage line was written. Report the result when a dish is judged. This is
+// always a no-op when the page is opened standalone (window.parent ===
+// window), so nothing is posted to itself.
+const GAME_ID='daltadka';
+const Hub={me:null,roster:[],room:'',up:function(k,p){try{if(window.parent===window)return;window.parent.postMessage({t:'gu',game:GAME_ID,k:k,p:p},'*');}catch(e){}}};
 const RAW={moong:[110,150,60],masoor:[196,120,60],chana:[200,165,95],urad:[40,38,36],toor:[214,176,66]},COOK={moong:[233,196,60],masoor:[232,146,58],chana:[212,154,44],urad:[150,132,92],toor:[236,182,50]};
 const mixv=(a,b,t)=>a.map((v,i)=>Math.round(v+(b[i]-v)*t)),rgbs=a=>`rgb(${a})`;
 function flame(id,id2,cx,cy,r,len,t){
@@ -638,6 +647,7 @@ function finish(){
   const score=Math.round((10000+pace)*mult);
   S.final=score;mark('done');document.querySelectorAll('.guide').forEach(e=>e.classList.remove('guide'));$('foot').classList.remove('hide');
   const prev=best(S.k);if(score>prev)save(S.k,score);
+  Hub.up('result',{inst:'dal-'+Date.now(),dish:LENT[S.k].n,score:score});
   const [g,gc]=grade(q);
   const TIPS={'ghee smoke':'Add ghee before the pan gets very hot.','pan fire':'Turn the pan down. An empty pan overheats fast.','boil over':'Lower the pot burner, or stir, when BOIL-OVER climbs.','stuck and scorched':'Keep water in the pot and stir when STICKING climbs.','boiled dry':'Top up the water before the pot runs dry.','spice burned':'Keep the pan under 180° once the spice is in.','burnt spices':'Keep the pan under 180° once the spice is in.'};
   const sum=a=>a.reduce((x,y)=>x+y,0),qOf=(v,pp)=>sum(v)/v.length*.6+Math.min(...v)*.4-sum(pp);

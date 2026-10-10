@@ -23,19 +23,23 @@ button.eg.on{background:#ffd23f;color:#241b12;border-color:#ffd23f}
  #shout-input{flex:1;background:#0d0a06;border:1px solid #6b5636;border-radius:10px;padding:6px 12px;color:#f0e6d2;font:inherit}
  #shout-input:focus{outline:none;border-color:#ffd23f}
   .hint{color:#8a7a5c;font-size:12px;margin:0}
-  /* ── phone touch controls ── hidden on mouse/desktop, shown on touch-only devices */
-  #phone-controls{position:absolute;inset:0;display:none;pointer-events:none;z-index:4}
-  @media (hover:none) and (pointer:coarse){#phone-controls{display:flex}}
-  #phone-controls .phone-dpad{
-   position:absolute;left:calc(12px + env(safe-area-inset-left,0px));bottom:calc(20px + env(safe-area-inset-bottom,0px));
-   display:grid;grid-template-columns:repeat(3,56px);grid-auto-rows:56px;gap:8px;width:fit-content;pointer-events:auto}
-  #phone-controls .dpad-up{grid-column:2;grid-row:1}
-  #phone-controls .dpad-left{grid-column:1;grid-row:2}
-  #phone-controls .dpad-down{grid-column:2;grid-row:3}
-  #phone-controls .dpad-right{grid-column:3;grid-row:2}
-  #phone-controls .phone-jump{
-   position:absolute;right:calc(12px + env(safe-area-inset-right,0px));bottom:calc(48px + env(safe-area-inset-bottom,0px));
-   width:84px;height:84px;border-radius:50%;pointer-events:auto}
+/* ── phone touch controls ──────────────────────────────────────────────────
+   These live in their own bar BELOW the stage, not floating over it. They
+   used to be position:absolute inside #stage-wrap, which meant they sat on
+   top of the playfield in landscape and on the letterbox bars below it in
+   portrait — never in a predictable place, and always in the way. */
+   #phone-controls{
+    display:none;align-items:center;justify-content:space-between;gap:12px;flex:none;
+    background:#241b12;border:1px solid #4a3a26;border-radius:12px;padding:8px 10px}
+   @media (hover:none) and (pointer:coarse){#phone-controls{display:flex}}
+   #phone-controls .phone-dpad{
+    display:grid;grid-template-columns:repeat(3,52px);grid-auto-rows:52px;gap:6px;flex:none}
+   #phone-controls .dpad-up{grid-column:2;grid-row:1}
+   #phone-controls .dpad-left{grid-column:1;grid-row:2}
+   #phone-controls .dpad-down{grid-column:2;grid-row:3}
+   #phone-controls .dpad-right{grid-column:3;grid-row:2}
+   #phone-controls .phone-jump{
+    width:84px;height:84px;border-radius:50%;flex:none;margin-right:4px}
   .phone-btn{
    font:700 19px/1 system-ui; color:#f0e6d2;
    background:rgba(51,40,24,.65);border:2px solid #6b5636;border-radius:12px;cursor:pointer;
@@ -54,20 +58,22 @@ button.eg.on{background:#ffd23f;color:#241b12;border-color:#ffd23f}
 <div id="wrap">
   <div id="bar">
     <button class="eg" id="btn-world">New world</button>
+    <button class="eg" id="btn-menu" title="Back to the hub menu">☰ Menu</button>
     <span id="role" style="font-family:monospace;font-size:11px;opacity:.85">connecting…</span>
   </div>
   <div id="stage-wrap">
     <canvas id="cv" width="1400" height="900"></canvas>
     <div id="overlay"><h1>eggs</h1><p>A chicken-coop sandbox for eggs. Bounce around the perches, splat, respawn. Jump twice for a double jump. Ride the teal elevator around its loop — hold up/down to drive it. Hop on the skateboard: tap jump for a flipping ollie (the board jumps too), hold jump to bail, mind the peg. Every hit you survive adds damage, and the more damage you carry the further you fly. One power-up at a time appears on a perch — a star (wrecking ball), a bean (grow BIG → HUGE → TITAN until someone hits you back down a size), or legs (touch someone to lift &amp; throw them).</p><p class="controls-hint" style="font-size:11px;opacity:.75">Arrows / WASD move · Space jumps (twice!) · brake hops off the board · you are the egg with your name on it</p></div>
-    <div id="phone-controls">
-      <div class="phone-dpad">
-        <button class="phone-btn dpad-up" data-key="ArrowUp" aria-label="up / jump"><span class="ico">▲</span></button>
-        <button class="phone-btn dpad-left" data-key="ArrowLeft" aria-label="left"><span class="ico">◄</span></button>
-        <button class="phone-btn dpad-down" data-key="ArrowDown" aria-label="down / brake"><span class="ico">▼</span></button>
-        <button class="phone-btn dpad-right" data-key="ArrowRight" aria-label="right"><span class="ico">►</span></button>
-      </div>
-      <button class="phone-btn phone-jump" data-key="Space" aria-label="jump"><span class="ico">JUMP</span></button>
+  </div>
+  <!-- Controls sit outside #stage-wrap so they never cover the playfield. -->
+  <div id="phone-controls">
+    <div class="phone-dpad">
+      <button class="phone-btn dpad-up" data-key="ArrowUp" aria-label="up / jump"><span class="ico">▲</span></button>
+      <button class="phone-btn dpad-left" data-key="ArrowLeft" aria-label="left"><span class="ico">◄</span></button>
+      <button class="phone-btn dpad-down" data-key="ArrowDown" aria-label="down / brake"><span class="ico">▼</span></button>
+      <button class="phone-btn dpad-right" data-key="ArrowRight" aria-label="right"><span class="ico">►</span></button>
     </div>
+    <button class="phone-btn phone-jump" data-key="Space" aria-label="jump"><span class="ico">JUMP</span></button>
   </div>
   <div id="meta"><span id="stat">tap to enter the nest</span></div>
   <div id="shoutbar">
@@ -1222,6 +1228,9 @@ function renderRole(){var r=document.getElementById('role');
  if(s&&!booted)s.textContent='tap to enter the nest';}
 function resetLocal(){plats=[];eggs=[];decals=[];parts=[];pu=null;newWorld();}
 document.getElementById('btn-world').onclick=function(){if(isHost||amSolo)newWorld();else Hub.up('intent',{a:'world'});};
+// Back to the hub menu. eggs had no way out at all on a phone: "New world"
+// just reseeds the sandbox, and leaving meant finding the hub's own controls.
+document.getElementById('btn-menu').onclick=function(){Hub.up('close');};
 document.getElementById('btn-shout').onclick=function(){sendShout();};
 document.getElementById('shout-input').addEventListener('keydown',function(e){if(e.key==='Enter'){e.preventDefault();sendShout();}e.stopPropagation();});
 overlay.addEventListener('click',function(){overlay.classList.add('hide');Hub.up('hello');});
@@ -1236,7 +1245,9 @@ var isTouch = window.matchMedia && window.matchMedia('(hover: none) and (pointer
   if(!box){
     if(isTouch){
       var h=document.querySelector('.controls-hint');
-      if(h)h.innerHTML='Drag the D-pad to move &amp; drive the elevator · JUMP for double jump / ollie / bail · grab the LEGS pickup to lift &amp; throw · you are the egg with your name on it';
+      // No "drag the D-pad" — each button is an independent press and nothing
+      // implements dragging, so say what the buttons actually do.
+      if(h)h.innerHTML='Hold the arrows to move &amp; drive the elevator · JUMP for double jump / ollie / bail · grab the LEGS pickup to lift &amp; throw · you are the egg with your name on it';
     }
     return;
   }
@@ -1258,10 +1269,11 @@ var isTouch = window.matchMedia && window.matchMedia('(hover: none) and (pointer
     btn.addEventListener('pointerleave',release);
     btn.addEventListener('contextmenu',function(e){e.preventDefault();});
   });
-  // hint: mention touch controls (only on touch devices)
+  // hint: mention touch controls (only on touch devices). "Hold the arrows",
+  // not "drag" — there is no drag handling, each button is its own press.
   if(isTouch){
     var h=document.querySelector('.controls-hint');
-    if(h)h.innerHTML='Drag the D-pad to move &amp; drive the elevator · JUMP for double jump / ollie / bail · grab the LEGS pickup to lift &amp; throw · you are the egg with your name on it';
+    if(h)h.innerHTML='Hold the arrows below to move &amp; drive the elevator · JUMP for double jump / ollie / bail · grab the LEGS pickup to lift &amp; throw · you are the egg with your name on it';
   }
 })();
 Hub.init();reportHeight();

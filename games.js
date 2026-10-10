@@ -13,7 +13,11 @@
 // `menuLabel` overrides the button text only (not the title used in invites,
 // chat, and the record) — for games that aren't really "played".
 window.BUB_GAMES = [
-  { id: 'goldberg', file: 'goldberg.html', title: 'Goldberg', players: '2-5', color: '#e6c280', fill: true, lobby: true,
+  // Goldberg is deliberately NOT in the pre-room "Solo Corner": it got in via
+  // `lobby: true`, which is a different flag from `soloable` and put a whole
+  // building sandbox in the "play something while you wait" list. It still
+  // promotes itself to a local table when opened without a room.
+  { id: 'goldberg', file: 'goldberg.html', title: 'Goldberg', players: '2-5', color: '#e6c280', fill: true,
     icon: '🔔', desc: 'Build a chain-reaction machine together out of parts, then press play and watch it go.' },
   { id: 'daltadka', file: 'daltadka.html', title: 'Dal Tadka', players: 'solo', color: '#d9b26f', solo: true, lobby: true, fill: true,
     icon: '🍲', desc: 'Cook dal from scratch for hungry judges, who score how well you timed each step.' },
@@ -25,7 +29,10 @@ window.BUB_GAMES = [
     icon: '🚀', desc: 'Pick destinations and maneuver your rocket; the hand holding most red cards launches first.' },
   { id: 'grammar', file: 'discover_the_grammar.html', title: 'Discover the Grammar', players: '2-4', color: '#f3f0e8', soloable: true,
     icon: '🔤', desc: 'Compare strange sentences side by side and work out the hidden rule behind them.' },
-  { id: 'wordbridge', file: 'wordbridge.html', title: 'Word Bridge', players: '2-4', color: '#000000',
+  // `soloable: true` also runs a real solo table with no room, so it belongs in
+// the pre-room "Solo Corner". Word Bridge has its own solo mode (you play both
+// sides), so it qualifies — it was simply never flagged.
+  { id: 'wordbridge', file: 'wordbridge.html', title: 'Word Bridge', players: '2-4', color: '#000000', soloable: true,
     icon: '🌉', desc: 'Everyone writes one word that fits both meanings, then the table judges each bridge.' },
   //{ id: 'wordwright', file: 'wordwright.html', title: 'Wordwright', players: '2-5', color: '#a5b4fc',
   //  icon: '📝', desc: 'Co-write a story one sentence at a time.' },

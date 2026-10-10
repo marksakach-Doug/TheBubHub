@@ -62,7 +62,10 @@ window.BubRecord = (function(){
       touch: function(id,name){ this.remember(id,name); if (id) this.gold.touched[id] = true; },
       goldReset: function(){ this.gold = { touched: {}, reported: false }; },
       flushGoldberg: function(){
-        if (!isHostFn()) return;
+        // Goldberg is its own engine and never posts a `result`, so the hub
+        // tracks who touched it instead. A solo-origin table has no hub host,
+        // so requiring isHostFn() here would silently drop every solo game —
+        // gate on "someone actually played" rather than on hub host.
         var ids = Object.keys(this.gold.touched);
         if (!ids.length) return;
         if (this.gold.reported) return;
@@ -85,12 +88,38 @@ window.BubRecord = (function(){
           var rest = names.filter(function(n){ return n !== w; });
           return (w || 'Someone') + (rest.length ? ' beat ' + recJoinNames(rest) : ' played') + ' at ' + title;
         }
+        if (game === 'chess'){
+          // players are [whiteId, blackId?]; `bot` says black wasn't a person.
+          // `won` is which colour won ('w'/'b'/'draw') so we never have to
+          // guess an id, and the bot never needs a fake roster entry.
+          var white = names[0] || 'Someone';
+          var black = p.bot ? 'the bot' : (names[1] || 'an opponent');
+          if (p.won === 'w') return white + ' beat ' + black + ' at ' + title;
+          if (p.won === 'b') return black + ' beat ' + white + ' at ' + title;
+          return white + ' drew with ' + black + ' at ' + title;
+        }
         if (game === 'warp'){
           if (p.win) return recJoinNames(names) + ' beat the Borg ' + p.ps + '–' + p.bs + ' at ' + title;
           return recJoinNames(names) + ' lost to the Borg ' + p.bs + '–' + p.ps + ' at ' + title;
         }
+        if (game === 'blastoff'){
+          // `win` is the winning pilot's id, `score` the red cards they took.
+          var w = p.win ? this.nameOf(p.win) : names[0];
+          var n = (p.score === undefined || p.score === null) ? null : p.score;
+          return w + ' won Blast Off' + (n !== null ? ' with ' + n + ' red card' + (n === 1 ? '' : 's') : '');
+        }
         if (game === 'goldberg') return recJoinNames(names) + ' played ' + title;
         if (game === 'grammar') return recJoinNames(names) + ' lost at ' + title;
+        if (game === 'wordbridge' || game === 'word-bridge'){
+          // Round-based: the line records how far the table got.
+          if (p.rounds) return recJoinNames(names) + ' played ' + p.rounds + ' rounds at ' + title;
+          return recJoinNames(names) + ' played ' + title;
+        }
+        if (game === 'daltadka' || game === 'dal-tadka'){
+          if (p.dish && p.score !== undefined && p.score !== null)
+            return getName() + ' cooked ' + p.dish + ' scoring ' + p.score + ' at ' + title;
+          return getName() + ' played ' + title;
+        }
         if (game === 'waltz') return getName() + ' scored ' + (p.score || 0) + ' at ' + title;
         if (game === 'DrawDrive' || game === 'drawdrive')
           return p.text || (recJoinNames(names) + ' raced at Draw and Drive');

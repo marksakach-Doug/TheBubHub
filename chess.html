@@ -20,7 +20,8 @@ body{
   font-family:ui-sans-serif,system-ui,-apple-system,"Segoe UI",sans-serif;
   overscroll-behavior:contain;
 }
-#app{width:100%;max-width:740px;display:flex;flex-direction:column;gap:12px}
+/* position:relative anchors the menu button to the app shell. */
+#app{position:relative;width:100%;max-width:740px;display:flex;flex-direction:column;gap:12px}
 
 #boardwrap{
   align-self:center; padding:10px; border-radius:12px;
@@ -28,7 +29,13 @@ body{
   box-shadow:0 10px 28px rgba(0,0,0,.5), inset 0 1px 0 rgba(255,255,255,.22);
 }
 #board{
-  position:relative; display:grid; grid-template-columns:repeat(8,1fr);
+  /* Both axes are pinned to 1fr. With only the columns pinned, the eight
+     implicit rows were content-sized and an empty row could collapse while a
+     piece-bearing row stayed tall — which is exactly the warping that showed
+     up in sparse endgames. */
+  position:relative; display:grid;
+  grid-template-columns:repeat(8,1fr);
+  grid-template-rows:repeat(8,1fr);
   width:min(80vw,440px); aspect-ratio:1; touch-action:none;
   border-radius:4px; overflow:hidden; box-shadow:0 0 0 1px rgba(0,0,0,.4);
 }
@@ -74,6 +81,9 @@ button.good{background:linear-gradient(180deg,#9dc36a,#7fa650); border-color:#5d
 #setup h1{margin:0; font-size:32px; letter-spacing:2px}
 #setup p{margin:0; color:var(--dim); font-size:13px; max-width:46ch; line-height:1.5}
 .row{display:flex; gap:8px; flex-wrap:wrap; justify-content:center}
+/* "Menu" is the way back to the mode/setup screen without leaving the
+   stage. Same treatment as the other games' menu buttons. */
+#btn-menu{position:absolute;top:10px;right:10px;z-index:5;min-height:36px;padding:6px 12px;font-size:13px}
 #note{font-size:12px; font-family:ui-monospace,monospace; color:var(--dim); min-height:16px}
 #thinking{font-size:11px; font-family:ui-monospace,monospace; color:var(--dim)}
 #err{color:#e8846f; font-size:11px; font-family:ui-monospace,monospace; white-space:pre-wrap}
@@ -117,11 +127,15 @@ button.good{background:linear-gradient(180deg,#9dc36a,#7fa650); border-color:#5d
         <button id="btn-accept" class="good hidden">Accept draw</button>
         <button id="btn-decline" class="ghost hidden">Decline</button>
       </div>
-      <div class="row" style="margin-top:6px"><span id="thinking"></span></div>
+      <div class="row" style="margin-top:6px">
+        <button id="btn-claim" class="good hidden">Take Black</button>
+        <span id="thinking"></span>
+      </div>
     </div>
   </div>
   <div id="err"></div>
 </div>
+<button id="btn-menu" title="Back to the mode screen">☰ Menu</button>
 
 <script>
 (function(){
@@ -156,9 +170,14 @@ function makeState(){
     ep: -1, half: 0, full: 1 };
 }
 function copy(st){
+  // Seats and soloOrigin travel with the snapshot: they describe the table,
+  // not the position. Dropping them would turn a takeback into "nobody is
+  // White" and, worse, un-hide Take Black for guests watching a solo game.
   return { b: st.b.slice(), turn: st.turn,
     cw: { w: st.cw.w.slice(), b: st.cw.b.slice() },
-    ep: st.ep, half: st.half, full: st.full };
+    ep: st.ep, half: st.half, full: st.full,
+    seats: st.seats ? { w: st.seats.w, b: st.seats.b } : null,
+    soloOrigin: !!st.soloOrigin };
 }
 // Repetition signature (board + side + rights + ep), threefold-safe.
 function posKey(st){
@@ -407,7 +426,11 @@ const Hub = {
   init(){
     window.addEventListener('message', onDown);
     this.up('hello');
-    setTimeout(() => { if (!Hub.me) startSolo(); }, 1200);   // opened off disk
+    // Opened off disk (no hub): take the local seat so the solo table runs.
+    // This used to call startSolo(), which is not defined anywhere — the
+    // timer threw a ReferenceError, localSolo stayed false and every isHost()
+    // check answered false, so a file-opened game had no host at all.
+    setTimeout(() => { if (!Hub.me){ localSolo = true; render(); } }, 1200);
   }
 };
 let localSolo = false;
@@ -440,16 +463,54 @@ let sel = -1;
 let offer = null;        // {by}
 let botT = null;
 let flashT = null;
+let reported = false;    // one 'result' per game, ever
 
-// Which side YOU are. Solo: always White (the bot is Black). Two-player: the
-// host is White and the guest is Black, so a guest has to move the black
-// pieces — this must not be hard-coded to White.
-const HUMAN = () => (mode === 'two' && inRoom() && !isHost()) ? BLACK : WHITE;
-const BOT = () => (mode === 'two' ? null : BLACK);
+// Which side YOU are, or null if you are only watching.
+//
+//  solo / host of any table ....... WHITE  (the bot, if any, is BLACK)
+//  guest holding the black seat ... BLACK
+//  guest with no black seat ........ null   — read-only
+//  guest watching a solo table ..... null   — read-only
+//
+// Two guests can join the same room, so "am I a guest" is NOT the same as
+// "am I Black". The black seat is claimed once and belongs to that player.
+function mySeat(){
+  if (!S) return null;
+  if (!inRoom() || isHost()) return WHITE;      // host (and pre-room solo) plays White
+  if (S.soloOrigin) return null;                // watching someone's solo game
+  if (S.seats && S.seats.b === myId()) return BLACK;
+  return null;                                  // no black seat yet → watching
+}
+const HUMAN = () => mySeat();
+const BOT = () => (mode === 'two' && !S.soloOrigin) ? null : BLACK;
+
+// ---- BubHub Record: one line when a game finishes ----------------------
+// Send player *ids* and which colour won; the hub composes the sentence and
+// resolves names itself (it knows the local player's name even before a roster
+// arrives, and it numbers duplicates). Building the sentence here would mean
+// guessing names we can't see. The hub only records multiplayer games on the
+// host, so guests can skip this entirely.
+function reportResult(){
+  if (reported || !over || !S) return;
+  reported = true;
+  if (mode === 'two' && inRoom() && !isHost()) return;   // host records
+  const wId = S.seats && S.seats.w;
+  const bId = S.seats && S.seats.b;
+  Hub.up('result', {
+    players: [wId, bId].filter(Boolean),
+    bot: !bId,
+    won: over.result === 'draw' ? 'draw' : over.result
+  });
+}
 
 function reset(){
   S = makeState(); stack = []; seen = {}; over = null;
+  reported = false;
   lastMove = null; sel = -1; offer = null;
+  // Seats: White is the host. Black is claimed by the first guest to take it.
+  // A solo-origin table never offers Black to a guest — the bot has it.
+  S.seats = { w: myId(), b: null };
+  S.soloOrigin = (mode === 'solo');
   seen[posKey(S)] = 1;
 }
 function toSetup(){ S = null; mode = 'setup'; $('play').classList.add('hidden'); $('setup').classList.remove('hidden'); renderSetup(); }
@@ -462,46 +523,83 @@ function begin(which){
 function send(){ render(); if (inRoom() && isHost() && S) Hub.up('state', pack()); }
 function pack(){
   return { b:S.b.slice(), turn:S.turn, cw:S.cw, ep:S.ep, half:S.half, full:S.full,
-    over, lastMove, offer };
+    over, lastMove, offer, seats:S.seats, soloOrigin:!!S.soloOrigin };
 }
 function onState(p){
   if (!p || !p.b) return;
   S = { b:p.b, turn:p.turn, cw:p.cw, ep:p.ep, half:p.half, full:p.full };
   over = p.over || null; lastMove = p.lastMove || null; offer = p.offer || null;
+  S.seats = p.seats || null; S.soloOrigin = !!p.soloOrigin;
   seen = {}; stack = []; sel = -1;
   if (mode === 'setup'){ mode = 'two'; }
   $('setup').classList.add('hidden'); $('play').classList.remove('hidden');
   render();
 }
 function onRoster(){
-  const hadRoom = !!Hub.room;
   localSolo = !Hub.room;                 // derived, never latched
-  // A room appeared while we were playing the bot (this is what the Invite
-  // button does from a solo table). Drop the bot and set up a real two-player
-  // table: the guest arrives as Black and the host stays White.
-  if (hadRoom && mode === 'solo' && isHost()){
-    clearTimeout(botT);
-    mode = 'two';
-    reset();
-    $('setup').classList.add('hidden'); $('play').classList.remove('hidden');
-    send();
-    return;
-  }
+  // A table can be started before the roster lands (the frame's own 1.2s
+  // fallback), which would leave the White seat with no id in it — and then
+  // the finished game couldn't be recorded. Claim it the moment we know who
+  // we are. Only the host (or a solo table) is ever White, so this can't
+  // hand the seat to a guest.
+  if (S && !S.seats.w && myId() && (localSolo || isHost())) S.seats.w = myId();
+  // A room can appear under the player's feet (the Invite button does this).
+  // The solo table KEEPS RUNNING — bots keep flying, guests who arrive are
+  // read-only watchers. Switching to a real two-player game is deliberate:
+  // leave the stage and start one from the setup screen.
   renderSetup();
   if (S) render();
 }
 function flash(t){ $('err').textContent = t || ''; clearTimeout(flashT); if (t) flashT = setTimeout(() => { $('err').textContent = ''; }, 2600); }
 
 /* ---------- host-side intent handling (two-player) ---------- */
+function nameOf(id){
+  if (id === myId()) return myName();
+  const o = others().find(m => m.id === id);
+  return (o && o.name) || 'your friend';
+}
 function onIntent(d, from){
   if (!isHost() || !S) return;
-  if (d.a === 'new'){ reset(); send(); return; }
-  // the host owns White, so a guest intent can only ever be a Black move
-  if (d.a === 'move'){ doMove(d.from, d.to, BLACK); send(); return; }
-  if (d.a === 'resign'){ over = { result: WHITE, why: (from.name || 'Guest') + ' resigned' }; send(); return; }
-  if (d.a === 'draw'){ offer = { by: from.id }; send(); return; }
-  if (d.a === 'accept'){ if (offer){ over = { result:'draw', why:'Draw agreed' }; offer = null; } send(); return; }
-  if (d.a === 'decline'){ offer = null; send(); return; }
+  if (d.a === 'new'){ begin('two'); send(); return; }
+  if (d.a === 'claim'){
+    if (S.soloOrigin) return Hub.up('denied', { to: from.id, text: 'This is a solo game — Black is a bot.' });
+    if (S.seats.b && S.seats.b !== from.id)
+      return Hub.up('denied', { to: from.id, text: 'Black is already played by ' + nameOf(S.seats.b) + '.' });
+    S.seats.b = from.id; sel = -1; send();
+    return;
+  }
+  if (d.a === 'move'){
+    // only the black-seat holder may move black; the host moves white locally
+    if (S.soloOrigin) return Hub.up('denied', { to: from.id, text: "You're watching the host's solo game." });
+    if (!S.seats.b) return Hub.up('denied', { to: from.id, text: 'Take Black first.' });
+    if (S.seats.b !== from.id)
+      return Hub.up('denied', { to: from.id, text: 'Black is played by ' + nameOf(S.seats.b) + ' — you are watching.' });
+    doMove(d.from, d.to, BLACK); send(); return;
+  }
+  // Everything below is Black's alone. The buttons are disabled for watchers,
+  // but a crafted message can still arrive, so the host re-checks the seat.
+  const blackSeat = S.seats && S.seats.b;
+  const seatedBlack = from.id === blackSeat;
+  const notBlack = () => Hub.up('denied', {
+    to: from.id,
+    text: blackSeat ? ('Black is played by ' + nameOf(blackSeat) + ' — you are watching.')
+                    : 'Nobody has taken Black — you are watching.'
+  });
+
+  if (d.a === 'resign'){
+    if (!seatedBlack) return notBlack();
+    over = { result: WHITE, why: nameOf(from.id) + ' resigned — White wins' }; send(); return;
+  }
+  if (d.a === 'draw'){
+    if (!seatedBlack) return notBlack();
+    offer = { by: from.id }; send(); return;
+  }
+  if (d.a === 'accept'){
+    if (!seatedBlack) return notBlack();
+    if (offer){ over = { result:'draw', why:'Draw agreed' }; offer = null; }
+    send(); return;
+  }
+  if (d.a === 'decline'){ if (!seatedBlack) return notBlack(); offer = null; send(); return; }
 }
 /* One place where a human move becomes a real move (host validates). */
 function doMove(from, to, side){
@@ -597,17 +695,19 @@ function render(){
   }
   // hud
   const o = others();
-  // Name labels follow YOUR side, so a guest (playing Black) sees themselves
-  // on the bottom row and the host on top.
-  const you = myName();
-  const opp = (o[0] && o[0].name) || 'Guest';
-  if (mode === 'two'){
-    if (HUMAN() === WHITE){ $('pn1').textContent = you + ' (you)'; $('pn2').textContent = opp; }
-    else { $('pn1').textContent = opp; $('pn2').textContent = you + ' (you)'; }
-  } else {
-    $('pn1').textContent = 'You (White)';
-    $('pn2').textContent = 'Bot (Black)';
-  }
+  // Name labels follow the SEATS, not who's looking, so two people watching
+  // still see "White: Host / Black: Guest".
+  const seatName = (id) => {
+    if (!id) return null;
+    if (id === myId()) return myName();
+    const m = o.find(x => x.id === id);
+    return (m && m.name) || 'Guest';
+  };
+  const whiteName = (mode === 'two' && S.seats) ? (seatName(S.seats.w) || 'White') : (mode === 'two' ? 'White' : 'You (White)');
+  const blackName = (mode === 'two') ? (seatName(S.seats && S.seats.b) || 'Black — open') : 'Bot (Black)';
+  $('pn1').textContent = whiteName + (mySeat() === WHITE ? ' (you)' : '');
+  $('pn2').textContent = blackName + (mySeat() === BLACK ? ' (you)' : '');
+
   const st = $('status');
   st.className = 'status';
   if (over){
@@ -615,9 +715,16 @@ function render(){
     if (over.result !== 'draw') st.classList.add('good');
   } else if (offer){
     st.textContent = 'Draw offered — ' + ((offer.by === myId()) ? 'waiting for them' : 'accept or decline');
+  } else if (!mySeat()){
+    // read-only: say why, so the board isn't a dead mystery
+    st.textContent = S.soloOrigin
+      ? '👁 watching — this is the host’s solo game'
+      : '👁 watching — take Black to play';
   } else {
     st.textContent = (S.turn === WHITE ? 'White' : 'Black') + ' to move';
   }
+  // Take Black is offered only to a guest with no seat on a shared table.
+  $('btn-claim').classList.toggle('hidden', !(mode === 'two' && !S.soloOrigin && !mySeat() && !over));
   // captured: pieces a side has LOST, grouped per colour
   const miss = (c) => {
     const have = { P:0,N:0,B:0,R:0,Q:0,K:0 };
@@ -635,12 +742,17 @@ function render(){
     (mb ? '<span class="lab">black lost </span>' + mb + '&nbsp;&nbsp;' : '') +
     (mw ? '<span class="lab">white lost </span>' + mw : '');
   // buttons
-  $('btn-accept').classList.toggle('hidden', !(offer && !over));
-  $('btn-decline').classList.toggle('hidden', !(offer && !over));
+  const watching = !mySeat();          // read-only spectator
+  $('btn-accept').classList.toggle('hidden', !(offer && !over && !watching));
+  $('btn-decline').classList.toggle('hidden', !(offer && !over && !watching));
   $('btn-takeback').disabled = mode !== 'solo' || stack.length < 2 || !!over;
-  $('btn-draw').disabled = !!over;
-  $('btn-resign').disabled = !!over;
+  // a watcher must not resign or offer a draw on someone else's game
+  $('btn-draw').disabled = !!over || watching;
+  $('btn-resign').disabled = !!over || watching;
   $('btn-new').disabled = mode === 'two' && !isHost() && inRoom();
+  // A guest can't tear the table down; the host (or a pre-room solo player) can.
+  $('btn-menu').style.display = isHost() ? '' : 'none';
+  reportResult();
   driveBot();
 }
 
@@ -711,12 +823,25 @@ $('board').addEventListener('pointerup', (ev) => {
 $('board').addEventListener('pointercancel', () => { endDrag(); dragFrom = -1; downSq = -1; render(); });
 
 /* ---------- buttons ---------- */
+// Back to the mode/setup screen. toSetup() already existed but nothing in the
+// DOM called it — it was only reachable via the hub's reset broadcast, which
+// also ejects you from the stage entirely.
+$('btn-menu').addEventListener('click', () => { if (isHost()) toSetup(); });
 $('btn-solo').addEventListener('click', () => begin('solo'));
 $('btn-two').addEventListener('click', () => { if (inRoom() && isHost()) begin('two'); });
 $('btn-new').addEventListener('click', () => {
   if (mode === 'solo'){ begin('solo'); return; }
   if (!inRoom()){ begin('two'); return; }
-  if (isHost()){ reset(); send(); } else Hub.up('intent', { a:'new' });
+  // restart keeps the black seat, so the same guest keeps playing Black
+  if (isHost()){
+    const b = S && S.seats ? S.seats.b : null;
+    const keep = mode;
+    reset(); mode = keep; if (b) S.seats.b = b;
+    send();
+  } else Hub.up('intent', { a:'new' });
+});
+$('btn-claim').addEventListener('click', () => {
+  Hub.up('intent', { a:'claim' });
 });
 $('btn-takeback').addEventListener('click', () => {
   // solo: undo a full round (your move + the bot's reply)
@@ -732,15 +857,17 @@ $('btn-takeback').addEventListener('click', () => {
   render();
 });
 $('btn-resign').addEventListener('click', () => {
-  if (!S || over) return;
-  // resigning always hands the win to the other side
+  if (!S || over || !mySeat()) return;      // watchers can't resign a game
+  // Resigning always hands the win to the OTHER side, so `result` is the
+  // opponent of whoever resigned — solo and two-player alike.
   const mine = HUMAN();
-  if (mode !== 'two'){ over = { result: mine, why: 'You resigned — ' + (mine === WHITE ? 'Black' : 'White') + ' wins' }; render(); return; }
+  const theirs = mine === WHITE ? BLACK : WHITE;
+  if (mode !== 'two'){ over = { result: theirs, why: 'You resigned — ' + (mine === WHITE ? 'Black' : 'White') + ' wins' }; render(); return; }
   if (isHost()){ over = { result: BLACK, why: myName() + ' resigned — Black wins' }; send(); }
   else Hub.up('intent', { a:'resign' });
 });
 $('btn-draw').addEventListener('click', () => {
-  if (!S || over) return;
+  if (!S || over || !mySeat()) return;      // watchers can't offer a draw
   if (mode === 'solo'){ over = { result:'draw', why:'Draw by agreement' }; render(); return; }
   if (isHost()){ offer = { by: myId() }; send(); }
   else Hub.up('intent', { a:'draw' });

@@ -173,6 +173,7 @@
     <!-- Focus mode chrome: thin bar replaces the header while a game is open. -->
     <div id="focus-bar">
         <button id="btn-focus-exit" title="Leave the stage (Esc)" class="btn-bouncy bg-slate-700 hover:bg-slate-600 text-white text-sm font-bold py-1 px-3 rounded-xl">✕ Stage</button>
+        <button id="btn-focus-menu" title="Leave this game and go back to the game list" class="btn-bouncy bg-slate-800 hover:bg-slate-700 text-white text-sm font-bold py-1 px-3 rounded-xl">☰ Games</button>
         <span id="focus-title"></span>
         <button id="focus-room" title="Room ID — click to copy"></button>
         <button id="btn-invite" title="Copy invite link for this room + game" class="btn-bouncy bg-teal-600 hover:bg-teal-500 text-white text-sm font-bold py-1 px-3 rounded-xl flex-none">📩 Invite</button>
@@ -1382,6 +1383,18 @@
                 Rec.load();
                 const bexit = document.getElementById('btn-focus-exit');
                 if (bexit) bexit.addEventListener('click', () => { const gid = openGameId(); if (gid) GB.close(gid); });
+                // "☰ Games" is the obvious way out on a phone: leave the stage
+                // and land back on the game list, with the record and room
+                // controls in reach. "✕ Stage" only collapses the frame.
+                const bmenu = document.getElementById('btn-focus-menu');
+                if (bmenu) bmenu.addEventListener('click', () => {
+                    const gid = openGameId();
+                    if (!gid) return;
+                    GB.close(gid);
+                    closeDrawer();
+                    if (document.body.classList.contains('focus-mode')) exitFocus();
+                    window.scrollTo(0, 0);
+                });
                 const pill = document.getElementById('chat-pill');
                 if (pill) pill.addEventListener('click', toggleDrawer);
                 window.addEventListener('resize', () => {
@@ -1592,7 +1605,11 @@
                     return;
                 }
                 if (m.k === 'intent'){
-                    if (game === 'goldberg' && isHost) Rec.touch(myId, getName());
+                    // Goldberg never posts a result, so touching it is what
+                    // marks the session as played. Record it whatever the hub
+                    // host flag says — a solo-origin Goldberg table runs with
+                    // isHost false and would otherwise never be written.
+                    if (game === 'goldberg') Rec.touch(myId, getName());
                     if (isHost){
                         GB.down(game, { t: 'gd', game, k: 'intent', p: m.p, from: { id: myId, name: getName() } });
                     } else {
@@ -1836,9 +1853,10 @@
             } catch (e) {}
             if (!room) {
                 // Game-only link (no room): open it directly if it can be run
-                // without one — both `solo` games and `soloable` ones (chess,
-                // grammar, warp, eggs, blastoff all have a solo table).
-                const solo = GAMES.find(x => x.id === game && (x.solo || x.soloable));
+                // without one. This must match the predicate that builds the
+                // pre-room Solo Corner (:1368) — it checks `lobby` too, so
+                // a game listed there can be opened from its link.
+                const solo = GAMES.find(x => x.id === game && (x.solo || x.soloable || x.lobby));
                 if (solo) { try { GB.open(game); } catch (e) {} }
                 return; // otherwise — normal lobby
             }

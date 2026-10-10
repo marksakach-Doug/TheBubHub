@@ -17,9 +17,36 @@ body{margin:0;background:var(--space);color:var(--ink);font:15px/1.45 'Segoe UI'
 #bo-err{font:11px monospace;color:#ff8888}
 #bo-status{background:rgba(0,0,0,.6);border:2px solid var(--neon);border-radius:14px;padding:14px 16px;font-size:19px;font-weight:700;text-align:center;color:#f2faff;box-shadow:0 0 20px rgba(0,242,255,0.3);min-height:70px;display:flex;flex-direction:column;justify-content:center;align-items:center}
 #bo-status small{display:block;font-size:12px;font-weight:400;color:var(--dim);margin-top:4px}
-.feed-item{background:rgba(10,14,26,.92);border:1px solid var(--neon);color:#f2faff;border-radius:12px;padding:8px 16px;font-size:14px;max-width:92%;text-align:center;box-shadow:0 4px 14px rgba(0,242,255,0.2);position:absolute;top:6%;left:50%;transform:translate(-50%,0);z-index:100;white-space:normal;animation:feedPop .45s cubic-bezier(.34,1.56,.64,1) forwards, fadeOut .7s ease 1.6s forwards}
-@keyframes feedPop{0%{transform:scale(.7) translateY(10px);opacity:0}60%{transform:scale(1.05)}100%{transform:scale(1);opacity:1}}
-@keyframes fadeOut{to{opacity:0;transform:translate(-50%,-160%);pointer-events:none}}
+/* Result card: the last resolved flight, pinned until the next one. It stays
+   put (no auto-dismiss) because the whole point is that you can read the score
+   change after the fact instead of having to remember it. */
+#bo-result{background:rgba(0,0,0,.55);border:2px solid #334155;border-radius:14px;padding:10px 14px;display:flex;flex-direction:column;gap:6px}
+#bo-result.win{border-color:#4caf50}
+#bo-result.lose{border-color:#f44336}
+#bo-result.hole{border-color:#888}
+#bo-result.none{display:none}
+.bo-res-head{display:flex;align-items:baseline;justify-content:space-between;gap:10px;flex-wrap:wrap}
+.bo-res-who{font:800 13px system-ui;color:var(--neon)}
+.bo-res-verdict{font:900 15px system-ui;letter-spacing:.08em}
+#bo-result.win .bo-res-verdict{color:#8fe08f}
+#bo-result.lose .bo-res-verdict{color:#ff9c8f}
+#bo-result.hole .bo-res-verdict{color:#fff}
+.bo-res-math{font:15px system-ui;color:#f2faff}
+.bo-res-math b{font-size:19px}
+.bo-res-where{font:12px system-ui;color:var(--dim)}
+.bo-res-delta{font:700 12px system-ui;color:var(--dim);display:flex;align-items:center;gap:6px;flex-wrap:wrap}
+.bo-res-delta .ar{color:var(--dim)}
+.bo-res-delta .to{color:var(--gold);font-size:15px;font-weight:900}
+.bo-res-delta.up .to{color:#8fe08f}
+.bo-res-delta.down .to{color:#ff9c8f}
+@keyframes boResIn{from{opacity:0;transform:translateY(-8px)}to{opacity:1;transform:none}}
+#bo-result.fresh{animation:boResIn .35s ease}
+/* Destinations left: the one number that decides how a run ends. */
+.bo-left{display:flex;align-items:center;justify-content:center;gap:10px;background:rgba(0,0,0,.4);border:1px solid #334155;border-radius:12px;padding:8px 14px}
+.bo-left .n{font:900 28px system-ui;line-height:1;color:var(--neon)}
+.bo-left .cap{font:700 11px system-ui;letter-spacing:.12em;color:var(--dim)}
+.bo-left.low{border-color:#f44336}
+.bo-left.low .n{color:#ff8888}
 #bo-score{background:rgba(0,0,0,.5);border:2px solid var(--neon);border-radius:14px;padding:10px 12px;display:flex;flex-direction:column;gap:8px}
 .sc-vsrow{display:flex;align-items:center;justify-content:center;gap:14px}
 .sc-side{flex:1;text-align:center;min-width:0}
@@ -44,15 +71,10 @@ body{margin:0;background:var(--space);color:var(--ink);font:15px/1.45 'Segoe UI'
 .sc-chip.winner{border-color:var(--gold);background:rgba(255,224,130,.2);color:var(--gold)}
 #bo-tablewrap{position:relative;background:rgba(0,0,0,.28);border:1px solid #334155;border-radius:14px;padding:12px;display:flex;flex-direction:column;gap:12px;overflow:hidden}
 .bo-lbl{font:11px monospace;color:var(--dim);letter-spacing:.05em}
-.bo-deckrow{display:flex;gap:14px;align-items:stretch;justify-content:center;flex-wrap:wrap}
-.deck{background:rgba(0,0,0,.4);border:1px solid #334155;border-radius:12px;padding:10px 14px;display:flex;gap:10px;align-items:center;min-width:200px}
-.deck .stack{width:52px;height:74px;border-radius:8px;position:relative;flex:none;background:#222;box-shadow:3px 3px 0 #111,6px 6px 0 #0a0a0a;border:2px solid #444}
-.deck.red .stack{background:linear-gradient(135deg,#ff4d4d,#8b0000);border-color:#ff8888}
-.deck.black .stack{background:linear-gradient(135deg,#4d6a8a,#0a1428);border-color:#a0c0ff}
-.deck .n{font-size:26px;font-weight:900;color:#fff}
-.deck .cap{font-size:12px;font-weight:700}
-.deck .dim{font:11px monospace;color:var(--dim)}
-.bo-midrow{display:grid;grid-template-columns:220px 1fr 220px;gap:12px;align-items:start}
+/* Draw piles are shown as a plain face-down stack, never with a count: the
+   only number worth watching is destinations remaining (see .bo-left). */
+/* Two columns now: the mission-log box is gone. */
+.bo-midrow{display:grid;grid-template-columns:1fr 1fr;gap:12px;align-items:start}
 @media(max-width:640px){.bo-midrow{grid-template-columns:1fr}}
 .bo-zone{background:rgba(0,0,0,.32);border:1px solid #334155;border-radius:12px;padding:10px;min-height:150px}
 .bo-zone.you{border-color:var(--neon);box-shadow:0 0 12px rgba(0,242,255,0.25)}
@@ -77,6 +99,18 @@ body{margin:0;background:var(--space);color:var(--ink);font:15px/1.45 'Segoe UI'
 .bo-act .ic{font-size:30px;flex:none}
 .bo-act .tt{font-size:17px;font-weight:800}
 .bo-act .ss{font-size:12px;color:var(--dim);font-weight:400}
+/* Which button to press: bounce the one the numbers favour, flash After Burner
+   when the ship is strong enough that the double draw is worth the gamble. */
+@keyframes boBounce{0%,100%{transform:translateY(0)}50%{transform:translateY(-7px)}}
+@keyframes boFlash{0%,100%{box-shadow:0 0 0 0 rgba(255,140,60,0)}50%{box-shadow:0 0 0 6px rgba(255,140,60,.55)}}
+.bo-act.hint-bounce{animation:boBounce 1s ease-in-out infinite;border-color:var(--gold)}
+.bo-act.hint-flash{animation:boFlash .9s ease-in-out infinite;border-color:#ff8c3c}
+.bo-act .why{display:block;font-size:12px;font-weight:700;color:var(--gold);margin-top:2px}
+.bo-act.hint-flash .why{color:#ff8c3c}
+@media (prefers-reduced-motion:reduce){
+  .bo-act.hint-bounce,.bo-act.hint-flash{animation:none;border-color:var(--gold)}
+  .bo-act.hint-flash{border-color:#ff8c3c}
+}
 #bo-veil{position:absolute;inset:0;display:flex;align-items:center;justify-content:center;background:rgba(10,14,26,.65);backdrop-filter:blur(2px);pointer-events:none;border-radius:14px;z-index:5;transition:opacity .5s ease, visibility .5s ease}
 #bo-veil.hidden{opacity:0;visibility:hidden}
 #bo-veil .ribbon{background:rgba(26,28,58,.92);border:2px solid var(--neon);border-radius:14px;padding:14px 26px;font-size:19px;font-weight:800;text-align:center;box-shadow:0 6px 20px rgba(0,242,255,0.3)}
@@ -88,12 +122,12 @@ body{margin:0;background:var(--space);color:var(--ink);font:15px/1.45 'Segoe UI'
 #standalone-note a{color:var(--neon)}
 @media (prefers-reduced-motion:reduce){*{animation:none!important;transition:none!important}}
 
-/* Result Popup Styles */
-#bo-result-popup{position:absolute;inset:0;z-index:110;display:flex;align-items:center;justify-content:center;pointer-events:none}
-.res-ribbon{background:rgba(26,28,58,.95);border:3px solid var(--neon);color:#fff;padding:20px 40px;border-radius:20px;font-size:24px;font-weight:900;text-align:center;box-shadow:0 0 30px var(--neon);animation:resPop .5s cubic-bezier(.34,1.56,.64,1) forwards}
-@keyframes resPop{0%{transform:scale(0);opacity:0}100%{transform:scale(1);opacity:1}}
-.res-fade-out{animation:resFade .5s ease forwards}
-@keyframes resFade{to{opacity:0;transform:translateY(-20px)}}
+/* Flash used when something needs to be noticed, then it settles. */
+#bo-flash{position:absolute;inset:0;z-index:110;display:flex;align-items:center;justify-content:center;pointer-events:none}
+#bo-flash .flashbox{background:rgba(26,28,58,.95);border:3px solid var(--gold);color:#fff;padding:18px 34px;border-radius:20px;font-size:22px;font-weight:900;text-align:center;box-shadow:0 0 30px rgba(255,224,130,.6);animation:flashIn .45s cubic-bezier(.34,1.56,.64,1) forwards}
+@keyframes flashIn{0%{transform:scale(0);opacity:0}100%{transform:scale(1);opacity:1}}
+.flash-fade-out{animation:flashFade .45s ease forwards}
+@keyframes flashFade{to{opacity:0;transform:translateY(-20px)}}
 </style>
 </head>
 <body>
@@ -102,10 +136,10 @@ body{margin:0;background:var(--space);color:var(--ink);font:15px/1.45 'Segoe UI'
         <div><span class="bo-t">BLAST OFF!</span> <span id="bo-err"></span></div>
         <div style="display:flex;gap:8px">
             <button id="btn-bo-new" class="bo-b hidden">New game</button>
+            <button id="btn-bo-menu" class="bo-b hidden" title="Back to the setup screen">Menu</button>
         </div>
     </div>
     <div id="bo-status">Preparing for launch…</div>
-    <div id="bo-feed" style="position:absolute;inset:0;pointer-events:none;z-index:100"></div>
     <div id="bo-setup" class="wf-setup hidden">
         <span class="bo-lbl" id="bo-setup-title">HOST SETUP — Everyone plays (2–6). Most red cards win.</span>
         <div style="display:flex;align-items:center;gap:8px"><button id="btn-bo-start" class="bo-b">Ignite Engines</button><span id="bo-setup-note" class="bo-lbl"></span></div>
@@ -113,9 +147,10 @@ body{margin:0;background:var(--space);color:var(--ink);font:15px/1.45 'Segoe UI'
     <div id="bo-waiting" class="hidden bo-lbl" style="background:rgba(0,0,0,.28);border:1px solid #334155;border-radius:12px;padding:10px">Waiting for the mission commander to start.</div>
     <div id="bo-game" class="hidden" style="flex-direction:column;gap:12px">
         <div id="bo-tablewrap">
-            <div id="bo-result-popup" class="hidden"></div>
+            <div id="bo-flash" class="hidden"></div>
             <div id="bo-veil" class="hidden"><div class="ribbon" id="bo-veil-text">Waiting…</div></div>
             <div id="bo-topdeck"></div>
+            <div id="bo-result" class="none"></div>
             <div id="bo-score"></div>
             <div class="bo-midrow" id="bo-midrow"></div>
             <div id="bo-arena"></div>
@@ -182,7 +217,7 @@ function onDown(e){
     if (m.k === 'state'){ if (m.p) { S = m.p; render(); } return; }
     if (m.k === 'intent'){ onIntent(m.p, m.from); return; }
     if (m.k === 'denied'){ toast(m.p.text); return; }
-    if (m.k === 'reset'){ S = null; render(); return; }
+    if (m.k === 'reset'){ S = null; lastResKey = null; render(); return; }
 }
 const myId = () => Hub.me && Hub.me.id;
 const myName = () => (Hub.names && Hub.names[myId()]) || (Hub.me && cleanName(Hub.me.name)) || 'Player';
@@ -241,7 +276,7 @@ const DEST = {
     13: ['Cygnus X-1','🕳️'], 14: ['Sagittarius A*','🌌']
 };
 const BLACK_HOLES = [13, 14];
-let S = null, noteT = null, lastFeedN = 0;
+let S = null, noteT = null, lastResKey = null;
 let lastTurn = null;
 
 const val = (c) => V[c.r] || +c.r;
@@ -289,6 +324,7 @@ function fresh(){
         currentDest: null, extraDest: null,
         pend: null, pend_p: null, pend_path: null,
         feed: [], feedN: 0, msg: '',
+        last: null,          // pinned result card (last resolved flight)
         // A table born in solo keeps its bots even after the player invites
         // someone and a room appears — the invite is for watching, not for
         // stealing a chair. Fresh multiplayer starts set this false.
@@ -340,13 +376,20 @@ function resolveFight(p, helperId, path){
     const shipVal = p.ship ? val(p.ship) : 0;
     const helperVal = (h && h.ship) ? val(h.ship) : 0;
     const totalPower = shipVal + helperVal;
-    
+
     let dests = [S.currentDest];
     if (path === 'afterburner' && S.extraDest) dests.push(S.extraDest);
-    
+
     const destSum = dests.reduce((s, c) => s + val(c), 0);
     const win = totalPower >= destSum;
     const isBlackHole = dests.some(c => BLACK_HOLES.includes(val(c)));
+
+    // Snapshot the score before anything moves so the result card can show the
+    // change. Without this you have to remember what you were on last turn.
+    const before = p.score;
+    // Which pilots this flight involved, and what power each contributed.
+    const parts = [{ name: pn(p), power: shipVal }];
+    if (h) parts.push({ name: pn(h), power: helperVal });
 
     say(`${pn(p)}${h ? ' + ' + pn(h) : ''}: Power ${totalPower} vs Destination ${destSum} — ${win ? 'Success!' : 'Failure!'}`);
 
@@ -378,15 +421,45 @@ function resolveFight(p, helperId, path){
     }
 
     S.redDisco.push(...dests);
-    
+
+    // The pinned result card. Persists until the next fight resolves, so it
+    // covers your own turns and the bots' alike.
+    S.last = {
+        who: pn(p),
+        helper: h ? pn(h) : null,
+        parts,
+        dests: dests.map(c => ({ n: DEST[val(c)][0], v: val(c) })),
+        power: totalPower,
+        destSum,
+        win,
+        hole: isBlackHole,
+        lostShip: !win || isBlackHole,
+        path,
+        before,
+        after: p.score,
+        key: (S.feedN || 0) + ':' + p.id + ':' + shipVal + ':' + totalPower + ':' + destSum
+    };
+
     if (S.redDeck.length === 0){
         S.over = true;
         const winner = S.pl.reduce((prev, curr) => (prev.score > curr.score) ? prev : curr);
         say(`🚀 Mission Over! ${pn(winner)} wins with ${winner.score} red cards!`);
         S.msg = `🏆 ${pn(winner)} wins the game!`;
+        reportResult(winner);
     } else {
         endTurn();
     }
+}
+
+// BubHub Record: one line when the mission ends. Without this only the
+// generic "played Blast Off!" usage line was ever written.
+function reportResult(winner){
+    Hub.up('result', {
+        inst: S.inst,
+        win: winner.id,
+        score: winner.score,
+        players: S.pl.map(p => p.id)
+    });
 }
 
 function handle(d){
@@ -537,20 +610,75 @@ function card(c, attr){
     const hole = isRed && BLACK_HOLES.includes(val(c)) ? ' hole' : '';
     return `<div class="bo-c ${isRed ? 'red' : 'black'}${hole}" ${attr || ''}><b>${val(c)}</b><i>${icon}</i><u>${name}</u></div>`;
 }
-function deckBox(kind, count, disc, label){
-    return `<div class="deck ${kind}"><div class="stack"></div><div><div class="n">${count}</div><div class="cap">${label}</div><div class="dim">discard ${disc}</div></div></div>`;
+/* Destinations left. This is the number that decides how a run ends, so it
+   gets a dedicated readout that turns red as the pile empties. */
+function destinationsLeft(){
+    const n = S.redDeck.length;
+    const cls = n <= 3 ? ' low' : '';
+    const tail = n === 0 ? ' — none left, this is the last flight'
+        : n === 1 ? ' — one flight left'
+        : n <= 3 ? ' — the run is nearly over' : '';
+    return `<div class="bo-left${cls}"><span class="cap">DESTINATIONS LEFT</span><span class="n">${n}</span></div>` +
+           (tail ? `<div class="bo-lbl" style="text-align:center">${tail}</div>` : '');
 }
 
-function triggerResultPopup(text){
-    const pop = $('bo-result-popup');
+/* The pinned result card. Stays put until the next fight resolves so the
+   score change is readable rather than something you have to remember. */
+function resultCard(){
+    const L = S.last;
+    if (!L) return '';
+    const verdict = L.hole ? 'BLACK HOLE' : L.win ? 'SUCCESS' : 'FAILURE';
+    const powerTxt = L.parts.map(x => `${esc(x.name)} <b>${x.power}</b>`).join(' + ');
+    const destTxt = L.dests.map(d => `${esc(d.n)} <b>${d.v}</b>`).join(' + ');
+    const arrow = L.path === 'afterburner' ? ' 🔥 After Burner'
+        : L.path === 'share' ? ' 🤝 Share Ships' : ' 🛡️ Normal Flight';
+    const deltaCls = L.after > L.before ? ' up' : L.after < L.before ? ' down' : '';
+    const gained = L.after - L.before;
+    const deltaTxt = gained > 0 ? `+${gained}` : gained < 0 ? `${gained}` : 'no change';
+    const extra = [];
+    if (L.lostShip) extra.push(L.helper ? 'both ships lost' : 'ship lost');
+    if (L.dests.some(d => BLACK_HOLES.includes(d.v))) extra.push('black hole');
+    return `<div class="bo-res-head">
+              <span class="bo-res-who">${esc(L.who)}${L.helper ? ' + ' + esc(L.helper) : ''}</span>
+              <span class="bo-res-verdict">${verdict}</span>
+            </div>
+            <div class="bo-res-math">Power ${powerTxt} &nbsp;vs&nbsp; Destination ${destTxt} = ${L.destSum}</div>
+            <div class="bo-res-where">${arrow}${extra.length ? ' — ' + extra.join(', ') : ''}</div>
+            <div class="bo-res-delta${deltaCls}">Red cards
+              <span class="from">${L.before}</span>
+              <span class="ar">→</span>
+              <span class="to">${L.after}</span>
+              <span>(${deltaTxt})</span>
+            </div>`;
+}
+
+/* After Burner draws a face-down second destination, so "can I beat it?" can
+   only be estimated. We use the mean of the ranks still in the red pile plus
+   the known first destination as the expected total, and only flash when the
+   ship is comfortably clear of that. A low bar would advise a bad gamble. */
+function afterburnerFeasible(){
+    if (!S || !S.currentDest) return false;
+    const c = cur();
+    const shipVal = c && c.ship ? val(c.ship) : 0;
+    if (shipVal < 10) return false;               // the stated minimum
+    const first = val(S.currentDest);
+    const remaining = S.redDeck.map(val);
+    if (!remaining.length) return false;
+    const meanSecond = remaining.reduce((s, v) => s + v, 0) / remaining.length;
+    const expected = first + meanSecond;
+    return shipVal >= expected;                    // comfortable, not marginal
+}
+
+function triggerFlash(text){
+    const pop = $('bo-flash');
     if (!pop) return;
-    pop.innerHTML = `<div class="res-ribbon">${esc(text)}</div>`;
+    pop.innerHTML = `<div class="flashbox">${esc(text)}</div>`;
     pop.classList.remove('hidden');
     setTimeout(() => {
-        const ribbon = pop.querySelector('.res-ribbon');
-        if (ribbon) ribbon.classList.add('res-fade-out');
-        setTimeout(() => { pop.classList.add('hidden'); }, 500);
-    }, 2500);
+        const box = pop.querySelector('.flashbox');
+        if (box) box.classList.add('flash-fade-out');
+        setTimeout(() => { pop.classList.add('hidden'); }, 450);
+    }, 2000);
 }
 
 function render(){
@@ -563,6 +691,7 @@ function render(){
     };
     sh('bo-setup', isHost() && !S); sh('bo-waiting', !isHost() && !S); sh('bo-game', !!S);
     $('btn-bo-new').classList.toggle('hidden', !(isHost() && S));
+    $('btn-bo-menu').classList.toggle('hidden', !isHost());
     const setupTitle = $('bo-setup-title');
     if (setupTitle) setupTitle.textContent = (S && S.soloOrigin) || localSolo
         ? 'SOLO FLIGHT — you plus two bot pilots. Most red cards wins.'
@@ -574,12 +703,10 @@ function render(){
         return;
     }
     
-    // Turn Change Detection for Popup
-    if (lastTurn !== null && S.turn !== lastTurn){
-        const meIdx = S.pl.findIndex(p => p.id === myId());
-        if (lastTurn === meIdx && S.feed.length > 0){
-            triggerResultPopup(S.feed[0].t);
-        }
+    // Flash only on the turn where the run ends — the last destination drawn
+    // is the moment "how many are left" stops being a curiosity.
+    if (lastTurn !== null && S.turn !== lastTurn && !S.over && S.redDeck.length === 0){
+        triggerFlash('LAST DESTINATION');
     }
     lastTurn = S.turn;
 
@@ -600,15 +727,30 @@ function render(){
         st.innerHTML = `${esc(S.msg)}<small>${sub}</small>`;
     }
 
-    $('bo-feed').innerHTML = S.feed.slice(0, 1).map(e =>
-        `<div class="feed-item${e.n > lastFeedN ? ' pop' : ''}">${esc(e.t)}</div>`
-    ).join('');
-    if (S.feed.length) lastFeedN = Math.max(lastFeedN, S.feed[0].n);
-
     $('bo-topdeck').innerHTML =
-        `<div class="bo-deckrow">${deckBox('red', S.redDeck.length, S.redDisco.length, 'DESTINATIONS')}` +
+        `<div class="bo-deckrow" style="display:flex;gap:12px;align-items:center;justify-content:center;flex-wrap:wrap">` +
+        destinationsLeft() +
         (S.currentDest ? `<div class="bo-cards">${card(S.currentDest)} ${S.extraDest ? card(S.extraDest) : ''}</div>` : '') +
         `</div>`;
+
+    // The pinned result card. `fresh` marks it so it animates in once per
+    // resolved flight rather than pulsing on every re-render.
+    const res = $('bo-result');
+    if (res){
+        const L = S.last;
+        res.className = L ? '' : 'none';
+        if (L){
+            res.classList.add(L.hole ? 'hole' : L.win ? 'win' : 'lose');
+            if (L.key !== lastResKey){
+                lastResKey = L.key;
+                res.classList.add('fresh');
+            }
+            res.innerHTML = resultCard();
+        } else {
+            res.innerHTML = '';
+            lastResKey = null;
+        }
+    }
 
     const sc = $('bo-score');
     let L_cap = 'SHIP POWER', L_n = '—', L_sub = '—', L_you = false, L_win = false;
@@ -633,13 +775,18 @@ function render(){
     sc.innerHTML = `<div class="sc-vsrow">${leftSide}${center}${rightSide}</div>` +
         `<div class="sc-chips">${S.pl.map(q => `<span class="sc-chip ${S.turn === S.pl.indexOf(q) ? 'on' : ''} ${q.id === myId() ? 'you' : ''}">${esc(pn(q))} <span class="pw">🔴${q.score}</span></span>`).join('')}</div>`;
 
-    let mid = `<div>${deckBox('black', S.blackDeck.length, S.blackDisco.length, 'SPACESHIPS')}</div>`;
+    let mid = '';
     if (p){
         mid += `<div class="bo-zone ${S.turn === S.pl.indexOf(p) ? 'you' : ''}"><span class="bo-lbl">YOUR SHIP</span><div class="bo-cards">${card(p.ship)}</div></div>`;
     } else {
         mid += `<div class="bo-zone"><span class="bo-lbl">Join the game to see your ship.</span></div>`;
     }
-    mid += `<div class="bo-zone"><span class="bo-lbl">MISSION LOG</span><div class="bo-lbl" style="margin-top:10px">The pilot with the most red cards wins.</div></div>`;
+    // Shows every pilot's ship face-up so you can see who can help on Share
+    // Ships, and why the bots chose what they chose.
+    mid += `<div class="bo-zone"><span class="bo-lbl">FLEET</span><div class="bo-cards">` +
+        S.pl.map((q, i) => `<div style="display:flex;flex-direction:column;align-items:center;gap:3px">` +
+            `${card(q.ship)}<span class="bo-lbl">${esc(pn(q))}</span></div>`).join('') +
+        `</div></div>`;
     $('bo-midrow').innerHTML = mid;
 
     $('bo-arena').innerHTML = '';
@@ -657,17 +804,42 @@ function render(){
         veil.classList.add('hidden');
     }
 
-    const bigBtn = (a, ic, t, s, o, attr = '') => `<button class="bo-act ${o || ''}" data-a="${a}" ${attr}><span class="ic">${ic}</span><span><span class="tt">${t}</span><br><span class="ss">${s}</span></span></button>`;
+    // `why` is the one-line reason the button is recommended, so the hint is
+    // never just an unexplained bounce. Everything interpolated here is escaped:
+    // `why` is built from player names, which are user input.
+    const bigBtn = (a, ic, t, s, o = '', attr = '', why = '') =>
+        `<button class="bo-act ${o || ''}" data-a="${a}" ${attr}><span class="ic">${esc(ic)}</span><span><span class="tt">${esc(t)}</span><br><span class="ss">${esc(s)}</span>${why ? `<span class="why">${esc(why)}</span>` : ''}</span></button>`;
     let ac = '';
     if (paused) ac = '';
     else if (!S.over){
         if (S.phase === 'choose' && myId() === (cur() ? cur().id : null)){
-            ac = bigBtn('newship', '🛠️', 'Find New Ship', 'Draw a new ship to replace your current one.', 'k') +
-                 bigBtn('blastoff', '🚀', 'Blast Off!', 'Head towards a destination to collect red cards.');
+            // Blast Off leads: flying is the point of the game, looking for a
+            // better ship is the fallback.
+            ac = bigBtn('blastoff', '🚀', 'Blast Off!', 'Draw a destination and try to reach it.', '', '') +
+                 bigBtn('newship', '🛠️', 'Find New Ship', 'Draw a new ship to replace your current one.', 'k', '');
         } else if (S.phase === 'fight' && myId() === (cur() ? cur().id : null)){
-            ac = bigBtn('pathA', '🛡️', 'Normal Flight', 'Ship vs Destination. Low risk.') +
-                 bigBtn('pathB', '🤝', 'Share Ships', 'Ask another pilot for help. Higher success chance.') +
-                 bigBtn('pathC', '🔥', 'After Burner', 'Draw two destinations. High risk, double reward!');
+            // Hints only — every button stays live. Which one bounces is
+            // decided by the numbers: your ship against the known
+            // destination, and an estimate for After Burner's face-down draw.
+            const shipVal = c && c.ship ? val(c.ship) : 0;
+            const destVal = S.currentDest ? val(S.currentDest) : 0;
+            const enough = shipVal >= destVal;
+            const others = S.pl.filter(x => x.id !== myId() && x.ship);
+            const bestHelp = others.reduce((m, x) => Math.max(m, val(x.ship)), 0);
+            const canReachWithHelp = bestHelp > 0 && (shipVal + bestHelp) >= destVal;
+            const abOk = afterburnerFeasible();
+            const abHint = !canReachWithHelp && bestHelp > 0
+                ? `Strongest help available: ${bestHelp} (${shipVal} + ${bestHelp} = ${shipVal + bestHelp})`
+                : (bestHelp ? `Strongest help available: ${bestHelp}` : 'No other pilot has a ship');
+            ac = bigBtn('pathA', '🛡️', 'Normal Flight', 'Ship vs destination. One red card, keep your ship.',
+                        enough ? 'hint-bounce' : '', '',
+                        enough ? `Your ship ${shipVal} reaches ${destVal} — this one is safe` : '') +
+                 bigBtn('pathB', '🤝', 'Share Ships', 'Ask another pilot to combine ships. They may lose theirs too.',
+                        !enough && canReachWithHelp ? 'hint-bounce' : '', '',
+                        !enough && canReachWithHelp ? `You cannot reach ${destVal} alone, but help would` : abHint) +
+                 bigBtn('pathC', '🔥', 'After Burner', 'Draw a second destination. Double the cards — and the risk.',
+                        abOk ? 'hint-flash' : '', '',
+                        abOk ? `Ship ${shipVal} — likely strong enough for two` : '');
         } else if (S.phase === 'decide' && S.pend && S.pend.who === myId()){
             ac = bigBtn('decide', '✅', 'YES', 'Help the other pilot.', '', 'data-i="yes"') +
                  bigBtn('decide', '❌', 'NO', 'Stay in orbit.', 'k', 'data-i="no"');
@@ -693,6 +865,17 @@ $('bo-panel').addEventListener('click', (e) => {
 });
 $('btn-bo-start').addEventListener('click', () => startGame());
 $('btn-bo-new').addEventListener('click', () => rematch());
+$('btn-bo-menu').addEventListener('click', () => toSetup());
+
+// Back to this game's own setup screen, so you can change the rules without
+// leaving the stage. The hub sends k:'reset' for everyone; a solo or host
+// player can also do it themselves.
+function toSetup(){
+    if (!isHost()) return;
+    S = null; lastResKey = null;
+    render();
+    reportHeight();
+}
 
 (function init(){
     Hub.init();

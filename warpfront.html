@@ -26,6 +26,16 @@ body{margin:0;background:var(--bg);color:var(--ink);font:15px/1.45 system-ui,san
 .hidden{display:none!important}
 .wf-panel{background:var(--panel);border:1px solid var(--line);border-radius:12px;}
 .wf-hud{display:grid;grid-template-columns:1fr 1fr;gap:8px;margin-bottom:8px;}
+/* Turn strip: the order never changes, so show it. Tracking
+   ♦ → Borg → ♥ → Borg → ♣ → Borg from memory is what made the turn feel
+   unhighlighted on a phone, where the HUD is scrolled off-screen. */
+.wf-turns{display:flex;gap:5px;flex-wrap:wrap;margin:8px 0 10px;align-items:center}
+.wf-turn{font-family:monospace;font-size:11px;font-weight:700;padding:4px 9px;border-radius:999px;border:1px solid #333;background:#111;color:#777;white-space:nowrap}
+.wf-turn.borg{border-style:dashed}
+.wf-turn.now{background:var(--accent);border-color:var(--accent);color:#000;box-shadow:0 0 10px rgba(0,255,204,.55)}
+.wf-turns .lbl{font-family:monospace;font-size:10px;color:#666;margin-right:2px}
+@keyframes wfTurnPop{0%{transform:scale(.9)}60%{transform:scale(1.08)}100%{transform:scale(1)}}
+.wf-turn.now{animation:wfTurnPop .4s ease}
 .wf-score{background:#050505;padding:6px 8px;border-radius:6px;border:1px solid #00ff00;font-family:monospace;font-size:12px;font-weight:bold;}
 .wf-score .a{color:#00ff00}.wf-score .b{color:#ff3333}
 .wf-sensor{background:#050505;padding:6px 8px;border-radius:6px;border:1px solid var(--accent);display:flex;justify-content:space-between;align-items:center;font-family:monospace;font-size:11px;}
@@ -69,6 +79,16 @@ body{margin:0;background:var(--bg);color:var(--ink);font:15px/1.45 system-ui,san
 #standalone-note{max-width:520px;margin:60px auto;text-align:center;font-family:Georgia,serif;color:#e0e0e0}
 #standalone-note a{color:var(--accent)}
 @media (prefers-reduced-motion:reduce){*{animation:none!important;transition:none!important}}
+/* Phone: the status line and the turn strip stay pinned at the top. Without
+   this the actionable hand panels sit below a wrapped planet grid and the
+   only turn indicator ("Acting:") is scrolled off-screen. */
+@media (max-width:640px){
+  #wf-status{position:sticky;top:0;z-index:30;font-size:11px;padding:6px 8px}
+  .wf-node{width:50px;height:50px}
+  .wf-col{width:52px}
+  .wf-card.mini{width:26px;height:37px}
+  .wf-hand .wf-card{width:34px;height:50px;font-size:11px}
+}
 </style>
 </head>
 <body>
@@ -76,6 +96,7 @@ body{margin:0;background:var(--bg);color:var(--ink);font:15px/1.45 system-ui,san
     <div class="wf-head">
         <div><span class="wf-title">WARP FRONT</span> <span id="warp-err" class="hidden"></span></div>
         <div style="display:flex;gap:8px">
+            <button id="btn-warp-menu" class="wf-btn" title="Back to the setup screen">☰ Menu</button>
             <button id="btn-warp-new" class="wf-btn primary">New battle</button>
         </div>
     </div>
@@ -97,9 +118,13 @@ body{margin:0;background:var(--bg);color:var(--ink);font:15px/1.45 system-ui,san
     </div>
     <div id="warp-waiting" class="wf-waiting hidden">Waiting for the host to start a game.</div>
 
-    <div id="warp-game" class="hidden" style="flex-direction:column;gap:12px">
+    <!-- The id must be wf-game: every $('wf-game') in the script looks this
+         up, and it was spelled warp-game in the markup, so gameEl was always
+         null and the classList.remove('hidden') never ran. The board was
+         permanently display:none. -->
+    <div id="wf-game" class="hidden" style="flex-direction:column;gap:12px">
         <div>
-            <span class="wf-sub" id="wf-claims-help">FACTIONS — claim yours. With two players, someone must take two; every faction needs a player or its turns wait.</span>
+            <span class="wf-sub" id="wf-claims-help">FACTIONS — take one. Two players: one takes two.</span>
             <div class="wf-frow" id="warp-claims"></div>
         </div>
         <div class="wf-hud">
@@ -108,15 +133,16 @@ body{margin:0;background:var(--bg);color:var(--ink);font:15px/1.45 system-ui,san
         </div>
         <div id="wf-over" class="wf-over hidden"></div>
         <div class="wf-panel" style="padding:10px;">
-            <span class="wf-sub">BATTLE GRID — play one card per faction turn beside a planet. Match exactly (home suit +1). Borg may overshoot. First to 5 planets wins.</span>
+            <span class="wf-sub">PLANETS — reach 5 to win. <b>Each card has a number. Add it to the planet's number and match the total exactly. Your home planet gives +1. Going over doesn't count — the Borg is allowed to overshoot, you are not.</b></span>
             <div id="wf-board" class="wf-grid"></div>
         </div>
         <div>
-            <span class="wf-sub" id="wf-command-help">COMMAND — you see only your own cards; teammates' hands are face-down. Plan in chat, Scan to reveal a card to everyone. Talk rule: never name the rank of a face-down card.</span>
+            <span class="wf-sub" id="wf-command-help">CARDS — pick a card, then the planet it goes beside.</span>
             <div class="wf-cmdrow">
                 <button id="btn-wf-scan" class="wf-btn amber" disabled>Scan a card (reveal)</button>
                 <button id="btn-wf-regroup" class="wf-btn amber" disabled>Confirm regroup</button>
             </div>
+            <div id="wf-turns" class="wf-turns"></div>
             <div id="wf-hands" style="display:flex;flex-direction:column;gap:8px"></div>
         </div>
     </div>
@@ -296,7 +322,9 @@ function startBattle(diff, players){
     diff = diff || remembered.diff;
     players = players || remembered.players;
     remembered = { diff, players };
-    if (peerCount() < players){
+    // A solo table has no roster at all, so peerCount() is 0 and every
+    // "1 player — solo" start was refused with "Waiting for 1 players".
+    if (!localSolo && peerCount() < players){
         const note = $('warp-setup-note');
         if (note) note.textContent = `Waiting for ${players} players (${peerCount()} here).`;
         render();
@@ -393,6 +421,9 @@ function doRegroup(suit, cardIdx){
     return null;
 }
 function doScan(suit, cardIdx, byName){
+    // Scan exists to reveal a card to other people. In solo every hand is
+    // already face-up, so it does nothing but block further scans.
+    if (localSolo) return 'No scanning solo — your cards are already visible.';
     if (S.activeFaction !== suit) return 'Scan only on your faction’s turn.';
     const f = S.factions[suit];
     const card = f.hand[cardIdx];
@@ -526,6 +557,7 @@ function onIntent(d, from){
         return;
     }
     if (d.action === 'scan'){
+        if (localSolo) return;             // nothing to scan at a solo table
         if (!senderOwns(d.faction, from.id)){ deny(from.id, `${FACTIONS[d.faction]} is assigned to ${ownerName} — claim it first.`); return; }
         const err = doScan(d.faction, d.cardIdx, from.name);
         if (err) deny(from.id, err);
@@ -590,6 +622,7 @@ function toggleClaim(suit){
     claimSet(suit, !(c && c.id === myId()));
 }
 function clickScanBtn(){
+    if (localSolo) return;                 // hidden in solo; belt and braces
     if (!S || S.over || paused() || !S.activeFaction || !iControl(S.activeFaction)) return;
     const hand = S.factions[S.activeFaction].hand;
     if (!hand.length || hand.some(c => c.scanned)){ setInfo('Nothing to scan — you already show a card.'); return; }
@@ -600,6 +633,7 @@ function clickScanBtn(){
 function clickCard(suit, idx){
     if (!S || S.over || paused() || S.activeFaction !== suit || !iControl(suit)) return;
     if (scanMode){
+        if (localSolo){ scanMode = false; render(); return; }
         scanMode = false;
         const c = S.factions[suit].hand[idx];
         if (!c || c.scanned){ render(); return; }
@@ -666,29 +700,45 @@ function statusText(){
     if (actor === 'borg') return 'Borg is acting…';
     const holder = S.claims[actor];
     if (!holder){
-        let t = `${FACTIONS[actor]} ${actor} has no player — claim it above to take this turn.`;
-        if ((S.config.players || 2) === 2) t += ' Two-player game: someone must take a second faction.';
+        let t = `${FACTIONS[actor]} has no player — claim it above.`;
+        if ((S.config.players || 2) === 2) t += ' One of you takes two.';
         return t;
     }
     const mine = holder.id === myId();
     if (needsRegroup(actor)){
         return mine
-            ? 'No legal play — select one of your cards, then Confirm regroup.'
-            : `${FACTIONS[actor]} (${holder.name}) has no legal play — waiting on their regroup.`;
+            ? 'No legal play — pick a card, then Confirm regroup.'
+            : `${FACTIONS[actor]} has no legal play — regrouping.`;
     }
     if (mine){
-        let t = `Your turn: ${FACTIONS[actor]} ${actor} — select a card, then a planet.`;
-        if (S.factions[actor].hand.some(c => !c.scanned) && !S.factions[actor].hand.some(c => c.scanned))
-            t += ' Or Scan a card to reveal it.';
-        return t;
+        // One line. The scan nudge only appears in multiplayer, where a hidden
+        // hand is a real problem; in solo every card is already face-up.
+        if (!localSolo && S.factions[actor].hand.some(c => !c.scanned) && !S.factions[actor].hand.some(c => c.scanned))
+            return `Your turn — pick a card, then a planet. Or Scan one.`;
+        return `Your turn — pick a card, then a planet.`;
     }
-    return `Waiting for ${FACTIONS[actor]} (${holder.name}).`;
+    return `Waiting for ${FACTIONS[actor]}.`;
+}
+
+// The turn strip. ORDER is a fixed 6-step cycle, so the player can see the
+// shape of it instead of tracking it. The active step is highlighted, which
+// is the cue that was missing on a phone.
+function renderTurns(){
+    const el = $('wf-turns');
+    if (!el) return;
+    if (!S){ el.innerHTML = ''; return; }
+    const actor = ORDER[S.turnIndex];
+    el.innerHTML = `<span class="lbl">TURN ORDER</span>` + ORDER.map((o, i) => {
+        const cls = o === 'borg' ? 'borg' : '';
+        const now = !S.over && i === S.turnIndex;
+        return `<span class="wf-turn ${cls}${now ? ' now' : ''}">${o === 'borg' ? 'Borg' : FACTIONS[o]}</span>`;
+    }).join('') + (S.over ? '' : `<span class="wf-turn now" style="background:#c48a00;border-color:#c48a00">now: ${actor === 'borg' ? 'Borg' : FACTIONS[actor]}</span>`);
 }
 
 // ---- rendering ----
 function render(){
-    const setupEl = $('warp-setup'), waitingEl = $('warp-waiting'), gameEl = $('warp-game');
-    const newBtn = $('btn-warp-new');
+    const setupEl = $('warp-setup'), waitingEl = $('warp-waiting'), gameEl = $('wf-game');
+    const newBtn = $('btn-warp-new'), menuBtn = $('btn-warp-menu');
     if (!S){
         statusEl.textContent = statusText();
         boardEl.innerHTML = '';
@@ -711,6 +761,8 @@ function render(){
         if (waitingEl) waitingEl.classList.toggle('hidden', !(!isHost() && Hub.me));
         if (gameEl) gameEl.classList.add('hidden');
         if (newBtn) newBtn.style.display = 'none';
+        if (menuBtn) menuBtn.style.display = isHost() ? '' : 'none';
+        renderTurns();
         const scb = $('btn-wf-scan'), rgb = $('btn-wf-regroup');
         if (scb) scb.disabled = true;
         if (rgb) rgb.disabled = true;
@@ -721,15 +773,18 @@ function render(){
     if (setupEl) setupEl.classList.add('hidden');
     if (waitingEl) waitingEl.classList.add('hidden');
     if (gameEl){ gameEl.classList.remove('hidden'); gameEl.style.display = 'flex'; }
-    // The help lines describe teamwork, which is meaningless on a solo table.
+    // Short lines. The old text was a paragraph per panel and the important part
+    // ("which planet, which card") was buried in it.
     const ch = $('wf-claims-help'), mh = $('wf-command-help');
     if (ch) ch.textContent = localSolo
-        ? 'YOUR THREE CREWS — Federation, Klingons and Ferengi all answer to you. Play each one on its turn.'
-        : 'FACTIONS — claim yours. With two players, someone must take two; every faction needs a player or its turns wait.';
+        ? 'ALL THREE ARE YOURS. Play each on its turn.'
+        : 'Take one faction. Two players: one takes two.';
     if (mh) mh.textContent = localSolo
-        ? 'COMMAND — all three hands are yours and fully visible. One card per faction turn beside a planet.'
-        : 'COMMAND — you see only your own cards; teammates\' hands are face-down. Plan in chat, Scan to reveal a card to everyone. Talk rule: never name the rank of a face-down card.';
+        ? 'Pick a card, then the planet it goes beside.'
+        : 'Pick a card, then a planet. Scan shares one card with the team.';
     if (newBtn) newBtn.style.display = isHost() ? '' : 'none';
+    if (menuBtn) menuBtn.style.display = isHost() ? '' : 'none';
+    renderTurns();
 
     $('wf-score-a').textContent = `ALLIANCE ${S.scores.players}/5`;
     $('wf-score-b').textContent = `BORG ${S.scores.borg}/5`;
@@ -759,10 +814,14 @@ function render(){
     const regroupNeeded = !S.over && af && needsRegroup(af);
     const rgb = $('btn-wf-regroup');
     rgb.disabled = !(regroupNeeded && sel && sel.faction === af && iControl(af));
+    // Scan is a multiplayer-only mechanic: it reveals a card to teammates, and in
+    // solo every hand is already face-up. Hidden rather than disabled so the
+    // help text doesn't describe a button that isn't there.
     const scb = $('btn-wf-scan');
-    const canScan = !S.over && !paused() && af && iControl(af) &&
+    const canScan = !localSolo && !S.over && !paused() && af && iControl(af) &&
         S.factions[af].hand.length > 0 &&
         !S.factions[af].hand.some(c => c.scanned);
+    scb.style.display = localSolo ? 'none' : '';
     scb.disabled = !canScan;
     scb.textContent = scanMode ? 'Cancel scan' : 'Scan a card (reveal)';
 
@@ -814,9 +873,15 @@ function render(){
         const wrap = document.createElement('div');
         wrap.className = 'wf-panel';
         wrap.style.padding = '8px';
+        // A 1px border colour was the only travel-with-the-cards turn cue, and
+        // on a phone it was easy to miss. Fill the active panel instead, and
+        // give it a "TO MOVE" badge that isn't 11px grey text.
         wrap.style.borderColor = active ? (S.claims[suit] ? '#00ffcc' : '#c48a00') : '#333';
+        if (active) wrap.style.background = '#0d2b26';
         const holder = S.claims[suit];
-        wrap.innerHTML = `<div class="wf-sub" style="margin-bottom:4px;">${FACTIONS[suit].toUpperCase()} ${suit} · deck ${f.deck.length} · ${holder ? esc(holder.name) : 'open'}${active ? ' · TO MOVE' : ''}${mine ? '' : ' · (hidden)'}</div>`;
+        wrap.innerHTML = `<div class="wf-sub" style="margin-bottom:4px;${active ? 'color:#00ffcc;font-weight:800;font-size:12px' : ''}">` +
+            `${FACTIONS[suit].toUpperCase()} ${active ? ' — TO MOVE' : ''}</div>` +
+            `<div class="wf-sub" style="margin-bottom:4px;">${suit} · deck ${f.deck.length} · ${holder ? esc(holder.name) : 'open'}${mine ? '' : ' · (hidden)'}</div>`;
         const row = document.createElement('div');
         row.className = 'wf-hand';
         f.hand.forEach((c, ci) => {
@@ -843,6 +908,14 @@ function render(){
 $('btn-warp-new').addEventListener('click', () => {
     if (!isHost() || !S) return;
     startBattle(S.config.diff, S.config.players);
+});
+// Back to the setup screen so the difficulty/player count can be changed.
+// S going null is the only thing that reveals #warp-setup, and that only
+// happened via the hub's reset broadcast — which also closed the frame.
+$('btn-warp-menu').addEventListener('click', () => {
+    if (!isHost()) return;
+    reset();
+    reportHeight();
 });
 $('btn-warp-start').addEventListener('click', () => {
     startBattle($('warp-diff').value, parseInt($('warp-players').value, 10) || 2);

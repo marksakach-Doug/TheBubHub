@@ -1,320 +1,588 @@
-# 🫧 Bub Hub — Peer-to-Peer Arcade
+# Bub Hub — Peer-to-Peer Arcade
 
-Bub Hub is a tiny, modular arcade for HTML games. The **hub** (`index.html`) owns rooms,
-chat, and networking. **Games** are plain `.html` files that render in a shared stage and
-talk to the hub through a small `postMessage` bridge. Adding a game never touches `index.html` —
-you drop in a file and add one line to `games.js`.
+Bub Hub is a tiny, modular arcade for HTML games. The **hub** (`index.html`) owns
+rooms, chat, invites, and networking. **Games** are plain `.html` files that
+render in a shared stage and talk to the hub through a small `postMessage`
+bridge. Adding a game never touches `index.html` — you drop in a file and add one
+line to `games.js`.
 
-No build step. No server. Double-click `index.html` and play. Multiplayer runs over
-[PeerJS](https://peerjs.com/) (peer-to-peer, no game server).
+No build step. No server. No dependencies. Double-click `index.html` and play.
+Multiplayer runs over [PeerJS](https://peerjs.com/) (peer-to-peer, no game
+server).
 
-## Layout (game first)
+---
 
-```
-┌─────────────────────────────┐
-│  Header (logo + name)       │
-├─────────────────────────────┤
-│  🎮 GAME STAGE (iframes)    │  ← the main thing; placeholder when empty
-├─────────────────────────────┤
-│  Lobby  — or —  Room UI     │
-│    Room UI order:           │
-│    1. game invites          │
-│    2. chat                  │
-│    3. room/game controls    │
-├─────────────────────────────┤
-│  Footer                     │
-└─────────────────────────────┘
-```
+## Contents
 
-## Game sections
+1. [Quick start](#quick-start) · 2. [Anatomy of a game file](#anatomy-of-a-game-file)
+3. [The bridge](#the-bridge) · 4. [Pre-room vs in-room](#pre-room-vs-in-room)
+5. [Seats and spectators](#seats-and-spectators) · 6. [Registry reference](#registry-reference)
+7. [UX conventions](#ux-conventions) · 8. [Hub behaviours that affect you](#hub-behaviours-that-affect-you)
+9. [Testing](#testing) · 10. [Networking model](#networking-model) · 11. [BubHub Record](#bubhub-record)
+12. [File map](#file-map) · 13. [Engine notes](#engine-notes)
 
-| Section | Where | Rule | Example |
-|---|---|---|---|
-| 🎲 **Multiplayer Arcade** | Room UI only | Entry has **no** `solo` flag | Warp Front, LOTR Cards |
-| 🎯 **Solo Corner** | Room UI + lobby (if `lobby: true`) | Entry has `solo: true` | Waltz Engine |
-| Lobby card | Lobby only | Entry has `lobby: true` **or** `soloable: true` | Waltz Engine ("while you wait") |
+---
 
-Sections render from the registry — a section with zero games hides itself automatically.
+## Quick start
 
-## Adding a game
-
-1. Drop your `my-game.html` next to `index.html`.
-2. Add one line to `games.js`:
+1. Copy an existing game as a starting point. `blastoff.html` is the smallest
+   complete multiplayer game; `warpfront.html` shows minimal state sync;
+   `chess.html` is a full game with solo + two-player + a bot + a proper rules
+   engine.
+2. Save your file next to `index.html`.
+3. Add one line to `games.js`:
 
 ```js
-window.BUB_GAMES = [
-  // Multiplayer (host-authoritative, needs a room):
-  { id: 'mygame', file: 'my-game.html', title: 'My Game', players: '2-4',
-    color: '#00ffcc', icon: '🎯', desc: 'One sentence for the button tooltip.' },
-
-  // Solo (playable with no room; lobby:true also lists it pre-room):
-  // { id: 'mygame', file: 'my-game.html', title: 'My Game', players: 'solo',
-  //   color: '#d9b26f', solo: true, lobby: true, height: 640 },
-];
+{ id: 'mygame', file: 'my-game.html', title: 'My Game', players: '2-4',
+  color: '#00ffcc', icon: '🎯', desc: 'One sentence for the button tooltip.' },
 ```
 
-3. Reload `index.html`. Done — buttons, iframes, invites, and roster all derive from the registry.
-   Multiplayer buttons are grouped by the `players` string, smallest group first.
+4. Reload `index.html`. Buttons, iframes, invites, tooltips, and the roster all
+   derive from the registry — there is nothing else to wire up.
 
-### Registry fields
+That's it for a multiplayer game. To also make it playable **alone**, see
+[Pre-room vs in-room](#pre-room-vs-in-room).
 
-| Field | Required | Meaning |
-|---|---|---|
-| `id` | ✅ | Unique game key. Must match the `game` field your file sends in every bridge message. |
-| `file` | ✅ | HTML file loaded into the stage iframe. |
-| `title` | ✅ | Display name (buttons, invites, chat). |
-| `players` | ✅ | Display string (`'2-4'`, `'solo'`). Informational only. |
-| `color` | – | Accent for lobby button + invite bar. |
-| `solo` | – | `true` → Solo Corner instead of Multiplayer Arcade. Solo games skip the bridge. |
-| `lobby` | – | `true` → also listed in the pre-room lobby card. |
-| `height` | – | Fixed stage height (px). Solo games use this since they never report a height. |
-| `fill` | – | `true` → viewport-fill game. The hub sizes the frame to the stage (focus mode) instead of trusting the game's reported height. For canvas worlds (Goldberg, Waltz Engine). |
-| `icon` | – | Emoji shown before the button label (e.g. `'🔔'`). |
-| `desc` | – | One sentence shown in the button's tooltip after the player count. |
-| `soloable` | – | `true` → a bridge game that also runs a real solo table, so it appears in the pre-room **Solo Corner** list. It keeps its real `players` count for in-room grouping. See "Solo modes" below. |
-| `menuLabel` | – | Button text only (title, invites, chat and the record are untouched), with no Play/Hide verb. For things that aren't "played" — e.g. the guest book. |
+---
 
-### Solo vs multiplayer criteria
+## Anatomy of a game file
 
-Ask two questions:
+One self-contained `.html`. No imports, no bundler, no CDN. Convention:
 
-1. **Does it need another human?** No → `solo: true` (+ `lobby: true`, `height`).
-2. **Does it need shared state?** Yes → multiplayer: exactly one **host** runs the rules,
-   everyone else sends **intents**. The hub relays bytes and never reads rules.
-
-### Solo modes
-
-Two kinds of "playable alone", and they live differently:
-
-- `solo: true` — the game never needed a hub. It ignores the bridge entirely
-  (`daltadka`, `waltz`, `truth`).
-- `soloable: true` — a normal multiplayer game that *also* runs a one-seat
-  table (`grammar`, `warp`, `blastoff`, `eggs`).
-
-A `soloable` game is listed in the pre-room Solo Corner, which is one **flat**
-set with no player-count headings (in-room lists stay grouped — that's where
-you're picking for a group). Opening one pre-room, the hub sends a roster with
-an empty `room`, and the game promotes itself to local host:
-
-```js
-if (!Hub.room) claimSolo();   // derived from the room, never latched
-const isHost = () => localSolo || !!(Hub.me && Hub.me.isHost);
+```html
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>My Game</title>
+<style> /* all your CSS, scoped by id/class prefixes */ </style>
+</head>
+<body>
+  <div id="app"> ... your UI ... </div>
+  <script>
+  (function(){
+    'use strict';
+    const GAME_ID = 'mygame';      // must equal the registry `id`
+    // ... bridge, rules, render, input ...
+  })();
+  </script>
+</body>
+</html>
 ```
 
-Two rules keep this safe:
+Rules of thumb that keep games working inside an iframe:
 
-- **Derived, not latched.** Re-derive solo on every roster, so opening a game
-  pre-room and *then* joining a room correctly drops back to multiplayer.
-- **Solo is additive.** Room seats, player gates and turn flow are untouched;
-  only the minimum is relaxed. In a room the games still demand 2–4 (grammar),
-  2–6 (blastoff), 2–3 (warp), so a lone host can't strand later joiners.
+- **Wrap your code in an IIFE** so nothing leaks onto the shared `window` and
+  nothing collides with another game.
+- **Prefix your ids/classes** (`bo-`, `wf-`, `chess-`) — the page above you
+  is the hub, but two frames never share a DOM, so this is just for humans.
+- **No `fetch()` of local files.** `file://` blocks it (the registry itself is
+  loaded with a `<script>` tag for exactly this reason). Inline your data.
+- **No external CDN for anything essential** — the hub already loads Tailwind
+  from a CDN, so the whole arcade degrades offline. Chess uses Unicode pieces and
+  CSS wood tones rather than image files for this reason.
+- **Own your own layout height** (see [UX conventions](#ux-conventions)).
 
-| Game | Solo table |
-|---|---|
-| `grammar` | You are Analyst and the only Verifier — proposals grade immediately, the voting phase never opens. |
-| `warp` | You command all three factions in turn order against the Borg (no AI crewmates); every hand is yours and face-up. |
-| `blastoff` | You plus two local bot pilots. Bots are deliberately dumb: each turn they try one phase-legal action, and `handle()` (the single legality gate) decides whether it counts. They never send anything over the hub and never appear in a real room. |
-| `eggs` | The `m.length===1` branch already spawns you plus a throwable dummy. |
-| `chess` | You are always White. Solo = a greedy 1-ply bot as Black; in a room the host is White and the guest is Black (no bot). |
-| `wordbridge` | Has its own in-game Solo button; not listed pre-room. |
-| `lotr` | Multiplayer only — "monsters hunt the leader" needs real rivals. |
+---
 
-### Chess rules engine
+## The bridge
 
-`chess.html` carries its own move generator (no library, no build step). Board is
-64 slots with **index 0 = a8**, so `sq = file + (8 - rank) * 8`; the renderer
-draws `row = vr` so White sits at the bottom.
-
-- `pseudo()` generates king-moves-legal moves including castling, en passant and
-  all four promotion pieces; `legal()` runs each one through `applyMove()` on a
-  clone and drops any that leave your own king attacked.
-- En passant lands on the square **directly ahead** (the one the double push
-  skipped), and the captured pawn sits at `to - 16` — both for White *and*
-  Black, since rank 8 is index 0. Getting this wrong is easy and invisible.
-- Promotions are generated queen-first so "first match wins" = auto-queen.
-- Draws: stalemate, fifty-move, threefold repetition, and insufficient material
-  (K/K, K+minor/K, K+B/K+B — a lone bishop or knight pair can't mate).
-- The bot is intentionally 1-ply: material swing, a "will this hang?" check,
-  a bonus for checks, plus jitter. It never returns an illegal move, because it
-  only ever picks from `legal()`.
-- Tests live in `/tmp/opencode/chess_rules_test.py` (extracts the real
-  functions and runs them against Scholar's/Fool's mate, castling, en passant,
-  promotion, stalemate, pins and 40 full games).
-
-
-## The game ↔ hub bridge (multiplayer)
-
-Games live in a sandboxed-feeling iframe and reach the outside world only via `postMessage`.
-Copy the pattern from `warpfront.html` / `lotr.html` (~15 lines):
+Everything the hub can tell you and everything you can tell it. Copy this
+pattern — it is the whole contract:
 
 ```js
-const GAME_ID = 'warp'; // must equal the registry `id`
+const GAME_ID = 'mygame';
 const Hub = {
-  up(k, p) { try { window.parent.postMessage({ t: 'gu', game: GAME_ID, k, p }, '*'); } catch(e) {} },
-  on(e) {
-    const m = e.data;
-    if (!m || m.game !== GAME_ID) return;
-    if (m.t !== 'gd') return;
-    if (m.k === 'roster') onRoster(m.p);   // { you, room, roster[] }
-    if (m.k === 'state')  onState(m.p, m.from);
-    if (m.k === 'intent') onIntent(m.p, m.from); // host only
-    if (m.k === 'denied') show(m.p.text);
-    if (m.k === 'reset')  reset();
+  me: null, roster: [], room: '',
+  up(k, p){ try { window.parent.postMessage({ t:'gu', game: GAME_ID, k, p }, '*'); } catch(e){} },
+  init(){
+    window.addEventListener('message', onDown);
+    this.up('hello');                       // announce → hub replies with roster
   }
 };
-window.addEventListener('message', Hub.on);
-Hub.up('hello'); // 1. announce yourself; hub replies with roster
+function onDown(e){
+  const m = e.data;
+  if (!m || m.t !== 'gd' || m.game !== GAME_ID) return;
+  if (m.k === 'roster')  onRoster(m.p);     // { you, room, roster[] }
+  if (m.k === 'state')   onState(m.p, m.from);
+  if (m.k === 'intent')  onIntent(m.p, m.from);   // host only
+  if (m.k === 'denied')  toast(m.p.text);
+  if (m.k === 'hide')    pause();
+  if (m.k === 'show')    resume();
+  if (m.k === 'reset')   reset();
+}
+// Note: `say` is accepted for compatibility but dropped by the hub, so never
+// rely on pushing game chatter into the chat log.
+const myId   = () => Hub.me && Hub.me.id;
+const myName = () => (Hub.me && Hub.me.name) || 'Player';
+const isHost = () => !!(Hub.me && Hub.me.isHost);
+const inRoom = () => !!Hub.room;
+const others = () => (Hub.roster || []).filter(m => m.id !== myId());
 ```
 
-### Messages your game can send (`gu` = game-up)
+### Messages you send (`gu` = game-up)
 
-| `k` | `p` | Hub does |
+| `k` | `p` | What the hub does |
 |---|---|---|
-| `hello` | – | Marks the frame ready, flushes queued mail, pushes roster. |
-| `height` | number | Resizes the stage iframe (`min(p, 4000)`). Report on load + resize. |
-| `intent` | any JSON | Non-host → forwarded to host. Host → delivered to host's own engine. |
-| `state` | any JSON | Host only. Broadcast to all peers. |
-| `say` | string | Posted into room chat as the game title. |
-| `invite` | – | Host only. Pops a "Show table" bar on every guest's screen. |
+| `hello` | – | Marks the frame ready, flushes queued mail, pushes a `roster`. Send it on load **and** on the first click (covers slow frame startup). |
+| `height` | number | Resizes the stage iframe, clamped to 4000px. Send on load and on resize. |
+| `intent` | any JSON | Non-host → forwarded to the host. Host → fed to your own `onIntent`. |
+| `state` | any JSON | Host only. Broadcast to every peer. Keep it small and JSON-serialisable. |
+| `say` | string | **No-op.** Game chatter is dropped on purpose (notifications don't go in the chat log). Still on the wire for compatibility — don't rely on it. |
+| `invite` | – | Host only. Tells the room a table is open (see [auto-open](#hub-behaviours-that-affect-you)). |
 | `denied` | `{ to, text }` | Host only. Routes a rejection back to one player. |
-| `close` | – | Hides your stage frame (hub shows the placeholder). |
+| `result` | see [Record](#bubhub-record) | Logs "X beat Y at <game>" to the shared sheet. |
+| `close` | – | Hides your own stage frame. |
 
-### Messages your game receives (`gd` = game-down)
+### Messages you receive (`gd` = game-down)
 
 | `k` | `p` / `from` | Meaning |
 |---|---|---|
-| `roster` | `{ you: { id, name, isHost }, room, roster: [{ id, name, host }] }` | Who's here + am I host. Re-sent on every join/leave. |
-| `state` | `p` = host state, `from` = `{ id, name }` | Authoritative snapshot (guests render, don't simulate). |
-| `intent` | `p` = guest action, `from` = `{ id, name }` | Host only. Validate, apply, then `state`. |
-| `denied` | `{ text }` | Your intent was rejected — show it. |
-| `reset` | – | Room tore down — reset to a fresh table. |
-| `hide` | – | Your stage frame was hidden — stop music, suspend your loop. |
-| `show` | – | Your stage frame is visible again — resume (music stays off until requested). |
+| `roster` | `{ you:{id,name,isHost}, room, roster:[{id,name,host}] }` | Who is here. Re-sent on **every** join/leave/rename — treat it as the source of truth for seats. |
+| `state` | host state + `from` | Authoritative snapshot. Guests render it; they never simulate. |
+| `intent` | guest action + `from` | Host only. Validate, apply, then broadcast `state`. |
+| `denied` | `{ text }` | One of your intents was rejected. Show it. |
+| `reset` | – | The room tore down — go back to a fresh table. |
+| `hide` / `show` | – | Your frame was hidden/shown. Stop music, suspend your loop, then resume. |
 
-### The golden rule (Warp Front / LOTR pattern)
+**Dead message:** `say` is still accepted on the wire, but the hub discards game
+chatter ("notifications don't go in the chat log anymore"). It survives only for
+compatibility with older game files, so don't build on it.
 
-- **Guests** never mutate shared state. They `up('intent', …)` and render the next `state`.
-- **Host** is the only writer: validate `intent` → mutate → `up('state', snapshot)`.
-- Keep `state` small, serializable JSON (PeerJS relays it verbatim).
-- Report `height` so the game fits the stage instead of scrolling inside it.
+### The golden rule
 
-### Minimal host check
+- **Guests never mutate shared state.** They `up('intent', …)` and render the
+  next `state`.
+- **The host is the only writer:** validate the intent → mutate → `up('state', snapshot)`.
+- **Validate on the host, always.** The `handle()`-style function that decides
+  legality should be the *same* function for local input and remote intents, so
+  a client can't do something the host wouldn't allow. Chess does exactly this:
+  `doMove(from, to, side)` is the only way a move happens.
+- **A disabled button is not a check.** Disabling *Resign* for a watcher stops
+  the honest path; it does nothing about `postMessage({k:'intent', p:{a:'resign'}})`
+  from anyone at all. Every intent handler has to re-derive permission from
+  state on the host, and reply `denied` when it fails:
+
+  ```js
+  if (d.a === 'resign'){
+    if (from.id !== (S.seats && S.seats.b)) return notBlack();   // re-check!
+    over = { result: WHITE, why: nameOf(from.id) + ' resigned — White wins' };
+    send(); return;
+  }
+  ```
+
+  Chess learned this the hard way: `draw`, `accept`, `decline` and `resign` were
+  all unguarded, so a guest watching someone else's game could end it by sending
+  one crafted message.
+- **Never trust `from.name`** for logic — use `from.id`; resolve the display
+  name from your roster (names can change mid-game, see
+  [name dedupe](#hub-behaviours-that-affect-you)).
+
+---
+
+## Pre-room vs in-room
+
+The hub tells you which world you're in with one field: `Hub.room`.
+
+- `Hub.room === ''` → **pre-room**. You are alone (or have joined nobody's
+  room). This is where solo play happens.
+- `Hub.room === 'bubbies123'` → **in a room**, with peers.
+
+This is the single most useful thing to know as a game author, because it lets
+one file serve both.
+
+### The local-host pattern
+
+Pre-room you get `isHost: false` and no peers, so guest intents would go nowhere
+and nothing would animate. Games solve this by **promoting themselves to local
+host** when there is no room:
 
 ```js
-let isHost = false;
-function onRoster(r) { isHost = r.you.isHost; /* enable host-only buttons */ }
-function onMove(move) {
-  if (isHost) { applyMove(move); Hub.up('state', snapshot()); } // I am host
-  else Hub.up('intent', move);                                   // ask the host
+let localSolo = false;
+function onRoster(p){
+  Hub.me = p.you; Hub.roster = p.roster || []; Hub.room = p.room || '';
+  localSolo = !Hub.room;                    // derived, NOT latched
+  render();
 }
-function onIntent(move, from) { if (valid(move)) { applyMove(move); Hub.up('state', snapshot()); } }
+const isHost = () => localSolo || !!(Hub.me && Hub.me.isHost);
 ```
+
+And a fallback for when the file is opened **directly** (double-clicked, no hub
+answering) — every game has one:
+
+```js
+setTimeout(() => { if (!Hub.me) { localSolo = true; Hub.me = {id:'solo', name:'Player', isHost:true}; render(); } }, 1200);
+```
+
+**Derived, never latched.** Re-derive `localSolo` from `Hub.room` on *every*
+roster. If a player opens a game pre-room and *then* creates a room, the next
+roster has a real room id and the game must fall back to multiplayer. A latch
+(`if (!localSolo) localSolo = true`) leaves the game stuck in solo forever.
+
+**Solo is additive.** Only relax the *minimum*; never invent extra seats.
+Keep the room path honest so a lone host can't strand later joiners:
+
+```js
+const minSeats = localSolo ? 1 : 2;      // grammar: 2-4 in a room, 1 alone
+if (seats.length < minSeats || seats.length > 4) return say('Need 2–4 players');
+```
+
+### Two kinds of solo
+
+| Flag | Means | Pre-room behaviour | Example |
+|---|---|---|---|
+| `solo: true` | The game never needed a hub at all | Ignores the bridge completely | Waltz Engine, Dal Tadka, Write Something True |
+| `soloable: true` | A normal multiplayer game that *also* runs a one-seat table | Local host + bots/AI or a reduced board | Chess, Grammar, Warp Front, Blast Off!, eggs, Word Bridge |
+
+`soloable` games appear in the pre-room **Solo Corner** (one flat list, no
+headings). `solo: true` games skip the bridge and don't need a roster at all.
+
+The Solo Corner is `g.lobby || g.soloable`. Prefer `soloable` for anything that
+can actually be started alone — `lobby` is the escape hatch for a multiplayer-only
+game that should still appear pre-room, and it is not the same thing.
+
+### Solo tables and spectators (`soloOrigin`)
+
+If someone **invites** from a solo table, the hub creates a room *underneath the
+running game*. Your game keeps playing; the newcomer becomes a spectator. Two
+small additions make that safe and clear:
+
+```js
+// in your fresh()/reset(): remember where this table was born
+S.soloOrigin = localSolo;
+
+// broadcast it with the snapshot, so guests know too
+function pack(){ return { /* … */ seats: S.seats, soloOrigin: !!S.soloOrigin }; }
+```
+
+- **A solo-origin table is never re-seated.** Grammar simply refuses to add
+  newcomers when `S.soloOrigin` (otherwise a guest joining a 1-player game
+  silently becomes player 2 mid-round). Chess shows "👁 watching — this is the
+  host's solo game".
+- **Local bots belong to the table, not to the moment.** Blast Off's bots are
+  gated on `S.soloOrigin`, not on "am I pre-room right now" — otherwise the bots
+  freeze the instant a room appears. This is the single easiest bug to write
+  here.
+
+Switching from a solo game to a real shared game is deliberately a separate,
+visible action (leave the stage, start a new one) rather than something that
+happens under the player.
+
+---
+
+## Seats and spectators
+
+Two people can be in the same room, so **"am I a guest" is not the same as "am I
+the second player"**. Chess demonstrates the pattern:
+
+```js
+// which side am I? null means "watching, read-only"
+function mySeat(){
+  if (!S) return null;
+  if (!inRoom() || isHost()) return WHITE;      // host (and pre-room solo) is White
+  if (S.soloOrigin) return null;                // watching a solo game
+  if (S.seats && S.seats.b === myId()) return BLACK;
+  return null;                                  // no black seat yet
+}
+```
+
+- Store seats **in the state** (`S.seats = { w, b }`) so they survive reconnects
+  and reach every guest.
+- Bind Black **once**, from an explicit claim (`intent {a:'claim'}`), and reject
+  later claims with the holder's name. An auto-claim-on-first-move is fine too;
+  what you must not do is let "any guest" own a shared seat.
+- Derive your UI from `mySeat()`, and **make `null` mean read-only everywhere**:
+  no move dots, no piece pick-up, and disable resign / draw. Use one predicate
+  rather than scattering checks.
+- Watchers who are also *players in the room* still get chat and can see the
+  roster — they're just not seated at the table.
+
+Every game gets seat handling for free if you gate on the roster
+(`S.seats`, `S.claims`, `me() === null`) — Grammar, Warp Front, Blast Off! and
+Word Bridge already refuse input from unseated people. Chess and eggs (a 4-player
+cap) were the exceptions.
+
+### Snapshots must carry the table, not just the position
+
+If you keep an undo/takeback stack, the thing you push is usually a *position*
+clone — board, turn, castling rights. Don't forget that seats and
+`soloOrigin` describe the **table**, and a position-only snapshot silently drops
+them. Chess did exactly this, and the symptom only appeared after a takeback:
+`S.seats` became `undefined`, so the finished game couldn't be recorded — and,
+more seriously, a guest watching a solo game was quietly offered "Take Black"
+again, because the flag that says *this table was born solo* had evaporated.
+Both live in `copy()` now:
+
+```js
+function copy(st){
+  return { b: st.b.slice(), turn: st.turn, /* …rights, counters… */
+    seats: st.seats ? { w: st.seats.w, b: st.seats.b } : null,
+    soloOrigin: !!st.soloOrigin };
+}
+```
+
+Rule of thumb: **anything that is true of the table rather than the position
+must be in every snapshot, every serialisation, and every broadcast.** If you
+find yourself writing a clone by hand, that list is where bugs hide.
+
+Related: your own id can arrive *after* your table starts (the frame's solo
+fallback timer beats the hub's roster on a slow load). If you capture `myId()`
+into state at construction time, claim the seat again when the roster lands:
+
+```js
+if (S && !S.seats.w && myId() && (localSolo || isHost())) S.seats.w = myId();
+```
+
+
+---
+
+## Registry reference
+
+One line per game in `games.js`.
+
+| Field | Required | Meaning |
+|---|---|---|
+| `id` | ✅ | Unique key. **Must** equal the `game` field your file sends in every bridge message. |
+| `file` | ✅ | HTML file loaded into the stage iframe. |
+| `title` | ✅ | Display name (buttons, invites, chat, record). |
+| `players` | ✅ | Display string (`'2-4'`, `'solo'`). Informational — also the grouping key in-room. |
+| `color` | – | Accent for the button + invite bar. Button text colour is computed from its brightness, so any hex works. |
+| `icon` | – | Emoji before the button label. |
+| `desc` | – | One sentence in the button tooltip, after the player count. |
+| `solo` | – | `true` → Solo Corner; the game skips the bridge. |
+| `soloable` | – | `true` → also runs a solo table, so it lists pre-room. Keeps its real `players` count in-room. |
+| `lobby` | – | `true` → listed in the pre-room Solo Corner even if it can't be *played* alone. Only for "have a look while you wait". Prefer `soloable`. |
+| `height` | – | Fixed stage height (px) for bridge-less solo games. |
+| `fill` | – | `true` → viewport-fill game; the hub sizes the frame instead of trusting your reported height. Use for canvas worlds. |
+| `menuLabel` | – | Button text only (title/invites/chat/record untouched). Replaces `Play <title>`; while the stage is open it reads `Hide <menuLabel>`. For things that aren't really "played". |
+| `noRecord` | – | `true` → never write to BubHub Record. |
+
+Sections are derived: an in-room section with zero games hides itself, and
+multiplayer buttons are grouped by `players` (smallest first).
+
+---
+
+## UX conventions
+
+These are the hub-owned behaviours a game must cooperate with.
+
+- **You do not own the close button.** The hub closes games from the `✕ Stage`
+  bar, which really hides the frame and sends you `hide` (stop music, suspend
+  your loop). Never ship your own Hide/Close.
+- **Report your height.** `Hub.up('height', h)` on load and resize, or the game
+  scrolls inside its frame. Measure `Math.max(document.body.scrollHeight,
+  document.documentElement.scrollHeight)`. `fill: true` games are exempt.
+- **Respect `hide` / `show`.** Stop `requestAnimationFrame` loops, mute audio,
+  clear timers. Goldberg fades its music out this way.
+- **No hover-only UI.** The hub runs on phones and in an iframe; the game board
+  fills the viewport and the room UI is a drawer. Use pointer events for
+  drag/tap so touch works.
+- **Tap targets ≥ ~40px** on small screens; test at 390px wide.
+- **Read-only states should say so.** A frozen board with no explanation reads
+  as broken — "👁 watching" or "waiting for the host" is much better.
+- **Keyboard:** Esc closes the stage. Don't fight it.
+- **Name the sides / pieces clearly** rather than relying on colour alone.
+
+---
+
+## Hub behaviours that affect you
+
+Things the hub does around your game that are worth knowing.
+
+- **Invite from a solo table creates a room.** With no room, the Invite button
+  spins one up, reopens your game, and copies a link with `room=` + `game=`.
+  Without this the link would be a dead `?game=` URL.
+- **The Invite button hides** when the open game is `solo: true` — there is no
+  shared table to invite anyone to.
+- **Idle room members auto-open the host's game.** If the *room host* opens a
+  game and you aren't already in one, it opens for you (no yank). If you're
+  mid-game you keep the manual "Show table" bar. Send `invite` when a table is
+  genuinely ready.
+- **First visit shows a blocking name modal** in the centre of the screen. The
+  hub always has a name for you (an animal suggestion), so games never need to
+  handle "no name" — but do use `myName()` rather than assuming it changes.
+- **Duplicate names get numbered.** Two "john"s in a room become `john` and
+  `john1`, and the host renumbers a colliding newcomer on join and tells them.
+  So **don't cache a name** — read `myName()` fresh when you render, and key
+  seats on **id**, never on name.
+- **Game buttons pick their own text colour** from the background brightness, so
+  you don't need to worry about contrast in `games.js`.
+
+---
+
+## Testing
+
+There is no test runner (no build step), but there are two scripts in `tests/`
+that need only `pip install esprima playwright` (and `playwright install
+chromium`):
+
+| Script | What it does |
+|---|---|
+| `python3 tests/jscheck.py` | Parses every inline `<script>` in the folder with a real JS parser. This is the cheapest way to catch a typo before you reload the hub. |
+| `python3 tests/chess_rules.py` | Extracts the **real** move generator out of `chess.html` and runs it against textbook positions (mate, castling, en passant, promotion, stalemate, pins, draws) plus 40 full bot games. |
+| `python3 tests/chess_play.py` | Drives chess in a real browser: solo + bot, takeback, seat claims, spectators, watcher lockout, keep-solo-running, phone layout. |
+| `python3 tests/record_test.py` | Runs the shipped `BubRecord.create()` against stub roster data and checks the exact sentence each payload produces. |
+
+The chess tests work by **extracting the shipped function source** and running
+it against assertions, rather than re-implementing the rules — so they test what
+players actually play. That approach caught three real bugs during development
+(a crashing bot, en passant generated on the wrong squares, and the wrong pawn
+removed on capture). Copy that idea for a game with rules worth trusting.
+
+For anything interactive, drive the page with Playwright and assert on the
+**DOM**, not on private state:
+
+```python
+page.click("#board .sq[data-sq='52']")            # click a piece
+page.wait_for_timeout(200)
+dots = page.eval_on_selector_all("#board .dot", "els => els.length")
+```
+
+Watch for page errors the whole time — a silent `ReferenceError` in a game looks
+exactly like "nothing happens".
+
+---
 
 ## Networking model
 
-- **Host a room** claims a PeerJS id (= the room code). **Join** connects to that id.
-- Topology is hub-and-spoke through the host: guests send to the host, the host relays.
-  Chat and `say` follow the same path.
-- `Disconnect` / unload destroys the peer and resets all game frames.
+- **Hosting a room** claims a PeerJS id (that *is* the room code). **Joining**
+  connects to that id.
+- Hub-and-spoke through the host: guests send to the host, the host relays.
+  Chat, `say`, and game `intent` all follow the same path.
+- **Presence**: the hub broadcasts `{type:'presence', id, name, game}` on
+  open/close/hello, and the room drawer renders one chip per player showing
+  `in <game>` or `in lobby`.
 
-## Presence (who is where)
+### Sessions, reconnects, host migration
 
-- Every hub broadcasts `{ type: 'presence', id, name, game }` on open/close/hello.
-- The room controls render one chip per player (`#roster-list`): name + `in <game>` or `in lobby`, so you can tell which game everyone is in.
+- Your player id, display name, room and role live in `sessionStorage`
+  (`bubhub.session`), so a reload offers **Rejoin `<room>` as host/guest** — and
+  games that seat by id (LOTR, chess) keep your seat.
+- Hosting retries a just-released room id with backoff instead of silently
+  minting a new one.
+- A guest whose host link drops shows "host lost — reconnecting…" and keeps
+  dialing the room with capped backoff.
+- **If the host is really gone, the table moves rather than dying.** The
+  lowest-id survivor claims the same room id (the room id itself is the mutex, so
+  only one host can win), keeps the table it already holds, and re-broadcasts.
+  Everyone's reconnect loop lands on the same id. A returning host whose id is
+  taken is offered "Table moved to X — join them?" and rejoins as a guest.
 
-## Sessions, reconnects & host migration
+Practical consequence for your game: **the host can change mid-session.** Never
+assume a fixed host id; re-read `isHost()` on every roster and be ready to adopt
+a `state` snapshot from a new host.
 
-- Your player id, display name, room, and role are kept in `sessionStorage`
-  (`bubhub.session`), so a reload offers **Rejoin `<room>` as host/guest** in the lobby
-  — and games that seat players by id (LOTR) keep your seat.
-- Hosting retries a just-released room id 5× with backoff (`unavailable-id`) instead
-  of silently minting a random room.
-- Guests whose host link drops show **host lost — reconnecting…** and keep dialing
-  the room with capped backoff until it answers.
-- **If the host is really gone, the table moves instead of dying.** The lowest-id
-  survivor claims the same room id (staggered 3s + 4s per rank, standing down the
-  moment any host answers — the room id itself is the mutex, so only one host
-  can win). Its game keeps the exact table it already holds (LOTR/Blast Off
-  broadcast full state to every guest) and re-broadcasts; everyone else's
-  reconnect loop lands on the same id and play continues. A returning host
-  whose id is taken is offered **"Table moved to X — join them?"** and rejoins
-  as a guest on its old seat. If nobody can take over, the room may start a
-  fresh game instead — never silently.
-- Clicks with no host link are answered **"host gone — waiting"** instead of
-  vanishing. After ~60s of silence the pill says so explicitly (it keeps trying).
-
-## Game chrome conventions
-
-- **Hide**: the hub owns this — every game is closed from the hub's `✕ Stage`
-  bar, which really hides the frame
-  (`#game-stage iframe.hidden { display:none !important }`) and sends the
-  game a `hide` message (stop music, suspend your loop). Games must NOT ship
-  their own Hide/Close buttons.
-- **Room number**: always visible in the focus bar (`Room <id> · N players`, click to copy).
-- **Chat drawer**: dismissible via the 💬 pill toggle, the drawer ✕, or tapping the
-  backdrop — never Esc-only.
-- **LOTR choices are player choices**: a new card always opens a fit prompt
-  (Equip / Stow / Discard, each naming its cost) instead of auto-equipping or
-  auto-discarding; a full spare (`swap`), a full gear set (`stash`), a gear
-  swap from a full set (`place`), an illegal weapon after a level drop
-  (`illegal`), and a lost fight (`lose`) each open a tap-the-card decision;
-  the engine never silently picks your cards (Narsil/K is excluded unless it
-  is your only weapon). Explore and Fight are equal-weight buttons with the
-  real trade-off spelled out (safe card vs risky Levels, with exact odds in
-  words — no card is ever previewed).
-- **Goldberg touch**: press a part, then drag it out on the stage (tap = default
-  size) — the drag sets length + angle. Placed parts show canvas handles: end
-  dots reshape, the ring turns, ✛ moves the pendulum anchor / lever pivot /
-  catapult hinge. Tap a part twice for the lock/delete pill (⇄ flips
-  conveyor / turntable / fan / spawner-what, FIRE shoots a cocked catapult,
-  🎈 pops a balloon, 🔗 welds two parts into one rigid unit, 📋 copies).
-  No spawn marker — balls are placed by tap like everything else. 🔔 bell rings
-  its tuned chime when struck (tune root + scale + per-bell degrees in the 🎵
-  drawer; G major out of the box). The catapult cocks by dragging its arm back
-  past ~45° (or aim it with the ring), then fires on tap / F / knock — the arm
-  is centred on its body with a real cup and a torsion spring that throws.
-  Balloons pop on a hard hit and drop their bob as a ball. The spawner drops
-  a ball/domino/block every 2s, oldest children culled past 8 alive. Clear
-  needs every player in the room to approve (25s, one No cancels). 💾 Machines
-  saves named tables to this browser (plus export/import text).
-  The host auto-saves the table to localStorage; Clear wipes it. World is a
-  fixed 1920×1200 so every screen shares coordinates. Opened with no room
-  (lobby Play button), Goldberg runs a private local table — hosting a room
-  later shares that same table, joining someone's room starts from theirs.
-
-## Run it
-
-1. Open `index.html` in a browser (double-click works — the registry loads via `<script>`, not `fetch`).
-2. Host a room → share the Room ID (click it to copy).
-3. Guests paste the ID → Connect → host launches a game → guests tap **Show table**.
-
-> If two players see different things, both hard-reload (<kbd>Ctrl</kbd>+<kbd>Shift</kbd>+<kbd>R</kbd>)
-> — game files are cached aggressively by the browser.
+---
 
 ## BubHub Record
 
-Every finished game writes one line (e.g. `6 Oct 2026 Harry beat John at LOTR Cards`)
-to the shared Google Sheet behind `BUB_API` in `index.html` — the same sheet as the
-DalTadka leaderboard. BubHub rows carry `kind=bub` and the sentence in the `text`
-column, so DalTadka's board never shows them. The card at the bottom of the lobby
-(and room drawer) lists them newest-first, 5 then expandable.
+Finished games can write one line to the shared sheet behind `BUB_API`:
 
-Games announce their ending over the bridge as `Hub.up('result', {...})` with player
-**ids**; the hub resolves names from its own roster and builds the sentence in one
-place (`Rec.sentence` in `index.html`). Only the host writes (solo games write from
-the local machine). Goldberg has no end state, so the hub notes everyone who sends
-a Goldberg intent and records the line when the panel closes.
+```js
+Hub.up('result', { players: ['p-id-1', 'p-id-2'], text: 'Sam beat Alex' });
+```
 
-## Files
+- Send **player ids**, not names — the hub resolves them against its own roster
+  and its own stored name for you (it also numbers duplicates). Don't compose a
+  sentence from names a game can only partly see; you'll end up writing
+  "your friend beat the bot" into a shared sheet nobody can edit.
+- Per-game fields let the hub build a sensible line. Chess, for example:
+
+  ```js
+  Hub.up('result', { players: [whiteId, blackId].filter(Boolean),
+                     bot: !blackId,          // black wasn't a person
+                     won: 'w' | 'b' | 'draw' });
+  // -> "Sam beat Zaphod at Chess" / "Sam beat the bot at Chess"
+  ```
+
+  Saying *which colour won* beats passing a winner id: the hub doesn't have to
+  guess which id was which, and the bot never needs a fake roster entry.
+- Send `text` only when the game has something specific to say (eggs: "Sam
+  smashed Zaphod at eggs"). Otherwise the default is used.
+- **Every game should send a real result.** The generic usage line is a safety
+  net for a game that hasn't been wired up yet, not a finished feature — "Sam
+  played Blast Off!" says nothing. If a game has no natural final round (Word
+  Bridge), report it when the session ends: reset, rematch, or leave.
+- Solo games record locally; multiplayer records on the host only.
+- `noRecord: true` opts out entirely.
+- Send it **once per game** — guard with a flag, because `render()` runs often
+  and `record()` will happily write a duplicate line otherwise.
+
+### Leaving the stage
+
+There are two different "back" buttons, and games need only care about one:
+
+- **Hub `☰ Games`** (focus bar, always visible) returns to the hub game list.
+  Games post `Hub.up('close')` for this; `index.html` handles it and closes the
+  frame.
+- **Per-game `☰ Menu`** returns to *that game's own setup screen* so the rules
+  can be changed (difficulty, level, Dread, seed). Without it a host can only
+  change rules by leaving the stage entirely, because setup is gated on
+  `S === null` and nothing inside the game clears `S`.
+
+Games that render a Menu button should hide it unless `isHost()`.
+
+---
+
+## File map
 
 | File | Touch? | Purpose |
 |---|---|---|
-| `index.html` | Rarely | Hub shell: stage, lobby/room UI, PeerJS room, game broker. |
+| `index.html` | Rarely | Hub shell: stage, lobby/room UI, PeerJS room, game broker, invites. |
 | `games.js` | ✅ to add games | The registry. The only file you edit for a new game. |
-| `bub-record.js` | Rarely | Modular BubHub Record (loaded via script tag). Generic `played X` lines mean even a brand-new game with no `result` logic leaves a line on open/close. |
-| `warpfront.html`, `lotr.html` | Reference | Multiplayer examples (host + guests, like-for-like pattern to copy). |
-| `goldberg.html` | Playable | Chain-reaction sandbox (host-authoritative physics, everyone builds). Parts: ball, plank, block, domino, peg, bucket, bouncer, turntable, conveyor, fan, balloon, lever, pendulum, bell (tunable), catapult (cocks + throws), spawner + drawn tracks. Weld parts rigidly, copy/paste groups, save named machines, clear by unanimous vote. |
-| `DrawDrive.html` | Playable | Draw and Drive (multiplayer: maze turn-taking drawer/driver + versus battle + off-rails). Tiny laser crumbs dissolve; cookie mode deleted. |
-| `eggs.html` | Playable | eggs sandbox in a night-time chicken coop (plank walls, wire, bulb, straw floor, wooden perches, hens). Random worlds, tiered splats (BIG → HUGE → TITAN: smash harder, die easier), legs pickup for lift & throw (mash jump to wiggle free), one rotating reachable power-up at a time (star/bean/legs). |
-| `LobbyWaltzEngine.html` | Reference | Solo example (`solo` + `lobby` + fixed `height`). |
-| `horse.jpg` | – | Mascot 🐴 |
+| `bub-record.js` | Rarely | BubHub Record: composes the sentence for each game from a small payload (loaded via script tag). |
+| `tests/jscheck.py` | – | Parses every script in the folder; run after editing. |
+| `tests/chess_rules.py` | – | Chess rules tests (extracts the real engine). |
+| `tests/chess_play.py` | – | Chess browser tests (solo, seats, spectators, phone). |
+| `tests/record_test.py` | – | BubHub Record sentence tests (runs the real `bub-record.js`). |
+| `warpfront.html` | Reference | Minimal state-sync multiplayer example. |
+| `goldberg.html` | Reference | Best example of the local-host ↔ room transitions, and of `hide`/`show`. |
+| `chess.html` | Reference | Solo + two-player + bot + a real rules engine + seat claims. |
+| `LobbyWaltzEngine.html` | Reference | Simplest `solo` game (no bridge at all). |
+| `lotr.html`, `wordbridge.html`, `blastoff.html`, `eggs.html`, `daltadka.html`, `discover_the_grammar.html`, `wordwright.html`, `DrawDrive.html`, `truths.html` | Playable / WIP | The rest of the arcade. `wordwright` and `DrawDrive` are commented out of the registry. |
+
+---
+
+## Engine notes
+
+Two games carry their own non-trivial logic; both are documented so they can be
+copied or fixed.
+
+### Chess (`chess.html`)
+
+Own move generator, no library. Board is 64 slots with **index 0 = a8**, so
+`sq = file + (8 - rank) * 8`; the renderer draws `row = vr` so White sits at the
+bottom.
+
+- `pseudo()` generates king-moves-legal moves (castling, en passant, all four
+  promotion pieces); `legal()` runs each through `applyMove()` on a clone and
+  drops any that leave your own king attacked.
+- En passant lands on the square **directly ahead** (the one the double push
+  skipped) and the captured pawn sits at `to - 16` — for both colours, because
+  rank 8 is index 0. This is easy to get wrong and invisible in testing unless
+  you test it.
+- Promotions are generated queen-first, so "first match wins" = auto-queen.
+- Draws: stalemate, fifty-move, threefold repetition, insufficient material.
+- The bot is intentionally 1-ply (material swing, a "will this hang?" check, a
+  check bonus, jitter). It can only ever pick from `legal()`, so it cannot cheat.
+
+### eggs (`eggs.html`)
+
+Damage-% knockback plus a Mario-style mushroom: the `bean` grows you
+BIG → HUGE → TITAN with **no timer** — the size is *spent* by taking a hit
+(`shrinkEgg`), and only the abyss or a star still kills you outright.
+
+---
+
+## Run it
+
+1. Open `index.html` (double-click works — the registry loads via `<script>`).
+2. Host a room → share the Room ID (click it to copy) or press **Invite**.
+3. Guests open the link → they're dropped straight into the game.
+
+If two players see different things, both hard-reload
+(<kbd>Ctrl</kbd>+<kbd>Shift</kbd>+<kbd>R</kbd>) — game files are cached hard.
+
+If a game behaves oddly after an edit, run `python3 tests/jscheck.py` first:
+a syntax error in an iframe shows up as a blank box, not a message.

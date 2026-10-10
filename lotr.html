@@ -128,6 +128,7 @@ body{margin:0;background:var(--felt);color:var(--ink);font:15px/1.45 Georgia,ser
     <div class="lr-head" style="display:flex;flex-wrap:wrap;align-items:center;justify-content:space-between;gap:8px">
         <div><span class="lr-t">LOTR CARDS</span> <span id="lr-err" style="font:11px monospace;color:#ff8888"></span></div>
         <div style="display:flex;gap:8px">
+            <button id="btn-lr-menu" class="lr-b" title="Back to the setup screen">☰ Menu</button>
             <button id="btn-lr-new" class="lr-b hidden">New game</button>
         </div>
     </div>
@@ -893,6 +894,8 @@ function render(){
     const sh = (id, on) => { const e = $(id); e.classList.toggle('hidden', !on); if (id === 'lr-game') e.style.display = on ? 'flex' : ''; else e.classList.toggle('flex', on); };
     sh('lr-setup', isHost() && !S); sh('lr-waiting', !isHost() && !S); sh('lr-game', !!S);
     $('btn-lr-new').classList.toggle('hidden', !(isHost() && S));
+    // Only the host may tear down a live table.
+    $('btn-lr-menu').classList.toggle('hidden', !isHost());
     if (!S){
         if (isHost()) $('lr-setup-note').textContent = `${peerCount()} in the room.`;
         st.textContent = 'Fight beasts, claim weapons, reach Level 15.';
@@ -1043,6 +1046,13 @@ $('lotr-panel').addEventListener('click', (e) => {
 });
 $('btn-lr-start').addEventListener('click', () => startGame($('lr-dread').checked));
 $('btn-lr-new').addEventListener('click', () => rematch());
+// Back to the setup screen so Rising Dread can be changed. S being null is the
+// only thing that reveals #lr-setup, and it was otherwise only cleared by the
+// hub's reset broadcast — which also closed the frame.
+$('btn-lr-menu').addEventListener('click', () => {
+    if (!isHost()) return;
+    S = null; broadcast(); render(); reportHeight();
+});
 
 Hub.init();
 render();
