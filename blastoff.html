@@ -66,16 +66,20 @@ body{margin:0;background:var(--space);color:var(--ink);font:15px/1.45 'Segoe UI'
 .sc-chips{display:flex;gap:6px;flex-wrap:wrap;justify-content:center}
 .sc-chip{font:700 11px system-ui;background:rgba(0,0,0,.45);border:1px solid #334155;border-radius:9px;padding:3px 9px;color:#d8cfae;white-space:nowrap}
 .sc-chip .pw{color:#fff;font-size:13px}
+.sc-chip .si{color:#fff;font-size:13px}
+.sc-chip .si.none{color:var(--dim)}
 .sc-chip.on{border-color:var(--neon);color:#fff;box-shadow:0 0 8px var(--neon)}
-.sc-chip.you{border-color:var(--gold)}
+/* "You" was only a 1px border recolour, which is easy to miss — and with the
+   FLEET panel gone this chip is the only place your own ship is marked. */
+.sc-chip.you{border-color:var(--gold);background:rgba(255,224,130,.14);color:var(--gold)}
 .sc-chip.winner{border-color:var(--gold);background:rgba(255,224,130,.2);color:var(--gold)}
 #bo-tablewrap{position:relative;background:rgba(0,0,0,.28);border:1px solid #334155;border-radius:14px;padding:12px;display:flex;flex-direction:column;gap:12px;overflow:hidden}
 .bo-lbl{font:11px monospace;color:var(--dim);letter-spacing:.05em}
 /* Draw piles are shown as a plain face-down stack, never with a count: the
-   only number worth watching is destinations remaining (see .bo-left). */
-/* Two columns now: the mission-log box is gone. */
-.bo-midrow{display:grid;grid-template-columns:1fr 1fr;gap:12px;align-items:start}
-@media(max-width:640px){.bo-midrow{grid-template-columns:1fr}}
+   only number worth watching is destinations remaining (see .bo-left).
+   One column now: the FLEET panel is gone and every pilot's ship power
+   lives in the score chips instead (see .sc-chip .si). */
+.bo-midrow{display:grid;grid-template-columns:1fr;gap:12px;align-items:start}
 .bo-zone{background:rgba(0,0,0,.32);border:1px solid #334155;border-radius:12px;padding:10px;min-height:150px}
 .bo-zone.you{border-color:var(--neon);box-shadow:0 0 12px rgba(0,242,255,0.25)}
 .bo-cards{display:flex;gap:10px;flex-wrap:wrap;justify-content:center;min-height:108px;align-items:center}
@@ -111,10 +115,27 @@ body{margin:0;background:var(--space);color:var(--ink);font:15px/1.45 'Segoe UI'
   .bo-act.hint-bounce,.bo-act.hint-flash{animation:none;border-color:var(--gold)}
   .bo-act.hint-flash{border-color:#ff8c3c}
 }
-#bo-veil{position:absolute;inset:0;display:flex;align-items:center;justify-content:center;background:rgba(10,14,26,.65);backdrop-filter:blur(2px);pointer-events:none;border-radius:14px;z-index:5;transition:opacity .5s ease, visibility .5s ease}
+/* Not-your-turn state. This used to be a full-table scrim:
+   background:rgba(10,14,26,.65) + backdrop-filter:blur(2px). The table was
+   already live behind it (pointer-events:none), so the scrim only tinted and
+   softened everything you needed to read to find out what happened on someone
+   else's turn — which is the opposite of helpful. No background, no blur: the
+   ribbon docks at the top of the table and the cards stay at full strength. */
+#bo-veil{position:absolute;inset:0;display:flex;align-items:flex-start;justify-content:center;padding-top:6px;pointer-events:none;border-radius:14px;z-index:5;transition:opacity .5s ease, visibility .5s ease}
 #bo-veil.hidden{opacity:0;visibility:hidden}
-#bo-veil .ribbon{background:rgba(26,28,58,.92);border:2px solid var(--neon);border-radius:14px;padding:14px 26px;font-size:19px;font-weight:800;text-align:center;box-shadow:0 6px 20px rgba(0,242,255,0.3)}
+#bo-veil .ribbon{background:rgba(26,28,58,.92);border:2px solid var(--neon);border-radius:14px;padding:7px 16px;font-size:15px;font-weight:800;text-align:center;box-shadow:0 6px 20px rgba(0,242,255,0.3);max-width:92%}
 #bo-veil .ribbon small{display:block;font-size:12px;font-weight:400;color:var(--dim);margin-top:4px}
+/* say() keeps 8 entries and Hub.up('say', ...) broadcasts every one, but
+   nothing rendered them: the only read of the feed was S.feedN as an
+   animation cache-buster, so a player watching the table had no record of
+   what the other pilots had actually done. Mirrors lotr's .feed-item.
+   Newest fades as a callout; older entries persist so the turn is readable. */
+#bo-feed{position:absolute;inset:0;pointer-events:none;z-index:100}
+.bo-feed-item{background:rgba(26,28,58,.92);border:1px solid var(--neon);color:#e0f0ff;border-radius:12px;padding:6px 14px;font-size:13px;max-width:92%;text-align:center;box-shadow:0 4px 14px rgba(0,0,0,.55);position:absolute;top:6%;left:50%;transform:translate(-50%,0);white-space:normal}
+.bo-feed-item.pop{animation:feedPop .45s cubic-bezier(.34,1.56,.64,1) forwards}
+.bo-feed-item.newest{z-index:101;animation:feedPop .45s cubic-bezier(.34,1.56,.64,1) forwards, fadeOut .7s ease 1.6s forwards}
+@keyframes feedPop{0%{transform:scale(.7) translateY(10px);opacity:0}60%{transform:scale(1.05)}100%{transform:scale(1);opacity:1}}
+@keyframes fadeOut{to{opacity:0;transform:translate(-50%,-160%);pointer-events:none}}
 #bo-note{font:11px monospace;color:var(--neon);min-height:14px;text-align:center}
 .hidden{display:none!important}
 .wf-setup{background:rgba(0,0,0,.4);border:1px solid #334155;border-radius:10px;padding:10px;display:flex;flex-direction:column;gap:8px}
@@ -149,6 +170,7 @@ body{margin:0;background:var(--space);color:var(--ink);font:15px/1.45 'Segoe UI'
         <div id="bo-tablewrap">
             <div id="bo-flash" class="hidden"></div>
             <div id="bo-veil" class="hidden"><div class="ribbon" id="bo-veil-text">Waiting…</div></div>
+            <div id="bo-feed"></div>
             <div id="bo-topdeck"></div>
             <div id="bo-result" class="none"></div>
             <div id="bo-score"></div>
@@ -276,7 +298,10 @@ const DEST = {
     13: ['Cygnus X-1','🕳️'], 14: ['Sagittarius A*','🌌']
 };
 const BLACK_HOLES = [13, 14];
-let S = null, noteT = null, lastResKey = null;
+let S = null, noteT = null, lastResKey = null, lastFeedN = 0;
+// Recent actions shown on the table. say() retains 8; four is enough to
+// reconstruct a turn without burying the cards.
+const FEED_SHOWN = 4;
 let lastTurn = null;
 
 const val = (c) => V[c.r] || +c.r;
@@ -293,6 +318,19 @@ function draw(k){
         d.push(...shuff);
     }
     return d.pop() || { r: '2', c: k };
+}
+
+// Every ship a pilot holds comes from here, so the guarantee lives in one
+// place: a ship is never worth less than 2. (val() maps an unknown rank to 0
+// via `V[c.r] || +c.r`, so a stray rank would otherwise be a 0-power ship
+// that renders as a normal card — worse than having no ship at all, since
+// afterburnerFeasible needs 10 and you could never launch with it.)
+function drawShip(){
+    for (;;){
+        const c = draw('B');
+        if (val(c) >= 2) return c;
+        S.blackDisco.push(c);
+    }
 }
 
 const cur = () => S && S.pl[S.turn];
@@ -397,7 +435,7 @@ function resolveFight(p, helperId, path){
         p.score += dests.length;
         say(`${pn(p)} collects ${dests.length} red card(s)!`);
         if (h) {
-            const ns = draw('B');
+            const ns = drawShip();
             h.ship = ns;
             say(`${pn(h)} draws a new ship: ${val(ns)}.`);
         }
@@ -487,14 +525,27 @@ function handle(d){
 
     if (S.phase === 'choose'){
         if (d.action === 'newship'){
-            const ns = draw('B');
-            S.blackDisco.push(p.ship || {r:'0', c:'B'});
+            const ns = drawShip();
+            // Discard the REAL ship only. This used to push a placeholder
+            // {r:'0'} when the player had none — and draw() reshuffles the
+            // whole discard pile back into the deck when it runs dry, so the
+            // placeholder came back around and could be dealt as an actual
+            // 0-power ship (it usually surfaced on the helper's replacement
+            // draw after a win). draw() already copes with an empty pile.
+            if (p.ship) S.blackDisco.push(p.ship);
             p.ship = ns;
             say(`${pn(p)} finds a new ship: ${val(ns)}.`);
             endTurn();
             return null;
         }
         if (d.action === 'blastoff'){
+            // There is nothing to launch without a ship. Without this the
+            // move was legal: resolveFight coerces a missing ship to power 0,
+            // so it was a guaranteed loss that still burned a red destination
+            // off the deck and locked out afterburner (needs shipVal >= 10).
+            // The bots never did it only because botTurn pre-filters; the
+            // header comment above lists this as a rejection handle() owns.
+            if (!p.ship) return 'You have no ship — find a new one first.';
             S.currentDest = draw('R');
             S.phase = 'fight';
             S.msg = `Destination: ${DEST[val(S.currentDest)][0]} (${val(S.currentDest)}). Choose your flight path.`;
@@ -727,6 +778,11 @@ function render(){
         st.innerHTML = `${esc(S.msg)}<small>${sub}</small>`;
     }
 
+    $('bo-feed').innerHTML = (S.feed || []).slice(0, FEED_SHOWN).map((e, i) =>
+        `<div class="bo-feed-item${i === 0 ? ' newest' : ''}${e.n > lastFeedN ? ' pop' : ''}" style="top:calc(6% + ${i * 34}px);opacity:${i === 0 ? 1 : 0.92}">${esc(e.t)}</div>`
+    ).join('');
+    if (S.feed && S.feed.length) lastFeedN = Math.max(lastFeedN, S.feed[0].n);
+
     $('bo-topdeck').innerHTML =
         `<div class="bo-deckrow" style="display:flex;gap:12px;align-items:center;justify-content:center;flex-wrap:wrap">` +
         destinationsLeft() +
@@ -773,7 +829,28 @@ function render(){
     const center = `<div class="sc-vs"><div class="x">🚀</div><div class="sc-verdict ${vcls}">${verdict}</div></div>`;
     
     sc.innerHTML = `<div class="sc-vsrow">${leftSide}${center}${rightSide}</div>` +
-        `<div class="sc-chips">${S.pl.map(q => `<span class="sc-chip ${S.turn === S.pl.indexOf(q) ? 'on' : ''} ${q.id === myId() ? 'you' : ''}">${esc(pn(q))} <span class="pw">🔴${q.score}</span></span>`).join('')}</div>`;
+        // Each chip carries BOTH numbers now: red cards collected, and the
+        // power of the ship that pilot is carrying. The ship value used to be
+        // only in the FLEET panel, which showed every pilot's ship as a full
+        // face-up card in a zone styled identically to YOUR SHIP — and because
+        // .bo-zone.you keys off TURN, not ownership, that zone lost its accent
+        // on anyone else's turn and the whole thing read as "these are my
+        // cards". A number in the chip says the same thing in a quarter of
+        // the space and can't be mistaken for a hand.
+        // A pilot with no ship shows a dim em-dash, never 0 — 0 is a real
+        // card rank as far as val() is concerned and would read as a broken
+        // ship (see drawShip()).
+        `<div class="sc-chips">${S.pl.map(q => {
+            const isMe = q.id === myId();
+            const isTurn = S.turn === S.pl.indexOf(q);
+            const sv = q.ship ? val(q.ship) : null;
+            const ships = q.ship ? 'ship ' + sv : 'no ship';
+            const title = `${esc(pn(q))}: ${ships}, ${q.score} red card${q.score === 1 ? '' : 's'}` +
+                (isMe ? ' (you)' : '') + (isTurn ? ' — their turn' : '');
+            return `<span class="sc-chip ${isTurn ? 'on' : ''} ${isMe ? 'you' : ''}"${isTurn ? ' aria-current="true"' : ''} title="${title}">` +
+                `${esc(pn(q))}${isMe ? ' (you)' : ''} <span class="pw">🔴${q.score}</span> ` +
+                `<span class="si${sv == null ? ' none' : ''}">🚀${sv == null ? '—' : sv}</span></span>`;
+        }).join('')}</div>`;
 
     let mid = '';
     if (p){
@@ -781,12 +858,6 @@ function render(){
     } else {
         mid += `<div class="bo-zone"><span class="bo-lbl">Join the game to see your ship.</span></div>`;
     }
-    // Shows every pilot's ship face-up so you can see who can help on Share
-    // Ships, and why the bots chose what they chose.
-    mid += `<div class="bo-zone"><span class="bo-lbl">FLEET</span><div class="bo-cards">` +
-        S.pl.map((q, i) => `<div style="display:flex;flex-direction:column;align-items:center;gap:3px">` +
-            `${card(q.ship)}<span class="bo-lbl">${esc(pn(q))}</span></div>`).join('') +
-        `</div></div>`;
     $('bo-midrow').innerHTML = mid;
 
     $('bo-arena').innerHTML = '';
@@ -814,9 +885,13 @@ function render(){
     else if (!S.over){
         if (S.phase === 'choose' && myId() === (cur() ? cur().id : null)){
             // Blast Off leads: flying is the point of the game, looking for a
-            // better ship is the fallback.
-            ac = bigBtn('blastoff', '🚀', 'Blast Off!', 'Draw a destination and try to reach it.', '', '') +
-                 bigBtn('newship', '🛠️', 'Find New Ship', 'Draw a new ship to replace your current one.', 'k', '');
+            // better ship is the fallback. But with no ship there is nothing
+            // to launch, so only the recovery move is offered — and we say why
+            // rather than leaving the player wondering.
+            const ns = p && p.ship;
+            if (ns) ac = bigBtn('blastoff', '🚀', 'Blast Off!', 'Draw a destination and try to reach it.', '', '');
+            else ac = `<div class="bo-lbl">No ship — find a new one to launch.</div>`;
+            ac += bigBtn('newship', '🛠️', 'Find New Ship', 'Draw a new ship to replace your current one.', 'k', '');
         } else if (S.phase === 'fight' && myId() === (cur() ? cur().id : null)){
             // Hints only — every button stays live. Which one bounces is
             // decided by the numbers: your ship against the known

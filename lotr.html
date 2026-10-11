@@ -17,9 +17,13 @@ body{margin:0;background:var(--felt);color:var(--ink);font:15px/1.45 Georgia,ser
 #lr-err{font:11px monospace;color:#ff8888}
 #lr-status{background:rgba(0,0,0,.45);border:2px solid #6f8a4a;border-radius:14px;padding:14px 16px;font-size:19px;font-weight:700;text-align:center;color:#f2ecd8;box-shadow:0 4px 18px rgba(0,0,0,.5);min-height:70px;display:flex;flex-direction:column;justify-content:center;align-items:center}
 #lr-status small{display:block;font-size:12px;font-weight:400;color:var(--dim);margin-top:4px}
-.feed-item{background:rgba(20,26,18,.92);border:1px solid var(--gold);color:#f2ecd8;border-radius:12px;padding:8px 16px;font-size:14px;max-width:92%;text-align:center;box-shadow:0 4px 14px rgba(0,0,0,.55);position:absolute;top:6%;left:50%;transform:translate(-50%,0);z-index:100;white-space:normal;animation:feedPop .45s cubic-bezier(.34,1.56,.64,1) forwards, fadeOut .7s ease 1.6s forwards}
-.feed-item.pop{animation:feedPop .45s cubic-bezier(.34,1.56,.64,1), fadeOut .7s ease 1.6s forwards}
-.feed-item.big{border-width:2px;font-size:17px;font-weight:700}
+/* The newest entry is the "just happened" callout and fades on its own. Older
+   ones persist, so the last few actions stay readable while you wait — which
+   is the whole point now that the veil no longer dims the table. */
+.feed-item{background:rgba(20,26,18,.92);border:1px solid var(--gold);color:#f2ecd8;border-radius:12px;padding:6px 14px;font-size:13px;max-width:92%;text-align:center;box-shadow:0 4px 14px rgba(0,0,0,.55);position:absolute;top:6%;left:50%;transform:translate(-50%,0);z-index:100;white-space:normal}
+.feed-item.pop{animation:feedPop .45s cubic-bezier(.34,1.56,.64,1) forwards}
+.feed-item.newest{z-index:101;animation:feedPop .45s cubic-bezier(.34,1.56,.64,1) forwards, fadeOut .7s ease 1.6s forwards}
+.feed-item.big{border-width:2px;font-size:15px;font-weight:700}
 @keyframes feedPop{0%{transform:scale(.7) translateY(10px);opacity:0}60%{transform:scale(1.05)}100%{transform:scale(1);opacity:1}}
 @keyframes fadeOut{to{opacity:0;transform:translate(-50%,-160%);pointer-events:none}}
 #lr-score{background:rgba(0,0,0,.5);border:2px solid var(--gold);border-radius:14px;padding:10px 12px;display:flex;flex-direction:column;gap:8px}
@@ -110,9 +114,17 @@ body{margin:0;background:var(--felt);color:var(--ink);font:15px/1.45 Georgia,ser
 .lr-act .ic{font-size:30px;flex:none}
 .lr-act .tt{font-size:17px;font-weight:800}
 .lr-act .ss{font-size:12px;color:#d8cfae;font-weight:400}
-#lr-veil{position:absolute;inset:0;display:flex;align-items:center;justify-content:center;background:rgba(8,10,7,.55);backdrop-filter:blur(1px);pointer-events:none;border-radius:14px;z-index:5;transition:opacity .5s ease, visibility .5s ease}
+/* Not-your-turn state. This used to be a full-table scrim:
+   background:rgba(8,10,7,.55) + backdrop-filter:blur(1px) covering topdeck,
+   scoreboard, gear, arena and meters. The table was already live behind it
+   (pointer-events:none), so all the scrim did was tint and soften the very
+   thing you needed to read to work out what happened on someone else's turn.
+   No background, no blur — the ribbon docks at the top and the cards stay
+   legible. The ribbon text is kept: "Waiting for Zoe to choose" and
+   "Mark is fighting" are the clearest statement of what the game wants. */
+#lr-veil{position:absolute;inset:0;display:flex;align-items:flex-start;justify-content:center;padding-top:6px;pointer-events:none;border-radius:14px;z-index:5;transition:opacity .5s ease, visibility .5s ease}
 #lr-veil.hidden{opacity:0;visibility:hidden}
-#lr-veil .ribbon{background:rgba(20,26,18,.92);border:2px solid var(--gold);border-radius:14px;padding:14px 26px;font-size:19px;font-weight:800;text-align:center;box-shadow:0 6px 20px rgba(0,0,0,.6)}
+#lr-veil .ribbon{background:rgba(20,26,18,.92);border:2px solid var(--gold);border-radius:14px;padding:7px 16px;font-size:15px;font-weight:800;text-align:center;box-shadow:0 6px 20px rgba(0,0,0,.6);max-width:92%}
 #lr-veil .ribbon small{display:block;font-size:12px;font-weight:400;color:var(--dim);margin-top:4px}
 .shake{animation:shakeA .4s}
 @keyframes shakeA{0%,100%{transform:none}25%{transform:translateX(-6px)}50%{transform:translateX(6px)}75%{transform:translateX(-3px)}}
@@ -289,6 +301,9 @@ const V = { J: 12, Q: 14, K: 16, A: 18 };
 const MON = { 2:['Bat','🦇'],3:['Crow','🐦'],4:['Goblin','👺'],5:['Giant Spider','🕷️'],6:['Angry Wood Elf','🧝'],7:['Warg','🐺'],8:['Orc','👹'],9:['Uruk-hai','🧟'],10:['Troll','🧌'],J:['Shelob','🕸️'],Q:['Balrog','🔥'],K:['Nazgûl','💀'],A:['Dragon','🐉'] };
 const WEP = { 2:['Rusty Dagger','🗡️'],3:['Hunting Knife','🔪'],4:['Sling','🪨'],5:['Short Bow','🏹'],6:['Hand Axe','🪓'],7:['Throwing Spear','🔱'],8:['Dwarven Axe','⚒️'],9:['Elven Longbow','🏹'],10:['Sting','🗡️','Glows when Orcs are near'],J:['Orcrist','⚔️','The Goblin-cleaver: Draw 2 Loot, keep 1'],Q:['Glamdring','🗡️','Foe-hammer: High power'],K:['Narsil','⚔️','The Blade that was Broken'],A:['Andúril','⚔️','Flame of the West: Ultimate Power'] };
 let S = null, remembered = { dread: true }, noteT = null, lastFeedN = 0, lastLvls = {}, lastWinShown = null, lotrInst = 0;
+// How many recent actions to keep on screen. say() retains 8; four is enough
+// to reconstruct a turn without burying the table.
+const FEED_SHOWN = 4;
 // The game is over when the winner is decided (belt and braces: phase or flag,
 // since older in-flight states may only carry the phase).
 const isOver = () => !!(S && (S.over || S.phase === 'over'));
@@ -1014,8 +1029,13 @@ function render(){
         if (lastWinShown){ lastWinShown = null; $('lr-confetti').innerHTML = ''; }
     }
 
-    $('lr-feed').innerHTML = S.feed.slice(0, 1).map(e =>
-        `<div class="feed-item${e.n > lastFeedN ? ' pop' : ''}${/DRAGON|wins!|Level 15/.test(e.t) ? ' big' : ''}">${esc(e.t)}</div>`
+    // say() keeps 8 entries and broadcasts them, but this rendered only the
+    // newest one (slice(0,1)) as a toast that fades ~2.3s later — so entries
+    // 2-8 were never visible and "I don't know what happened on the other
+    // players' turns" had no answer at all. Show the last few, stacked.
+    // Each is nudged down the page so they don't pile on the same spot.
+    $('lr-feed').innerHTML = S.feed.slice(0, FEED_SHOWN).map((e, i) =>
+        `<div class="feed-item${i === 0 ? ' newest' : ''}${e.n > lastFeedN ? ' pop' : ''}${i === 0 && /DRAGON|wins!|Level 15/.test(e.t) ? ' big' : ''}" style="top:calc(6% + ${i * 34}px);opacity:${i === 0 ? 1 : 0.92}">${esc(e.t)}</div>`
     ).join('');
     if (S.feed.length) lastFeedN = Math.max(lastFeedN, S.feed[0].n);
 
