@@ -123,7 +123,7 @@ function pickH(){
     .catch(function(){horseLine='Could not load english-vietnamese.txt. Put it in the same folder as this game.'});
 }
 
-var HX=240,HY=300,E=[],horseLine='',near=false,was=false;
+var HX=65,HY=30,E=[],horseLine='',near=false,was=false;
 function rnd(a,b){return a+Math.random()*(b-a)}
 function cl(v,a,b){return v<a?a:v>b?b:v}
 function inPond(x,y){var a=(x-POND.x)/POND.rx,b=(y-POND.y)/POND.ry;return a*a+b*b<1}
