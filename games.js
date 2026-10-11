@@ -17,7 +17,7 @@ window.BUB_GAMES = [
   // `lobby: true`, which is a different flag from `soloable` and put a whole
   // building sandbox in the "play something while you wait" list. It still
   // promotes itself to a local table when opened without a room.
-  { id: 'goldberg', file: 'goldberg.html', title: 'Goldberg', players: '2-5', color: '#e6c280', fill: true,
+  { id: 'goldberg', file: 'goldberg.html', title: 'Goldberg', players: '2-6', color: '#e6c280', fill: true,
     icon: '🔔', desc: 'Build a chain-reaction machine together out of parts, then press play and watch it go.' },
   { id: 'daltadka', file: 'daltadka.html', title: 'Dal Tadka', players: 'solo', color: '#d9b26f', solo: true, lobby: true, fill: true,
     icon: '🍲', desc: 'Cook dal from scratch for hungry judges, who score how well you timed each step.' },
@@ -51,7 +51,7 @@ window.BUB_GAMES = [
     icon: '✍️', desc: 'Write one honest line a day — editable until midnight, sealed after.' },
   //{ id: 'DrawDrive', file: 'DrawDrive.html', title: 'Draw and Drive', players: '1-4', color: '#3cc3d4', fill: true,
   //  icon: '✏️', desc: 'Draw a track, then drive a car along what you drew.' },
-  { id: 'eggs', file: 'eggs.html', title: 'eggs', players: '1-4', color: '#ffd23f', fill: true, soloable: true,
+  { id: 'eggs', file: 'eggs.html', title: 'eggs', players: '2-4', color: '#ffd23f', fill: true, soloable: true,
     icon: '🥚', desc: 'Bounce and splat around a chicken coop, growing bigger with beans while you knock rivals off the edge.' },
   { id: 'chess', file: 'chess.html', title: 'Chess', players: '1-2', color: '#c89b6d', fill: true, soloable: true,
     icon: '♞', desc: 'Full-rules chess — you are White, against a friend or a simple greedy bot.' },
