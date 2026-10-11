@@ -39,7 +39,7 @@ input{flex:1 1 auto;min-width:0;padding:8px 12px;background:#1e293b;color:#fff;b
 'use strict';
 var GID='mucking',W=400,H=640;
 var POND={x:150,y:430,rx:120,ry:90},TREE={x:310,y:130},TREEB={x:310,y:204},BENCH={x:65,y:200};
-var ICON={apple:'🍎',ball:'🏐',flower:'🌼',lantern:'🏮',stick:'🪵',boot:'🥾',fish:'🐟'};
+var ICON={note:'📝',apple:'🍎',ball:'🏐',flower:'🌼',lantern:'🏮',stick:'🪵',boot:'🥾',fish:'🐟'};
 var ACT={eat:'😋',sniff:'💛',fish:'🎣',ripple:'〰️',poke:'…',glow:'✨',throw:'💨',wave:'👋',show:'✨',flop:'💦',hop:'🤗',fall:'💫'};
 var $=function(i){return document.getElementById(i)};
 function rnd(a,b){return a+Math.random()*(b-a)}
@@ -79,7 +79,7 @@ function addItem(k,x,y){S.n++;S.it.push({i:S.n,k:k,x:cl(x,20,W-20),y:cl(y,40,H-2
 function newWorld(){
   S={n:0,p:{},it:[]};
   [['apple',272,216],['apple',338,222],['apple',304,240],['ball',230,300],['flower',60,300],['flower',340,340],
-   ['flower',300,570],['lantern',310,470],['stick',70,140],['stick',190,70]].forEach(function(a){addItem(a[0],a[1],a[2])});
+   ['flower',300,570],['lantern',310,470],['stick',70,140],['stick',190,70],['note',120,240]].forEach(function(a){addItem(a[0],a[1],a[2])});
 }
 function onRoster(){
   if(!isHost()){Hub.up('intent',{a:'hello'});return}
@@ -148,6 +148,12 @@ function onIntent(d,from){
   }else if(d.a==='unride'){
     if(!p.r)return;
     syncRiders();p.r=null;p.z=0;p.a=0;p.tp++;
+  }
+  else if(d.a==='give'){
+    var gi=heldBy(id),gt=S.p[d.to];
+    if(gi&&gt&&d.to!==id&&Math.hypot(gt.x-p.x,gt.y-p.y)<90)gi.b=d.to;
+  }else if(d.a==='write'){
+    var wi=heldBy(id);if(wi&&wi.k==='note')wi.t=String(d.t||'').slice(0,300);
   }
 }
 // Towers wobble, then tumble. Taller means likelier, but there is no height cap.
@@ -294,7 +300,17 @@ function pick(){
   S.it.forEach(function(it){if(it.b)return;var d=Math.hypot(it.x-me.x,it.y-me.y);if(d<bd){bd=d;best=it}});
   if(best)send({a:'take',i:best.i});
 }
-function useIt(){if(S)send({a:'use'})}
+function useIt(){
+  if(!S)return;var h=heldBy(myId());
+  if(h&&h.k==='note'){var t=prompt('Your note (only you can read this):',h.t||'');if(t!=null)send({a:'write',t:t});return}
+  send({a:'use'});
+}
+function give(){
+  var h=S&&heldBy(myId());if(!h)return useIt();
+  var b=null,bd=90;
+  for(var k in S.p){if(k===myId())continue;var q=S.p[k],d=Math.hypot(q.x-me.x,q.y-me.y);if(d<bd){bd=d;b=k}}
+  if(b)send({a:'give',to:b});
+}
 function say(){var i=$('say'),t=i.value.trim();if(t)send({a:'say',t:t});i.value=''}
 function sit(){
   var mp=S&&S.p[myId()];if(!mp||mp.r||me.mode===1)return;
@@ -341,7 +357,7 @@ cv.addEventListener('pointerdown',function(e){
   if(me.mode===1){me.ta=y<me.y-me.a?Math.min(150,me.a+45):Math.max(0,me.a-45);return}
   me.tx=cl(x,16,W-16);me.ty=cl(y,40,H-30);
 });
-[['bp',pick],['bu',useIt],['bz',sit],['bc',climb],['bs',say]].forEach(function(a){$(a[0]).addEventListener('click',function(){a[1]();this.blur()})});
+[['bp',pick],['bu',give],['bz',sit],['bc',climb],['bs',say]].forEach(function(a){$(a[0]).addEventListener('click',function(){a[1]();this.blur()})});
 
 // ---------- loop ----------
 function move(){
@@ -380,7 +396,7 @@ function frame(t){
 function ui(){
   var h=S&&heldBy(myId()),c=climbCtx();
   $('bp').textContent=h?'Put down '+ICON[h.k]:'Pick up';
-  $('bu').textContent=h?'Use '+ICON[h.k]:'Wave';
+  $('bu').textContent=h?'Give '+ICON[h.k]:'Wave';
   $('bz').textContent=['Sit','Lie down','Stand'][me.z];
   $('bc').textContent=({off:'Hop off',down:'Climb down',hop:'Hop on',tree:'Climb tree'})[c&&c.k]||'Climb';
   $('bc').style.opacity=c?1:.5;
