@@ -36,7 +36,7 @@ window.BUB_GAMES = [
   // `soloable: true` also runs a real solo table with no room, so it belongs in
 // the pre-room "Solo Corner". Word Bridge has its own solo mode (you play both
 // sides), so it qualifies — it was simply never flagged.
-  { id: 'wordbridge', file: 'wordbridge.html', title: 'Word Bridge', players: '2-4', color: '#000000', soloable: true,
+  { id: 'wordbridge', file: 'wordbridge.html', title: 'Word Bridge', players: '2-6', color: '#000000', soloable: true,
     icon: '🌉', desc: 'Everyone writes one word that fits both meanings, then the table judges each bridge.' },
   //{ id: 'wordwright', file: 'wordwright.html', title: 'Wordwright', players: '2-5', color: '#a5b4fc',
   //  icon: '📝', desc: 'Co-write a story one sentence at a time.' },
