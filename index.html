@@ -160,6 +160,14 @@
                 <p id="hub-err" class="hidden text-[11px] font-mono text-red-300 mt-1"></p>
             </div>
         </div>
+        <div id="header-room" class="hidden flex-none mx-3 mb-1 items-center gap-2 bg-slate-800/80 backdrop-blur px-3 py-2 rounded-2xl border border-teal-700/70 card-glow">
+            <span class="text-teal-300 text-lg leading-none" aria-hidden="true">🛋</span>
+            <div class="leading-tight">
+                <div id="header-room-label" class="text-sm font-extrabold text-teal-100 font-mono">No room</div>
+                <div id="header-room-sub" class="text-[11px] text-slate-400 font-mono">not connected</div>
+            </div>
+            <button id="btn-header-room" title="Copy this room's invite link" class="btn-bouncy bg-slate-700 hover:bg-slate-600 text-white text-[11px] font-bold px-2 py-1 rounded-xl">invite</button>
+        </div>
         <div id="name-box" class="relative flex items-center gap-2 bg-slate-800/80 backdrop-blur px-3 py-2 rounded-2xl border border-slate-700 card-glow">
             <label for="player-name" class="text-sm text-slate-400">Display Name:</label>
             <input type="text" id="player-name" placeholder="Your name" value="Fox" maxlength="24" class="bg-slate-900 border border-slate-600 rounded-xl px-2 py-1 w-32 focus:outline-none focus:border-teal-400 font-bold text-teal-100">
@@ -364,7 +372,7 @@
         // lobby can offer "Rejoin <room> as host/guest".
         const SKEY = 'bubhub.session';
         function loadSession(){ try { return JSON.parse(sessionStorage.getItem(SKEY) || 'null'); } catch(e) { return null; } }
-        function saveSession(){ try { sessionStorage.setItem(SKEY, JSON.stringify({ room: currentRoomId, host: isHost, id: myId, name: getName() })); } catch(e) {} }
+        function saveSession(){ try { let game = null; try { game = openGameId(); } catch (e) {} sessionStorage.setItem(SKEY, JSON.stringify({ room: currentRoomId, host: isHost, id: myId, name: getName(), game: game || null })); } catch(e) {} }
         function clearSession(){ try { sessionStorage.removeItem(SKEY); } catch(e) {} }
         let myId = (loadSession() || {}).id || ('p-' + Math.random().toString(36).slice(2, 10));
         const links = new Map(); // playerId -> { conn, name, host }
@@ -1183,6 +1191,31 @@
             const dr = document.getElementById('drawer-room');
             if (dr) dr.textContent = id ? ('Room ' + id) : 'Room —';
             if (inRoom) ui.activeRoom.textContent = id;
+            else if (ui.activeRoom) ui.activeRoom.textContent = '';
+
+            // The always-visible chip. Before this, the room id lived ONLY in
+            // #room-ui (hidden outside a room), #focus-bar and the drawer —
+            // so on the main page there was nowhere that ever showed which
+            // room you were in. This one lives in <header> and shows in the
+            // lobby, in a room, and (via #focus-room above) in focus mode.
+            const chip = document.getElementById('header-room');
+            const chipL = document.getElementById('header-room-label');
+            const chipS = document.getElementById('header-room-sub');
+            const chipB = document.getElementById('btn-header-room');
+            if (chip){
+                chip.classList.toggle('hidden', !inRoom);
+                chip.classList.toggle('flex', !!inRoom);
+                if (inRoom){
+                    if (chipL) chipL.textContent = 'Room ' + id;
+                    if (chipS){
+                        const gid = (function(){ try { return openGameId(); } catch (e) { return null; } })();
+                        chipS.textContent = (isHost ? 'hosting' : 'joined')
+                            + ' · ' + n + (n === 1 ? ' player' : ' players')
+                            + (gid ? ' · ' + gid : '');
+                    }
+                    if (chipB) chipB.classList.remove('hidden');
+                }
+            }
             renderInviteButton();
         }
         // A `solo: true` game (Waltz, Dal Tadka, Write Something True) never
@@ -1205,6 +1238,12 @@
         ui.activeRoom.addEventListener('click', () => copyId(ui.activeRoom, currentRoomId));
         document.getElementById('focus-room').addEventListener('click', (e) => copyId(e.currentTarget, currentRoomId));
         document.getElementById('drawer-room').addEventListener('click', (e) => copyId(e.currentTarget, currentRoomId));
+        (function () {
+            const b = document.getElementById('btn-header-room');
+            // The chip only shows while you are already in a room, so the link
+            // is always valid here — no need to spin one up like btn-invite does.
+            if (b) b.addEventListener('click', () => copyInviteLink(b, 'invite'));
+        })();
         document.getElementById('drawer-close').addEventListener('click', closeDrawer);
         document.getElementById('drawer-scrim').addEventListener('click', closeDrawer);
         function toggleDrawer(){
@@ -1217,7 +1256,7 @@
             const txt = document.getElementById('resume-text');
             if (!bar || !txt) return;
             if (s && s.room && !inRoom){
-                txt.textContent = `You were in room “${s.room}”${s.host ? ' as host' : ''} — pick it back up?`;
+                txt.textContent = `You were in room “${s.room}”${s.host ? ' as host' : ''}${s.game ? ` playing ${s.game}` : ''} — pick it back up?`;
                 bar.classList.remove('hidden');
                 bar.classList.add('flex');
             } else {
@@ -1229,6 +1268,11 @@
         document.getElementById('btn-resume-go').addEventListener('click', () => {
             const s = loadSession();
             if (!s || !s.room) return;
+            // Restore the game too, not just the room. Without this the stage
+            // came back empty and showed "No game open yet" until the player
+            // hunted for the game button again — which is exactly what happens
+            // after a phone lock drops the page.
+            if (s.game && GAMES.some(g => g.id === s.game)) pendingInviteGame = s.game;
             if (s.host){ ui.hostInput.value = s.room; document.getElementById('btn-host').click(); }
             else { ui.joinInput.value = s.room; document.getElementById('btn-join').click(); }
         });
@@ -1243,7 +1287,85 @@
             GB.resetAll();
         }
 
+        /* ------------------------------------------------------------------
+           Phone lock / app switch.
+
+           Mobile browsers do NOT reliably fire beforeunload — they fire
+           pagehide, and a backgrounded tab is usually just FROZEN rather than
+           unloaded. Either way the PeerJS socket dies silently, timers stop,
+           and on unlock nothing re-dialled: the player came back to a dead
+           main page and had to click their way back into the room.
+
+           So: never tear down on a pagehide that lands in the back/forward
+           cache, and always run revive() when the page comes back. revive()
+           rebuilds whatever the freeze destroyed and re-announces it to the
+           open game.
+           ------------------------------------------------------------------ */
+        let lastHideAt = 0;
+        let reviving = false;
+
+        function revive() {
+            if (reviving || document.hidden) return;
+            reviving = true;
+            try {
+                const wasGone = lastHideAt && (Date.now() - lastHideAt) > 4000;
+                lastHideAt = 0;
+
+                // 1. Put the peer back if the freeze killed it.
+                if (inRoom && currentRoomId) {
+                    if (isHost) {
+                        if (!peer || peer.destroyed) {
+                            // keepRoom=true so the room id is re-claimed
+                            // without resetting the table's game state.
+                            try { hostCreate(currentRoomId, 0, true, null); } catch (e) {}
+                        } else if (peer.disconnected) {
+                            try { peer.reconnect(); } catch (e) { tryReconnect(); }
+                        }
+                    } else {
+                        reconnectDelay = 1500;
+                        if (!peer || peer.destroyed || peer.disconnected) tryReconnect();
+                        else if (!hostLink()) dialHost();
+                    }
+                }
+
+                // 2. Tell the open game we are back and re-push its state.
+                //    A game that was frozen mid-turn has no idea time passed.
+                let gid = null;
+                try { gid = openGameId(); } catch (e) {}
+                if (!gid) {
+                    const s = loadSession();
+                    if (s && s.game && GAMES.some(g => g.id === s.game)) { gid = s.game; }
+                }
+                if (gid) {
+                    try { GB.open(gid); } catch (e) {}
+                    try {
+                        GB.updateButtons();
+                        GB.refreshStage();
+                        renderRoomChips();
+                        renderResume();
+                    } catch (e) {}
+                }
+
+                if (wasGone) { try { setStatus(ui.hostStatus, ''); } catch (e) {} }
+            } finally { reviving = false; }
+        }
+
+        // pagehide is the mobile-correct unload signal; beforeunload is kept
+        // for desktop. Whichever fires, a genuine unload tears the socket
+        // down — and revive() rebuilds it if the page turns out to be coming
+        // back (bfcache / unlock), which is the case that used to strand you.
+        window.addEventListener('pagehide', (e) => {
+            if (e.persisted) { lastHideAt = Date.now(); return; }   // going to bfcache — keep state
+            cleanup();
+        });
         window.addEventListener('beforeunload', cleanup);
+        window.addEventListener('pageshow', (e) => {
+            if (e.persisted) revive();
+        });
+        document.addEventListener('visibilitychange', () => {
+            if (document.hidden) { lastHideAt = Date.now(); return; }
+            revive();
+        });
 
         window.addEventListener('error', (e) => {
             try {
@@ -1454,6 +1576,9 @@
                 shrinkChat(true);
                 enterFocus(game);
                 try { broadcastPresence(); refreshRoster(); } catch(e){}
+                // Remember the open game so a reload / phone lock can restore
+                // the table, not just the room.
+                try { saveSession(); } catch(e){}
                 if (!document.body.classList.contains('focus-mode')) {
                     try { f.el.scrollIntoView({ behavior: 'smooth', block: 'start' }); } catch(e) {}
                 }
@@ -1470,6 +1595,7 @@
                 this.updateButtons();
                 this.refreshStage();
                 const stillOpen = openGameId();
+                try { saveSession(); } catch(e){}
                 if (!stillOpen) {
                     shrinkChat(false);
                     exitFocus();
@@ -1863,7 +1989,16 @@
             pendingInviteGame = game || null;
             ui.joinInput.value = room;
             const g = GAMES.find(x => x.id === game);
-            // The name page replaces the whole lobby for invite guests.
+            // The name page replaces the whole lobby for invite guests — but a
+            // returning player must never be made to retype a name the browser
+            // already has. Reuse the same saved-name logic the welcome modal
+            // uses (:513) and the boot check uses (:1794); this block used to
+            // skip both, so the overlay opened on an EMPTY box and doJoin
+            // rejected it even though ui.nameInput held the name.
+            // Only a PERSISTED name counts as "already have one". ui.nameInput is
+            // always pre-filled with a random animal name, so testing it here
+            // would auto-join every first-time visitor as "Panda".
+            const known = loadSavedName();
             const landing = document.getElementById('invite-landing');
             const title = document.getElementById('invite-game-title');
             const roomLine = document.getElementById('invite-room-line');
@@ -1873,13 +2008,28 @@
             if (title) title.textContent = g ? g.title : 'Bub Hub';
             if (g && g.color) title.style.color = g.color;
             if (roomLine) roomLine.textContent = 'room ' + room;
+            const skipGate = () => {
+                if (landing) { landing.classList.add('hidden'); landing.classList.remove('flex'); }
+                ui.lobby.classList.remove('hidden');
+                ui.lobby.classList.add('flex');
+            };
+            if (known){
+                if (nameEl) nameEl.value = known;
+                ui.nameInput.value = known;
+                nameConfirmed = true;
+                renderNameGate();
+                skipGate();
+                joinAsGuest(room);
+                return;
+            }
+            if (nameEl) nameEl.value = (ui.nameInput.value || randomAnimalName()).slice(0, 24);
             if (landing) { landing.classList.remove('hidden'); landing.classList.add('flex'); }
             ui.lobby.classList.add('hidden');
             ui.lobby.classList.remove('flex');
             const say = (msg) => { if (status) { status.textContent = msg; status.classList.remove('hidden'); } };
             const doJoin = () => {
-                const nm = (nameEl.value || '').trim().slice(0, 24);
-                if (!nm) { nameEl.focus(); say('type your name first 👆'); return; }
+                const nm = ((nameEl && nameEl.value) || ui.nameInput.value || '').trim().slice(0, 24);
+                if (!nm) { if (nameEl) nameEl.focus(); say('type your name first 👆'); return; }
                 ui.nameInput.value = nm;
                 nameConfirmed = true;
                 saveName();
@@ -1892,8 +2042,7 @@
             nameEl.addEventListener('keydown', (ev) => { if (ev.key === 'Enter') doJoin(); });
             document.getElementById('btn-invite-skip').addEventListener('click', () => {
                 pendingInviteGame = null;
-                if (landing) { landing.classList.add('hidden'); landing.classList.remove('flex'); }
-                ui.lobby.classList.remove('hidden');
+                skipGate();
             });
             setTimeout(() => { try { nameEl.focus(); } catch (e) {} }, 300);
         })();

@@ -273,7 +273,17 @@ function pseudo(st, c){
         const tc = nr;
         if (tc < 0 || tc > 7) continue;
         const ts = tc * 8 + nf, tp = st.b[ts];
-        if (tp !== '.' && colourOf(tp) === opponent(c)) promo(i, ts);   // capture-promotion
+        if (tp !== '.' && colourOf(tp) === opponent(c)){
+          // Promotion is ONLY legal on the back rank. This branch used to be a
+          // bare `promo(i, ts)` with no guard AND no plain-capture else — so
+          // every pawn capture anywhere on the board was generated as four
+          // promotions and never as itself. Both move entry points (doMove and
+          // the bot) resolve a click by first from/to match and the queen is
+          // pushed first, so every pawn capture in mid-board turned into a
+          // queen instead of a capture.
+          if (nr === lastRow) promo(i, ts);
+          else out.push({ from:i, to:ts, promo:null });
+        }
       }
     } else if (t === 'N'){
       for (const [df, dr] of [[-2,-1],[-2,1],[-1,-2],[-1,2],[1,-2],[1,2],[2,-1],[2,1]]){

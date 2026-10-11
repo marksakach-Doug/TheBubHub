@@ -347,15 +347,25 @@ function pumpIll(){
 // call next(); the choice handler finishes the flow.
 function fitOptions(p, c){
     const opts = [], can = canEq(p, c), cn = wname(c), cv = val(c);
+    // If we would have to throw away a spare to make room, say whether that
+    // is actually a good deal. A usable 9 beats an unusable 14 for a Lv 1-4
+    // player, so "Stow as spare" must not read as a neutral choice when it
+    // silently costs them their good weapon. (spareVal existed for exactly
+    // this and was never called.)
+    const swapNote = (lose, gain) => {
+        const bad = spareVal(p, gain) < spareVal(p, lose);
+        return bad ? ' — WORSE TRADE: ' + wname(lose) + ' is worth keeping to you'
+                   : ' — a fair swap';
+    };
     if (can && p.eq.length < cap(p))
         opts.push({ t: 'Equip ' + cn, d: 'Power ' + cv + ' — gear ' + p.eq.length + '/' + cap(p), go: 'eq' });
     else if (can && p.eq.length && !p.hand.length)
         opts.push({ t: 'Equip ' + cn, d: 'gear is full — you choose a weapon to move to the spare', go: 'place', dropSpare: false });
     else if (can && p.eq.length && p.hand.length)
-        opts.push({ t: 'Equip ' + cn, d: 'gear AND spare full — your spare ' + wname(p.hand[0]) + ' is discarded, and you choose what leaves the gear', go: 'place', dropSpare: true });
+        opts.push({ t: 'Equip ' + cn, d: 'gear AND spare full — your spare ' + wname(p.hand[0]) + ' is discarded, and you choose what leaves the gear' + swapNote(p.hand[0], c), go: 'place', dropSpare: true });
     if (!can || !p.eq.length || p.eq.length >= cap(p)){
         if (!p.hand.length) opts.push({ t: 'Stow as spare', d: 'your one spare slot — kept, not equipped', go: 'spare' });
-        else opts.push({ t: 'Stow as spare', d: 'spare is full — your ' + wname(p.hand[0]) + ' is discarded', go: 'sparedrop' });
+        else opts.push({ t: 'Stow as spare', d: 'spare is full — your ' + wname(p.hand[0]) + ' is discarded' + swapNote(p.hand[0], c), go: 'sparedrop' });
     }
     opts.push({ t: 'Discard ' + cn, d: 'to the loot pile — nothing changes', go: 'drop' });
     return opts;
@@ -499,6 +509,7 @@ function say(t){
 function fresh(dr){
     const nm = rosterNames();
     Hub.names = nm;
+    resetCardAnims();
     const ids = [myId()].concat(Hub.roster.filter(m => m.id !== myId()).map(m => m.id));
     const ps = ids.map(id => ({ id, name: nm[id] || cleanName(id) }));
     S = { cfg: { dread: dr }, pl: ps.map(x => ({ id: x.id, name: x.name, lvl: 1, eq: [], hand: [] })),
@@ -636,6 +647,19 @@ function handle(d){
                 S.phase = 'decide';
                 S.msg = S.pend.why;
             } else { p.hand = []; p.eq.push(x); say(`${pn(p)} equips ${wname(x)}.`); }
+        } else if (d.to === 'dsp'){
+            // Discard the spare. This is the only exit the spare slot has, and
+            // without it a player could get permanently wedged: a face card
+            // below Lv 5 cannot be equipped (:629 refuses it), a lone weapon
+            // cannot be unequipped (:641), and Explore could only offer to
+            // throw away the good spare for the dead one (fitOptions'
+            // `sparedrop`). The oversized unequippable card in the report just
+            // sat there forever.
+            const sp = p.hand[0];
+            if (!sp) return 'Your spare slot is already empty.';
+            p.hand = [];
+            S.lootD.push(sp);
+            say(`${pn(p)} discards ${wname(sp)} from the spare.`);
         } else {
             if (p.eq.length <= 1) return 'Equip something else first — you need a weapon in hand.';
             if (p.hand.length) return 'Your one spare slot is full.';
@@ -790,6 +814,22 @@ function onIntent(d, from){
 }
 function onPeerLeftReset(){ S = null; render(); }
 
+// Cards are bare {r, c} value objects with no identity of their own, so the
+// flip animation is gated on a running multiset of signatures already on the
+// table. Before this, `flip` was hard-coded on every card and every render
+// replaced innerHTML wholesale — so every tap (including a *rejected* one,
+// which still calls broadcast()) replayed the flip on the whole table. That
+// is what read as "the cards just bounce".
+let shownCards = Object.create(null);
+function cardSig(c){ return c.c + c.r; }
+function isNewCard(c){
+    const s = cardSig(c);
+    const n = (shownCards[s] | 0) + 1;
+    shownCards[s] = n;
+    return n === 1;
+}
+function resetCardAnims(){ shownCards = Object.create(null); }
+
 function card(c, attr, big){
     const m = c.c === 'R', n = (m ? MON : WEP)[c.r];
     const leg = 'JQKA'.includes(c.r) || (!m && c.r === '10');
@@ -799,7 +839,8 @@ function card(c, attr, big){
         if (n[2]) tooltip = `toast('${n[0]}: Power ${v} — ${n[2]}')`;
         else if ('JQKA'.includes(c.r)) tooltip = `toast('${n[0]}: Power ${v}')`;
     }
-    return `<div class="lr-c ${m ? 'm' : 'w'}${leg ? ' leg' : ''}${big ? ' big' : ''} flip" ${attr || ''} onclick="${tooltip}"><b>${v}</b><i>${n[1]}</i><u>${n[0]}</u></div>`;
+    const flip = isNewCard(c) ? ' flip' : '';
+    return `<div class="lr-c ${m ? 'm' : 'w'}${leg ? ' leg' : ''}${big ? ' big' : ''}${flip}" ${attr || ''} onclick="${tooltip}"><b>${v}</b><i>${n[1]}</i><u>${n[0]}</u></div>`;
 }
 function deckBox(kind, count, disc, label){
     return `<div class="deck ${kind}"><div class="stack"></div><div><div class="n">${count}</div><div class="cap">${label}</div><div class="dim">discard ${disc}</div></div></div>`;
@@ -963,8 +1004,12 @@ function render(){
         mid += `<div class="lr-zone${mine ? ' you' : ''}"><span class="lr-lbl">EQUIPPED ${p.eq.length}/${cap(p)} (Power: ${power(p)})${p.lvl < 5 ? ' · Lv 1–4: number weapons only' : ''}${gearing ? ' · click to move' : ''}</span>` +
             `<div class="lr-cards" style="min-height:124px">${p.eq.map((x, i) => card(x, gearing ? `data-a="gear" data-to="un" data-i="${i}"` : '', true)).join('') || '<span class="lr-lbl">none</span>'}</div>` +
             gearBtn + `</div>`;
-        mid += `<div class="lr-zone"><span class="lr-lbl">SPARE (1 max)</span>` +
-            `<div class="lr-cards" style="min-height:124px">${p.hand.map(x => card(x, gearing ? 'data-a="gear" data-to="eq"' : '', true)).join('') || '<span class="lr-lbl">empty</span>'}</div></div>`;
+        mid += `<div class="lr-zone"><span class="lr-lbl">SPARE (1 max)${p.hand.length && mine && gearing ? ' · equip or discard' : ''}</span>` +
+            `<div class="lr-cards" style="min-height:124px">${p.hand.map(x => card(x, gearing ? 'data-a="gear" data-to="eq"' : '', true)).join('') || '<span class="lr-lbl">empty</span>'}</div>` +
+            (mine && gearing && p.hand.length
+                ? `<button class="lr-act" data-a="gear" data-to="dsp" style="margin-top:8px;min-height:44px;padding:8px;font-size:13px"><span class="ic" style="font-size:17px">🗑</span><span style="font-weight:800">Discard spare</span></button>`
+                : '') +
+            `</div>`;
     } else {
         mid += `<div class="lr-zone"><span class="lr-lbl">Watching — gear appears once the host seats you.</span></div><div class="lr-zone"></div>`;
     }

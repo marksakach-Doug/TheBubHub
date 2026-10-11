@@ -35,6 +35,15 @@ button.go[disabled]{background:var(--paper);color:#8c8c8c}
 .sense:first-child{padding-right:12px}
 .sense + .sense{border-left:1px solid var(--rule);padding-left:12px}
 .pos{display:block;font-style:italic;color:var(--ash);font-size:.85em;margin:0 0 2px}
+/* Phone: the two meanings used to render at 14px (and the pos tag at ~11.9px)
+   squeezed into two columns. Stack them and give them room to read. */
+@media (max-width:639px){
+  .senses{grid-template-columns:1fr;gap:10px}
+  .sense:first-child{padding-right:0}
+  .sense + .sense{border-left:0;padding-left:0}
+  .sense{font-size:clamp(17px,4.4vw,19px);line-height:1.35}
+  .pos{font-size:.82em;margin:0 0 3px}
+}
 @media (min-width:640px){
   .sense{font-size:clamp(16px,2.4vw,21px)}
   .sense:first-child{padding-right:28px}
@@ -66,7 +75,9 @@ button.go[disabled]{background:var(--paper);color:#8c8c8c}
 .miss{margin:10px 0 0;color:var(--ash);font-size:14px}
 .arbnote{color:#b00000;font-size:13px;text-align:right;margin:6px 0 0;}
 .whybox{margin-top:8px}
-.whybox input{width:100%;font-family:inherit;font-size:15px;line-height:1.4;padding:6px 12px;border:1px solid var(--ink);border-radius:0;background:var(--paper);color:var(--ink)}
+/* 16px is the iOS Safari threshold: any focused field below it makes the page
+   zoom in on a phone and never zoom back out. */
+.whybox input{width:100%;font-family:inherit;font-size:16px;line-height:1.4;padding:6px 12px;border:1px solid var(--ink);border-radius:0;background:var(--paper);color:var(--ink)}
 .whybox input::placeholder{color:#8c8c8c}
 .whys{margin:8px 0 0;display:grid;gap:6px}
 .whyline{font-size:clamp(15px,2.4vw,20px);line-height:1.4;overflow-wrap:anywhere}
