@@ -57,4 +57,6 @@ window.BUB_GAMES = [
   { id: 'chess', file: 'chess.html', title: 'Chess', players: '2', color: '#c89b6d', fill: true, soloable: true,
     icon: '♞', desc: 'Full-rules chess — you are White, against a friend or a simple greedy bot.' },
     { id:'minigo', title:'MiniGo', file:'minigo.html', icon:'⚫', color:'#c98f55', players:'2', soloable:false, desc:'Go on a tiny 7x7 board.' },
+]
+  { id:'96game', title:'The 96 Game', file:'the96game.html', icon:'⚫', color:'#c98f55', players:'2-8', soloable:false, desc:'Go on a tiny 7x7 board.' },
 ];
