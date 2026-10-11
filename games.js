@@ -38,8 +38,7 @@ window.BUB_GAMES = [
 // sides), so it qualifies — it was simply never flagged.
   { id: 'wordbridge', file: 'wordbridge.html', title: 'Word Bridge', players: '2-6', color: '#000000', soloable: true,
     icon: '🌉', desc: 'Everyone writes one word that fits both meanings, then the table judges each bridge.' },
-  { id: 'wordwright', file: 'wordwright.html', title: 'Wordwright', players: '2-6', color: '#a5b4fc',
-  //  icon: '📝', desc: 'Co-write a story one sentence at a time.' },
+  { id: 'wordwright', file: 'wordwright.html', title: 'Wordwright', players: '2-6', color: '#a5b4fc', icon: '📝', desc: 'Co-write a story one sentence at a time.' },
   // solo: playable with no room and no bridge. `lobby: true` also lists it
   // in the lobby so there is something to play while waiting for others.
   // `fill` lets the stage own the viewport (solo games never report a height,
