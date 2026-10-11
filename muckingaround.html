@@ -42,12 +42,94 @@ var POND={x:150,y:430,rx:120,ry:90},TREE={x:310,y:130},TREEB={x:310,y:204},BENCH
 var ICON={note:'📝',apple:'🍎',ball:'🏐',flower:'🌼',lantern:'🏮',stick:'🪵',boot:'🥾',fish:'🐟'};
 var ACT={eat:'😋',sniff:'💛',fish:'🎣',ripple:'〰️',poke:'…',glow:'✨',throw:'💨',wave:'👋',show:'✨',flop:'💦',hop:'🤗',fall:'💫'};
 var $=function(i){return document.getElementById(i)};
+
+var F='english-vietnamese.txt',SIZE=0,WHOLE=null,A=64,dec=new TextDecoder('utf-8');
+
+function fetchWhole(){
+  if(WHOLE)return Promise.resolve(WHOLE);
+  return fetch(F)
+    .then(function(r){
+      if(!r.ok)throw new Error('HTTP '+r.status);
+      return r.arrayBuffer();
+    })
+    .then(function(ab){
+      WHOLE=new Uint8Array(ab);
+      SIZE=WHOLE.length;
+      return WHOLE;
+    });
+}
+
+function rng(a,e){
+  return fetch(F,{headers:{Range:'bytes='+a+'-'+e}})
+    .then(function(r){
+      if(!r.ok)throw new Error('HTTP '+r.status);
+      var cr=r.headers.get('Content-Range');
+      return r.arrayBuffer().then(function(ab){
+        var u=new Uint8Array(ab);
+        if(r.status!==206){
+          WHOLE=u;
+          SIZE=u.length;
+          return {b:u,whole:1};
+        }
+        SIZE=cr?+cr.split('/')[1]:SIZE;
+        return {b:u,whole:0};
+      });
+    })
+    .catch(function(){
+      return fetchWhole().then(function(w){
+        return {b:w,whole:1};
+      });
+    });
+}
+
+function entryFrom(b,p){
+  var s=p,e;
+  while(s<b.length&&b[s]!==A)s++;
+  if(s>=b.length){
+    s=0;
+    while(s<b.length&&b[s]!==A)s++;
+    if(s>=b.length)return '';
+  }
+  e=s+1;
+  while(e<b.length&&b[e]!==A)e++;
+  var text=dec.decode(b.subarray(s,e)).trim();
+  var lines=text.split('\n').filter(function(l){return l.trim().length>0});
+  return lines.slice(0,3).join(' / ');
+}
+
+function oneEntry(tries){
+  if(WHOLE){
+    var pos=Math.floor(Math.random()*SIZE);
+    var entry=entryFrom(WHOLE,pos);
+    return Promise.resolve(entry||'(no entry found)');
+  }
+  if(!SIZE){
+    return rng(0,1024).then(function(){
+      return oneEntry(tries);
+    });
+  }
+  var off=Math.floor(Math.random()*SIZE);
+  return rng(off,Math.min(SIZE-1,off+65535)).then(function(r){
+    var e=entryFrom(r.b,r.whole?off:0);
+    if(!e&&tries<5)return oneEntry(tries+1);
+    return e||'(no entry found)';
+  });
+}
+
+function pickH(){
+  horseLine='...';
+  oneEntry(0)
+    .then(function(e){horseLine=e})
+    .catch(function(){horseLine='Could not load english-vietnamese.txt. Put it in the same folder as this game.'});
+}
+
+var HX=240,HY=300,E=[],horseLine='',near=false,was=false;
 function rnd(a,b){return a+Math.random()*(b-a)}
 function cl(v,a,b){return v<a?a:v>b?b:v}
 function inPond(x,y){var a=(x-POND.x)/POND.rx,b=(y-POND.y)/POND.ry;return a*a+b*b<1}
 function hue(id){var h=7;for(var i=0;i<id.length;i++)h=(h*31+id.charCodeAt(i))%360;return h}
 
-// ---------- hub bridge (same protocol as Word Bridge) ----------
+// ---------- hub bridge ----------
 var Hub={me:null,roster:[],up:function(k,p){try{window.parent.postMessage({t:'gu',game:GID,k:k,p:p},'*')}catch(e){}}};
 var S=null,me={x:150,y:280,f:1,tx:null,ty:null,z:0,mode:0,a:0,ta:0,tp:-1},keys={},vw={},seen={},mvNow=false,dt=0.016,lastSent='';
 function myId(){return Hub.me&&Hub.me.id}
@@ -55,7 +137,7 @@ function isHost(){return !!(Hub.me&&Hub.me.isHost)}
 function heldBy(id){if(!S)return null;for(var i=0;i<S.it.length;i++)if(S.it[i].b===id)return S.it[i];return null}
 function send(d){if(isHost())onIntent(d,{id:myId()});else Hub.up('intent',d)}
 
-// stacks: p.r is the id of the player whose back you are on
+// stacks
 function rootOf(id){var n=0;while(S.p[id]&&S.p[id].r&&n++<500)id=S.p[id].r;return id}
 function kids(id){for(var k in S.p)if(S.p[k].r===id)return k;return null}
 function topOf(id){var n=0,c;while((c=kids(id))&&n++<500)id=c;return id}
@@ -144,7 +226,7 @@ function onIntent(d,from){
     if(p.r||p.tr||!t2||d.to===id||t2.tr)return;
     var rt=rootOf(d.to);
     if(rt===id||S.p[rt].tr||Math.hypot(t2.x-p.x,t2.y-p.y)>80)return;
-    p.r=topOf(d.to);p.z=0;p.a=0;act(p,'hop');   // always onto the top of the stack: no height limit
+    p.r=topOf(d.to);p.z=0;p.a=0;act(p,'hop');
   }else if(d.a==='unride'){
     if(!p.r)return;
     syncRiders();p.r=null;p.z=0;p.a=0;p.tp++;
@@ -156,7 +238,7 @@ function onIntent(d,from){
     var wi=heldBy(id);if(wi&&wi.k==='note')wi.t=String(d.t||'').slice(0,300);
   }
 }
-// Towers wobble, then tumble. Taller means likelier, but there is no height cap.
+
 setInterval(function(){
   if(!S||!isHost())return;
   var H2={};
@@ -168,7 +250,7 @@ setInterval(function(){
   });
 },500);
 
-// ---------- scenery (drawn once) ----------
+// ---------- scenery ----------
 var cv=$('c'),ctx=cv.getContext('2d');ctx.scale(2,2);
 function mk(){var c=document.createElement('canvas');c.width=W*2;c.height=H*2;var x=c.getContext('2d');x.scale(2,2);return[c,x]}
 var B=mk(),bgc=B[0],bx=B[1],O=mk(),oc=O[0],ox=O[1];
@@ -190,7 +272,6 @@ var B=mk(),bgc=B[0],bx=B[1],O=mk(),oc=O[0],ox=O[1];
 })();
 
 // ---------- drawing ----------
-// Emoji are baked once into opaque sprites, so no leftover fillStyle/alpha can ever fade them.
 var SPR={},EF='"Apple Color Emoji","Segoe UI Emoji","Noto Color Emoji",sans-serif';
 function emoji(s,x,y,size){
   var k=s+size,c=SPR[k];
@@ -201,16 +282,24 @@ function emoji(s,x,y,size){
   ctx.drawImage(c,x-c.n/2,y-c.n/2,c.n,c.n);
 }
 function bubble(txt,x,y){
-  ctx.font='13px system-ui';ctx.textBaseline='alphabetic';
-  var ws=txt.split(' '),ls=[],l='';
-  ws.forEach(function(w){var t=l?l+' '+w:w;if(ctx.measureText(t).width>130&&l){ls.push(l);l=w}else l=t});ls.push(l);
-  var bw=Math.min(160,Math.max.apply(null,ls.map(function(q){return ctx.measureText(q).width}))+16),bh=ls.length*16+10;
+  ctx.font='12px system-ui';ctx.textBaseline='alphabetic';
+  var maxW=170,words=txt.split(' '),ls=[],cur='';
+  words.forEach(function(w){
+    var t=cur?cur+' '+w:w;
+    if(ctx.measureText(t).width>maxW&&cur){ls.push(cur);cur=w}
+    else cur=t;
+  });
+  if(cur)ls.push(cur);
+  if(ls.length>4)ls=ls.slice(0,4);
+  var maxLineW=0;
+  ls.forEach(function(q){var w=ctx.measureText(q).width;if(w>maxLineW)maxLineW=w});
+  var bw=Math.min(190,maxLineW+16),bh=ls.length*15+10;
   var bx0=cl(x-bw/2,4,W-bw-4),by=cl(y-bh,2,H-bh-8);
   ctx.globalAlpha=1;ctx.fillStyle='#fff';ctx.beginPath();
-  if(ctx.roundRect)ctx.roundRect(bx0,by,bw,bh,9);else ctx.rect(bx0,by,bw,bh);ctx.fill();
+  if(ctx.roundRect)ctx.roundRect(bx0,by,bw,bh,8);else ctx.rect(bx0,by,bw,bh);ctx.fill();
   ctx.beginPath();ctx.moveTo(x-5,by+bh-1);ctx.lineTo(x+5,by+bh-1);ctx.lineTo(x,by+bh+6);ctx.fill();
   ctx.fillStyle='#1e293b';ctx.textAlign='left';
-  ls.forEach(function(q,i){ctx.fillText(q,bx0+8,by+17+i*16)});
+  ls.forEach(function(q,i){ctx.fillText(q,bx0+8,by+14+i*15)});
 }
 function drawItem(it,now){
   var inP=inPond(it.x,it.y),yy=it.y+(inP?Math.sin(now/500+it.i)*2.5:0);
@@ -275,8 +364,10 @@ function draw(now){
     list.push({y:v.y+L*.01,f:function(){drawP(id,p,x,v.y,v.a,f,mv,L,z,now)}});
     tops.push(function(){topFx(id,p,x,v.y-v.a,now)});
   });
+  list.push({y:HY,f:function(){emoji('🐴',HX,HY,30)}});
+  if(near&&horseLine)tops.push(function(){bubble(horseLine,HX,HY-34)});
   list.sort(function(a,b){return a.y-b.y}).forEach(function(o){o.f()});
-  // evening: a shared slow day/night; lit lanterns cut warm holes in the dusk
+
   var al=Math.max(0,Math.sin(Date.now()/240000*6.2832))*.55;
   if(al>.02){
     ox.globalCompositeOperation='source-over';ox.clearRect(0,0,W,H);ox.fillStyle='rgba(10,18,52,'+al+')';ox.fillRect(0,0,W,H);
@@ -363,7 +454,7 @@ cv.addEventListener('pointerdown',function(e){
 function move(){
   var up=keys.arrowup||keys.w,dn=keys.arrowdown||keys.s,rt=keys.arrowright||keys.d,lf=keys.arrowleft||keys.a;
   var dx=(rt?1:0)-(lf?1:0),dy=(dn?1:0)-(up?1:0);
-  if(me.mode===1){   // up in the branches: up/down climbs, left/right shuffles along a branch
+  if(me.mode===1){
     if(up)me.ta=Math.min(150,me.a+50);else if(dn)me.ta=Math.max(0,me.a-50);
     if(dx&&me.a>20){me.x=cl(me.x+dx*70*dt,TREE.x-45,TREE.x+45);me.f=dx}
     me.a+=cl(me.ta-me.a,-80*dt,80*dt);
@@ -385,11 +476,14 @@ function frame(t){
   dt=Math.min(.05,(t-last)/1000||.016);last=t;
   var id=myId(),mp=S&&id&&S.p[id];
   if(mp){
-    if(mp.tp!==me.tp){me.tp=mp.tp;me.x=mp.x;me.y=mp.y;me.z=0;me.mode=0;me.a=0;me.ta=0;me.tx=null}  // the host moved me (landing, spawn)
+    if(mp.tp!==me.tp){me.tp=mp.tp;me.x=mp.x;me.y=mp.y;me.z=0;me.mode=0;me.a=0;me.ta=0;me.tx=null}
     if(mp.r){var b=place(mp.r);me.x=b.x;me.y=b.y;me.a=0;me.mode=0;me.z=0;me.tx=null;mvNow=false}
     else move();
     if(isHost()&&!mp.r){mp.x=me.x;mp.y=me.y;mp.f=me.f;mp.z=me.z;mp.tr=me.mode;mp.a=me.a}
   }
+  var nr=!!mp&&Math.hypot(me.x-HX,me.y-HY)<60;
+  if(nr&&!was)pickH();
+  was=nr;near=nr;
   draw(Date.now());
   requestAnimationFrame(frame);
 }
@@ -401,7 +495,7 @@ function ui(){
   $('bc').textContent=({off:'Hop off',down:'Climb down',hop:'Hop on',tree:'Climb tree'})[c&&c.k]||'Climb';
   $('bc').style.opacity=c?1:.5;
   var n=S?Object.keys(S.p).length:0;
-  $('hint').textContent='Walk: tap, arrows or WASD. E pick up/put down, F use, G sit, C climb the tree or hop on a friend.'+(n>1?'  '+n+' here.':'');
+  $('hint').textContent=(near&&horseLine)?horseLine:'Walk: tap, arrows or WASD. E pick up/put down, F use, G sit, C climb the tree or hop on a friend.'+(n>1?'  '+n+' here.':'');
 }
 setInterval(function(){
   if(!S||!myId())return;
@@ -409,7 +503,7 @@ setInterval(function(){
   else{var s=[Math.round(me.x),Math.round(me.y),me.f,me.z,me.mode,Math.round(me.a)].join();if(s!==lastSent){lastSent=s;Hub.up('intent',{a:'pos',x:me.x,y:me.y,f:me.f,z:me.z,tr:me.mode,al:me.a})}}
 },130);
 setInterval(ui,250);
-Hub.up('height',720);   // only used outside focus mode
+Hub.up('height',720);
 
 window.addEventListener('message',onDown);
 Hub.up('hello');
