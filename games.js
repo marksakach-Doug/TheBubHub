@@ -24,6 +24,10 @@ window.BUB_GAMES = [
   { id: 'warp', file: 'warpfront.html', title: 'Warp Front', players: '2-3', color: '#00ffcc', soloable: true,
     icon: '🛸', desc: 'Claim a faction and play cards onto planets — first side to five planets wins.' },
   { id: 'lotr', file: 'lotr.html', title: 'LOTR Cards', players: '2-6', color: '#b9c98a',
+    // `grow` (not `fill`): the frame is sized to the game and the WHOLE PAGE
+    // scrolls as one. `fill` would pin the frame to the viewport and make the
+    // game scroll inside it instead, which is a nested scroll on a phone.
+    grow: true,
     icon: '🃏', desc: 'Race to Level 15 while monsters hunt whoever is in the lead.' },
   { id: 'blastoff', file: 'blastoff.html', title: 'Blast Off!', players: '2-6', color: '#00f2ff', soloable: true,
     icon: '🚀', desc: 'Pick destinations and maneuver your rocket; the hand holding most red cards launches first.' },
