@@ -67,6 +67,12 @@ body{margin:0;background:var(--felt);color:var(--ink);font:15px/1.45 Georgia,ser
 .lr-zone{background:rgba(0,0,0,.32);border:1px solid #4d4a3a;border-radius:12px;padding:10px;min-height:150px}
 .lr-zone.you{border-color:var(--green);box-shadow:0 0 12px rgba(155,184,106,.25)}
 .lr-cards{display:flex;gap:10px;flex-wrap:wrap;justify-content:center;min-height:108px;align-items:center}
+/* A row of .lr-act buttons. These used to be laid out with a bare
+   width:100% on the button, so every one wrapped onto its own line and a
+   3-button fight screen took three lines. flex:1 1 260px lets them share a
+   row and wrap only when they genuinely don't fit. */
+.lr-btnrow{gap:10px}
+.lr-btnrow .lr-act{width:auto}
 .lr-c{width:76px;height:108px;border-radius:9px;display:flex;flex-direction:column;align-items:center;justify-content:space-between;padding:6px 3px 5px;border:2px solid;position:relative;flex:none;user-select:none;background:#fff}
 .lr-c.m{background:linear-gradient(#6b4a2b,#3b2815);border-color:#a47a4a;color:#f0e2c4}
 .lr-c.w{background:linear-gradient(#b3b8ae,#6d746a);border-color:#dde1d6;color:#1b2218}
@@ -96,7 +102,7 @@ body{margin:0;background:var(--felt);color:var(--ink);font:15px/1.45 Georgia,ser
 .lm-sub{font:10px monospace;color:var(--dim)}
 .lm.gone{opacity:.45}
 #lr-actions{display:flex;flex-direction:column;gap:10px}
-.lr-act{display:flex;gap:12px;align-items:center;width:100%;text-align:left;background:#33481f;border:2px solid #9bb86a;color:#f0f4e0;border-radius:14px;padding:14px 16px;cursor:pointer;min-height:64px}
+.lr-act{display:flex;gap:12px;align-items:center;flex:1 1 260px;text-align:left;background:#33481f;border:2px solid #9bb86a;color:#f0f4e0;border-radius:14px;padding:14px 16px;cursor:pointer;min-height:64px}
 .lr-act:hover:not([disabled]){transform:translateY(-2px);box-shadow:0 6px 16px rgba(0,0,0,.5)}
 .lr-act:active:not([disabled]){transform:scale(.99)}
 .lr-act[disabled]{opacity:.45;cursor:not-allowed}
@@ -116,6 +122,21 @@ body{margin:0;background:var(--felt);color:var(--ink);font:15px/1.45 Georgia,ser
 #dragon-flash.on{animation:dragonF 1.6s ease}
 @keyframes dragonF{0%{opacity:0}20%{opacity:1}70%{opacity:1}100%{opacity:0}}
 .hidden{display:none!important}
+/* Phone: shave the fixed floors. On a 2-player `choose` turn the page ran to
+   ~900px against a ~750px phone viewport, which is what made every turn feel
+   like a scroll. Cards themselves keep their size (they're the whole point);
+   only the empty-space floors come down. */
+@media (max-width:640px){
+  #lotr-panel{padding:8px;gap:8px}
+  #lr-tablewrap{gap:8px}
+  #lr-status{min-height:0;padding:10px 12px;font-size:17px}
+  .lr-zone{min-height:0;padding:8px}
+  .lr-cards{min-height:0}
+  .lr-midrow{gap:8px}
+  .lr-act{min-height:56px;padding:11px 12px;flex:1 1 100%}
+  .lr-act .tt{font-size:16px}
+  .lr-act .ic{font-size:24px}
+}
 .wf-setup{background:rgba(0,0,0,.4);border:1px solid #4d4a3a;border-radius:10px;padding:10px;display:flex;flex-direction:column;gap:8px}
 .wf-setup select{font:12px monospace;background:#1a1a1a;color:var(--ink);border:1px solid #444;border-radius:8px;padding:5px 8px}
 #standalone-note{max-width:520px;margin:60px auto;text-align:center}
@@ -182,10 +203,18 @@ const Hub = {
     }
 };
 let heightT = null;
+let lastHeightT = 0;
 function reportHeight(){
     clearTimeout(heightT);
     heightT = setTimeout(() => {
         const h = Math.max(document.body.scrollHeight, document.documentElement.scrollHeight);
+        // Only speak when the height ACTUALLY moved. render() runs at the end
+        // of every state message, and act() -> broadcast() -> render() fires
+        // even for a REJECTED action — so this used to re-measure and re-post
+        // on every tap, and the hub re-sized the frame under the player's
+        // thumb. That was most of the "constant scrolling up and down".
+        if (Math.abs(h - lastHeightT) <= 2) return;
+        lastHeightT = h;
         Hub.up('height', h);
     }, 60);
 }
@@ -284,6 +313,19 @@ const power = (p, dr) => p.eq.reduce((s, c) => s + val(c, dr), 0);
 // Spare-slot worth: a weapon you cannot equip yet is worth far less than one
 // you can — a usable 9 beats an unusable 14 for a Lv 1–4 player.
 const spareVal = (p, c) => canEq(p, c) ? val(c) : val(c) - 100;
+// May this player pick a fight this turn? They need at least one weapon they
+// can actually swing — an UNEQUIPPED card in the spare does not count, and
+// neither does a weapon their Level no longer lets them use.
+//
+// This used to be `eq.length > 0 || hand.length > 0`, which let a player
+// holding a single unequippable spare press Fight: power 0 against a minimum
+// 2-power monster is a guaranteed loss, pumpLose() then skipped the discard
+// because the gear was empty, and the whole turn was consumed for nothing.
+//
+// canEq (not just `power > 0`) matters because the level-loss paths never call
+// normLevel, so a player who equipped a King at Level 5 and then dropped back
+// below Level 5 is left holding a weapon that looks real and swings at nothing.
+const canFightNow = (p) => !!p && p.eq.some(x => canEq(p, x) && val(x) > 0);
 function dread(p){
     if (!S.cfg.dread) return 0;
     return Math.max(0, p.lvl - Math.min(...S.pl.filter(x => !x.gone).map(x => x.lvl)));
@@ -676,7 +718,7 @@ function handle(d){
         }
         if (S.pend && S.pend.kind === 'place'){
             if (S.pend.who !== d.pid) return 'Waiting for ' + (S.pl.find(x => x.id === S.pend.who) ? pn(S.pl.find(x => x.id === S.pend.who)) : 'someone') + ' to choose.';
-            if (a !== 'decide' || d.i == null || !S.pend.cards[d.i]) return 'Tap one of the highlighted cards.';
+            if (a !== 'decide' || d.i == null || !S.pend.cards[d.i]) return 'Tap one of the weapon buttons below.';
             return resolvePlace(d.i);
         }
         if (a !== 'decide' || !S.pend || S.pend.who !== d.pid){
@@ -726,7 +768,7 @@ function handle(d){
             S.phase = 'pick'; S.msg = `${pn(c)} explores — draw 2 Loot, keep 1.`; return null;
         }
         if (a === 'fight'){
-            if (!c.eq.length && !c.hand.length) return 'No weapons — you must Explore.';
+            if (!canFightNow(c)) return 'You need an equipped weapon you can use — Explore first.';
             const need = c.lvl >= 10 ? 2 : 1, ms = [];
             for (let i = 0; i < need; i++) {
                 let m = draw('M');
@@ -1029,10 +1071,23 @@ function render(){
             // a new card with explicit options: each button names its cost
             ar = `<span class="lr-lbl">${esc(pd.why || 'choose')}</span>` +
                 `<div class="lr-cards">${card(pd.incoming, '', true)}</div>` +
-                (minePd ? `<div class="lr-cards" style="justify-content:center;gap:10px">${(pd.opts || []).map((o, i) => `<button class="lr-act" data-a="choice" data-i="${i}"><span><span class="tt">${esc(o.t)}</span><br><span class="ss">${esc(o.d)}</span></span></button>`).join('')}</div>`
+                (minePd ? `<div class="lr-cards lr-btnrow" style="justify-content:center">${(pd.opts || []).map((o, i) => `<button class="lr-act" data-a="choice" data-i="${i}"><span><span class="tt">${esc(o.t)}</span><br><span class="ss">${esc(o.d)}</span></span></button>`).join('')}</div>`
                         : `<span class="lr-lbl">waiting for them to choose</span>`);
         } else if (pd.kind === 'place'){
-            ar = `<span class="lr-lbl">GEAR FULL — ${esc(who ? pn(who) : 'choosing')} moves one weapon to the spare${pd.dropSpare ? ' (spare is discarded)' : ''} — ${esc(pd.why || 'tap a weapon')}</span><div class="lr-cards">${pd.cards.map((x, i) => card(x, minePd ? `data-a="decide" data-i="${i}"` : '', true)).join('')}</div>`;
+            // This used to render a bare face-up card with no explanation — and
+            // because the EQUIPPED row above already showed that exact card at
+            // the same size, it looked like the same card twice with nothing
+            // to do. It also never showed what you were GETTING.
+            // Now: show the incoming card, and give one explicit button per
+            // weapon that can be moved out, naming both sides of the trade.
+            // The buttons keep data-a="decide" data-i so the existing dispatch
+            // and resolvePlace() are unchanged — this is presentation only.
+            const inName = pd.incoming ? wname(pd.incoming) : 'the new card';
+            ar = `<span class="lr-lbl">GEAR FULL — choose which weapon leaves the gear to make room for <b>${esc(inName)}</b>${pd.dropSpare ? ' · your spare is also discarded' : ''}</span>` +
+                `<div class="lr-cards">${card(pd.incoming, '', true)}</div>` +
+                (minePd
+                    ? `<div class="lr-cards lr-btnrow">${pd.cards.map((x, i) => `<button class="lr-act" data-a="decide" data-i="${i}"><span><span class="tt">Move ${esc(wname(x))} to the spare</span><br><span class="ss">and equip ${esc(inName)}${pd.dropSpare && S.pl.find(v => v.id === pd.who) && S.pl.find(v => v.id === pd.who).hand[0] ? ' · your ' + esc(wname(S.pl.find(v => v.id === pd.who).hand[0])) + ' is discarded' : ''}</span></span></button>`).join('')}</div>`
+                    : `<span class="lr-lbl">waiting for ${esc(who ? pn(who) : 'them')} to choose</span>`);
         } else {
         const tag = pd.kind === 'lose' ? 'DISCARD ONE' : (pd.kind === 'stash' ? `GEAR FULL — new card: ${wname(pd.incoming)}` : 'SPARE FULL — keep 1');
         const verb = pd.kind === 'lose' ? 'tap the card to DISCARD' : (pd.kind === 'stash' ? 'tap a weapon to move to the spare' : 'tap the card to KEEP');
@@ -1045,7 +1100,11 @@ function render(){
         ar = `<div class="lr-tally" style="font-size:22px">🏆 ${esc(pn(w))} wins the game!</div>` +
             `<div class="sc-chips" style="margin-top:8px">${table}</div>`;
     }
+    // #lr-arena is always a flex item in the table column, so an empty one
+    // still cost a 12px gap above and below. Hide it when there is nothing to
+    // show, which is every phase except the decide prompts.
     $('lr-arena').innerHTML = ar;
+    $('lr-arena').style.display = ar ? '' : 'none';
 
     $('lr-meters').innerHTML = S.pl.map(q =>
         meter(q, false, S.turn === S.pl.indexOf(q) && ph !== 'over', q.id === myId()).replace('class="lm', `data-pid="${q.id}" class="lm`)
@@ -1066,16 +1125,18 @@ function render(){
     if (paused) ac = '';
     else if (ph === 'choose' && mine) {
         // the whole turn in two equal buttons: safe card vs risky levels
-        const canFight = c.eq.length > 0 || c.hand.length > 0;
+        const canFight = canFightNow(c);
         ac = bigBtn('explore', '🔍', 'Explore', 'Safe · keep 1 of 2 Loot cards · no Levels either way.', 'k') +
             (canFight
                 ? bigBtn('fight', '⚔️', 'Fight', 'Win 1 Level (2 if you push your luck) · lose = discard a weapon · ' + fightOdds(c) + '.', '')
-                : `<div class="lr-lbl">No weapons — explore first, then fight.</div>`);
+                : `<div class="lr-lbl">${c.eq.length
+                    ? 'No equipped weapon you can use at Level ' + c.lvl + ' — discard the spare below and explore for a number weapon.'
+                    : 'No equipped weapon — Explore first, then fight.'}</div>`);
     }
     else if (ph === 'fight' && mine) {
         const canPush = !f.pushed && !f.ask && (power(c) + (f.helper ? power(S.pl.find(x => x.id === f.helper)) : 0) >= total());
         const fightButtons = (!f.ask ? bigBtn('ask', '📯', 'Ask for help', 'A teammate adds their weapon Power. They share the spoils.', 'k') : (f.helper ? '' : `<div class="lr-lbl">Waiting for a helper…</div>`)) + (canPush ? bigBtn('push', '🎲', 'Push your luck', 'Flip one more Monster beyond the requirement. Win counts double.', 'k') : '') + bigBtn('resolve', '⚖️', 'Resolve fight', `Power ${power(c) + (f.helper ? power(S.pl.find(x => x.id === f.helper)) : 0)} vs Monsters ${total()}. Exact ties win.`);
-        ac = `<div class="lr-cards" style="justify-content:center; gap:10px; margin-bottom:10px">${fightButtons}</div>`;
+        ac = `<div class="lr-cards lr-btnrow" style="justify-content:center; margin-bottom:10px">${fightButtons}</div>`;
     }
     else if (ph === 'fight' && p && !p.gone && f.ask && !f.helper && p.eq.length) ac = bigBtn('help', '🤝', `Help ${pn(c)}`, `Add +${power(p)} Power. Win: draw 1 Loot or gain 1 Level. Lose: you discard too.`);
     else if (ph === 'boss' && p && !p.gone && !S.boss.ch[myId()]) ac = bigBtn('bchoice', '⚔️', 'Join the battle', 'Your weapons count toward Team Power. Win: +2 Levels.', '', 'data-j="j"') + bigBtn('bchoice', '🏃', 'Stay out', 'Discard 1 equipped weapon. No reward, no risk beyond that.', 'k', 'data-j="o"');

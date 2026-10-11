@@ -89,6 +89,11 @@
            "#game-stage iframe" (1,0,1), so a "hidden" frame would stay
            on screen. This wins and makes GB.close() actually hide games. */
         #game-stage iframe.hidden { display: none !important; }
+        /* Nothing to show until a game opens. Without this the stage is an
+           empty flex child of a gap-4 body and still costs a 16px gap.
+           Specificity (1,1,0) beats Tailwind's `flex`; no focus-mode rule sets
+           display on #game-stage, so there is no fight here. */
+        #game-stage.stage-idle { display: none; }
         .gv-invite-btn { font-weight: 800; font-size: 13px; padding: 4px 16px; border-radius: 12px; flex: none; }
         /* ---- Focus mode: the open game owns the viewport; the hub page never scrolls. ---- */
         #focus-bar { display: none; }
@@ -99,8 +104,20 @@
         body.focus-mode > footer { display: none; }
         body.focus-mode #lobby-ui { display: none !important; }
         body.focus-mode #game-stage { position: fixed; inset: 44px 0 0 0; z-index: 20; margin: 0; padding: 0; gap: 0; }
-        body.focus-mode #game-stage-empty { display: none !important; }
         body.focus-mode #game-stage iframe { height: 100% !important; min-height: 0; border-radius: 0; border-left: 0; border-right: 0; }
+        /* ---- grow mode: a `grow` game scrolls with the PAGE, not inside the frame.
+           Focus mode normally pins the stage (position:fixed, inset:0) and locks
+           body overflow so the game owns the viewport — that produces a nested
+           scroll: the hub page never moves and the game scrolls inside the iframe.
+           For a `grow` game we undo all of that. The frame height still has to be
+           written with !important, because "body.focus-mode #game-stage iframe"
+           is itself !important and would otherwise beat an inline style. ---- */
+        body.focus-mode.grow-stage { overflow: visible; height: auto; min-height: 100dvh; }
+        body.focus-mode.grow-stage #game-stage { position: static !important; inset: auto !important; z-index: auto; padding-top: 44px !important; }
+        /* Leave room for the floating chat pill so it can't sit on top of the
+           bottom of a tall game. */
+        body.focus-mode.grow-stage.in-room #game-stage { padding-bottom: 76px !important; }
+        body.focus-mode.grow-stage #room-ui { position: fixed; }
         body.focus-mode #focus-bar { display: flex; position: fixed; top: 0; left: 0; right: 0; height: 44px; z-index: 40; align-items: center; gap: 10px; padding: 0 10px; background: rgba(15,23,42,.97); border-bottom: 1px solid #334155; }
         #focus-title { font-weight: 800; font-size: 14px; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
         /* In focus mode the room UI becomes a right-side drawer, off-canvas until summoned. */
@@ -235,13 +252,10 @@
     </div>
 
     <!-- Shared game stage (TOP LEVEL): Primary focus of the experience.
-         Games render here as iframes. Empty placeholder shows until a game opens. -->
-    <div id="game-stage" class="flex flex-col gap-4 relative z-10">
-        <div id="game-stage-empty" class="bg-slate-800/60 backdrop-blur px-5 py-6 rounded-2xl border border-dashed border-slate-600 text-center">
-            <p class="text-slate-300 text-sm font-bold">🎮 No game open yet</p>
-            <p class="text-slate-500 text-xs mt-1">Pick a solo game below, or join a room and launch a multiplayer game. It will appear here, above the chat.</p>
-        </div>
-    </div>
+         Games render here as iframes. It holds nothing until a game opens,
+         at which point refreshStage() drops the stage-idle class and it
+         takes up space; otherwise the class hides it so it costs no gap. -->
+    <div id="game-stage" class="flex flex-col gap-4 relative z-10 stage-idle"></div>
 
     <!-- Lobby UI -->
     <div id="lobby-ui" class="grid grid-cols-1 md:grid-cols-2 gap-4 flex-none relative z-10">
@@ -396,8 +410,7 @@
             lobbyGamesCard: document.getElementById('lobby-games-card'),
             lobbyGameButtons: document.getElementById('lobby-game-buttons'),
             gameInvites: document.getElementById('game-invites'),
-            gameStage: document.getElementById('game-stage'),
-            stageEmpty: document.getElementById('game-stage-empty')
+            gameStage: document.getElementById('game-stage')
         };
 
         function randomRoomName() {
@@ -1269,9 +1282,9 @@
             const s = loadSession();
             if (!s || !s.room) return;
             // Restore the game too, not just the room. Without this the stage
-            // came back empty and showed "No game open yet" until the player
-            // hunted for the game button again — which is exactly what happens
-            // after a phone lock drops the page.
+            // came back empty and the player had to hunt for the game button
+            // again — which is exactly what happens after a phone lock drops
+            // the page.
             if (s.game && GAMES.some(g => g.id === s.game)) pendingInviteGame = s.game;
             if (s.host){ ui.hostInput.value = s.room; document.getElementById('btn-host').click(); }
             else { ui.joinInput.value = s.room; document.getElementById('btn-join').click(); }
@@ -1605,8 +1618,14 @@
             },
 
             refreshStage(){
+                // The stage holds nothing but game frames, so "is anything
+                // open" is the same question as "should the stage take up
+                // space at all". It used to toggle a placeholder box inside
+                // the stage; that box is gone, and this keeps the six call
+                // sites (revive/open/close/closeAll/resetAll) working while
+                // making an idle stage cost zero height.
                 const anyOpen = Object.values(this.frames).some(x => !x.el.classList.contains('hidden'));
-                if (ui.stageEmpty) ui.stageEmpty.classList.toggle('hidden', anyOpen);
+                if (ui.gameStage) ui.gameStage.classList.toggle('stage-idle', !anyOpen);
             },
 
             closeAll(){
@@ -1696,15 +1715,7 @@
                     const f = GB.frames[game];
                     if (f && typeof m.p === 'number' && m.p > 0) {
                         f.lastH = m.p;
-                        const g = GAMES.find(x => x.id === game);
-                        if (document.body.classList.contains('focus-mode')) {
-                            // A fill game owns the whole stage; anything else is
-                            // clamped to the viewport so the page never scrolls.
-                            if (g && g.fill) { f.el.style.height = ''; f.el.style.minHeight = '0px'; }
-                            else f.el.style.height = Math.min(m.p, Math.max(200, window.innerHeight - 44)) + 'px';
-                        } else {
-                            f.el.style.height = Math.min(m.p, 4000) + 'px';
-                        }
+                        sizeFrame(f, game);
                     }
                     return;
                 }
@@ -1858,6 +1869,10 @@
             document.body.classList.add('focus-mode');
             const gid = game || openGameId();
             const g = GAMES.find(x => x.id === gid);
+            // A `grow` game opts out of the pinned stage + locked body, so the
+            // whole page scrolls instead of the game scrolling inside a frame
+            // that keeps changing height.
+            document.body.classList.toggle('grow-stage', !!(g && g.grow));
             const t = document.getElementById('focus-title');
             if (t) {
                 const n = peerCount();
@@ -1869,26 +1884,50 @@
         }
         function exitFocus(){
             if (!document.body.classList.contains('focus-mode')) return;
-            document.body.classList.remove('focus-mode');
+            document.body.classList.remove('focus-mode', 'grow-stage');
             closeDrawer();
             Object.entries(GB.frames).forEach(([gid, f]) => {
                 const g = GAMES.find(x => x.id === gid);
+                f.el.style.removeProperty('min-height');
                 f.el.style.minHeight = '420px';
+                f.el.style.removeProperty('height');
                 if (f.lastH) f.el.style.height = Math.min(f.lastH, 4000) + 'px';
                 else if (g && g.height) f.el.style.height = g.height + 'px';
                 else f.el.style.height = '';
             });
         }
-        function sizeStageFrames(){
+        /* Size one frame. Three modes, all in one place — this used to be
+           duplicated across the height-message handler, exitFocus() and
+           sizeStageFrames(), and they had already drifted apart.
+
+             fill  : frame owns the stage; the hub leaves the sizing alone.
+             grow  : frame is sized to the game and the PAGE scrolls as one.
+             other : frame is clamped to the viewport so the page never
+                     scrolls and the game scrolls inside the iframe.
+
+           The `grow` height is written with !important on purpose: the rule
+           "body.focus-mode #game-stage iframe { height: 100% !important }"
+           is itself !important, and an inline style without !important would
+           lose to it. */
+        function sizeFrame(f, game){
+            const g = GAMES.find(x => x.id === game);
             const focused = document.body.classList.contains('focus-mode');
+            f.el.style.removeProperty('height');
+            if (focused && g && g.fill){ f.el.style.height = ''; f.el.style.minHeight = '0px'; return; }
+            if (!f.lastH){ if (g && g.height) f.el.style.height = g.height + 'px'; else f.el.style.height = ''; return; }
+            const px = Math.min(f.lastH, 4000) + 'px';
+            if (!focused || (g && g.grow)){
+                f.el.style.minHeight = focused ? '0px' : '420px';
+                f.el.style.setProperty('height', px, 'important');
+            } else {
+                f.el.style.minHeight = '0px';
+                f.el.style.height = Math.min(f.lastH, Math.max(200, window.innerHeight - 44)) + 'px';
+            }
+        }
+        function sizeStageFrames(){
             Object.entries(GB.frames).forEach(([gid, f]) => {
                 if (f.el.classList.contains('hidden')) return;
-                const g = GAMES.find(x => x.id === gid);
-                if (focused && g && g.fill) { f.el.style.height = ''; f.el.style.minHeight = '0px'; }
-                else if (focused) {
-                    f.el.style.minHeight = '0px';
-                    if (f.lastH) f.el.style.height = Math.min(f.lastH, Math.max(200, window.innerHeight - 44)) + 'px';
-                }
+                sizeFrame(f, gid);
             });
         }
         function openDrawer(){ document.body.classList.add('drawer-open'); hasNewChat = false; renderPill(); const pk = document.getElementById('chat-peek'); if (pk) pk.classList.add('hidden'); }
