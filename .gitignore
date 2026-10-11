@@ -1,0 +1,9 @@
+# Python bytecode from the tests/ suite — never source, and the .pyc files
+# embed the absolute path of whichever machine ran them.
+__pycache__/
+*.pyc
+
+# OS / editor noise
+.DS_Store
+Thumbs.db
+*.swp
