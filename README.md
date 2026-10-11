@@ -540,6 +540,7 @@ Games that render a Menu button should hide it unless `isHost()`.
 | `goldberg.html` | Reference | Best example of the local-host ↔ room transitions, and of `hide`/`show`. |
 | `chess.html` | Reference | Solo + two-player + bot + a real rules engine + seat claims. |
 | `LobbyWaltzEngine.html` | Reference | Simplest `solo` game (no bridge at all). |
+| `the96game.html` | Playable | Telephone game. The chain is **host-only until the reveal** — each player gets their one input over the `denied` channel, which is the hub's only per-player route. Drawing widget lifted from `wordwright.html`. |
 | `lotr.html`, `wordbridge.html`, `blastoff.html`, `eggs.html`, `daltadka.html`, `discover_the_grammar.html`, `wordwright.html`, `DrawDrive.html`, `truths.html` | Playable / WIP | The rest of the arcade. `wordwright` and `DrawDrive` are commented out of the registry. |
 
 ---

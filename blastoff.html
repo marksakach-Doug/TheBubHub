@@ -80,7 +80,7 @@ body{margin:0;background:var(--space);color:var(--ink);font:15px/1.45 'Segoe UI'
    One column now: the FLEET panel is gone and every pilot's ship power
    lives in the score chips instead (see .sc-chip .si). */
 .bo-midrow{display:grid;grid-template-columns:1fr;gap:12px;align-items:start}
-.bo-zone{background:rgba(0,0,0,.32);border:1px solid #334155;border-radius:12px;padding:10px;min-height:150px}
+.bo-zone{background:rgba(0,0,0,.32);border:1px solid #334155;border-radius:12px;padding:10px;min-height:150px;display:flex;flex-direction:column;gap:12px}
 .bo-zone.you{border-color:var(--neon);box-shadow:0 0 12px rgba(0,242,255,0.25)}
 .bo-cards{display:flex;gap:10px;flex-wrap:wrap;justify-content:center;min-height:108px;align-items:center}
 .bo-c{width:76px;height:108px;border-radius:9px;display:flex;flex-direction:column;align-items:center;justify-content:space-between;padding:6px 3px 5px;border:2px solid;position:relative;flex:none;user-select:none;background:#fff}
@@ -94,7 +94,7 @@ body{margin:0;background:var(--space);color:var(--ink);font:15px/1.45 'Segoe UI'
 .bo-c[data-a]:hover{transform:translateY(-3px)}
 .bo-c.flip{animation:flipIn .45s ease}
 @keyframes flipIn{0%{transform:rotateY(90deg) scale(.9);opacity:0}100%{transform:none;opacity:1}}
-#bo-actions{display:flex;flex-direction:column;gap:10px}
+.bo-actions-inner{display:flex;flex-direction:column;gap:8px}
 .bo-act{display:flex;gap:12px;align-items:center;width:100%;text-align:left;background:#1a202c;border:2px solid var(--neon);color:#f0f4ff;border-radius:14px;padding:14px 16px;cursor:pointer;min-height:64px}
 .bo-act:hover:not([disabled]){transform:translateY(-2px);box-shadow:0 6px 16px rgba(0,242,255,0.2)}
 .bo-act:active:not([disabled]){transform:scale(.99)}
@@ -198,11 +198,19 @@ const Hub = {
     init(){
         window.addEventListener('message', onDown);
         this.up('hello');
-        // Opened straight off disk (no hub): run the solo table rather than
-        // dead-ending on a "join a room" note.
-        setTimeout(() => {
-            if (!Hub.me) goSoloLocal();
-        }, 1500);
+
+        // If we are not in an iframe, we are solo.
+        if (window.self === window.top) {
+            goSoloLocal();
+            render();
+        } else {
+            setTimeout(() => {
+                if (!Hub.me) {
+                    goSoloLocal();
+                    render();
+                }
+            }, 1500);
+        }
     }
 };
 /* ---- solo table ----

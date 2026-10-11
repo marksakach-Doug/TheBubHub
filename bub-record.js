@@ -115,6 +115,11 @@ window.BubRecord = (function(){
           if (p.rounds) return recJoinNames(names) + ' played ' + p.rounds + ' rounds at ' + title;
           return recJoinNames(names) + ' played ' + title;
         }
+        if (game === 'the96game' || game === '96game' || game === 'the-96-game'){
+          // Lap-based: the line records how many times the sentence went round.
+          if (p.laps) return recJoinNames(names) + ' played ' + p.laps + ' laps at ' + title;
+          return recJoinNames(names) + ' played ' + title;
+        }
         if (game === 'daltadka' || game === 'dal-tadka'){
           if (p.dish && p.score !== undefined && p.score !== null)
             return getName() + ' cooked ' + p.dish + ' scoring ' + p.score + ' at ' + title;
