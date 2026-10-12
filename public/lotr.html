@@ -41,6 +41,13 @@ body{margin:0;background:var(--felt);color:var(--ink);font:15px/1.45 Georgia,ser
 .sc-chip.on{border-color:var(--gold);color:#fff;box-shadow:0 0 8px rgba(217,180,74,.5)}
 .sc-chip.you{border-color:var(--green)}
 .sc-chip.winner{border-color:var(--gold);background:rgba(217,180,74,.2);color:#ffd76a}
+/* Mini monster chips + mini level meters live inside the VS box. */
+.mon-minis{display:flex;gap:4px;flex-wrap:wrap;justify-content:center;margin-top:2px}
+.mon-mini{font:700 11px system-ui;background:rgba(0,0,0,.45);border:1px solid #a05a4a;border-radius:7px;padding:1px 6px;color:#f0c8b8;white-space:nowrap}
+.mon-mini.dread{border-style:dashed;color:#e0b070;border-color:#a47a4a}
+.sc-chip{position:relative;padding-bottom:6px}
+.sc-chip .meter{position:absolute;left:7px;right:7px;bottom:3px;height:3px;background:#0a0d08;border-radius:2px;overflow:hidden}
+.sc-chip .meter i{display:block;height:100%;border-radius:2px}
 #lr-confetti{position:absolute;inset:0;pointer-events:none;overflow:hidden;z-index:20;border-radius:14px}
 .cf{position:absolute;top:-14px;width:10px;height:14px;opacity:0;animation-name:cfFall;animation-timing-function:ease-in;animation-fill-mode:forwards}
 @keyframes cfFall{0%{opacity:1;transform:translateY(0) rotate(0)}100%{opacity:0;transform:translateY(420px) rotate(var(--r,720deg))}}
@@ -642,11 +649,11 @@ function resolve(){
 }
 const bossP = () => 14 + S.boss.ms.reduce((s, c) => s + val(c, true), 0);
 function startBoss(){
-    const n = S.pl.filter(p => !p.gone).length, ms = [];
-    for (let i = 0; i < n; i++) ms.push(draw('M'));
-    S.boss = { ms, ch: {} }; S.fight = null; S.phase = 'boss';
+    // No cards drawn yet: extras scale with JOINERS (drawn at resolve time),
+    // and Dragon power stays hidden until everyone has chosen.
+    S.boss = { ms: [], ch: {} }; S.fight = null; S.phase = 'boss';
     S.pl.forEach(p => { if (p.gone) S.boss.ch[p.id] = 'x'; });
-    say(`🐉 THE DRAGON! Boss Power ${bossP()}. Everyone: Join or Stay Out.`);
+    say(`🐉 THE DRAGON! Everyone: Join or Stay Out.`);
     S.msg = 'The Dragon awakens — Join or Stay Out.';
     const df = $('dragon-flash');
     if (df){ df.classList.remove('on'); void df.offsetWidth; df.classList.add('on'); }
@@ -657,6 +664,8 @@ function resolveBoss(){
     S.pl.filter(p => B.ch[p.id] === 'o').forEach(p => { say(`${pn(p)} flees.`); queueLose(p); });
     const J = S.pl.filter(p => B.ch[p.id] === 'j');
     J.forEach(p => { pw[p.id] = power(p, true); });
+    // One extra card per JOINED player, drawn now that joiners are known.
+    J.forEach(() => B.ms.push(draw('M')));
     const team = Object.values(pw).reduce((a, b) => a + b, 0);
     while (team === bossP()) B.ms.push(draw('M'));
     const win = team > bossP();
@@ -922,7 +931,14 @@ function gearNames(p){ return p.eq.map(wname).join(' + ') || 'no weapons'; }
 function lvlRule(p){ return p.lvl >= 10 ? '2 equipped max · 2 monsters' : p.lvl >= 5 ? 'any weapon · 1 monster' : 'number weapons · 1 monster'; }
 function chip(q, turn, you, win){
     const tip = `Lv ${q.lvl} · ⚔${power(q)} · ${gearNames(q)} · ${lvlRule(q)}${q.gone ? ' · out' : ''}${turn ? ' · to move' : ''}`;
-    return `<span class="sc-chip${turn ? ' on' : ''}${you ? ' you' : ''}${win ? ' winner' : ''}" title="${esc(tip)}">${esc(pn(q))}${you ? ' (you)' : ''} <span class="pw">⚔${power(q)} · Lv ${q.lvl}</span></span>`;
+    const pct = Math.min(100, Math.max(0, (q.lvl - 1) / 14 * 100));
+    const col = q.lvl >= 15 ? '#d9b44a' : q.lvl >= 10 ? '#b0523c' : q.lvl >= 5 ? '#b98a3c' : '#7a9b4f';
+    return `<span class="sc-chip${turn ? ' on' : ''}${you ? ' you' : ''}${win ? ' winner' : ''}" title="${esc(tip)}">${esc(pn(q))}${you ? ' (you)' : ''} <span class="pw">⚔${power(q)} · Lv ${q.lvl}</span><span class="meter"><i style="width:${pct}%;background:${col}"></i></span></span>`;
+}
+// Tiny monster chips for the VS box: emoji + value, full name in tooltip.
+function monMini(c){
+    const m = c.c === 'R', n = (m ? MON : WEP)[c.r];
+    return `<span class="mon-mini" title="${esc(n[0])} (${val(c, true)})">${n[1]}${val(c, true)}</span>`;
 }
 // Big central scoreboard: current scores for the monster and the player(s).
 function scoreboard(){
@@ -934,16 +950,26 @@ function scoreboard(){
     let L, R, verdict = '', vcls = '';
     if (ph === 'boss'){
         const team = S.pl.filter(q => S.boss.ch[q.id] === 'j').reduce((s, q) => s + power(q, true), 0);
+        const done = Object.keys(S.boss.ch).length, totalN = S.pl.length;
+        const revealed = S.pl.every(x => S.boss.ch[x.id]);
         const bp = bossP();
-        L = { cap: 'TEAM POWER', n: team, sub: S.pl.filter(q => S.boss.ch[q.id] === 'j').map(pn).join(', ') || 'nobody joined yet', you: true, win: team > bp };
-        R = { cap: '🐉 DRAGON', n: bp, sub: S.boss.ms.map(wname).join(' + '), mon: true };
-        verdict = team > bp ? 'DRAGON FALLS' : (team < bp ? 'DRAGON WINS' : 'TIE — DRAGON HOLDS');
-        vcls = team > bp ? 'win' : (team < bp ? 'lose' : 'boss');
+        L = { cap: 'TEAM POWER', n: team, sub: S.pl.filter(q => S.boss.ch[q.id] === 'j').map(pn).join(', ') || 'nobody joined yet', you: true, win: revealed && team > bp };
+        if (revealed){
+            R = { cap: '🐉 DRAGON', n: bp, sub: S.boss.ms.map(wname).join(' + '), mon: true,
+                  minis: S.boss.ms.map(monMini).join('') + `<span class="mon-mini" title="Dragon (14)">🐉14</span>` };
+            verdict = team > bp ? 'DRAGON FALLS' : (team < bp ? 'DRAGON WINS' : 'TIE — DRAGON HOLDS');
+            vcls = team > bp ? 'win' : (team < bp ? 'lose' : 'boss');
+        } else {
+            R = { cap: '🐉 DRAGON', n: '?', sub: `${done}/${totalN} decided — join or stay out`, mon: true, minis: '' };
+            verdict = '🐉 DRAGON STIRS';
+            vcls = 'boss';
+        }
     } else if ((ph === 'fight' || ph === 'hreward') && f){
         const h = f.helper && S.pl.find(x => x.id === f.helper);
         const P = power(c) + (h ? power(h) : 0), T = total();
         L = { cap: (p && p.id === c.id ? 'YOUR POWER' : pn(c).toUpperCase() + "'S POWER"), n: P, sub: gearNames(c) + (h ? ' + ' + pn(h) : ''), you: !!(p && p.id === c.id), win: P >= T };
-        R = { cap: 'MONSTERS', n: T, sub: f.mons.map(wname).join(' + ') + (dread(c) ? ' + dread' : ''), mon: true };
+        R = { cap: 'MONSTERS', n: T, sub: f.mons.map(wname).join(' + ') + (dread(c) ? ' + dread' : ''), mon: true,
+              minis: f.mons.map(monMini).join('') + (dread(c) ? `<span class="mon-mini dread" title="Rising Dread hunts the leader">+${dread(c)} dread</span>` : '') };
         verdict = P >= T ? 'WINNING' : 'LOSING';
         vcls = P >= T ? 'win' : 'lose';
     } else if (over && w){
@@ -959,7 +985,9 @@ function scoreboard(){
         vcls = '';
     }
     const side = (s) => `<div class="sc-side${s.you ? ' you' : ''}${s.mon ? ' mon' : ''}${s.win ? ' win' : ''}">` +
-        `<div class="sc-cap">${esc(s.cap)}</div><div class="sc-n">${esc(String(s.n))}</div><div class="sc-sub" title="${esc(s.sub)}">${esc(s.sub)}</div></div>`;
+        `<div class="sc-cap">${esc(s.cap)}</div><div class="sc-n">${esc(String(s.n))}</div>` +
+        (s.minis ? `<div class="mon-minis">${s.minis}</div>` : '') +
+        `<div class="sc-sub" title="${esc(s.sub)}">${esc(s.sub)}</div></div>`;
     const monBadge = `<div>${deckBox('red mini', S.mon.length, S.monD.length, 'MONSTERS')}</div>`;
     el.innerHTML = `<div class="sc-vsrow">${monBadge}${side(L)}<div class="sc-vs"><div class="x">⚔</div><div class="sc-verdict ${vcls}">${esc(verdict)}</div></div>${side(R)}</div>` +
         `<div class="sc-chips">${S.pl.map(q => chip(q, !over && S.turn === S.pl.indexOf(q), q.id === myId(), over && S.win === q.id)).join('')}</div>`;
@@ -986,12 +1014,10 @@ function render(){
         if (lastWinShown !== S.win){ lastWinShown = S.win; confettiBurst(); }
     } else if (lastWinShown){ lastWinShown = null; const cb = $('lr-confetti'); if (cb) cb.innerHTML = ''; }
 
-    // Monsters deck lives in the VS row now; topdeck shows only live cards.
-    let td = '';
-    if (f && (ph === 'fight' || ph === 'hreward')) td += `<div class="lr-cards">${f.mons.map(x => card(x)).join('')}</div><div class="lr-tally">Monsters ${total()}${dread(c) ? ` <small>(incl. +${dread(c)} dread)</small>` : ''}</div>`;
-    if (ph === 'boss') td += `<div class="lr-cards">${S.boss.ms.map(x => card(x)).join('')} ${card({r:'A', c:'R'}, '', true)}</div><div class="lr-tally">Boss Power ${bossP()} <small>· ${Object.keys(S.boss.ch).length}/${S.pl.length} decided</small></div>`;
-    $('lr-topdeck').innerHTML = td ? `<div class="lr-deckrow">${td}</div>` : '';
-    $('lr-topdeck').style.display = td ? '' : 'none';
+    // Fight/boss monsters render as mini chips beside the VS number now;
+    // the topdeck row stays hidden during play.
+    $('lr-topdeck').innerHTML = '';
+    $('lr-topdeck').style.display = 'none';
 
     scoreboard();
 
@@ -1002,10 +1028,10 @@ function render(){
         if (ph === 'fight' && mine) {
             gearBtn = `<button class="lr-act compact" data-a="resolve" title="Resolve the fight now" style="margin-top:8px"><span class="ic">⚖️</span><span class="tt">Resolve</span></button>`;
         }
-        mid += `<div class="lr-zone${mine ? ' you' : ''}"><span class="lr-lbl">EQUIPPED ${p.eq.length}/${cap(p)} (Power: ${power(p)})${p.lvl < 5 ? ' · Lv 1–4: number weapons only' : ''}${gearing ? ' · click to move' : ''}</span>` +
+        mid += `<div class="lr-zone${mine ? ' you' : ''}"><span class="lr-lbl">YOUR EQUIPPED (${esc(pn(p))}) ${p.eq.length}/${cap(p)} (Power: ${power(p)})${p.lvl < 5 ? ' · Lv 1–4: number weapons only' : ''}${gearing ? ' · click to move' : ''}</span>` +
             `<div class="lr-cards">${p.eq.map((x, i) => card(x, gearing ? `data-a="gear" data-to="un" data-i="${i}"` : '', true)).join('') || '<span class="lr-lbl">none</span>'}</div>` +
             gearBtn + `</div>`;
-        mid += `<div class="lr-zone"><span class="lr-lbl">SPARE (1 max)${p.hand.length && mine && gearing ? ' · equip or discard' : ''}</span>` +
+        mid += `<div class="lr-zone"><span class="lr-lbl">YOUR SPARE (${esc(pn(p))}, 1 max)${p.hand.length && mine && gearing ? ' · equip or discard' : ''}</span>` +
             `<div class="lr-cards">${p.hand.map(x => card(x, gearing ? 'data-a="gear" data-to="eq"' : '', true)).join('') || '<span class="lr-lbl">empty</span>'}</div>` +
             (mine && gearing && p.hand.length
                 ? `<button class="lr-act compact" data-a="gear" data-to="dsp" title="Discard the spare card to the loot pile" style="margin-top:6px"><span class="ic">🗑</span><span class="tt">Discard</span></button>`
@@ -1027,9 +1053,12 @@ function render(){
         const pd = S.pend, who = S.pl.find(x => x.id === pd.who);
         const minePd = pd.who === myId() && !paused;
         if (pd.kind === 'fit' || pd.kind === 'illegal'){
-            // a new card with explicit options: each button names its cost
-            ar = `<span class="lr-lbl">${esc(pd.why || 'choose')}</span>` +
-                `<div class="lr-cards">${card(pd.incoming, '', true)}</div>` +
+            // a new card with explicit options: each button names its cost.
+            // Another player's card renders dimmed + owner-labeled so it
+            // never reads as your own gear.
+            const owner = minePd ? '' : `${esc(who ? pn(who) : 'Someone')}'s card — `;
+            ar = `<span class="lr-lbl">${owner}${esc(pd.why || 'choose')}</span>` +
+                `<div class="lr-cards"${minePd ? '' : ' style="opacity:.55"'}>${card(pd.incoming, '', true)}</div>` +
                 (minePd ? `<div class="lr-cards lr-btnrow" style="justify-content:center">${(pd.opts || []).map((o, i) => `<button class="lr-act" data-a="choice" data-i="${i}"><span><span class="tt">${esc(o.t)}</span><br><span class="ss">${esc(o.d)}</span></span></button>`).join('')}</div>`
                         : `<span class="lr-lbl">waiting for them to choose</span>`);
         } else if (pd.kind === 'place'){
@@ -1042,15 +1071,16 @@ function render(){
             // The buttons keep data-a="decide" data-i so the existing dispatch
             // and resolvePlace() are unchanged — this is presentation only.
             const inName = pd.incoming ? wname(pd.incoming) : 'the new card';
-            ar = `<span class="lr-lbl">GEAR FULL — choose which weapon leaves the gear to make room for <b>${esc(inName)}</b>${pd.dropSpare ? ' · your spare is also discarded' : ''}</span>` +
-                `<div class="lr-cards">${card(pd.incoming, '', true)}</div>` +
+            const ownerP = minePd ? '' : `${esc(who ? pn(who) : 'Someone')}'s cards — `;
+            ar = `<span class="lr-lbl">${ownerP}GEAR FULL — choose which weapon leaves the gear to make room for <b>${esc(inName)}</b>${pd.dropSpare ? ' · your spare is also discarded' : ''}</span>` +
+                `<div class="lr-cards"${minePd ? '' : ' style="opacity:.55"'}>${card(pd.incoming, '', true)}</div>` +
                 (minePd
                     ? `<div class="lr-cards lr-btnrow">${pd.cards.map((x, i) => `<button class="lr-act" data-a="decide" data-i="${i}"><span><span class="tt">Move ${esc(wname(x))} to the spare</span><br><span class="ss">and equip ${esc(inName)}${pd.dropSpare && S.pl.find(v => v.id === pd.who) && S.pl.find(v => v.id === pd.who).hand[0] ? ' · your ' + esc(wname(S.pl.find(v => v.id === pd.who).hand[0])) + ' is discarded' : ''}</span></span></button>`).join('')}</div>`
                     : `<span class="lr-lbl">waiting for ${esc(who ? pn(who) : 'them')} to choose</span>`);
         } else {
         const tag = pd.kind === 'lose' ? 'DISCARD ONE' : (pd.kind === 'stash' ? `GEAR FULL — new card: ${wname(pd.incoming)}` : 'SPARE FULL — keep 1');
         const verb = pd.kind === 'lose' ? 'tap the card to DISCARD' : (pd.kind === 'stash' ? 'tap a weapon to move to the spare' : 'tap the card to KEEP');
-        ar = `<span class="lr-lbl">${esc(tag)} — ${esc(who ? pn(who) : 'choosing')} (${verb})</span><div class="lr-cards">${pd.cards.map((x, i) => card(x, minePd ? `data-a="decide" data-i="${i}"` : '', true)).join('')}</div>`;
+        ar = `<span class="lr-lbl">${minePd ? '' : esc((who ? pn(who) : 'Someone') + "'s cards — ")}${esc(tag)} — ${esc(who ? pn(who) : 'choosing')} (${verb})</span><div class="lr-cards"${minePd ? '' : ' style="opacity:.55"'}>${pd.cards.map((x, i) => card(x, minePd ? `data-a="decide" data-i="${i}"` : '', true)).join('')}</div>`;
         }
     } else if (ph === 'over'){
         const w = S.pl.find(x => x.id === S.win);
