@@ -8,18 +8,16 @@
 :root{--ink:#e4d8b8;--dim:#a7a58f;--gold:#d9b44a;--green:#9bb86a;--felt:#1c241b;}
 *{box-sizing:border-box}
 body{margin:0;background:var(--felt);color:var(--ink);font:15px/1.45 Georgia,serif;}
-#lotr-panel{max-width:960px;margin:0 auto;padding:12px;display:flex;flex-direction:column;gap:12px;}
+#lotr-panel{max-width:960px;margin:0 auto;padding:8px;display:flex;flex-direction:column;gap:8px;}
 .lr-head{display:flex;flex-wrap:wrap;align-items:center;justify-content:space-between;gap:8px;}
 .lr-t{color:#b9c98a;font-weight:900;letter-spacing:.2em;font-size:20px}
 .lr-b{font:700 13px system-ui;padding:8px 16px;border-radius:12px;border:1px solid #4d4a3a;background:#4f6b3a;color:#f0f4e0;cursor:pointer;}
 .lr-b.k{background:#6b4a2b}
 .lr-b[disabled]{opacity:.4;cursor:not-allowed}
 #lr-err{font:11px monospace;color:#ff8888}
-#lr-status{background:rgba(0,0,0,.45);border:2px solid #6f8a4a;border-radius:14px;padding:14px 16px;font-size:19px;font-weight:700;text-align:center;color:#f2ecd8;box-shadow:0 4px 18px rgba(0,0,0,.5);min-height:70px;display:flex;flex-direction:column;justify-content:center;align-items:center}
-#lr-status small{display:block;font-size:12px;font-weight:400;color:var(--dim);margin-top:4px}
-/* Static action buttons live in the same table box as the player's gear.
-   All buttons are always present; the ones that don't apply are dimmed. */
-.lr-actrow{display:flex;flex-wrap:wrap;gap:10px;padding:8px 0}
+/* Top status banner removed (single-page layout): turn state lives in
+   the veil ribbon + scoreboard verdict. */
+.lr-actrow{display:flex;flex-wrap:wrap;gap:8px;padding:6px 0}
 .lr-actrow .lr-act{flex:1 1 220px}
 .lr-act[disabled].hint{animation:none}
 #lr-score{background:rgba(0,0,0,.5);border:2px solid var(--gold);border-radius:14px;padding:10px 12px;display:flex;flex-direction:column;gap:8px}
@@ -27,7 +25,7 @@ body{margin:0;background:var(--felt);color:var(--ink);font:15px/1.45 Georgia,ser
 .sc-side{flex:1;text-align:center;min-width:0}
 .sc-cap{font:700 11px system-ui;letter-spacing:.15em;color:var(--dim)}
 .sc-side.you .sc-cap{color:#b9c98a}
-.sc-n{font-size:52px;font-weight:900;line-height:1.05;color:#f2ecd8;text-shadow:0 2px 10px rgba(0,0,0,.7)}
+.sc-n{font-size:36px;font-weight:900;line-height:1.05;color:#f2ecd8;text-shadow:0 2px 10px rgba(0,0,0,.7)}
 .sc-side.mon .sc-n{color:#f0b6a0}
 .sc-side.win .sc-n{color:#ffd76a;text-shadow:0 0 18px rgba(217,180,74,.8)}
 .sc-sub{font-size:11px;color:var(--dim);min-height:14px;overflow:hidden;text-overflow:ellipsis;white-space:nowrap}
@@ -46,11 +44,8 @@ body{margin:0;background:var(--felt);color:var(--ink);font:15px/1.45 Georgia,ser
 #lr-confetti{position:absolute;inset:0;pointer-events:none;overflow:hidden;z-index:20;border-radius:14px}
 .cf{position:absolute;top:-14px;width:10px;height:14px;opacity:0;animation-name:cfFall;animation-timing-function:ease-in;animation-fill-mode:forwards}
 @keyframes cfFall{0%{opacity:1;transform:translateY(0) rotate(0)}100%{opacity:0;transform:translateY(420px) rotate(var(--r,720deg))}}
-#lr-status.winner{background:linear-gradient(135deg,#4a3a10,#2a2410);border:2px solid var(--gold);box-shadow:0 0 30px rgba(217,180,74,.6);animation:winGlow 1.4s infinite}
-@keyframes winGlow{0%,100%{box-shadow:0 0 18px rgba(217,180,74,.4)}50%{box-shadow:0 0 34px rgba(217,180,74,.8)}}
-#lr-status .win-big{font-size:30px;font-weight:900;color:#ffd76a;letter-spacing:.02em}
-#lr-status .win-sub{font-size:13px;color:#e4d8b8;font-weight:400;margin-top:4px}
-#lr-tablewrap{position:relative;background:rgba(0,0,0,.28);border:1px solid #4d4a3a;border-radius:14px;padding:12px;display:flex;flex-direction:column;gap:12px;overflow:hidden}
+/* Winner glow now lives on the scoreboard verdict + arena (banner removed). */
+#lr-tablewrap{position:relative;background:rgba(0,0,0,.28);border:1px solid #4d4a3a;border-radius:14px;padding:8px;display:flex;flex-direction:column;gap:8px;overflow:hidden}
 .lr-lbl{font:11px monospace;color:var(--dim);letter-spacing:.05em}
 .lr-deckrow{display:flex;gap:14px;align-items:stretch;justify-content:center;flex-wrap:wrap}
 .deck{background:rgba(0,0,0,.4);border:1px solid #4d4a3a;border-radius:12px;padding:10px 14px;display:flex;gap:10px;align-items:center;min-width:200px}
@@ -60,27 +55,32 @@ body{margin:0;background:var(--felt);color:var(--ink);font:15px/1.45 Georgia,ser
 .deck .n{font-size:26px;font-weight:900;color:#fff}
 .deck .cap{font-size:12px;font-weight:700}
 .deck .dim{font:11px monospace;color:var(--dim)}
+/* Compact monsters badge docked far-left inside the VS container. */
+.deck.mini{padding:4px 8px;gap:8px;min-width:0;border-radius:8px;flex:none;align-self:center}
+.deck.mini .stack{width:22px;height:32px;border-radius:5px;box-shadow:1px 1px 0 #111,2px 2px 0 #0a0a0a;border-width:1px}
+.deck.mini .n{font-size:15px;line-height:1}
+.deck.mini .cap{font-size:9px;letter-spacing:.08em}
 .deck .newcard{animation:dealPop .4s cubic-bezier(.34,1.56,.64,1)}
 @keyframes dealPop{0%{transform:translateY(-14px) scale(.8);opacity:0}100%{transform:none;opacity:1}}
-.lr-midrow{display:grid;grid-template-columns:220px 1fr 220px;gap:12px;align-items:start}
+.lr-midrow{display:grid;grid-template-columns:200px 1fr 200px;gap:8px;align-items:start}
 @media(max-width:640px){.lr-midrow{grid-template-columns:1fr}}
-.lr-zone{background:rgba(0,0,0,.32);border:1px solid #4d4a3a;border-radius:12px;padding:10px;min-height:150px}
+.lr-zone{background:rgba(0,0,0,.32);border:1px solid #4d4a3a;border-radius:12px;padding:8px;min-height:0}
 .lr-zone.you{border-color:var(--green);box-shadow:0 0 12px rgba(155,184,106,.25)}
-.lr-cards{display:flex;gap:10px;flex-wrap:wrap;justify-content:center;min-height:108px;align-items:center}
+.lr-cards{display:flex;gap:8px;flex-wrap:wrap;justify-content:center;min-height:0;align-items:center}
 /* A row of .lr-act buttons. These used to be laid out with a bare
    width:100% on the button, so every one wrapped onto its own line and a
    3-button fight screen took three lines. flex:1 1 260px lets them share a
    row and wrap only when they genuinely don't fit. */
 .lr-btnrow{gap:10px}
 .lr-btnrow .lr-act{width:auto}
-.lr-c{width:76px;height:108px;border-radius:9px;display:flex;flex-direction:column;align-items:center;justify-content:space-between;padding:6px 3px 5px;border:2px solid;position:relative;flex:none;user-select:none;background:#fff}
+.lr-c{width:64px;height:92px;border-radius:9px;display:flex;flex-direction:column;align-items:center;justify-content:space-between;padding:6px 3px 5px;border:2px solid;position:relative;flex:none;user-select:none;background:#fff}
 .lr-c.m{background:linear-gradient(#6b4a2b,#3b2815);border-color:#a47a4a;color:#f0e2c4}
 .lr-c.w{background:linear-gradient(#b3b8ae,#6d746a);border-color:#dde1d6;color:#1b2218}
 .lr-c.leg{box-shadow:0 0 12px var(--gold)}
-.lr-c.big{width:88px;height:124px}
+.lr-c.big{width:72px;height:100px}
 .lr-c b{position:absolute;top:-9px;left:-9px;min-width:26px;height:26px;padding:0 4px;border-radius:13px;background:#2d3b24;border:2px solid #9bb86a;color:#e9f2d0;font:700 12px/22px system-ui;text-align:center}
-.lr-c i{font-style:normal;font-size:40px;line-height:1;margin-top:14px}
-.lr-c.big i{font-size:48px}
+.lr-c i{font-style:normal;font-size:32px;line-height:1;margin-top:14px}
+.lr-c.big i{font-size:38px}
 .lr-c u{text-decoration:none;font-size:10px;font-weight:700;text-align:center;line-height:1.1}
 .lr-c[data-a]{cursor:pointer}
 .lr-c[data-a]:hover{transform:translateY(-3px)}
@@ -88,28 +88,19 @@ body{margin:0;background:var(--felt);color:var(--ink);font:15px/1.45 Georgia,ser
 @keyframes flipIn{0%{transform:rotateY(90deg) scale(.9);opacity:0}100%{transform:none;opacity:1}}
 .lr-tally{font-size:17px;font-weight:700;padding:4px 6px;text-align:center}
 .lr-tally small{font-size:11px;color:var(--dim)}
-.lr-meters{display:flex;gap:8px;flex-wrap:wrap}
-.lm{flex:1 1 150px;background:rgba(0,0,0,.35);border:1px solid #4d4a3a;border-radius:12px;padding:8px 10px}
-.lm.you{border-color:var(--green);box-shadow:0 0 10px rgba(155,184,106,.3)}
-.lm.on{border-color:var(--gold)}
-.lm-top{display:flex;justify-content:space-between;align-items:baseline;font-weight:700}
-.lm-top .lv{font-size:22px;color:#e9f2d0}
-.lm.you .lm-top .lv{font-size:28px}
-.lm-bar{position:relative;height:14px;background:#0a0d08;border:1px solid #4d4a3a;border-radius:7px;margin:6px 0;overflow:visible}
-.lm-fill{height:100%;border-radius:6px;background:#7a9b4f;transition:width .6s ease,background .6s ease}
-.lm .tick{position:absolute;top:-4px;width:2px;height:20px;background:#8a8870}
-.lm .tick span{position:absolute;top:-15px;left:-14px;font:9px monospace;color:var(--dim);white-space:nowrap}
-.lm-sub{font:10px monospace;color:var(--dim)}
-.lm.gone{opacity:.45}
-#lr-actions{display:flex;flex-direction:column;gap:10px}
-.lr-act{display:flex;gap:12px;align-items:center;flex:1 1 260px;text-align:left;background:#33481f;border:2px solid #9bb86a;color:#f0f4e0;border-radius:14px;padding:14px 16px;cursor:pointer;min-height:64px}
+/* Level meters removed: Lv/Power live in the scoreboard chips now. */
+#lr-actions{display:flex;flex-direction:column;gap:8px}
+.lr-act{display:flex;gap:8px;align-items:center;flex:1 1 140px;text-align:left;background:#33481f;border:2px solid #9bb86a;color:#f0f4e0;border-radius:10px;padding:8px 10px;cursor:pointer;min-height:40px}
 .lr-act:hover:not([disabled]){transform:translateY(-2px);box-shadow:0 6px 16px rgba(0,0,0,.5)}
 .lr-act:active:not([disabled]){transform:scale(.99)}
 .lr-act[disabled]{opacity:.45;cursor:not-allowed}
 .lr-act.k{background:#4a3418;border-color:#a47a4a}
-.lr-act .ic{font-size:30px;flex:none}
-.lr-act .tt{font-size:17px;font-weight:800}
-.lr-act .ss{font-size:12px;color:#d8cfae;font-weight:400}
+.lr-act .ic{font-size:18px;flex:none}
+.lr-act .tt{font-size:13px;font-weight:800}
+.lr-act .ss{font-size:11px;color:#d8cfae;font-weight:400}
+/* Compact single-word action buttons: explanation lives in title tooltip. */
+.lr-act.compact{justify-content:center;text-align:center}
+.lr-act.compact .ss{display:none}
 /* Not-your-turn state. This used to be a full-table scrim:
    background:rgba(8,10,7,.55) + backdrop-filter:blur(1px) covering topdeck,
    scoreboard, gear, arena and meters. The table was already live behind it
@@ -137,13 +128,12 @@ body{margin:0;background:var(--felt);color:var(--ink);font:15px/1.45 Georgia,ser
 @media (max-width:640px){
   #lotr-panel{padding:8px;gap:8px}
   #lr-tablewrap{gap:8px}
-  #lr-status{min-height:0;padding:10px 12px;font-size:17px}
   .lr-zone{min-height:0;padding:8px}
   .lr-cards{min-height:0}
   .lr-midrow{gap:8px}
-  .lr-act{min-height:56px;padding:11px 12px;flex:1 1 100%}
-  .lr-act .tt{font-size:16px}
-  .lr-act .ic{font-size:24px}
+  .lr-act{min-height:40px;padding:8px 10px;flex:1 1 100%}
+  .lr-act .tt{font-size:13px}
+  .lr-act .ic{font-size:18px}
 }
 .wf-setup{background:rgba(0,0,0,.4);border:1px solid #4d4a3a;border-radius:10px;padding:10px;display:flex;flex-direction:column;gap:8px}
 .wf-setup select{font:12px monospace;background:#1a1a1a;color:var(--ink);border:1px solid #444;border-radius:8px;padding:5px 8px}
@@ -161,7 +151,6 @@ body{margin:0;background:var(--felt);color:var(--ink);font:15px/1.45 Georgia,ser
             <button id="btn-lr-new" class="lr-b hidden">New game</button>
         </div>
     </div>
-    <div id="lr-status">Opening…</div>
     <div id="lr-setup" class="wf-setup hidden">
         <span class="lr-lbl">HOST SETUP — everyone in the room plays (2–6). First to Level 15.</span>
         <label class="lr-lbl" style="color:#e4d8b8"><input type="checkbox" id="lr-dread" checked style="width:auto"> Rising Dread — monsters hunt the leader: +1 Monster Total per level you lead the lowest player.</label>
@@ -176,7 +165,6 @@ body{margin:0;background:var(--felt);color:var(--ink);font:15px/1.45 Georgia,ser
             <div id="lr-score"></div>
             <div class="lr-midrow" id="lr-midrow"></div>
             <div id="lr-arena"></div>
-            <div id="lr-meters" class="lr-meters"></div>
             <div id="lr-actions"></div>
         </div>
     </div>
@@ -292,7 +280,7 @@ window.addEventListener('error', (e) => {
 const V = { J: 12, Q: 14, K: 16, A: 18 };
 const MON = { 2:['Bat','🦇'],3:['Crow','🐦'],4:['Goblin','👺'],5:['Giant Spider','🕷️'],6:['Angry Wood Elf','🧝'],7:['Warg','🐺'],8:['Orc','👹'],9:['Uruk-hai','🧟'],10:['Troll','🧌'],J:['Shelob','🕸️'],Q:['Balrog','🔥'],K:['Nazgûl','💀'],A:['Dragon','🐉'] };
 const WEP = { 2:['Rusty Dagger','🗡️'],3:['Hunting Knife','🔪'],4:['Sling','🪨'],5:['Short Bow','🏹'],6:['Hand Axe','🪓'],7:['Throwing Spear','🔱'],8:['Dwarven Axe','⚒️'],9:['Elven Longbow','🏹'],10:['Sting','🗡️','Glows when Orcs are near'],J:['Orcrist','⚔️','The Goblin-cleaver: Draw 2 Loot, keep 1'],Q:['Glamdring','🗡️','Foe-hammer: High power'],K:['Narsil','⚔️','The Blade that was Broken'],A:['Andúril','⚔️','Flame of the West: Ultimate Power'] };
-let S = null, remembered = { dread: true }, lastLvls = {}, lastWinShown = null, lotrInst = 0;
+let S = null, remembered = { dread: true }, lastWinShown = null, lotrInst = 0;
 // The game is over when the winner is decided (belt and braces: phase or flag,
 // since older in-flight states may only carry the phase).
 const isOver = () => !!(S && (S.over || S.phase === 'over'));
@@ -895,17 +883,9 @@ function card(c, attr, big){
     return `<div class="lr-c ${m ? 'm' : 'w'}${leg ? ' leg' : ''}${big ? ' big' : ''}${flip}" ${attr || ''}><b>${v}</b><i>${n[1]}</i><u>${n[0]}</u></div>`;
 }
 function deckBox(kind, count, disc, label){
+    // mini badge (docked in VS row): count + label only, no discard line.
+    if (String(kind).includes('mini')) return `<div class="deck ${kind}" title="${esc(label)} deck: ${count} left"><div class="stack"></div><div><div class="n">${count}</div><div class="cap">${label}</div></div></div>`;
     return `<div class="deck ${kind}"><div class="stack"></div><div><div class="n">${count}</div><div class="cap">${label}</div><div class="dim">discard ${disc}</div></div></div>`;
-}
-function meter(p, big, turn, you){
-    const pct = Math.min(100, Math.max(0, (p.lvl - 1) / 14 * 100));
-    const col = p.lvl >= 15 ? '#d9b44a' : p.lvl >= 10 ? '#b0523c' : p.lvl >= 5 ? '#b98a3c' : '#7a9b4f';
-    const sub = p.lvl >= 10 ? '2 equipped max · 2 monsters' : p.lvl >= 5 ? 'any weapon · 1 monster' : 'number weapons · 1 monster';
-    return `<div class="lm${you ? ' you' : ''}${turn ? ' on' : ''}${p.gone ? ' gone' : ''}">` +
-        `<div class="lm-top"><span>${esc(p.name)}${you ? ' (you)' : ''}</span><span class="lv">Lv ${p.lvl}</span></div>` +
-        `<div class="lm-bar"><div class="lm-fill" style="width:${pct}%;background:${col}"></div>` +
-        `<i class="tick" style="left:28.5%"><span>5 any</span></i><i class="tick" style="left:64.3%"><span>10 ×2</span></i><i class="tick" style="left:99%"><span>15</span></i></div>` +
-        `<div class="lm-sub">⚔ ${power(p)}${p.gone ? ' · out' : ''} · ${sub}</div></div>`;
 }
 function myAction(){
     if (!S || isOver() || S.turnEnding) return false;
@@ -939,8 +919,10 @@ function waitingText(){
     return [`${pn(c)} is deciding`, 'Explore or Fight.'];
 }
 function gearNames(p){ return p.eq.map(wname).join(' + ') || 'no weapons'; }
+function lvlRule(p){ return p.lvl >= 10 ? '2 equipped max · 2 monsters' : p.lvl >= 5 ? 'any weapon · 1 monster' : 'number weapons · 1 monster'; }
 function chip(q, turn, you, win){
-    return `<span class="sc-chip${turn ? ' on' : ''}${you ? ' you' : ''}${win ? ' winner' : ''}">${esc(pn(q))}${you ? ' (you)' : ''} <span class="pw">⚔${power(q)} · Lv ${q.lvl}</span></span>`;
+    const tip = `Lv ${q.lvl} · ⚔${power(q)} · ${gearNames(q)} · ${lvlRule(q)}${q.gone ? ' · out' : ''}${turn ? ' · to move' : ''}`;
+    return `<span class="sc-chip${turn ? ' on' : ''}${you ? ' you' : ''}${win ? ' winner' : ''}" title="${esc(tip)}">${esc(pn(q))}${you ? ' (you)' : ''} <span class="pw">⚔${power(q)} · Lv ${q.lvl}</span></span>`;
 }
 // Big central scoreboard: current scores for the monster and the player(s).
 function scoreboard(){
@@ -978,20 +960,19 @@ function scoreboard(){
     }
     const side = (s) => `<div class="sc-side${s.you ? ' you' : ''}${s.mon ? ' mon' : ''}${s.win ? ' win' : ''}">` +
         `<div class="sc-cap">${esc(s.cap)}</div><div class="sc-n">${esc(String(s.n))}</div><div class="sc-sub" title="${esc(s.sub)}">${esc(s.sub)}</div></div>`;
-    el.innerHTML = `<div class="sc-vsrow">${side(L)}<div class="sc-vs"><div class="x">⚔</div><div class="sc-verdict ${vcls}">${esc(verdict)}</div></div>${side(R)}</div>` +
+    const monBadge = `<div>${deckBox('red mini', S.mon.length, S.monD.length, 'MONSTERS')}</div>`;
+    el.innerHTML = `<div class="sc-vsrow">${monBadge}${side(L)}<div class="sc-vs"><div class="x">⚔</div><div class="sc-verdict ${vcls}">${esc(verdict)}</div></div>${side(R)}</div>` +
         `<div class="sc-chips">${S.pl.map(q => chip(q, !over && S.turn === S.pl.indexOf(q), q.id === myId(), over && S.win === q.id)).join('')}</div>`;
 }
 const mineTurn = () => { const p = me(); return !!p && !p.gone && S && cur().id === myId(); };
 function render(){
-    const st = $('lr-status'); if (!st) return;
-    const sh = (id, on) => { const e = $(id); e.classList.toggle('hidden', !on); if (id === 'lr-game') e.style.display = on ? 'flex' : ''; else e.classList.toggle('flex', on); };
+    const sh = (id, on) => { const e = $(id); if (!e) return; e.classList.toggle('hidden', !on); if (id === 'lr-game') e.style.display = on ? 'flex' : ''; else e.classList.toggle('flex', on); };
     sh('lr-setup', isHost() && !S); sh('lr-waiting', !isHost() && !S); sh('lr-game', !!S);
     $('btn-lr-new').classList.toggle('hidden', !(isHost() && S));
     // Only the host may tear down a live table.
     $('btn-lr-menu').classList.toggle('hidden', !isHost());
     if (!S){
         if (isHost()) $('lr-setup-note').textContent = `${peerCount()} in the room.`;
-        st.textContent = 'Fight beasts, claim weapons, reach Level 15.';
         reportHeight();
         return;
     }
@@ -999,45 +980,18 @@ function render(){
     const mine = !!p && !p.gone && c.id === myId();
     const paused = !isHost() && !hostPresent();
 
-    let big = S.msg, sub = '';
+    // Turn/banner text removed: veil ribbon + scoreboard verdict carry state.
+    // Winner handled by scoreboard verdict + arena; confetti still fires here.
     if (isOver()){
-        const w = S.pl.find(x => x.id === S.win);
-        st.classList.add('winner');
-        st.innerHTML = `<span class="win-big">🏆 ${esc(pn(w))} WINS!</span><span class="win-sub">reached Level ${w.lvl} — first to 15</span>`;
         if (lastWinShown !== S.win){ lastWinShown = S.win; confettiBurst(); }
-    } else if (paused){ big = 'Game paused — host disconnected.'; sub = 'It resumes when they return.'; }
-    else if (ph === 'fight'){
-        const h = f.helper && S.pl.find(x => x.id === f.helper), dr = dread(c);
-        big = `${mine ? 'Your fight' : pn(c) + ' fights'} — Power ${power(c) + (h ? power(h) : 0)} vs Monsters ${total()}`;
-        sub = `${mine ? 'Ask for help, push your luck, or resolve.' : 'Watch the tally. Offer help if asked.'}${dr ? ` Dread +${dr} hunts the leader.` : ''}`;
-    }
-    else if (ph === 'boss'){ big = `THE DRAGON — Boss Power ${bossP()}`; sub = 'Join the battle or stay out. Majority pain if you run: lose a weapon.'; }
-    else if (ph === 'decide' && S.pend){
-        const w = S.pl.find(x => x.id === S.pend.who);
-        big = (S.pend.who === myId()) ? 'Your choice.' : `${w ? pn(w) : 'Someone'} chooses.`;
-        sub = S.pend.why || 'Tap a highlighted card below.';
-    }
-    else if (mine && ph === 'choose'){ big = 'Your turn.'; sub = 'Explore for a safe card, or Fight for Levels — the buttons below show the trade.'; }
-    if (!isOver()){
-        st.classList.remove('winner');
-        st.innerHTML = `${esc(big)}${sub ? `<small>${esc(sub)}</small>` : ''}`;
-        if (lastWinShown){ lastWinShown = null; $('lr-confetti').innerHTML = ''; }
-    }
+    } else if (lastWinShown){ lastWinShown = null; const cb = $('lr-confetti'); if (cb) cb.innerHTML = ''; }
 
-    S.pl.forEach(q => {
-        const before = lastLvls[q.id];
-        if (before !== undefined && q.lvl !== before){
-            const el = document.querySelector(`#lr-meters [data-pid="${q.id}"] .lm-bar`);
-            if (el) el.classList.add(q.lvl > before ? 'pulse' : 'shake');
-        }
-        lastLvls[q.id] = q.lvl;
-    });
-
-    $('lr-topdeck').innerHTML =
-        `<div class="lr-deckrow">${deckBox('red', S.mon.length, S.monD.length, 'MONSTERS')}` +
-        (f && (ph === 'fight' || ph === 'hreward') ? `<div class="lr-cards">${f.mons.map(x => card(x)).join('')}</div><div class="lr-tally">Monsters ${total()}${dread(c) ? ` <small>(incl. +${dread(c)} dread)</small>` : ''}</div>` : '') +
-        (ph === 'boss' ? `<div class="lr-cards">${S.boss.ms.map(x => card(x)).join('')} ${card({r:'A', c:'R'}, '', true)}</div><div class="lr-tally">Boss Power ${bossP()} <small>· ${Object.keys(S.boss.ch).length}/${S.pl.length} decided</small></div>` : '') +
-        `</div>`;
+    // Monsters deck lives in the VS row now; topdeck shows only live cards.
+    let td = '';
+    if (f && (ph === 'fight' || ph === 'hreward')) td += `<div class="lr-cards">${f.mons.map(x => card(x)).join('')}</div><div class="lr-tally">Monsters ${total()}${dread(c) ? ` <small>(incl. +${dread(c)} dread)</small>` : ''}</div>`;
+    if (ph === 'boss') td += `<div class="lr-cards">${S.boss.ms.map(x => card(x)).join('')} ${card({r:'A', c:'R'}, '', true)}</div><div class="lr-tally">Boss Power ${bossP()} <small>· ${Object.keys(S.boss.ch).length}/${S.pl.length} decided</small></div>`;
+    $('lr-topdeck').innerHTML = td ? `<div class="lr-deckrow">${td}</div>` : '';
+    $('lr-topdeck').style.display = td ? '' : 'none';
 
     scoreboard();
 
@@ -1046,15 +1000,15 @@ function render(){
         const gearing = p && !p.gone && (ph === 'choose' || ph === 'fight' || ph === 'boss' || ph === 'over') && !paused;
         let gearBtn = '';
         if (ph === 'fight' && mine) {
-            gearBtn = `<button class="lr-act" data-a="resolve" style="margin-top:10px; min-height:50px; padding:10px; font-size:14px"><span class="ic" style="font-size:20px">⚖️</span><span style="font-weight:800">Resolve Fight</span></button>`;
+            gearBtn = `<button class="lr-act compact" data-a="resolve" title="Resolve the fight now" style="margin-top:8px"><span class="ic">⚖️</span><span class="tt">Resolve</span></button>`;
         }
         mid += `<div class="lr-zone${mine ? ' you' : ''}"><span class="lr-lbl">EQUIPPED ${p.eq.length}/${cap(p)} (Power: ${power(p)})${p.lvl < 5 ? ' · Lv 1–4: number weapons only' : ''}${gearing ? ' · click to move' : ''}</span>` +
-            `<div class="lr-cards" style="min-height:124px">${p.eq.map((x, i) => card(x, gearing ? `data-a="gear" data-to="un" data-i="${i}"` : '', true)).join('') || '<span class="lr-lbl">none</span>'}</div>` +
+            `<div class="lr-cards">${p.eq.map((x, i) => card(x, gearing ? `data-a="gear" data-to="un" data-i="${i}"` : '', true)).join('') || '<span class="lr-lbl">none</span>'}</div>` +
             gearBtn + `</div>`;
         mid += `<div class="lr-zone"><span class="lr-lbl">SPARE (1 max)${p.hand.length && mine && gearing ? ' · equip or discard' : ''}</span>` +
-            `<div class="lr-cards" style="min-height:124px">${p.hand.map(x => card(x, gearing ? 'data-a="gear" data-to="eq"' : '', true)).join('') || '<span class="lr-lbl">empty</span>'}</div>` +
+            `<div class="lr-cards">${p.hand.map(x => card(x, gearing ? 'data-a="gear" data-to="eq"' : '', true)).join('') || '<span class="lr-lbl">empty</span>'}</div>` +
             (mine && gearing && p.hand.length
-                ? `<button class="lr-act" data-a="gear" data-to="dsp" style="margin-top:8px;min-height:44px;padding:8px;font-size:13px"><span class="ic" style="font-size:17px">🗑</span><span style="font-weight:800">Discard spare</span></button>`
+                ? `<button class="lr-act compact" data-a="gear" data-to="dsp" title="Discard the spare card to the loot pile" style="margin-top:6px"><span class="ic">🗑</span><span class="tt">Discard</span></button>`
                 : '') +
             `</div>`;
     } else {
@@ -1111,10 +1065,6 @@ function render(){
     $('lr-arena').innerHTML = ar;
     $('lr-arena').style.display = ar ? '' : 'none';
 
-    $('lr-meters').innerHTML = S.pl.map(q =>
-        meter(q, false, S.turn === S.pl.indexOf(q) && ph !== 'over', q.id === myId()).replace('class="lm', `data-pid="${q.id}" class="lm`)
-    ).join('');
-
     const veil = $('lr-veil');
     if (!isOver() && !myAction() && !paused && !S.turnEnding){
         const [t, s] = waitingText();
@@ -1125,10 +1075,10 @@ function render(){
         veil.classList.remove('hidden');
     } else veil.classList.add('hidden');
 
-    // Static button layout: every action button is always present in the same
-    // table box as the player's gear; buttons that don't apply right now are
-    // dimmed via [disabled]. Boss Join/Stay-out only render during boss phase.
-    const bigBtn = (a, ic, t, s, o, x, disabled) => `<button class="lr-act${disabled ? '' : (o ? ' ' + o : '')}" data-a="${a}" ${x || ''}${disabled ? ' disabled' : ''}><span class="ic">${ic}</span><span><span class="tt">${t}</span><br><span class="ss">${s}</span></span></button>`;
+    // Compact single-word buttons: full explanation in title tooltip.
+    // Decide-prompt buttons (fit/illegal/place above) keep two-line detail
+    // because the consequence matters there.
+    const bigBtn = (a, ic, t, s, o, x, disabled) => `<button class="lr-act compact${disabled ? '' : (o ? ' ' + o : '')}" data-a="${a}" title="${esc(t + ' — ' + s)}" ${x || ''}${disabled ? ' disabled' : ''}><span class="ic">${ic}</span><span class="tt">${t}</span></button>`;
     const turnBlocked = !!(paused || isOver() || S.turnEnding);
     const canExplore = !turnBlocked && ph === 'choose' && mine;
     const canFightBtn = canExplore && canFightNow(c);
@@ -1140,17 +1090,17 @@ function render(){
     let ac = `<div class="lr-cards lr-btnrow" style="justify-content:center">` +
         bigBtn('explore', '🔍', 'Explore', 'Safe · keep 1 of 2 Loot cards · no Levels either way.', 'k', '', !canExplore) +
         bigBtn('fight', '⚔️', 'Fight', 'Win 1 Level (2 if you push your luck) · lose = discard a weapon · ' + (c ? fightOdds(c) : '') + '.', '', '', !canFightBtn) +
-        bigBtn('ask', '📯', 'Ask for help', 'A teammate adds their weapon Power. They share the spoils.', 'k', '', !canAsk) +
-        bigBtn('push', '🎲', 'Push your luck', 'Flip one more Monster beyond the requirement. Win counts double.', 'k', '', !canPush) +
-        bigBtn('resolve', '⚖️', 'Resolve fight', (f && (ph === 'fight' || ph === 'hreward')) ? `Power ${power(c) + (f.helper ? power(S.pl.find(x => x.id === f.helper)) : 0)} vs Monsters ${total()}. Exact ties win.` : 'Resolve the current fight. Exact ties win.', '', '', !canResolve) +
-        bigBtn('help', '🤝', `Help ${c ? pn(c) : 'pilot'}`, `Add +${p ? power(p) : 0} Power. Win: draw 1 Loot or gain 1 Level. Lose: you discard too.`, '', '', !canHelp) +
-        bigBtn('hr', '🃏', 'Draw 1 Loot', 'Take a card from the black deck into your gear.', '', 'data-j="loot"', !canHr) +
-        bigBtn('hr', '⬆️', 'Gain 1 Level', 'Closer to 15, right now.', 'k', 'data-j="lvl"', !canHr);
+        bigBtn('ask', '📯', 'Ask', 'A teammate adds their weapon Power. They share the spoils.', 'k', '', !canAsk) +
+        bigBtn('push', '🎲', 'Push', 'Flip one more Monster beyond the requirement. Win counts double.', 'k', '', !canPush) +
+        bigBtn('resolve', '⚖️', 'Resolve', (f && (ph === 'fight' || ph === 'hreward')) ? `Power ${power(c) + (f.helper ? power(S.pl.find(x => x.id === f.helper)) : 0)} vs Monsters ${total()}. Exact ties win.` : 'Resolve the current fight. Exact ties win.', '', '', !canResolve) +
+        bigBtn('help', '🤝', 'Help', `Add +${p ? power(p) : 0} Power to ${c ? pn(c) : 'pilot'}. Win: draw 1 Loot or gain 1 Level. Lose: you discard too.`, '', '', !canHelp) +
+        bigBtn('hr', '🃏', 'Loot', 'Take a card from the black deck into your gear.', '', 'data-j="loot"', !canHr) +
+        bigBtn('hr', '⬆️', '+Level', 'Closer to 15, right now.', 'k', 'data-j="lvl"', !canHr);
     if (ph === 'boss' && S.boss){
         const chose = !!(p && S.boss.ch[myId()]);
         const canBoss = !turnBlocked && p && !p.gone && !chose;
-        ac += bigBtn('bchoice', '⚔️', 'Join the battle', 'Your weapons count toward Team Power. Win: +2 Levels.', '', 'data-j="j"', !canBoss) +
-            bigBtn('bchoice', '🏃', 'Stay out', 'Discard 1 equipped weapon. No reward, no risk beyond that.', 'k', 'data-j="o"', !canBoss);
+        ac += bigBtn('bchoice', '⚔️', 'Join', 'Your weapons count toward Team Power. Win: +2 Levels.', '', 'data-j="j"', !canBoss) +
+            bigBtn('bchoice', '🏃', 'Out', 'Discard 1 equipped weapon. No reward, no risk beyond that.', 'k', 'data-j="o"', !canBoss);
     }
     ac += `</div>`;
     $('lr-actions').innerHTML = ac;
