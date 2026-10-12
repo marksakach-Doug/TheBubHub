@@ -94,7 +94,6 @@ body{margin:0;background:var(--space);color:var(--ink);font:15px/1.45 'Segoe UI'
 .bo-c[data-a]:hover{transform:translateY(-3px)}
 .bo-c.flip{animation:flipIn .45s ease}
 @keyframes flipIn{0%{transform:rotateY(90deg) scale(.9);opacity:0}100%{transform:none;opacity:1}}
-.bo-actions-inner{display:flex;flex-direction:column;gap:8px}
 .bo-act{display:flex;gap:12px;align-items:center;width:100%;text-align:left;background:#1a202c;border:2px solid var(--neon);color:#f0f4ff;border-radius:14px;padding:14px 16px;cursor:pointer;min-height:64px}
 .bo-act:hover:not([disabled]){transform:translateY(-2px);box-shadow:0 6px 16px rgba(0,242,255,0.2)}
 .bo-act:active:not([disabled]){transform:scale(.99)}
@@ -125,30 +124,16 @@ body{margin:0;background:var(--space);color:var(--ink);font:15px/1.45 'Segoe UI'
 #bo-veil.hidden{opacity:0;visibility:hidden}
 #bo-veil .ribbon{background:rgba(26,28,58,.92);border:2px solid var(--neon);border-radius:14px;padding:7px 16px;font-size:15px;font-weight:800;text-align:center;box-shadow:0 6px 20px rgba(0,242,255,0.3);max-width:92%}
 #bo-veil .ribbon small{display:block;font-size:12px;font-weight:400;color:var(--dim);margin-top:4px}
-/* say() keeps 8 entries and Hub.up('say', ...) broadcasts every one, but
-   nothing rendered them: the only read of the feed was S.feedN as an
-   animation cache-buster, so a player watching the table had no record of
-   what the other pilots had actually done. Mirrors lotr's .feed-item.
-   Newest fades as a callout; older entries persist so the turn is readable. */
-#bo-feed{position:absolute;inset:0;pointer-events:none;z-index:100}
-.bo-feed-item{background:rgba(26,28,58,.92);border:1px solid var(--neon);color:#e0f0ff;border-radius:12px;padding:6px 14px;font-size:13px;max-width:92%;text-align:center;box-shadow:0 4px 14px rgba(0,0,0,.55);position:absolute;top:6%;left:50%;transform:translate(-50%,0);white-space:normal}
-.bo-feed-item.pop{animation:feedPop .45s cubic-bezier(.34,1.56,.64,1) forwards}
-.bo-feed-item.newest{z-index:101;animation:feedPop .45s cubic-bezier(.34,1.56,.64,1) forwards, fadeOut .7s ease 1.6s forwards}
-@keyframes feedPop{0%{transform:scale(.7) translateY(10px);opacity:0}60%{transform:scale(1.05)}100%{transform:scale(1);opacity:1}}
-@keyframes fadeOut{to{opacity:0;transform:translate(-50%,-160%);pointer-events:none}}
-#bo-note{font:11px monospace;color:var(--neon);min-height:14px;text-align:center}
+/* Action buttons live inside the midrow (same box as YOUR SHIP). All buttons
+   are always present; the ones that don't apply are dimmed via [disabled]. */
+.bo-actrow{display:flex;flex-wrap:wrap;gap:10px;padding:8px 0}
+.bo-actrow .bo-act{width:calc(50% - 5px);flex:1 1 230px}
+.bo-act[disabled].hint-bounce,.bo-act[disabled].hint-flash{animation:none;border-color:#334155}
 .hidden{display:none!important}
 .wf-setup{background:rgba(0,0,0,.4);border:1px solid #334155;border-radius:10px;padding:10px;display:flex;flex-direction:column;gap:8px}
 #standalone-note{max-width:520px;margin:60px auto;text-align:center}
 #standalone-note a{color:var(--neon)}
 @media (prefers-reduced-motion:reduce){*{animation:none!important;transition:none!important}}
-
-/* Flash used when something needs to be noticed, then it settles. */
-#bo-flash{position:absolute;inset:0;z-index:110;display:flex;align-items:center;justify-content:center;pointer-events:none}
-#bo-flash .flashbox{background:rgba(26,28,58,.95);border:3px solid var(--gold);color:#fff;padding:18px 34px;border-radius:20px;font-size:22px;font-weight:900;text-align:center;box-shadow:0 0 30px rgba(255,224,130,.6);animation:flashIn .45s cubic-bezier(.34,1.56,.64,1) forwards}
-@keyframes flashIn{0%{transform:scale(0);opacity:0}100%{transform:scale(1);opacity:1}}
-.flash-fade-out{animation:flashFade .45s ease forwards}
-@keyframes flashFade{to{opacity:0;transform:translateY(-20px)}}
 </style>
 </head>
 <body>
@@ -168,17 +153,12 @@ body{margin:0;background:var(--space);color:var(--ink);font:15px/1.45 'Segoe UI'
     <div id="bo-waiting" class="hidden bo-lbl" style="background:rgba(0,0,0,.28);border:1px solid #334155;border-radius:12px;padding:10px">Waiting for the mission commander to start.</div>
     <div id="bo-game" class="hidden" style="flex-direction:column;gap:12px">
         <div id="bo-tablewrap">
-            <div id="bo-flash" class="hidden"></div>
             <div id="bo-veil" class="hidden"><div class="ribbon" id="bo-veil-text">Waiting…</div></div>
-            <div id="bo-feed"></div>
             <div id="bo-topdeck"></div>
             <div id="bo-result" class="none"></div>
             <div id="bo-score"></div>
             <div class="bo-midrow" id="bo-midrow"></div>
-            <div id="bo-arena"></div>
         </div>
-        <div id="bo-actions"></div>
-        <div id="bo-note"></div>
     </div>
 </div>
 <div id="standalone-note" class="hidden">
@@ -243,10 +223,9 @@ function onDown(e){
     const m = e.data;
     if (!m || m.t !== 'gd' || m.game !== GAME_ID) return;
     if (m.k === 'roster'){ Hub.me = m.p.you; Hub.roster = m.p.roster; Hub.room = m.p.room; Hub.names = rosterNames(); localSolo = !Hub.room; rosterAdopt(); return; }
-    if (m.k === 'hostmove'){ toast('host moved to ' + ((m.p && m.p.name) || 'someone')); if (!isHost()) act('hello'); else if (S) broadcast(); render(); return; }
+    if (m.k === 'hostmove'){ if (!isHost()) act('hello'); else if (S) broadcast(); render(); return; }
     if (m.k === 'state'){ if (m.p) { S = m.p; render(); } return; }
     if (m.k === 'intent'){ onIntent(m.p, m.from); return; }
-    if (m.k === 'denied'){ toast(m.p.text); return; }
     if (m.k === 'reset'){ S = null; lastResKey = null; render(); return; }
 }
 const myId = () => Hub.me && Hub.me.id;
@@ -262,7 +241,6 @@ function rosterAdopt(){
     const nowHost = isHost();
     if (S) syncNames();
     if (nowHost && S){
-        if (!wasHost) toast('you are hosting — table continues');
         broadcast();
     } else render();
     wasHost = nowHost;
@@ -306,11 +284,7 @@ const DEST = {
     13: ['Cygnus X-1','🕳️'], 14: ['Sagittarius A*','🌌']
 };
 const BLACK_HOLES = [13, 14];
-let S = null, noteT = null, lastResKey = null, lastFeedN = 0;
-// Recent actions shown on the table. say() retains 8; four is enough to
-// reconstruct a turn without burying the cards.
-const FEED_SHOWN = 4;
-let lastTurn = null;
+let S = null, lastResKey = null;
 
 const val = (c) => V[c.r] || +c.r;
 function shuffle(a){ for (let i = a.length - 1; i > 0; i--){ const j = Math.random() * (i + 1) | 0; [a[i], a[j]] = [a[j], a[i]]; } return a; }
@@ -371,6 +345,7 @@ function fresh(){
         pend: null, pend_p: null, pend_path: null,
         feed: [], feedN: 0, msg: '',
         last: null,          // pinned result card (last resolved flight)
+        turnEnding: false,   // 0.5s grace period after a fight resolves
         // A table born in solo keeps its bots even after the player invites
         // someone and a room appears — the invite is for watching, not for
         // stealing a chair. Fresh multiplayer starts set this false.
@@ -411,10 +386,17 @@ function startGame(){
 const rematch = () => { if (isHost() && S) startGame(); };
 
 function endTurn(){
-    S.currentDest = null; S.extraDest = null; S.pend = null; S.pend_p = null; S.pend_path = null;
-    S.turn = (S.turn + 1) % S.pl.length;
-    S.phase = 'choose';
-    S.msg = `${pn(cur())}'s turn.`;
+    if (S.turnEnding) return;
+    S.turnEnding = true;
+    setTimeout(() => {
+        if (!S || !S.turnEnding) return;
+        S.currentDest = null; S.extraDest = null; S.pend = null; S.pend_p = null; S.pend_path = null;
+        S.turn = (S.turn + 1) % S.pl.length;
+        S.phase = 'choose';
+        S.msg = `${pn(cur())}'s turn.`;
+        S.turnEnding = false;
+        broadcast();
+    }, 500);
 }
 
 function resolveFight(p, helperId, path){
@@ -493,6 +475,10 @@ function resolveFight(p, helperId, path){
         S.msg = `🏆 ${pn(winner)} wins the game!`;
         reportResult(winner);
     } else {
+        S.msg = L.hole ? '💥 BLACK HOLE — ships are lost!'
+            : L.win
+                ? `${pn(p)}${h ? ' + ' + pn(h) : ''} — Power ${totalPower} vs Dest ${destSum}: SUCCESS!`
+                : `${pn(p)}${h ? ' + ' + pn(h) : ''} — Power ${totalPower} vs Dest ${destSum}: FAILURE`;
         endTurn();
     }
 }
@@ -512,6 +498,7 @@ function handle(d){
     const p = S.pl.find(x => x.id === d.pid);
     if (!p) return 'You are not in this game.';
     if (S.over) return 'The game is over.';
+    if (S.turnEnding) return 'The turn is still resolving…';
     const mine = cur() && cur().id === d.pid;
 
     if (S.phase === 'decide'){
@@ -543,6 +530,7 @@ function handle(d){
             if (p.ship) S.blackDisco.push(p.ship);
             p.ship = ns;
             say(`${pn(p)} finds a new ship: ${val(ns)}.`);
+            S.msg = `${pn(p)} found a new ship (Power ${val(ns)}).`;
             endTurn();
             return null;
         }
@@ -591,21 +579,17 @@ function broadcast(){
     render();
     if (!S || !isHost()) return;
     Hub.up('state', S);
-    scheduleBot();      // hand the turn on if it's a bot's (solo only)
+    if (!S.turnEnding) scheduleBot();  // hand the turn on if it's a bot's (solo only)
 }
 function act(action, x){
     const d = Object.assign({ action, pid: myId(), name: myName() }, x || {});
     if (isHost()){
         if (!S) return;
-        const e = handle(d); if (e) toast(e);
-        broadcast();
+        const e = handle(d); if (e){ S.msg = e; render(); }
+        else broadcast();
     } else {
         Hub.up('intent', d);
     }
-}
-function toast(t){
-    const n = $('bo-note'); if (!n) return;
-    n.textContent = t; clearTimeout(noteT); noteT = setTimeout(() => { n.textContent = ''; }, 2400);
 }
 function onIntent(d, from){
     if (!isHost()) return;
@@ -728,18 +712,6 @@ function afterburnerFeasible(){
     return shipVal >= expected;                    // comfortable, not marginal
 }
 
-function triggerFlash(text){
-    const pop = $('bo-flash');
-    if (!pop) return;
-    pop.innerHTML = `<div class="flashbox">${esc(text)}</div>`;
-    pop.classList.remove('hidden');
-    setTimeout(() => {
-        const box = pop.querySelector('.flashbox');
-        if (box) box.classList.add('flash-fade-out');
-        setTimeout(() => { pop.classList.add('hidden'); }, 450);
-    }, 2000);
-}
-
 function render(){
     const st = $('bo-status'); if (!st) return;
     const sh = (id, on) => {
@@ -762,13 +734,6 @@ function render(){
         return;
     }
     
-    // Flash only on the turn where the run ends — the last destination drawn
-    // is the moment "how many are left" stops being a curiosity.
-    if (lastTurn !== null && S.turn !== lastTurn && !S.over && S.redDeck.length === 0){
-        triggerFlash('LAST DESTINATION');
-    }
-    lastTurn = S.turn;
-
     const p = me(), c = cur();
     const paused = !isHost() && !hostPresent();
     if (S.over){
@@ -785,11 +750,6 @@ function render(){
             : (S.phase === 'decide' ? 'Waiting for a pilot' : 'Prepare for maneuvers');
         st.innerHTML = `${esc(S.msg)}<small>${sub}</small>`;
     }
-
-    $('bo-feed').innerHTML = (S.feed || []).slice(0, FEED_SHOWN).map((e, i) =>
-        `<div class="bo-feed-item${i === 0 ? ' newest' : ''}${e.n > lastFeedN ? ' pop' : ''}" style="top:calc(6% + ${i * 34}px);opacity:${i === 0 ? 1 : 0.92}">${esc(e.t)}</div>`
-    ).join('');
-    if (S.feed && S.feed.length) lastFeedN = Math.max(lastFeedN, S.feed[0].n);
 
     $('bo-topdeck').innerHTML =
         `<div class="bo-deckrow" style="display:flex;gap:12px;align-items:center;justify-content:center;flex-wrap:wrap">` +
@@ -866,13 +826,56 @@ function render(){
     } else {
         mid += `<div class="bo-zone"><span class="bo-lbl">Join the game to see your ship.</span></div>`;
     }
+
+    // Static button layout: all 7 action buttons are always present inside the
+    // same midrow box as YOUR SHIP. Buttons that don't apply right now are
+    // dimmed via [disabled] instead of being added/removed.
+    const turnBlocked = !!(S.turnEnding || paused || S.over);
+    const myChoose = !turnBlocked && S.phase === 'choose' && myId() === (cur() ? cur().id : null);
+    const myFight = !turnBlocked && S.phase === 'fight' && myId() === (cur() ? cur().id : null);
+    const myDecide = !turnBlocked && S.phase === 'decide' && S.pend && S.pend.who === myId();
+    const shipVal = c && c.ship ? val(c.ship) : 0;
+    const destVal = S.currentDest ? val(S.currentDest) : 0;
+    const enough = shipVal >= destVal;
+    const others = S.pl.filter(x => x.id !== myId() && x.ship);
+    const bestHelp = others.reduce((m, x) => Math.max(m, val(x.ship)), 0);
+    const canReachWithHelp = bestHelp > 0 && (shipVal + bestHelp) >= destVal;
+    const abOk = afterburnerFeasible();
+    const abHint = !canReachWithHelp && bestHelp > 0
+        ? `Strongest help available: ${bestHelp} (${shipVal} + ${bestHelp} = ${shipVal + bestHelp})`
+        : (bestHelp ? `Strongest help available: ${bestHelp}` : 'No other pilot has a ship');
+    // `why` is the one-line reason the button is recommended, so the hint is
+    // never just an unexplained bounce. Everything interpolated here is escaped:
+    // `why` is built from player names, which are user input. Hints only render
+    // on enabled buttons — a dimmed button shows no bounce/flash and no why.
+    const bigBtn = (a, ic, t, s, o = '', attr = '', why = '', disabled = false) => {
+        const cls = disabled ? '' : (o || '');
+        const hint = disabled ? '' : (why || '');
+        return `<button class="bo-act ${cls}" data-a="${a}" ${attr}${disabled ? ' disabled' : ''}><span class="ic">${esc(ic)}</span><span><span class="tt">${esc(t)}</span><br><span class="ss">${esc(s)}</span>${hint ? `<span class="why">${esc(hint)}</span>` : ''}</span></button>`;
+    };
+    mid += `<div class="bo-actrow">` +
+        bigBtn('blastoff', '🚀', 'Blast Off!', 'Draw a destination and try to reach it.', '', '', '', !(myChoose && p && p.ship)) +
+        bigBtn('newship', '🛠️', 'Find New Ship', 'Draw a new ship to replace your current one.', 'k', '', '', !myChoose) +
+        bigBtn('pathA', '🛡️', 'Normal Flight', 'Ship vs destination. One red card, keep your ship.',
+            enough ? 'hint-bounce' : '', '',
+            enough ? `Your ship ${shipVal} reaches ${destVal} — this one is safe` : '', !myFight) +
+        bigBtn('pathB', '🤝', 'Share Ships', 'Ask another pilot to combine ships. They may lose theirs too.',
+            !enough && canReachWithHelp ? 'hint-bounce' : '', '',
+            !enough && canReachWithHelp ? `You cannot reach ${destVal} alone, but help would` : (myFight && others.length ? abHint : ''), !(myFight && others.length)) +
+        bigBtn('pathC', '🔥', 'After Burner', 'Draw a second destination. Double the cards — and the risk.',
+            abOk ? 'hint-flash' : '', '',
+            abOk ? `Ship ${shipVal} — likely strong enough for two` : '', !(myFight && abOk)) +
+        bigBtn('decide', '✅', 'YES', 'Help the other pilot.', '', 'data-i="yes"', '', !myDecide) +
+        bigBtn('decide', '❌', 'NO', 'Stay in orbit.', 'k', 'data-i="no"', '', !myDecide) +
+        `</div>`;
     $('bo-midrow').innerHTML = mid;
 
-    $('bo-arena').innerHTML = '';
     const veil = $('bo-veil');
     if (!S.over && paused){
         $('bo-veil-text').innerHTML = `Paused<small>Host disconnected — it resumes when they return.</small>`;
         veil.classList.remove('hidden');
+    } else if (!S.over && S.turnEnding){
+        veil.classList.add('hidden');
     } else if (!S.over && !myAction() && !S.pend){
         $('bo-veil-text').innerHTML = `Waiting for ${pn(cur())}...`;
         veil.classList.remove('hidden');
@@ -883,57 +886,11 @@ function render(){
         veil.classList.add('hidden');
     }
 
-    // `why` is the one-line reason the button is recommended, so the hint is
-    // never just an unexplained bounce. Everything interpolated here is escaped:
-    // `why` is built from player names, which are user input.
-    const bigBtn = (a, ic, t, s, o = '', attr = '', why = '') =>
-        `<button class="bo-act ${o || ''}" data-a="${a}" ${attr}><span class="ic">${esc(ic)}</span><span><span class="tt">${esc(t)}</span><br><span class="ss">${esc(s)}</span>${why ? `<span class="why">${esc(why)}</span>` : ''}</span></button>`;
-    let ac = '';
-    if (paused) ac = '';
-    else if (!S.over){
-        if (S.phase === 'choose' && myId() === (cur() ? cur().id : null)){
-            // Blast Off leads: flying is the point of the game, looking for a
-            // better ship is the fallback. But with no ship there is nothing
-            // to launch, so only the recovery move is offered — and we say why
-            // rather than leaving the player wondering.
-            const ns = p && p.ship;
-            if (ns) ac = bigBtn('blastoff', '🚀', 'Blast Off!', 'Draw a destination and try to reach it.', '', '');
-            else ac = `<div class="bo-lbl">No ship — find a new one to launch.</div>`;
-            ac += bigBtn('newship', '🛠️', 'Find New Ship', 'Draw a new ship to replace your current one.', 'k', '');
-        } else if (S.phase === 'fight' && myId() === (cur() ? cur().id : null)){
-            // Hints only — every button stays live. Which one bounces is
-            // decided by the numbers: your ship against the known
-            // destination, and an estimate for After Burner's face-down draw.
-            const shipVal = c && c.ship ? val(c.ship) : 0;
-            const destVal = S.currentDest ? val(S.currentDest) : 0;
-            const enough = shipVal >= destVal;
-            const others = S.pl.filter(x => x.id !== myId() && x.ship);
-            const bestHelp = others.reduce((m, x) => Math.max(m, val(x.ship)), 0);
-            const canReachWithHelp = bestHelp > 0 && (shipVal + bestHelp) >= destVal;
-            const abOk = afterburnerFeasible();
-            const abHint = !canReachWithHelp && bestHelp > 0
-                ? `Strongest help available: ${bestHelp} (${shipVal} + ${bestHelp} = ${shipVal + bestHelp})`
-                : (bestHelp ? `Strongest help available: ${bestHelp}` : 'No other pilot has a ship');
-            ac = bigBtn('pathA', '🛡️', 'Normal Flight', 'Ship vs destination. One red card, keep your ship.',
-                        enough ? 'hint-bounce' : '', '',
-                        enough ? `Your ship ${shipVal} reaches ${destVal} — this one is safe` : '') +
-                 bigBtn('pathB', '🤝', 'Share Ships', 'Ask another pilot to combine ships. They may lose theirs too.',
-                        !enough && canReachWithHelp ? 'hint-bounce' : '', '',
-                        !enough && canReachWithHelp ? `You cannot reach ${destVal} alone, but help would` : abHint) +
-                 bigBtn('pathC', '🔥', 'After Burner', 'Draw a second destination. Double the cards — and the risk.',
-                        abOk ? 'hint-flash' : '', '',
-                        abOk ? `Ship ${shipVal} — likely strong enough for two` : '');
-        } else if (S.phase === 'decide' && S.pend && S.pend.who === myId()){
-            ac = bigBtn('decide', '✅', 'YES', 'Help the other pilot.', '', 'data-i="yes"') +
-                 bigBtn('decide', '❌', 'NO', 'Stay in orbit.', 'k', 'data-i="no"');
-        }
-    }
-    $('bo-actions').innerHTML = ac;
     reportHeight();
 }
 
 function myAction(){
-    if (!S || S.over) return false;
+    if (!S || S.over || S.turnEnding) return false;
     const p = me();
     if (!p) return false;
     if (S.phase === 'choose' || S.phase === 'fight') return cur() && cur().id === myId();
@@ -943,7 +900,7 @@ function myAction(){
 
 $('bo-panel').addEventListener('click', (e) => {
     const t = e.target.closest('[data-a]');
-    if (!t) return;
+    if (!t || t.disabled) return;
     act(t.dataset.a, { i: t.dataset.i });
 });
 $('btn-bo-start').addEventListener('click', () => startGame());

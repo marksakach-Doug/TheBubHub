@@ -17,15 +17,11 @@ body{margin:0;background:var(--felt);color:var(--ink);font:15px/1.45 Georgia,ser
 #lr-err{font:11px monospace;color:#ff8888}
 #lr-status{background:rgba(0,0,0,.45);border:2px solid #6f8a4a;border-radius:14px;padding:14px 16px;font-size:19px;font-weight:700;text-align:center;color:#f2ecd8;box-shadow:0 4px 18px rgba(0,0,0,.5);min-height:70px;display:flex;flex-direction:column;justify-content:center;align-items:center}
 #lr-status small{display:block;font-size:12px;font-weight:400;color:var(--dim);margin-top:4px}
-/* The newest entry is the "just happened" callout and fades on its own. Older
-   ones persist, so the last few actions stay readable while you wait — which
-   is the whole point now that the veil no longer dims the table. */
-.feed-item{background:rgba(20,26,18,.92);border:1px solid var(--gold);color:#f2ecd8;border-radius:12px;padding:6px 14px;font-size:13px;max-width:92%;text-align:center;box-shadow:0 4px 14px rgba(0,0,0,.55);position:absolute;top:6%;left:50%;transform:translate(-50%,0);z-index:100;white-space:normal}
-.feed-item.pop{animation:feedPop .45s cubic-bezier(.34,1.56,.64,1) forwards}
-.feed-item.newest{z-index:101;animation:feedPop .45s cubic-bezier(.34,1.56,.64,1) forwards, fadeOut .7s ease 1.6s forwards}
-.feed-item.big{border-width:2px;font-size:15px;font-weight:700}
-@keyframes feedPop{0%{transform:scale(.7) translateY(10px);opacity:0}60%{transform:scale(1.05)}100%{transform:scale(1);opacity:1}}
-@keyframes fadeOut{to{opacity:0;transform:translate(-50%,-160%);pointer-events:none}}
+/* Static action buttons live in the same table box as the player's gear.
+   All buttons are always present; the ones that don't apply are dimmed. */
+.lr-actrow{display:flex;flex-wrap:wrap;gap:10px;padding:8px 0}
+.lr-actrow .lr-act{flex:1 1 220px}
+.lr-act[disabled].hint{animation:none}
 #lr-score{background:rgba(0,0,0,.5);border:2px solid var(--gold);border-radius:14px;padding:10px 12px;display:flex;flex-direction:column;gap:8px}
 .sc-vsrow{display:flex;align-items:center;justify-content:center;gap:14px}
 .sc-side{flex:1;text-align:center;min-width:0}
@@ -166,7 +162,6 @@ body{margin:0;background:var(--felt);color:var(--ink);font:15px/1.45 Georgia,ser
         </div>
     </div>
     <div id="lr-status">Opening…</div>
-    <div id="lr-feed" style="position:absolute;inset:0;pointer-events:none;z-index:100"></div>
     <div id="lr-setup" class="wf-setup hidden">
         <span class="lr-lbl">HOST SETUP — everyone in the room plays (2–6). First to Level 15.</span>
         <label class="lr-lbl" style="color:#e4d8b8"><input type="checkbox" id="lr-dread" checked style="width:auto"> Rising Dread — monsters hunt the leader: +1 Monster Total per level you lead the lowest player.</label>
@@ -182,9 +177,8 @@ body{margin:0;background:var(--felt);color:var(--ink);font:15px/1.45 Georgia,ser
             <div class="lr-midrow" id="lr-midrow"></div>
             <div id="lr-arena"></div>
             <div id="lr-meters" class="lr-meters"></div>
+            <div id="lr-actions"></div>
         </div>
-        <div id="lr-actions"></div>
-        <div id="lr-note" style="font:11px monospace;color:#e0b070;min-height:14px"></div>
     </div>
 </div>
 <div id="dragon-flash"></div>
@@ -234,10 +228,9 @@ function onDown(e){
     const m = e.data;
     if (!m || m.t !== 'gd' || m.game !== GAME_ID) return;
     if (m.k === 'roster'){ Hub.me = m.p.you; Hub.roster = m.p.roster; Hub.room = m.p.room; Hub.names = rosterNames(); rosterAdopt(); return; }
-    if (m.k === 'hostmove'){ toast('host moved to ' + ((m.p && m.p.name) || 'someone')); if (!isHost()) act('hello'); else if (S) broadcast(); render(); return; }
+    if (m.k === 'hostmove'){ if (!isHost()) act('hello'); else if (S) broadcast(); render(); return; }
     if (m.k === 'state'){ if (m.p) { S = m.p; render(); } return; }
     if (m.k === 'intent'){ onIntent(m.p, m.from); return; }
-    if (m.k === 'denied'){ toast(m.p.text); return; }
     if (m.k === 'reset'){ S = null; render(); return; }
 }
 const myId = () => Hub.me && Hub.me.id;
@@ -253,7 +246,6 @@ function rosterAdopt(){
     const nowHost = isHost();
     if (S) syncNames();
     if (nowHost && S){
-        if (!wasHost) toast('you are hosting — table continues');
         broadcast();
     } else render();
     wasHost = nowHost;
@@ -300,10 +292,7 @@ window.addEventListener('error', (e) => {
 const V = { J: 12, Q: 14, K: 16, A: 18 };
 const MON = { 2:['Bat','🦇'],3:['Crow','🐦'],4:['Goblin','👺'],5:['Giant Spider','🕷️'],6:['Angry Wood Elf','🧝'],7:['Warg','🐺'],8:['Orc','👹'],9:['Uruk-hai','🧟'],10:['Troll','🧌'],J:['Shelob','🕸️'],Q:['Balrog','🔥'],K:['Nazgûl','💀'],A:['Dragon','🐉'] };
 const WEP = { 2:['Rusty Dagger','🗡️'],3:['Hunting Knife','🔪'],4:['Sling','🪨'],5:['Short Bow','🏹'],6:['Hand Axe','🪓'],7:['Throwing Spear','🔱'],8:['Dwarven Axe','⚒️'],9:['Elven Longbow','🏹'],10:['Sting','🗡️','Glows when Orcs are near'],J:['Orcrist','⚔️','The Goblin-cleaver: Draw 2 Loot, keep 1'],Q:['Glamdring','🗡️','Foe-hammer: High power'],K:['Narsil','⚔️','The Blade that was Broken'],A:['Andúril','⚔️','Flame of the West: Ultimate Power'] };
-let S = null, remembered = { dread: true }, noteT = null, lastFeedN = 0, lastLvls = {}, lastWinShown = null, lotrInst = 0;
-// How many recent actions to keep on screen. say() retains 8; four is enough
-// to reconstruct a turn without burying the table.
-const FEED_SHOWN = 4;
+let S = null, remembered = { dread: true }, lastLvls = {}, lastWinShown = null, lotrInst = 0;
 // The game is over when the winner is decided (belt and braces: phase or flag,
 // since older in-flight states may only carry the phase).
 const isOver = () => !!(S && (S.over || S.phase === 'over'));
@@ -572,7 +561,8 @@ function fresh(dr){
     S = { cfg: { dread: dr }, pl: ps.map(x => ({ id: x.id, name: x.name, lvl: 1, eq: [], hand: [] })),
           loot: deck('B'), lootD: [], mon: deck('R'), monD: [], turn: 0, phase: 'choose', over: false,
           fight: null, pick: null, boss: null, win: null, feed: [], feedN: 0, msg: '',
-          pend: null, lossQ: [], illQ: [], after: null, afterPw: null, inst: ++lotrInst };
+          pend: null, lossQ: [], illQ: [], after: null, afterPw: null, inst: ++lotrInst,
+          turnEnding: false };
     const aside = [];
     S.pl.forEach(p => { let c; for (;;){ c = draw('L'); if (isNum(c)) break; aside.push(c); } p.eq = [c]; });
     S.loot.push(...aside); shuffle(S.loot);
@@ -592,12 +582,19 @@ function startGame(dr){
 const rematch = () => { if (isHost() && S) startGame(S.cfg.dread); };
 
 function endTurn(){
-    S.fight = null; S.pick = null; S.boss = null; S.q = [];
-    S.pend = null; S.lossQ = []; S.illQ = []; S.after = null; S.afterPw = null;
-    let k = 0;
-    do { S.turn = (S.turn + 1) % S.pl.length; k++; } while (cur().gone && k < S.pl.length);
-    S.phase = 'choose';
-    S.msg = `${pn(cur())}'s turn.`;
+    if (S.turnEnding) return;
+    S.turnEnding = true;
+    setTimeout(() => {
+        if (!S || !S.turnEnding) return;
+        S.fight = null; S.pick = null; S.boss = null; S.q = [];
+        S.pend = null; S.lossQ = []; S.illQ = []; S.after = null; S.afterPw = null;
+        let k = 0;
+        do { S.turn = (S.turn + 1) % S.pl.length; k++; } while (cur().gone && k < S.pl.length);
+        S.phase = 'choose';
+        S.msg = `${pn(cur())}'s turn.`;
+        S.turnEnding = false;
+        broadcast();
+    }, 500);
 }
 function chk(pw){
     let c = S.pl.filter(p => p.lvl >= 15);
@@ -633,6 +630,9 @@ function resolve(){
     const P = power(p) + (h ? power(h) : 0), T = total(), win = P >= T;
     S.monD.push(...f.mons);
     say(`${pn(p)}${h ? ' + ' + pn(h) : ''}: Power ${P} vs Monsters ${T} — ${win ? 'victory' : 'defeat'}.`);
+    S.msg = win
+        ? `${pn(p)}${h ? ' + ' + pn(h) : ''}: Power ${P} vs Monsters ${T} — victory!`
+        : `${pn(p)}${h ? ' + ' + pn(h) : ''}: Power ${P} vs Monsters ${T} — defeat.`;
     S.q = [];
     if (win){
         const g = f.pushed ? 2 : 1;
@@ -673,6 +673,9 @@ function resolveBoss(){
     while (team === bossP()) B.ms.push(draw('M'));
     const win = team > bossP();
     say(`Team ${team} vs Dragon ${bossP()} — ${win ? 'the Dragon falls! +2 Levels' : 'the Dragon wins.'}`);
+    S.msg = win
+        ? `Team ${team} vs Dragon ${bossP()} — the Dragon falls!`
+        : `Team ${team} vs Dragon ${bossP()} — the Dragon wins.`;
     J.forEach(p => { if (win){ p.lvl += 2; say(`${pn(p)} rises to Lv ${p.lvl}.`); } else { queueLose(p); p.lvl = Math.max(1, p.lvl - 1); say(`${pn(p)} drops to Lv ${p.lvl}.`); } normSort(p); });
     S.monD.push(...B.ms);
     let bossOpened = false;
@@ -686,6 +689,7 @@ function handle(d){
     const p = S.pl.find(x => x.id === d.pid), a = d.action;
     if (!p || p.gone) return 'You are not seated in this game.';
     if (S.phase === 'over') return 'The game is over.';
+    if (S.turnEnding) return 'The turn is still resolving…';
     const mine = cur().id === d.pid, f = S.fight;
     // Gear is personal housekeeping: any seated player may swap weapons on
     // anyone's turn (helpers especially need this). Blocked only while a
@@ -824,15 +828,12 @@ function act(action, x){
     const d = Object.assign({ action, pid: myId(), name: myName() }, x || {});
     if (isHost()){
         if (!S) return;
-        const e = handle(d); if (e) toast(e);
-        broadcast();
+        const e = handle(d);
+        if (e){ S.msg = e; render(); }
+        else broadcast();
     } else {
         Hub.up('intent', d);
     }
-}
-function toast(t){
-    const n = $('lr-note'); if (!n) return;
-    n.textContent = t; clearTimeout(noteT); noteT = setTimeout(() => { n.textContent = ''; }, 2400);
 }
 function confettiBurst(){
     const box = $('lr-confetti');
@@ -851,7 +852,6 @@ function confettiBurst(){
     box.innerHTML = html;
     setTimeout(() => { if (box && lastWinShown) box.innerHTML = ''; }, 4600);
 }
-window.toast = toast;
 function onIntent(d, from){
     if (!isHost()) return;
     d.pid = from.id; d.name = from.name;
@@ -891,13 +891,8 @@ function card(c, attr, big){
     const m = c.c === 'R', n = (m ? MON : WEP)[c.r];
     const leg = 'JQKA'.includes(c.r) || (!m && c.r === '10');
     const v = (!m && c.r === 'A') ? '14·20' : val(c, true);
-    let tooltip = '';
-    if (!m) {
-        if (n[2]) tooltip = `toast('${n[0]}: Power ${v} — ${n[2]}')`;
-        else if ('JQKA'.includes(c.r)) tooltip = `toast('${n[0]}: Power ${v}')`;
-    }
     const flip = isNewCard(c) ? ' flip' : '';
-    return `<div class="lr-c ${m ? 'm' : 'w'}${leg ? ' leg' : ''}${big ? ' big' : ''}${flip}" ${attr || ''} onclick="${tooltip}"><b>${v}</b><i>${n[1]}</i><u>${n[0]}</u></div>`;
+    return `<div class="lr-c ${m ? 'm' : 'w'}${leg ? ' leg' : ''}${big ? ' big' : ''}${flip}" ${attr || ''}><b>${v}</b><i>${n[1]}</i><u>${n[0]}</u></div>`;
 }
 function deckBox(kind, count, disc, label){
     return `<div class="deck ${kind}"><div class="stack"></div><div><div class="n">${count}</div><div class="cap">${label}</div><div class="dim">discard ${disc}</div></div></div>`;
@@ -913,7 +908,7 @@ function meter(p, big, turn, you){
         `<div class="lm-sub">⚔ ${power(p)}${p.gone ? ' · out' : ''} · ${sub}</div></div>`;
 }
 function myAction(){
-    if (!S || isOver()) return false;
+    if (!S || isOver() || S.turnEnding) return false;
     const p = me();
     if (!p || p.gone) return false;
     const ph = S.phase, f = S.fight;
@@ -1029,16 +1024,6 @@ function render(){
         if (lastWinShown){ lastWinShown = null; $('lr-confetti').innerHTML = ''; }
     }
 
-    // say() keeps 8 entries and broadcasts them, but this rendered only the
-    // newest one (slice(0,1)) as a toast that fades ~2.3s later — so entries
-    // 2-8 were never visible and "I don't know what happened on the other
-    // players' turns" had no answer at all. Show the last few, stacked.
-    // Each is nudged down the page so they don't pile on the same spot.
-    $('lr-feed').innerHTML = S.feed.slice(0, FEED_SHOWN).map((e, i) =>
-        `<div class="feed-item${i === 0 ? ' newest' : ''}${e.n > lastFeedN ? ' pop' : ''}${i === 0 && /DRAGON|wins!|Level 15/.test(e.t) ? ' big' : ''}" style="top:calc(6% + ${i * 34}px);opacity:${i === 0 ? 1 : 0.92}">${esc(e.t)}</div>`
-    ).join('');
-    if (S.feed.length) lastFeedN = Math.max(lastFeedN, S.feed[0].n);
-
     S.pl.forEach(q => {
         const before = lastLvls[q.id];
         if (before !== undefined && q.lvl !== before){
@@ -1131,7 +1116,7 @@ function render(){
     ).join('');
 
     const veil = $('lr-veil');
-    if (!isOver() && !myAction() && !paused){
+    if (!isOver() && !myAction() && !paused && !S.turnEnding){
         const [t, s] = waitingText();
         $('lr-veil-text').innerHTML = `${esc(t)}<small>${esc(s)}</small>`;
         veil.classList.remove('hidden');
@@ -1140,27 +1125,34 @@ function render(){
         veil.classList.remove('hidden');
     } else veil.classList.add('hidden');
 
-    const bigBtn = (a, ic, t, s, o, x) => `<button class="lr-act ${o || ''}" data-a="${a}" ${x || ''}><span class="ic">${ic}</span><span><span class="tt">${t}</span><br><span class="ss">${s}</span></span></button>`;
-    let ac = '';
-    if (paused) ac = '';
-    else if (ph === 'choose' && mine) {
-        // the whole turn in two equal buttons: safe card vs risky levels
-        const canFight = canFightNow(c);
-        ac = bigBtn('explore', '🔍', 'Explore', 'Safe · keep 1 of 2 Loot cards · no Levels either way.', 'k') +
-            (canFight
-                ? bigBtn('fight', '⚔️', 'Fight', 'Win 1 Level (2 if you push your luck) · lose = discard a weapon · ' + fightOdds(c) + '.', '')
-                : `<div class="lr-lbl">${c.eq.length
-                    ? 'No equipped weapon you can use at Level ' + c.lvl + ' — discard the spare below and explore for a number weapon.'
-                    : 'No equipped weapon — Explore first, then fight.'}</div>`);
+    // Static button layout: every action button is always present in the same
+    // table box as the player's gear; buttons that don't apply right now are
+    // dimmed via [disabled]. Boss Join/Stay-out only render during boss phase.
+    const bigBtn = (a, ic, t, s, o, x, disabled) => `<button class="lr-act${disabled ? '' : (o ? ' ' + o : '')}" data-a="${a}" ${x || ''}${disabled ? ' disabled' : ''}><span class="ic">${ic}</span><span><span class="tt">${t}</span><br><span class="ss">${s}</span></span></button>`;
+    const turnBlocked = !!(paused || isOver() || S.turnEnding);
+    const canExplore = !turnBlocked && ph === 'choose' && mine;
+    const canFightBtn = canExplore && canFightNow(c);
+    const canAsk = !turnBlocked && ph === 'fight' && mine && f && !f.ask;
+    const canPush = !turnBlocked && ph === 'fight' && mine && f && !f.pushed && !f.ask && (power(c) + (f.helper ? power(S.pl.find(x => x.id === f.helper)) : 0) >= total());
+    const canResolve = !turnBlocked && ph === 'fight' && mine && f;
+    const canHelp = !turnBlocked && ph === 'fight' && p && !p.gone && f && f.ask && !f.helper && p.eq.length > 0;
+    const canHr = !turnBlocked && ph === 'hreward' && f && f.helper === myId();
+    let ac = `<div class="lr-cards lr-btnrow" style="justify-content:center">` +
+        bigBtn('explore', '🔍', 'Explore', 'Safe · keep 1 of 2 Loot cards · no Levels either way.', 'k', '', !canExplore) +
+        bigBtn('fight', '⚔️', 'Fight', 'Win 1 Level (2 if you push your luck) · lose = discard a weapon · ' + (c ? fightOdds(c) : '') + '.', '', '', !canFightBtn) +
+        bigBtn('ask', '📯', 'Ask for help', 'A teammate adds their weapon Power. They share the spoils.', 'k', '', !canAsk) +
+        bigBtn('push', '🎲', 'Push your luck', 'Flip one more Monster beyond the requirement. Win counts double.', 'k', '', !canPush) +
+        bigBtn('resolve', '⚖️', 'Resolve fight', (f && (ph === 'fight' || ph === 'hreward')) ? `Power ${power(c) + (f.helper ? power(S.pl.find(x => x.id === f.helper)) : 0)} vs Monsters ${total()}. Exact ties win.` : 'Resolve the current fight. Exact ties win.', '', '', !canResolve) +
+        bigBtn('help', '🤝', `Help ${c ? pn(c) : 'pilot'}`, `Add +${p ? power(p) : 0} Power. Win: draw 1 Loot or gain 1 Level. Lose: you discard too.`, '', '', !canHelp) +
+        bigBtn('hr', '🃏', 'Draw 1 Loot', 'Take a card from the black deck into your gear.', '', 'data-j="loot"', !canHr) +
+        bigBtn('hr', '⬆️', 'Gain 1 Level', 'Closer to 15, right now.', 'k', 'data-j="lvl"', !canHr);
+    if (ph === 'boss' && S.boss){
+        const chose = !!(p && S.boss.ch[myId()]);
+        const canBoss = !turnBlocked && p && !p.gone && !chose;
+        ac += bigBtn('bchoice', '⚔️', 'Join the battle', 'Your weapons count toward Team Power. Win: +2 Levels.', '', 'data-j="j"', !canBoss) +
+            bigBtn('bchoice', '🏃', 'Stay out', 'Discard 1 equipped weapon. No reward, no risk beyond that.', 'k', 'data-j="o"', !canBoss);
     }
-    else if (ph === 'fight' && mine) {
-        const canPush = !f.pushed && !f.ask && (power(c) + (f.helper ? power(S.pl.find(x => x.id === f.helper)) : 0) >= total());
-        const fightButtons = (!f.ask ? bigBtn('ask', '📯', 'Ask for help', 'A teammate adds their weapon Power. They share the spoils.', 'k') : (f.helper ? '' : `<div class="lr-lbl">Waiting for a helper…</div>`)) + (canPush ? bigBtn('push', '🎲', 'Push your luck', 'Flip one more Monster beyond the requirement. Win counts double.', 'k') : '') + bigBtn('resolve', '⚖️', 'Resolve fight', `Power ${power(c) + (f.helper ? power(S.pl.find(x => x.id === f.helper)) : 0)} vs Monsters ${total()}. Exact ties win.`);
-        ac = `<div class="lr-cards lr-btnrow" style="justify-content:center; margin-bottom:10px">${fightButtons}</div>`;
-    }
-    else if (ph === 'fight' && p && !p.gone && f.ask && !f.helper && p.eq.length) ac = bigBtn('help', '🤝', `Help ${pn(c)}`, `Add +${power(p)} Power. Win: draw 1 Loot or gain 1 Level. Lose: you discard too.`);
-    else if (ph === 'boss' && p && !p.gone && !S.boss.ch[myId()]) ac = bigBtn('bchoice', '⚔️', 'Join the battle', 'Your weapons count toward Team Power. Win: +2 Levels.', '', 'data-j="j"') + bigBtn('bchoice', '🏃', 'Stay out', 'Discard 1 equipped weapon. No reward, no risk beyond that.', 'k', 'data-j="o"');
-    else if (ph === 'hreward' && f.helper === myId()) ac = bigBtn('hr', '🃏', 'Draw 1 Loot', 'Take a card from the black deck into your gear.', '', 'data-j="loot"') + bigBtn('hr', '⬆️', 'Gain 1 Level', 'Closer to 15, right now.', 'k', 'data-j="lvl"');
+    ac += `</div>`;
     $('lr-actions').innerHTML = ac;
     reportHeight();
 }
