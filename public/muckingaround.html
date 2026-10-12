@@ -130,10 +130,11 @@ function inPond(x,y){var a=(x-POND.x)/POND.rx,b=(y-POND.y)/POND.ry;return a*a+b*
 function hue(id){var h=7;for(var i=0;i<id.length;i++)h=(h*31+id.charCodeAt(i))%360;return h}
 
 // ---------- hub bridge ----------
-var Hub={me:null,roster:[],up:function(k,p){try{window.parent.postMessage({t:'gu',game:GID,k:k,p:p},'*')}catch(e){}}};
+var Hub={me:null,roster:[],room:'',up:function(k,p){try{window.parent.postMessage({t:'gu',game:GID,k:k,p:p},'*')}catch(e){}}};
 var S=null,me={x:150,y:280,f:1,tx:null,ty:null,z:0,mode:0,a:0,ta:0,tp:-1},keys={},vw={},seen={},mvNow=false,dt=0.016,lastSent='';
 function myId(){return Hub.me&&Hub.me.id}
-function isHost(){return !!(Hub.me&&Hub.me.isHost)}
+// Pre-room the hub reports room:'' and isHost:false — promote to local host (goldberg pattern).
+function isHost(){return !!(Hub.me&&Hub.me.isHost)||!Hub.room}
 function heldBy(id){if(!S)return null;for(var i=0;i<S.it.length;i++)if(S.it[i].b===id)return S.it[i];return null}
 function send(d){if(isHost())onIntent(d,{id:myId()});else Hub.up('intent',d)}
 
@@ -151,7 +152,7 @@ function place(id,n){
 
 function onDown(e){
   var m=e.data;if(!m||m.t!=='gd'||m.game!==GID)return;
-  if(m.k==='roster'){Hub.me=m.p.you;Hub.roster=m.p.roster||[];onRoster()}
+  if(m.k==='roster'){Hub.me=m.p.you;Hub.roster=m.p.roster||[];Hub.room=m.p.room||'';onRoster()}
   else if(m.k==='state'){if(!isHost()&&m.p)S=m.p}
   else if(m.k==='intent'){if(isHost())onIntent(m.p,m.from)}
 }
@@ -508,8 +509,9 @@ Hub.up('height',720);
 window.addEventListener('message',onDown);
 Hub.up('hello');
 setTimeout(function(){
-  if(Hub.me)return;
-  Hub.me={id:'me',name:'You',isHost:true};Hub.roster=[{id:'me',name:'You',host:true}];onRoster();
+  if(Hub.me&&Hub.room)return;
+  if(!Hub.room)Hub.room='';
+  Hub.me={id:(Hub.me&&Hub.me.id)||'me',name:(Hub.me&&Hub.me.name)||'You',isHost:true};Hub.roster=[{id:Hub.me.id,name:Hub.me.name,host:true}];onRoster();
 },window.parent===window?50:1500);
 requestAnimationFrame(frame);
 })();
