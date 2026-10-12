@@ -1,0 +1,19 @@
+{
+  "name": "bubhub",
+  "version": "10.0.0",
+  "private": true,
+  "type": "module",
+  "scripts": {
+    "dev": "vite",
+    "build": "vite build",
+    "preview": "vite preview",
+    "serve": "python3 -m http.server 5173"
+  },
+  "dependencies": {
+    "peerjs": "^1.5.2",
+    "qrcode": "^1.5.4"
+  },
+  "devDependencies": {
+    "vite": "^5.4.0"
+  }
+}

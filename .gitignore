@@ -7,3 +7,7 @@ __pycache__/
 .DS_Store
 Thumbs.db
 *.swp
+
+# Vite / node (v10 hub shell; legacy .html games need no build)
+node_modules/
+dist/

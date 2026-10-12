@@ -70,6 +70,15 @@ CASES = [
     ("wordbridge", {"players": ["w1", "b1"]},
      "Sam and Zaphod played Word Bridge"),
 
+    # the96game: laps played, no winner — and a 3-6 table, so the name joiner
+    # has to handle more than two.
+    ("the96game", {"players": ["w1", "b1"], "laps": 4},
+     "Sam and Zaphod played 4 laps at The 96 Game"),
+    ("the96game", {"players": ["w1", "b1", "c1"], "laps": 2},
+     "Sam, Zaphod and Trillian played 2 laps at The 96 Game"),
+    ("the96game", {"players": ["w1", "b1"]},
+     "Sam and Zaphod played The 96 Game"),
+
     # daltadka: solo, so the local player is the cook
     ("daltadka", {"players": ["w1"], "dish": "Moong", "score": 8420},
      "Sam cooked Moong scoring 8420 at Dal Tadka"),
@@ -96,7 +105,8 @@ def main():
               const NAMES = { w1: 'Sam', b1: 'Zaphod', c1: 'Trillian', c2: 'Marvin' };
               const TITLES = { lotr: 'LOTR Cards', chess: 'Chess', waltz: 'Waltz Engine',
                                goldberg: 'Goldberg', eggs: 'eggs', grammar: 'Discover the Grammar',
-                               blastoff: 'Blast Off!', wordbridge: 'Word Bridge', daltadka: 'Dal Tadka' };
+                               blastoff: 'Blast Off!', wordbridge: 'Word Bridge', daltadka: 'Dal Tadka',
+                               the96game: 'The 96 Game' };
               const R = window.BubRecord.create({
                 getName: () => 'Sam',
                 rosterList: () => Object.keys(NAMES).map(id => ({ id, name: NAMES[id] })),
