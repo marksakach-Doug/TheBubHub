@@ -7,6 +7,7 @@
     "dev": "vite",
     "build": "vite build",
     "preview": "vite preview",
+    "deploy": "bun run build && wrangler deploy",
     "serve": "python3 -m http.server 5173"
   },
   "dependencies": {
@@ -14,6 +15,8 @@
     "qrcode": "^1.5.4"
   },
   "devDependencies": {
-    "vite": "^6.0.0"
+    "@cloudflare/vite-plugin": "^1",
+    "vite": "^6.0.0",
+    "wrangler": "^4"
   }
 }
