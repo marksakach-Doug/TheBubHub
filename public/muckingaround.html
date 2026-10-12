@@ -282,7 +282,7 @@ function emoji(s,x,y,size){
   ctx.drawImage(c,x-c.n/2,y-c.n/2,c.n,c.n);
 }
 function bubble(txt,x,y){
-  ctx.font='14px system-ui';ctx.textBaseline='alphabetic';
+  ctx.font='16px system-ui';ctx.textBaseline='alphabetic';
   var maxW=170,words=txt.split(' '),ls=[],cur='';
   words.forEach(function(w){
     var t=cur?cur+' '+w:w;

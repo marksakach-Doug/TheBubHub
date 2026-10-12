@@ -15,8 +15,6 @@ body{margin:0;background:var(--space);color:var(--ink);font:15px/1.45 'Segoe UI'
 .bo-b.k{background:#c08a4a}
 .bo-b[disabled]{opacity:.4;cursor:not-allowed}
 #bo-err{font:11px monospace;color:#ff8888}
-#bo-status{background:rgba(0,0,0,.6);border:2px solid var(--neon);border-radius:14px;padding:14px 16px;font-size:19px;font-weight:700;text-align:center;color:#f2faff;box-shadow:0 0 20px rgba(0,242,255,0.3);min-height:70px;display:flex;flex-direction:column;justify-content:center;align-items:center}
-#bo-status small{display:block;font-size:12px;font-weight:400;color:var(--dim);margin-top:4px}
 /* Result card: the last resolved flight, pinned until the next one. It stays
    put (no auto-dismiss) because the whole point is that you can read the score
    change after the fact instead of having to remember it. */
@@ -128,6 +126,7 @@ body{margin:0;background:var(--space);color:var(--ink);font:15px/1.45 'Segoe UI'
    are always present; the ones that don't apply are dimmed via [disabled]. */
 .bo-actrow{display:flex;flex-wrap:wrap;gap:10px;padding:8px 0}
 .bo-actrow .bo-act{width:calc(50% - 5px);flex:1 1 230px}
+.bo-errline{font:12px system-ui;color:#ff9c8f;text-align:center;padding:2px 0}
 .bo-act[disabled].hint-bounce,.bo-act[disabled].hint-flash{animation:none;border-color:#334155}
 .hidden{display:none!important}
 .wf-setup{background:rgba(0,0,0,.4);border:1px solid #334155;border-radius:10px;padding:10px;display:flex;flex-direction:column;gap:8px}
@@ -145,7 +144,6 @@ body{margin:0;background:var(--space);color:var(--ink);font:15px/1.45 'Segoe UI'
             <button id="btn-bo-menu" class="bo-b hidden" title="Back to the setup screen">Menu</button>
         </div>
     </div>
-    <div id="bo-status">Preparing for launch…</div>
     <div id="bo-setup" class="wf-setup hidden">
         <span class="bo-lbl" id="bo-setup-title">HOST SETUP — Everyone plays (2–6). Most red cards win.</span>
         <div style="display:flex;align-items:center;gap:8px"><button id="btn-bo-start" class="bo-b">Ignite Engines</button><span id="bo-setup-note" class="bo-lbl"></span></div>
@@ -224,7 +222,7 @@ function onDown(e){
     if (!m || m.t !== 'gd' || m.game !== GAME_ID) return;
     if (m.k === 'roster'){ Hub.me = m.p.you; Hub.roster = m.p.roster; Hub.room = m.p.room; Hub.names = rosterNames(); localSolo = !Hub.room; rosterAdopt(); return; }
     if (m.k === 'hostmove'){ if (!isHost()) act('hello'); else if (S) broadcast(); render(); return; }
-    if (m.k === 'state'){ if (m.p) { S = m.p; render(); } return; }
+    if (m.k === 'state'){ if (m.p) { S = m.p; localErr = null; render(); } return; }
     if (m.k === 'intent'){ onIntent(m.p, m.from); return; }
     if (m.k === 'reset'){ S = null; lastResKey = null; render(); return; }
 }
@@ -284,7 +282,7 @@ const DEST = {
     13: ['Cygnus X-1','🕳️'], 14: ['Sagittarius A*','🌌']
 };
 const BLACK_HOLES = [13, 14];
-let S = null, lastResKey = null;
+let S = null, lastResKey = null, localErr = null;
 
 const val = (c) => V[c.r] || +c.r;
 function shuffle(a){ for (let i = a.length - 1; i > 0; i--){ const j = Math.random() * (i + 1) | 0; [a[i], a[j]] = [a[j], a[i]]; } return a; }
@@ -475,8 +473,8 @@ function resolveFight(p, helperId, path){
         S.msg = `🏆 ${pn(winner)} wins the game!`;
         reportResult(winner);
     } else {
-        S.msg = L.hole ? '💥 BLACK HOLE — ships are lost!'
-            : L.win
+        S.msg = isBlackHole ? '💥 BLACK HOLE — ships are lost!'
+            : win
                 ? `${pn(p)}${h ? ' + ' + pn(h) : ''} — Power ${totalPower} vs Dest ${destSum}: SUCCESS!`
                 : `${pn(p)}${h ? ' + ' + pn(h) : ''} — Power ${totalPower} vs Dest ${destSum}: FAILURE`;
         endTurn();
@@ -585,8 +583,8 @@ function act(action, x){
     const d = Object.assign({ action, pid: myId(), name: myName() }, x || {});
     if (isHost()){
         if (!S) return;
-        const e = handle(d); if (e){ S.msg = e; render(); }
-        else broadcast();
+        const e = handle(d); if (e){ localErr = e; render(); }
+        else { localErr = null; broadcast(); }
     } else {
         Hub.up('intent', d);
     }
@@ -713,7 +711,6 @@ function afterburnerFeasible(){
 }
 
 function render(){
-    const st = $('bo-status'); if (!st) return;
     const sh = (id, on) => {
         const e = $(id);
         if (!e) return;
@@ -728,28 +725,11 @@ function render(){
         ? 'SOLO FLIGHT — you plus two bot pilots. Most red cards wins.'
         : 'HOST SETUP — Everyone plays (2–6). Most red cards win.';
     if (!S){
-        st.textContent = localSolo
-            ? 'Solo flight: two simple bot pilots fly with you. They pick at random.'
-            : 'Ready for launch? Gather your crew and blast off!';
         return;
     }
     
     const p = me(), c = cur();
     const paused = !isHost() && !hostPresent();
-    if (S.over){
-        const winner = S.pl.reduce((prev, curr) => (prev.score > curr.score) ? prev : curr);
-        st.innerHTML = `<span style="color:var(--gold); font-size:24px">MISSION COMPLETE!</span><small>${pn(winner)} won the race!</small>`;
-    } else if (paused){
-        st.innerHTML = `Game paused — host disconnected.<small>It resumes when they return.</small>`;
-    } else {
-        // A guest watching a solo-originated table has no seat, so say so
-        // instead of showing "Waiting for a pilot" forever.
-        const watching = !me() && S.soloOrigin;
-        const sub = watching
-            ? "👁 watching — this is someone's solo game (bots flying)"
-            : (S.phase === 'decide' ? 'Waiting for a pilot' : 'Prepare for maneuvers');
-        st.innerHTML = `${esc(S.msg)}<small>${sub}</small>`;
-    }
 
     $('bo-topdeck').innerHTML =
         `<div class="bo-deckrow" style="display:flex;gap:12px;align-items:center;justify-content:center;flex-wrap:wrap">` +
@@ -853,7 +833,7 @@ function render(){
         const hint = disabled ? '' : (why || '');
         return `<button class="bo-act ${cls}" data-a="${a}" ${attr}${disabled ? ' disabled' : ''}><span class="ic">${esc(ic)}</span><span><span class="tt">${esc(t)}</span><br><span class="ss">${esc(s)}</span>${hint ? `<span class="why">${esc(hint)}</span>` : ''}</span></button>`;
     };
-    mid += `<div class="bo-actrow">` +
+    mid += (localErr ? `<div class="bo-errline">${esc(localErr)}</div>` : '') + `<div class="bo-actrow">` +
         bigBtn('blastoff', '🚀', 'Blast Off!', 'Draw a destination and try to reach it.', '', '', '', !(myChoose && p && p.ship)) +
         bigBtn('newship', '🛠️', 'Find New Ship', 'Draw a new ship to replace your current one.', 'k', '', '', !myChoose) +
         bigBtn('pathA', '🛡️', 'Normal Flight', 'Ship vs destination. One red card, keep your ship.',
