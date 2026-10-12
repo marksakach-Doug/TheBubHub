@@ -651,7 +651,7 @@ const bossP = () => 14 + S.boss.ms.reduce((s, c) => s + val(c, true), 0);
 function startBoss(){
     // No cards drawn yet: extras scale with JOINERS (drawn at resolve time),
     // and Dragon power stays hidden until everyone has chosen.
-    S.boss = { ms: [], ch: {} }; S.fight = null; S.phase = 'boss';
+    S.boss = { ms: [], ch: {}, jorder: [] }; S.fight = null; S.phase = 'boss';
     S.pl.forEach(p => { if (p.gone) S.boss.ch[p.id] = 'x'; });
     say(`🐉 THE DRAGON! Everyone: Join or Stay Out.`);
     S.msg = 'The Dragon awakens — Join or Stay Out.';
@@ -675,11 +675,39 @@ function resolveBoss(){
         : `Team ${team} vs Dragon ${bossP()} — the Dragon wins.`;
     J.forEach(p => { if (win){ p.lvl += 2; say(`${pn(p)} rises to Lv ${p.lvl}.`); } else { queueLose(p); p.lvl = Math.max(1, p.lvl - 1); say(`${pn(p)} drops to Lv ${p.lvl}.`); } normSort(p); });
     S.monD.push(...B.ms);
+    // Park the outcome on screen: the first joiner confirms (bossack) before
+    // the aftermath chain (discard prompts, win check, turn advance) runs,
+    // so everyone actually sees what happened.
+    B.res = { team, bp: bossP(), win, pw,
+              joined: J.map(p => p.id), fled: S.pl.filter(p => B.ch[p.id] === 'o').map(p => p.id),
+              lvls: J.map(p => ({ id: p.id, lvl: p.lvl })) };
+    S.phase = 'bossresult';
+    S.msg = win
+        ? `Team ${team} vs Dragon ${bossP()} — the Dragon falls! Waiting for confirmation.`
+        : `Team ${team} vs Dragon ${bossP()} — the Dragon wins. Waiting for confirmation.`;
+}
+// Duty: first joiner (in join order) still seated; else turn player; else any
+// seated player. Recomputed live so a departure never wedges the game.
+function bossAckId(){
+    const B = S && S.boss;
+    if (B && B.jorder) for (const id of B.jorder){
+        const q = S.pl.find(x => x.id === id);
+        if (q && !q.gone) return id;
+    }
+    const c = S && cur();
+    if (c && !c.gone) return c.id;
+    const any = S && S.pl.find(x => !x.gone);
+    return any ? any.id : null;
+}
+// Post-confirm tail of the old resolveBoss: discard prompts, win check, next.
+function continueBossAfterAck(){
+    const B = S.boss, pw = (B.res && B.res.pw) || {};
     let bossOpened = false;
-    J.forEach(p => { if (normLevel(p)) bossOpened = true; });
-    if (bossOpened){ S.after = 'bosschk'; S.afterPw = pw; return; }
-    if (pumpLose()){ S.after = 'bosschk'; S.afterPw = pw; return; }
+    B.res.joined.forEach(id => { const q = S.pl.find(x => x.id === id); if (q && normLevel(q)) bossOpened = true; });
+    if (bossOpened){ S.after = 'bosschk'; S.afterPw = pw; return null; }
+    if (pumpLose()){ S.after = 'bosschk'; S.afterPw = pw; return null; }
     if (!chk(pw)) endTurn();
+    return null;
 }
 
 function handle(d){
@@ -692,7 +720,7 @@ function handle(d){
     // anyone's turn (helpers especially need this). Blocked only while a
     // keep/reward step is pending, so those flows stay clean.
     if (a === 'gear'){
-        if (S.phase !== 'choose' && S.phase !== 'fight' && S.phase !== 'boss' && S.phase !== 'over') return 'Finish the current step first.';
+        if (S.phase !== 'choose' && S.phase !== 'fight' && S.phase !== 'boss' && S.phase !== 'bossresult' && S.phase !== 'over') return 'Finish the current step first.';
         if (d.to === 'eq'){
             const x = p.hand[0]; if (!x) return null;
             if (!canEq(p, x)) return 'Face-card weapons unlock at Level 5.';
@@ -748,9 +776,19 @@ function handle(d){
         if (a !== 'bchoice') return 'Dragon! Choose Join or Stay Out.';
         if (S.boss.ch[p.id]) return 'Already chosen.';
         S.boss.ch[p.id] = d.j === 'j' ? 'j' : 'o';
+        if (d.j === 'j') S.boss.jorder.push(p.id);
         if (S.pl.every(x => S.boss.ch[x.id])) resolveBoss();
         else S.msg = `Dragon: ${Object.keys(S.boss.ch).length}/${S.pl.length} decided.`;
         return null;
+    }
+    if (S.phase === 'bossresult'){
+        const duty = bossAckId();
+        if (a !== 'bossack' || d.pid !== duty){
+            const w = S.pl.find(x => x.id === duty);
+            return 'Waiting for ' + (w ? pn(w) : 'someone') + ' to confirm the Dragon result.';
+        }
+        say(`${pn(p)} confirms the Dragon result.`);
+        return continueBossAfterAck();
     }
     if (S.phase === 'pick'){
         if (a !== 'keep' || S.pick.who !== d.pid) return 'Waiting for ' + S.pl.find(x => x.id === S.pick.who).name + ' to pick.';
@@ -903,6 +941,7 @@ function myAction(){
     const ph = S.phase, f = S.fight;
     if (ph === 'choose' || ph === 'fight') return cur().id === myId() || (ph === 'fight' && f.ask && !f.helper && p.eq.length > 0);
     if (ph === 'boss') return !S.boss.ch[myId()];
+    if (ph === 'bossresult') return bossAckId() === myId();
     if (ph === 'pick') return S.pick.who === myId();
     if (ph === 'hreward') return f.helper === myId();
     if (ph === 'decide') return !!(S.pend && S.pend.who === myId());
@@ -917,6 +956,10 @@ function waitingText(){
     if (S.phase === 'boss'){
         const done = Object.keys(S.boss.ch).length;
         return [`Waiting on the Dragon — ${done}/${S.pl.length} decided`, 'Join the battle or stay out.'];
+    }
+    if (S.phase === 'bossresult'){
+        const w = S.pl.find(x => x.id === bossAckId());
+        return [`${w ? pn(w) : 'Someone'} is confirming the Dragon result`, 'Team vs Dragon breakdown above.'];
     }
     if (S.phase === 'pick') return [`Waiting for ${S.pl.find(x => x.id === S.pick.who).name} to keep a card (${S.pick.why || 'Explore'})`, 'Draw 2 Loot, keep 1.'];
     if (S.phase === 'hreward') return [`Waiting for the helper to choose`, 'Draw 1 Loot or gain 1 Level.'];
@@ -948,7 +991,7 @@ function scoreboard(){
     const over = ph === 'over';
     const w = over && S.pl.find(x => x.id === S.win);
     let L, R, verdict = '', vcls = '';
-    if (ph === 'boss'){
+    if ((ph === 'boss' || ph === 'bossresult') && S.boss){
         const team = S.pl.filter(q => S.boss.ch[q.id] === 'j').reduce((s, q) => s + power(q, true), 0);
         const done = Object.keys(S.boss.ch).length, totalN = S.pl.length;
         const revealed = S.pl.every(x => S.boss.ch[x.id]);
@@ -1023,7 +1066,7 @@ function render(){
 
     let mid = `<div>${deckBox('black', S.loot.length, S.lootD.length, 'LOOT')}</div>`;
     if (p){
-        const gearing = p && !p.gone && (ph === 'choose' || ph === 'fight' || ph === 'boss' || ph === 'over') && !paused;
+        const gearing = p && !p.gone && (ph === 'choose' || ph === 'fight' || ph === 'boss' || ph === 'bossresult' || ph === 'over') && !paused;
         let gearBtn = '';
         if (ph === 'fight' && mine) {
             gearBtn = `<button class="lr-act compact" data-a="resolve" title="Resolve the fight now" style="margin-top:8px"><span class="ic">⚖️</span><span class="tt">Resolve</span></button>`;
@@ -1082,6 +1125,14 @@ function render(){
         const verb = pd.kind === 'lose' ? 'tap the card to DISCARD' : (pd.kind === 'stash' ? 'tap a weapon to move to the spare' : 'tap the card to KEEP');
         ar = `<span class="lr-lbl">${minePd ? '' : esc((who ? pn(who) : 'Someone') + "'s cards — ")}${esc(tag)} — ${esc(who ? pn(who) : 'choosing')} (${verb})</span><div class="lr-cards"${minePd ? '' : ' style="opacity:.55"'}>${pd.cards.map((x, i) => card(x, minePd ? `data-a="decide" data-i="${i}"` : '', true)).join('')}</div>`;
         }
+    } else if (ph === 'bossresult' && S.boss && S.boss.res){
+        const R2 = S.boss.res;
+        const duty = bossAckId(), dutyP = S.pl.find(x => x.id === duty);
+        const lvlLines = R2.lvls.map(e => { const q = S.pl.find(x => x.id === e.id); return `${esc(q ? pn(q) : '?')}: Lv ${e.lvl}`; }).join(' · ');
+        const fled = R2.fled.map(id => { const q = S.pl.find(x => x.id === id); return q ? pn(q) : '?'; }).join(', ');
+        ar = `<div class="lr-tally" style="font-size:20px">🐉 Team ${R2.team} vs Dragon ${R2.bp} — ${R2.win ? 'THE DRAGON FALLS!' : 'THE DRAGON WINS'}</div>` +
+            `<div class="lr-lbl" style="text-align:center">${esc(lvlLines)}${fled ? ` · fled: ${esc(fled)} (discard a weapon)` : ''}</div>` +
+            `<div class="lr-lbl" style="text-align:center">${duty === myId() && !paused ? 'Tap Confirm to continue.' : `Waiting for ${esc(dutyP ? pn(dutyP) : 'someone')} to confirm.`}</div>`;
     } else if (ph === 'over'){
         const w = S.pl.find(x => x.id === S.win);
         const table = S.pl.slice().sort((a, b) => b.lvl - a.lvl || power(b) - power(a))
@@ -1131,6 +1182,12 @@ function render(){
         const canBoss = !turnBlocked && p && !p.gone && !chose;
         ac += bigBtn('bchoice', '⚔️', 'Join', 'Your weapons count toward Team Power. Win: +2 Levels.', '', 'data-j="j"', !canBoss) +
             bigBtn('bchoice', '🏃', 'Out', 'Discard 1 equipped weapon. No reward, no risk beyond that.', 'k', 'data-j="o"', !canBoss);
+    }
+    if (ph === 'bossresult' && S.boss && S.boss.res){
+        const duty = bossAckId();
+        const canAck = !turnBlocked && p && !p.gone && duty === myId();
+        const w = S.pl.find(x => x.id === duty);
+        ac += bigBtn('bossack', '✅', canAck ? 'Confirm' : `Waiting: ${w ? pn(w) : '?'}`, 'Confirm the Dragon result so the game can continue.', '', '', !canAck);
     }
     ac += `</div>`;
     $('lr-actions').innerHTML = ac;
