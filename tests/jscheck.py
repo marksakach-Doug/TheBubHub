@@ -77,7 +77,7 @@ def main(argv):
         targets = [root / a for a in argv[1:]]
     else:
         targets = sorted(root.glob("*.html")) + sorted(root.glob("*.js"))
-        for sub in ("src", "net", "room", "plugins", "games"):
+        for sub in ("src", "net", "room", "plugins", "public"):
             targets += sorted((root / sub).rglob("*.js"))
     # inline <script> blocks come from .html; bare .js files parse as modules
     rc = 0

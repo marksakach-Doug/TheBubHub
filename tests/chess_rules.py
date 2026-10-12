@@ -23,7 +23,7 @@ import sys
 from playwright.sync_api import sync_playwright
 
 ROOT = pathlib.Path(__file__).resolve().parent.parent
-SRC = (ROOT / "chess.html").read_text(encoding="utf-8")
+SRC = (ROOT / "public" / "chess.html").read_text(encoding="utf-8")
 SCRIPT = re.findall(r"<script(?![^>]*\bsrc=)[^>]*>(.*?)</script>", SRC, re.S)[-1]
 
 
