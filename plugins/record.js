@@ -2,9 +2,8 @@
 // date, dedupes, and writes to the sheet. Game-specific string formatting
 // was removed from bub-record.js: legacy compat payloads with .text are
 // passed through, but new modules only implement summarize().
-// Opt-in: localStorage 'bubhub.record.optin' === '1'. Off by default.
+// Always on: this hub is for friends, no consent gate.
 const BUB_API = 'https://script.google.com/macros/s/AKfycbwhy40Gk_QPoVz-jEwe-I72_rqbudw_QeLxZcGz7e2BMH3kIYS0AWkBiRulJl-CfU5jyA/exec';
-const OPTIN_KEY = 'bubhub.record.optin';
 const MONTHS = ['Jan', 'Feb', 'Mar', 'Apr', 'May', 'Jun', 'Jul', 'Aug', 'Sep', 'Oct', 'Nov', 'Dec'];
 
 function todayISO() {
@@ -17,14 +16,6 @@ function fmtDate(iso) {
   const m = /^(\d{4})-(\d{2})-(\d{2})/.exec(String(iso || ''));
   if (!m) return String(iso || '');
   return parseInt(m[3], 10) + ' ' + (MONTHS[parseInt(m[2], 10) - 1] || '?') + ' ' + m[1];
-}
-
-export function isOptedIn() {
-  try { return localStorage.getItem(OPTIN_KEY) === '1'; } catch (e) { return false; }
-}
-
-export function setOptedIn(v) {
-  try { localStorage.setItem(OPTIN_KEY, v ? '1' : '0'); } catch (e) {}
 }
 
 export function createRecord(opts) {
@@ -96,7 +87,6 @@ export function createRecord(opts) {
   }
 
   function write(entry) {
-    if (!isOptedIn()) { status('Record is off — turn it on to share lines.'); return; }
     status('Saving…');
     try {
       const q = 'kind=bub&game=' + encodeURIComponent(entry.game) +
@@ -167,7 +157,6 @@ export function createRecord(opts) {
   }
 
   function load() {
-    if (!isOptedIn()) { status('Record is off — turn it on to load the shared sheet.'); render(); return; }
     status('Loading…');
     try {
       fetch(BUB_API, { cache: 'no-store' }).then(function (r) { return r.json(); }).then(function (j) {
@@ -179,14 +168,6 @@ export function createRecord(opts) {
   }
 
   function wire() {
-    const box = document.getElementById('record-optin');
-    if (box) {
-      box.checked = isOptedIn();
-      box.addEventListener('change', function () {
-        setOptedIn(box.checked);
-        if (box.checked) load(); else status('Record is off.');
-      });
-    }
     ['record-more-lobby', 'record-more-room'].forEach(function (id) {
       const el = document.getElementById(id);
       if (el) el.addEventListener('click', function () { expanded = !expanded; render(); });

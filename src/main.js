@@ -10,7 +10,6 @@ import { createCompat, legacyRoster } from './compat.js';
 import { loadRegistry, soloCorner, roomLists } from './registry.js';
 import { createChat } from '../plugins/chat.js';
 import { createInvite, parseInvite } from '../plugins/invite.js';
-import { createQr } from '../plugins/qr.js';
 import { createRecord } from '../plugins/record.js';
 
 const SKEY = 'bubhub.session.v2';
@@ -64,7 +63,6 @@ export async function boot() {
   const getNet = function () { return net; };
   const chat = createChat({ store: store, getNet: getNet });
   const invite = createInvite({ store: store });
-  const qr = createQr({ getLink: function () { return invite.currentLink(); } });
   const record = createRecord({ store: store, getNet: getNet, getModule: getModule });
   let recentAnimals = [];
   let nameConfirmed = !!loadSavedName();
@@ -120,28 +118,61 @@ export async function boot() {
     });
   }
 
+  // Tables: everyone present at the same game, derived from presence.
+  // No protocol change — tables are a view over the hub roster.
+  function tables() {
+    const s = store.state;
+    const groups = {}; // gameId -> [members]
+    const lobby = [];
+    s.roster.forEach(function (m) {
+      if (m.game && byId.get(m.game)) {
+        if (!groups[m.game]) groups[m.game] = [];
+        groups[m.game].push(m);
+      } else {
+        lobby.push(m);
+      }
+    });
+    return { groups: groups, lobby: lobby };
+  }
+
+  function memberLabel(m) {
+    const s = store.state;
+    let seat = '';
+    Object.keys(s.seats).forEach(function (k) { if (s.seats[k] === m.id) seat = ' (seat ' + k + ')'; });
+    return (m.host ? '👑 ' : '') + m.name + (m.id === s.me.id ? ' (you)' : '') + seat +
+      (m.bot ? ' [bot]' : '') + (m.spectator ? ' [watching]' : '');
+  }
+
   function renderRoster() {
     const s = store.state;
     const ul = document.getElementById('roster-list');
     const ps = document.getElementById('peer-status');
     if (ul) {
       ul.innerHTML = '';
-      s.roster.forEach(function (m) {
-        const li = document.createElement('li');
-        li.className = 'text-slate-200 text-sm';
-        const seatKeys = Object.keys(s.seats);
-        let seat = '';
-        seatKeys.forEach(function (k) { if (s.seats[k] === m.id) seat = ' (seat ' + k + ')'; });
-        li.textContent = (m.host ? '👑 ' : '') + m.name + seat +
-          (m.game ? ' — in ' + gameTitle(m.game) : ' — in lobby') +
-          (m.bot ? ' [bot]' : '') + (m.spectator ? ' [watching]' : '');
-        ul.appendChild(li);
-      });
-      if (!s.roster.length) {
+      if (!s.inRoom) {
         const li = document.createElement('li');
         li.className = 'text-slate-500 text-xs italic';
-        li.textContent = s.inRoom ? 'Nobody else here yet — send an invite.' : 'Solo — not in a room.';
+        li.textContent = 'Solo — not in a room.';
         ul.appendChild(li);
+      } else {
+        const t = tables();
+        // lobby first, then one group per table
+        if (t.lobby.length) {
+          ul.appendChild(groupHeader('In lobby (' + t.lobby.length + ')'));
+          t.lobby.forEach(function (m) { ul.appendChild(memberItem(m)); });
+        }
+        Object.keys(t.groups).forEach(function (gid) {
+          const g = byId.get(gid);
+          const title = (g.meta.icon ? g.meta.icon + ' ' : '') + g.meta.title;
+          ul.appendChild(groupHeader(title + ' (' + t.groups[gid].length + ')'));
+          t.groups[gid].forEach(function (m) { ul.appendChild(memberItem(m)); });
+        });
+        if (!s.roster.length) {
+          const li = document.createElement('li');
+          li.className = 'text-slate-500 text-xs italic';
+          li.textContent = 'Nobody else here yet — send an invite.';
+          ul.appendChild(li);
+        }
       }
     }
     if (ps) {
@@ -149,6 +180,51 @@ export async function boot() {
         ? (s.isHost ? 'You host ' + s.roster.length + ' player(s).' : 'Connected to ' + s.roomId + ' (' + s.roster.length + ').')
         : 'Not in a room.';
     }
+    renderTables();
+  }
+
+  function groupHeader(text) {
+    const li = document.createElement('li');
+    li.className = 'text-teal-300 text-xs font-extrabold uppercase tracking-wide mt-1';
+    li.textContent = text;
+    return li;
+  }
+
+  function memberItem(m) {
+    const li = document.createElement('li');
+    li.className = 'text-slate-200 text-sm pl-2';
+    li.textContent = memberLabel(m);
+    return li;
+  }
+
+  // Passive table bars: who opened what, with a Join button.
+  // Opening a game NEVER mounts it for anyone else — no yank, by design.
+  function renderTables() {
+    const box = document.getElementById('game-invites');
+    if (!box) return;
+    box.innerHTML = '';
+    const s = store.state;
+    if (!s.inRoom) return;
+    const t = tables();
+    Object.keys(t.groups).forEach(function (gid) {
+      if (gid === s.openGame) return; // already at this table
+      const g = byId.get(gid);
+      const names = t.groups[gid].map(function (m) { return m.name; }).join(', ');
+      const div = document.createElement('div');
+      div.className = 'bg-slate-900 rounded p-2 text-xs flex items-center gap-2';
+      const span = document.createElement('span');
+      span.className = 'text-slate-300 truncate';
+      span.textContent = 'Table: ' + g.meta.title + ' — ' + names;
+      span.title = names;
+      const btn = document.createElement('button');
+      btn.className = 'btn-bouncy rounded px-2 py-1 text-xs font-bold ml-auto';
+      btn.style.background = g.meta.color || '#334155';
+      btn.textContent = 'Join table';
+      btn.addEventListener('click', function () { openGame(gid); });
+      div.appendChild(span);
+      div.appendChild(btn);
+      box.appendChild(div);
+    });
   }
 
   function gameTitle(id) {
@@ -636,6 +712,7 @@ export async function boot() {
   async function hostRoom() {
     errBox(null);
     if (!nameConfirmed) { setStatus('host-status', 'Confirm your name first (✓).'); return; }
+    if (store.state.inRoom) { setStatus('host-status', 'You are already in room ' + store.state.roomId + ' — leave it first.'); return; }
     const want = (document.getElementById('host-id-input').value || '').trim() || randomRoom();
     const keepGame = store.state.openGame;
     setStatus('host-status', 'Creating ' + want + '…');
@@ -652,6 +729,7 @@ export async function boot() {
   async function joinRoom(roomId, game) {
     errBox(null);
     if (!nameConfirmed) { setStatus('join-status', 'Confirm your name first (✓).'); return; }
+    if (store.state.inRoom) { setStatus('join-status', 'You are already in room ' + store.state.roomId + ' — leave it first.'); return; }
     const room = (roomId || document.getElementById('join-id-input').value || '').trim();
     if (!room) { setStatus('join-status', 'Enter a room id.'); return; }
     pendingGame = game || null;
@@ -666,8 +744,12 @@ export async function boot() {
   }
 
   function leaveRoom() {
-    const keepName = store.state.me.name;
-    const keepId = store.state.me.id;
+    const s = store.state;
+    const others = s.roster.filter(function (m) { return m.id !== s.me.id; }).length;
+    const label = s.inRoom ? ('room ' + s.roomId + ' (' + (others ? others + ' friend' + (others === 1 ? '' : 's') + ' here' : 'just you') + ')') : 'solo play';
+    if (!window.confirm('Leave ' + label + '?')) return;
+    const keepName = s.me.name;
+    const keepId = s.me.id;
     teardownNet();
     closeStageOnly();
     store.closeRoom();
@@ -724,7 +806,6 @@ export async function boot() {
       origSend(text);
     };
     invite.wire();
-    qr.wire();
     record.wire();
 
     document.getElementById('btn-focus-exit').addEventListener('click', function () {
@@ -756,29 +837,8 @@ export async function boot() {
       renderHeaderRoom();
     });
 
-    // resume bar
-    const rs = sess;
-    if (rs && rs.room) {
-      const bar = document.getElementById('resume-bar');
-      const txt = document.getElementById('resume-text');
-      if (bar && txt) {
-        bar.classList.remove('hidden');
-        txt.textContent = 'Rejoin ' + rs.room + ' as ' + (rs.host ? 'host' : 'guest') + '?';
-        document.getElementById('btn-resume-go').addEventListener('click', function () {
-          bar.classList.add('hidden');
-          if (rs.host) {
-            document.getElementById('host-id-input').value = rs.room;
-            hostRoom();
-          } else {
-            joinRoom(rs.room, rs.game || null);
-          }
-        });
-        document.getElementById('btn-resume-forget').addEventListener('click', function () {
-          clearSession();
-          bar.classList.add('hidden');
-        });
-      }
-    }
+    // NOTE: no resume bar by design — rejoining is an explicit act
+    // (paste an invite link or host anew), not a one-click habit.
 
     // invite link landing (?room=&game=)
     const inv = parseInvite();
@@ -796,9 +856,6 @@ export async function boot() {
           confirmName(document.getElementById('invite-name').value || randomPick());
           land.classList.add('hidden');
           joinRoom(inv.room, inv.game || null);
-        });
-        document.getElementById('btn-invite-skip').addEventListener('click', function () {
-          land.classList.add('hidden');
         });
       }
     } else if (inv.game && byId.get(inv.game)) {
@@ -818,12 +875,7 @@ export async function boot() {
     }
 
     showLobby();
-    if (isOptedInRecord()) record.load();
-    else record.render();
-  }
-
-  function isOptedInRecord() {
-    try { return localStorage.getItem('bubhub.record.optin') === '1'; } catch (e) { return false; }
+    record.load();
   }
 
   // chat/record net patch: give them broadcast fns now net exists lazily
