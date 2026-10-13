@@ -5,16 +5,19 @@
 export async function loadRegistry() {
   const fresh = [];
   try {
-    if (typeof import.meta !== 'undefined' && typeof import.meta.glob === 'function') {
-      const mods = import.meta.glob('../games/*/index.js');
-      const entries = Object.entries(mods);
-      for (let i = 0; i < entries.length; i++) {
-        try {
-          const m = await entries[i][1]();
-          if (m && m.meta) fresh.push({ kind: 'module', path: entries[i][0], module: m, meta: m.meta });
-        } catch (e) {
-          console.warn('game module failed:', entries[i][0], e);
-        }
+    // NO `typeof import.meta.glob` guard here. Vite statically replaces the
+    // call below at build time, so on a production bundle that guard is always
+    // false and every module game silently vanishes — which is exactly what
+    // happened: the live site served 15 iframe games and zero module games.
+    // Without Vite the call itself throws, and the catch below is the fallback.
+    const mods = import.meta.glob('../games/*/index.js');
+    const entries = Object.entries(mods);
+    for (let i = 0; i < entries.length; i++) {
+      try {
+        const m = await entries[i][1]();
+        if (m && m.meta) fresh.push({ kind: 'module', path: entries[i][0], module: m, meta: m.meta });
+      } catch (e) {
+        console.warn('game module failed:', entries[i][0], e);
       }
     }
   } catch (e) {
