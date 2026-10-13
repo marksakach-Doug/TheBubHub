@@ -322,6 +322,10 @@ export async function boot() {
   }
 
   // ---------- opening games ----------
+  // `roster` is a snapshot taken when the game opens. Anything that must stay
+  // live belongs in the game's projected state instead — `state.players` is
+  // re-sent on every reduce(), so a lobby should count dots from there, not
+  // from this array.
   function apiFor(meta) {
     const s = store.state;
     return {
@@ -329,8 +333,24 @@ export async function boot() {
       seats: Object.assign({}, s.seats),
       roster: store.rosterList(),
       isSpectator: store.isSpectator(),
+      // Who is actually at this table: opened the same game, not watching.
+      // This is what init() should seat, not the room roster — a room holds
+      // everyone in the lobby and every other table too.
+      atTable: store.rosterList().filter(function (m) {
+        return m.game === meta.id && !m.spectator;
+      }),
+      isHost: s.isHost,
+      // Solo Corner is a room of one: inRoom false, isHost true.
+      isInRoom: s.inRoom,
       send: function (action) { sendAction(meta.id, action); }
     };
+  }
+
+  // The context init() gets. Same table list apiFor hands the client, so a
+  // game seats the same people on open that its own lobby will later count.
+  function initCtx(meta) {
+    const api = apiFor(meta);
+    return { seats: api.roster, atTable: api.atTable, options: {} };
   }
 
   function openGame(id) {
@@ -373,7 +393,7 @@ export async function boot() {
       let st = modState.get(g.meta.id);
       if (!st) {
         try {
-          st = { mod: mod, state: mod.init({ seats: store.rosterList(), options: {} }) };
+          st = { mod: mod, state: mod.init(initCtx(g.meta)) };
         } catch (e) {
           console.error(e);
           st = { mod: mod, state: {} };
@@ -436,7 +456,7 @@ export async function boot() {
     const mod = g.module;
     let st = modState.get(gameId);
     if (!st) {
-      st = { mod: mod, state: mod.init({ seats: store.rosterList(), options: {} }) };
+      st = { mod: mod, state: mod.init(initCtx(g.meta)) };
       modState.set(gameId, st);
     }
     let next = st.state;

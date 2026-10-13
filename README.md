@@ -83,8 +83,11 @@ wins over a legacy entry with the same id. See
 ### `init(ctx) → state`
 
 Runs once, host-side, when the game is first opened. `ctx` is
-`{ seats: <roster array>, options: {} }`. Return a plain, JSON-serialisable
-object — it is cloned into `project()` and shipped to every client.
+`{ seats: <the whole room roster>, atTable: <who opened this game>, options: {} }`.
+Seat `atTable`, not `seats` — see
+[Seating, solo and spectators](#seating-solo-and-spectators). Return a plain,
+JSON-serialisable object — it is cloned into `project()` and shipped to every
+client.
 
 State is cached and restored, so it survives a reload and a late joiner.
 
