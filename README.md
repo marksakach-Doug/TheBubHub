@@ -188,10 +188,25 @@ with loop-tracking added by `src/stage.js`.
 | `seats` | `{ [seatNumber]: playerId }` | The hub's seat map. `0` is the first seat. |
 | `roster` | `[{ id, name, host, game, spectator, bot }]` | Everyone in the room. |
 | `isSpectator` | `boolean` | True when you are in a room but hold no seat. |
+| `atTable` | `[{ id, name, host, game }]` | Who is actually at **your** table: same game, not watching. This is what `init()` should seat. |
+| `isHost` | `boolean` | True when you host the room. Solo Corner is a room of one, so it is true there too. |
+| `isInRoom` | `boolean` | False in the Solo Corner. Use it to tell "one player" from "nobody has joined yet". |
 | `send` | `(action) => void` | Send an action. Host-side this runs `reduce()` locally; otherwise it goes to the host over the network. |
 | `root` | ShadowRoot | Your DOM root. |
 | `raf(fn)` / `cancelRaf(id)` | | Tracked `requestAnimationFrame`. Cancelled for you on teardown. |
 | `setTimeout(fn, ms)` / `setInterval(fn, ms)` | | Tracked timers. Cancelled for you on teardown. |
+
+`roster` and `atTable` are **snapshots taken when the game opened** — they do
+not refresh. Anything that must stay live (how many players are at the table
+right now) belongs in your projected state, which the hub re-sends on every
+`reduce()`. A lobby that counts seats from `atTable` will not notice a guest
+walking in.
+
+`init()` receives that same table list under `ctx.atTable`, with the full room
+roster still in `ctx.seats`. Seat `atTable` and filter out spectators: a room
+holds the lobby and every other table too, so seating the roster hands people
+dots for a game they never opened — and, because `join` is then a no-op for
+them, they stay seated for the life of the state.
 
 Use `api.raf`, `api.setTimeout` and `api.setInterval` rather than the globals.
 They are recorded per mount and cancelled when the game closes, so **a game can
@@ -354,7 +369,7 @@ There is no unit-test framework, but there is one command that checks the things
 worth checking:
 
 ```bash
-./test.sh                  # syntax + record sentences + dot return + chess rules
+./test.sh                  # syntax + secrets + lockfile + record sentences + game rules
 ./test.sh --skip-browser   # syntax only — fully offline, no Chromium needed
 ```
 
@@ -370,6 +385,7 @@ Without a browser the suite **fails loudly** rather than quietly skipping — us
 | `tests/jscheck.py` | Parses every `<script>` in the hub, `games/`, and every game in `public/` with a real JS parser. The cheapest way to catch a typo before you reload. |
 | `tests/record_test.py` | Runs the legacy `bub-record.js` against stub rosters and checks the exact sentence each payload produces. That file is **not** loaded by the running hub — this is a regression guard for it. |
 | `tests/record_legacy_test.py` | Runs the **live** legacy path, `plugins/record.js:describeLegacy()`, and checks the sentence every legacy game actually gets today. |
+| `tests/lockfile_test.py` | Fails if `bun.lock`'s format drifts from the bun pinned in `.bun-version` (Cloudflare runs `bun install --frozen-lockfile` with 1.2.15), and runs that frozen install to prove it. No browser. |
 | `tests/secrets_test.py` | Fails if any credential-named file is in the working tree, if `.gitignore` stops covering those names, or if anything git would commit contains a literal API token. No browser, no dependency. |
 | `tests/chess_rules.py` | Extracts the **real** move generator out of `public/chess.html` and runs it against textbook positions plus 40 full bot games. |
 | `tests/module_registry_test.py` | Guards the dev-vs-build trap in `src/registry.js`: asserts no runtime `import.meta.glob` feature check exists, then runs the real `loadRegistry()` both as a built bundle (glob replaced by a loader map) and with no Vite at all. |
@@ -421,8 +437,13 @@ npm run deploy    # bun run build && wrangler deploy
 
 ### Deploying (and keeping the credential out of git)
 
-Publishing is **independent of git**: `wrangler deploy` sends `dist/` straight to
-the live site. A deploy needs no commit, and a commit deploys nothing.
+**The `thebubhub` Worker has Workers Builds connected: pushing to `main` builds
+and deploys automatically.** (There is no Pages project in the account — a
+"Cloning repository… `bun install --frozen-lockfile`" log is a Workers build.)
+A failed build leaves the live site on the last good deployment, so check the log
+before assuming the site is broken.
+
+To publish without pushing:
 
 ```bash
 bun install
@@ -441,13 +462,24 @@ one reaches anything git would commit. The `account_id` in `wrangler.jsonc` is
 *not* a secret — it is there so the deploy knows which account it is publishing
 to.
 
-Two things worth knowing after a deploy:
+**The lockfile is a contract with CI.** Cloudflare runs
+`bun install --frozen-lockfile` with **bun 1.2.15**, pinned in `.bun-version`.
+`bun install` writes `bun.lock` in whatever format the *local* bun writes, and
+bun 1.3+ writes `"lockfileVersion": 2`, which 1.2.15 cannot parse:
 
-- The token carries Workers Scripts: Edit but **not** Zone → Cache Purge, so the
-  edge can serve the previous `index.html` for up to a minute. That is not a
-  failed deploy — check again before worrying.
-- Hashed asset filenames change, so anyone holding a cached page needs
-  <kbd>Ctrl</kbd>+<kbd>Shift</kbd>+<kbd>R</kbd>. `dist/` is gitignored.
+```
+error: Unknown lockfile version
+  at bun.lock:2:22
+warn: Ignoring lockfile
+error: lockfile had changes, but lockfile is frozen
+```
+
+That is a hard failure on every push, from a commit that changed no
+dependencies — it happened here once. So: install dependencies with the pinned
+bun (1.2.15 is the default `bun` on this machine, 1.4.3 is aliased
+`bun-1.4.3` and must not install here), and let
+`tests/lockfile_test.py` — which also runs the real frozen install — catch any
+drift.
 
 - `wrangler.jsonc` names the worker `thebubhub` and serves `dist/`.
 - `cloudflare()` must stay in the `plugins` array of `vite.config.js` — wrangler
@@ -521,6 +553,7 @@ that file next to its own `index.js`.
 | `net/protocol.js` | Rarely | The wire message types. |
 | `plugins/chat.js` · `invite.js` · `record.js` | Rarely | Player chat, share links, the record sheet. |
 | `tests/*` | – | `jscheck.py`, `chess_rules.py`, `record_test.py`, `record_legacy_test.py`, `dotreturn_test.py`, `dotreturn_play.py`, `chess_play.py` (broken). |
+| `.bun-version` | ✅ | The bun version Cloudflare Workers Builds runs. `bun.lock` must be written by *this* bun, or the build fails on every push. |
 | `AGENTS.md` | ✅ | The short operating manual for coding agents: the loop, the deploy path, the credential rules, and the gotchas that have already bitten. |
 | `test.sh` | – | One command for the checks above. |
 | `bub-record.js` | Rarely | Legacy sentence composer. **Only `tests/record_test.py` uses it now**; the running hub goes through `summarize()`. |

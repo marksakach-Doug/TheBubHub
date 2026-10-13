@@ -48,9 +48,13 @@ first `update()`), and never let an intent sent mid-frame start a second
 
 ## Deploying
 
-Deployment is independent of git — `wrangler deploy` publishes `dist/` straight
-to the live site, so a deploy does not need a commit and a commit does not deploy
-anything.
+**`thebubhub` has Workers Builds connected: pushing to `main` builds and
+deploys by itself.** There is no Pages project in the account — that build log
+("Cloning repository… Installing project dependencies: bun install
+--frozen-lockfile") is a Workers build. So a push is a release, and a failed
+build means the live site keeps serving the last good deployment.
+
+To publish without pushing:
 
 ```bash
 bun install
@@ -60,14 +64,25 @@ bun run build
 CLOUDFLARE_API_TOKEN="$(cat ~/.config/bubhub/cloudflare-token)" bunx wrangler deploy
 ```
 
+### The lockfile is a contract with CI
+
+CI runs `bun install --frozen-lockfile` with **bun 1.2.15** (pinned in
+`.bun-version`). `bun install` writes `bun.lock` in whatever format the *local*
+bun writes, and bun 1.3+ writes `lockfileVersion: 2`, which 1.2.15 cannot parse —
+that is a hard build failure on every push, from a commit that changed no
+dependencies. It happened here once already.
+
+- Run `bun install` with the pinned bun (1.2.15 is the default `bun` on this
+  machine; 1.4.3 is aliased `bun-1.4.3` and must **not** install in this repo).
+- `tests/lockfile_test.py` fails the suite if `bun.lock`'s version drifts from
+  the pin, and it runs the real `bun install --frozen-lockfile` to prove it.
+- To regenerate: `rm bun.lock && bun install && git add bun.lock`.
+
 **The credential lives at `~/.config/bubhub/cloudflare-token`, outside the repo,
 and nowhere else.** Never write a token into a tracked file, never echo one, and
 never paste one into chat or a commit. `tests/secrets_test.py` fails the suite if
-one appears in anything git would commit; keep it that way.
-
-The token has Workers Scripts: Edit. It does **not** have Zone → Cache Purge, so
-after a deploy the edge can serve the previous `index.html` for up to a minute —
-check again before assuming a deploy failed.
+one appears in anything git would commit; keep it that way. It carries Workers
+Scripts: Edit and Zone → Cache Purge.
 
 Deploying changes hashed asset filenames. Anyone holding a cached page needs
 <kbd>Ctrl</kbd>+<kbd>Shift</kbd>+<kbd>R</kbd>; `dist/` is gitignored.
@@ -78,6 +93,8 @@ Deploying changes hashed asset filenames. Anyone holding a cached page needs
   call at build time, so any `typeof import.meta.glob === 'function'` guard is
   always false in production and every module game vanishes silently. The
   surrounding `try`/`catch` is the fallback for a non-Vite context.
+- **Never regenerate `bun.lock` with a newer bun.** See the lockfile note above;
+  it breaks the Workers build for every future push.
 - **A shadow root lives on `.stage-host`**, not on `#game-stage` —
   `document.querySelector('#game-stage .stage-host').shadowRoot`.
 - **First visit shows a blocking name modal.** Any browser test against the hub
@@ -93,7 +110,9 @@ Deploying changes hashed asset filenames. Anyone holding a cached page needs
 - One logical change per commit, in the repo's voice: a short lowercase subject
   (`registry: …`, `dotreturn: …`) and a body that says what broke and why.
 - Never commit `dist/`, `node_modules/`, `.wrangler/` or credentials.
-- `bun.lock` is committed — reproducible builds matter more than a tidy status.
-- Do not commit or push unless asked. If asked to sync, the useful order is:
-  work → `bun run test` → commit → push → deploy (only when deploying was asked
-  for), and then verify the live site rather than trusting the deploy output.
+- `bun.lock` is committed — reproducible builds matter more than a tidy status,
+  and it must stay in the format the pinned bun writes.
+- Do not commit or push unless asked. Because pushing `main` deploys, ask
+  whether to publish before you push — "commit this" is not "ship it". The order
+  that works: work → `bun run test` → commit → (ask) → push → verify the live
+  site rather than trusting the build output.

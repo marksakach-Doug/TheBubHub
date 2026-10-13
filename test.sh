@@ -1,7 +1,7 @@
 #!/usr/bin/env bash
 # BubHub quick checks — one command, fail-fast.
 #
-#   ./test.sh                # syntax + record sentences + dot return + chess rules
+#   ./test.sh                # syntax + secrets + lockfile + record sentences + game rules
 #   ./test.sh --skip-browser # syntax only (fully offline, no Chromium needed)
 #
 # Exit codes: 0 = all green, 1 = a test failed, 2 = environment problem
@@ -97,7 +97,18 @@ else
   exit 1
 fi
 
-# ---- 4. record sentences (browser) ----
+# ---- 4. bun lockfile (no browser needed) ----
+step "bun lockfile — tests/lockfile_test.py"
+if python3 tests/lockfile_test.py; then
+  pass "lockfile_test"
+else
+  fail "lockfile_test"
+  echo "Stopped at first failure." >&2
+  printf '\nResult: %d passed, %d failed, %d skipped\n' "$PASS" "$FAIL" "$SKIPPED"
+  exit 1
+fi
+
+# ---- 5. record sentences (browser) ----
 step "record sentences — tests/record_test.py"
 if [ "$BROWSER_OK" = "1" ]; then
   if python3 tests/record_test.py; then
@@ -119,7 +130,7 @@ else
   fi
 fi
 
-# ---- 5. legacy record sentences (browser) ----
+# ---- 6. legacy record sentences (browser) ----
 step "legacy record sentences — tests/record_legacy_test.py"
 if [ "$BROWSER_OK" = "1" ]; then
   if python3 tests/record_legacy_test.py; then
@@ -141,7 +152,7 @@ else
   fi
 fi
 
-# ---- 6. module registry (browser) ----
+# ---- 7. module registry (browser) ----
 step "module registry — tests/module_registry_test.py"
 if [ "$BROWSER_OK" = "1" ]; then
   if python3 tests/module_registry_test.py; then
@@ -163,7 +174,7 @@ else
   fi
 fi
 
-# ---- 7. dot return rules (browser) ----
+# ---- 8. dot return rules (browser) ----
 step "dot return rules — tests/dotreturn_test.py"
 if [ "$BROWSER_OK" = "1" ]; then
   if python3 tests/dotreturn_test.py; then
@@ -185,7 +196,7 @@ else
   fi
 fi
 
-# ---- 8. dot return play test (browser) ----
+# ---- 9. dot return play test (browser) ----
 step "dot return play test — tests/dotreturn_play.py"
 if [ "$BROWSER_OK" = "1" ]; then
   if python3 tests/dotreturn_play.py; then
@@ -207,7 +218,7 @@ else
   fi
 fi
 
-# ---- 9. chess rules (browser) ----
+# ---- 10. chess rules (browser) ----
 step "chess rules — tests/chess_rules.py"
 if [ "$BROWSER_OK" = "1" ]; then
   if python3 tests/chess_rules.py; then
