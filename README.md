@@ -370,7 +370,9 @@ Without a browser the suite **fails loudly** rather than quietly skipping — us
 | `tests/jscheck.py` | Parses every `<script>` in the hub, `games/`, and every game in `public/` with a real JS parser. The cheapest way to catch a typo before you reload. |
 | `tests/record_test.py` | Runs the legacy `bub-record.js` against stub rosters and checks the exact sentence each payload produces. That file is **not** loaded by the running hub — this is a regression guard for it. |
 | `tests/record_legacy_test.py` | Runs the **live** legacy path, `plugins/record.js:describeLegacy()`, and checks the sentence every legacy game actually gets today. |
+| `tests/secrets_test.py` | Fails if any credential-named file is in the working tree, if `.gitignore` stops covering those names, or if anything git would commit contains a literal API token. No browser, no dependency. |
 | `tests/chess_rules.py` | Extracts the **real** move generator out of `public/chess.html` and runs it against textbook positions plus 40 full bot games. |
+| `tests/module_registry_test.py` | Guards the dev-vs-build trap in `src/registry.js`: asserts no runtime `import.meta.glob` feature check exists, then runs the real `loadRegistry()` both as a built bundle (glob replaced by a loader map) and with no Vite at all. |
 | `tests/dotreturn_test.py` | Loads the shipped `games/dotreturn/index.js` and checks its rules: the latched return tally, the reroll cooldown, the hidden score in `project()`, and the record sentence. |
 | `tests/dotreturn_play.py` | Mounts Dot Return behind a fake `api` and a fake clock, then asserts on the **DOM**: it builds, the dot moves, a swipe reaches the host, a drift home asks for a new trajectory, and the tally only appears after the clock runs out. |
 | `tests/chess_play.py` | **Currently broken** — it drives the pre-v10 shell over `file://` and was dropped from `test.sh`. Porting it to the Vite shell is a separate task. |
@@ -379,6 +381,13 @@ Without a browser the suite **fails loudly** rather than quietly skipping — us
 it against assertions rather than re-implementing the rules, so it tests what
 players actually play. That approach caught three real bugs during development.
 Copy that idea for a game with rules worth trusting.
+
+`module_registry_test.py` exists because a bug of exactly that kind shipped
+silently: `loadRegistry()` guarded its glob behind
+`typeof import.meta.glob === 'function'`, which is true under `npm run dev` and
+**always false in a production bundle**, so every module game was missing from
+the live site with no error anywhere. If you touch `src/registry.js`, run that
+test and believe it.
 
 The two Dot Return tests cover both halves of a continuous game: the rules that
 must not drift, and the pixels. The play test found a real bug on its first run —
@@ -410,14 +419,78 @@ npm run deploy    # bun run build && wrangler deploy
 > `npm run deploy` shells out to `bun`. If you don't have Bun installed, run
 > `npm run build && npx wrangler deploy` instead.
 
+### Deploying (and keeping the credential out of git)
+
+Publishing is **independent of git**: `wrangler deploy` sends `dist/` straight to
+the live site. A deploy needs no commit, and a commit deploys nothing.
+
+```bash
+bun install
+bun run build
+(cd dist && python3 -m http.server 5180)   # verify the artifact BEFORE publishing
+CLOUDFLARE_API_TOKEN="$(cat ~/.config/bubhub/cloudflare-token)" bunx wrangler deploy
+```
+
+Verify `dist/` in a browser before you publish — it is the exact artifact that
+ships, so it catches a broken build without touching production.
+
+**The token lives at `~/.config/bubhub/cloudflare-token` (mode 600), outside the
+repo.** It is the only copy. Never write it into a tracked file, never echo it,
+never paste it into a commit or chat; `tests/secrets_test.py` fails the suite if
+one reaches anything git would commit. The `account_id` in `wrangler.jsonc` is
+*not* a secret — it is there so the deploy knows which account it is publishing
+to.
+
+Two things worth knowing after a deploy:
+
+- The token carries Workers Scripts: Edit but **not** Zone → Cache Purge, so the
+  edge can serve the previous `index.html` for up to a minute. That is not a
+  failed deploy — check again before worrying.
+- Hashed asset filenames change, so anyone holding a cached page needs
+  <kbd>Ctrl</kbd>+<kbd>Shift</kbd>+<kbd>R</kbd>. `dist/` is gitignored.
+
 - `wrangler.jsonc` names the worker `thebubhub` and serves `dist/`.
 - `cloudflare()` must stay in the `plugins` array of `vite.config.js` — wrangler
   refuses to auto-configure a config without a plugin.
 
+### Trying a module game without npm
+
+`npm run dev` is the real hub and the only way to test invites, multiplayer and
+the record sheet — but it needs node. On a machine with no node, **a module game
+is still playable**, because it is just an ES module with no dependency on Vite:
+the `import.meta.glob` in `src/registry.js` is the only part that needs it.
+
+Dot Return ships such a harness at `games/dotreturn/dev.html`. It imports the
+**real** `index.js` and stands in for the hub, running the same
+`send → reduce → project → update` loop:
+
+```bash
+cd /path/to/BubHub
+python3 -m http.server 5173
+# http://localhost:5173/games/dotreturn/dev.html
+# http://<your-lan-ip>:5173/games/dotreturn/dev.html   ← the phone, over the LAN
+```
+
+Edit a constant in `games/dotreturn/index.js`, hit F5, play. `python3 -m
+http.server` is enough for this page even though it does not work for the hub,
+because the harness never asks the registry for anything. Double-clicking it
+prints the command above instead of showing a blank screen — ES modules cannot be
+imported over `file://`.
+
+It is not a copy of the game and not a mock: same `mount()`, same physics, same
+rules, with a readout of `phase` / `epoch` / the shared tally / your dot's
+authoritative heading, and arrow keys (or WASD) to steer without dragging a
+mouse. What it cannot cover is the hub itself — other players, invites, BubHub
+Record. `python3 tests/dotreturn_play.py` covers the game with 32 DOM assertions
+and needs no server at all. A new module game gets the same harness by copying
+that file next to its own `index.js`.
+
 **Requirements and limits worth knowing before you start:**
 
 - **ES modules need HTTP.** There is no `file://` support. Opening
-  `index.html` from disk shows an empty arcade.
+  `index.html` from disk shows an empty arcade — the same is true of a
+  per-game dev harness, which is why they print the server command instead of
+  failing silently.
 - **`npm run serve` (`python3 -m http.server`) does not work** for the hub: it
   does not serve `public/` at the root and cannot resolve `import.meta.glob`,
   so the registry comes up empty. Use `npm run dev`.
@@ -434,6 +507,7 @@ npm run deploy    # bun run build && wrangler deploy
 | File | Touch? | Purpose |
 |---|---|---|
 | `games/<id>/index.js` | ✅ to add a game | A module game. Auto-registered; the only file you create. |
+| `games/<id>/dev.html` | – | A per-game browser harness that mounts the game behind a fake hub, so you can play it with `python3 -m http.server` and no node. Inert to the registry. |
 | `public/games.js` | ✅ for legacy games | The legacy registry — one line per iframe game. |
 | `public/*.html` | ✅ for legacy games | The legacy games. Copied verbatim to the site root. |
 | `index.html` | Rarely | Hub shell markup + the few CSS rules that own the stage frame. |
@@ -447,6 +521,7 @@ npm run deploy    # bun run build && wrangler deploy
 | `net/protocol.js` | Rarely | The wire message types. |
 | `plugins/chat.js` · `invite.js` · `record.js` | Rarely | Player chat, share links, the record sheet. |
 | `tests/*` | – | `jscheck.py`, `chess_rules.py`, `record_test.py`, `record_legacy_test.py`, `dotreturn_test.py`, `dotreturn_play.py`, `chess_play.py` (broken). |
+| `AGENTS.md` | ✅ | The short operating manual for coding agents: the loop, the deploy path, the credential rules, and the gotchas that have already bitten. |
 | `test.sh` | – | One command for the checks above. |
 | `bub-record.js` | Rarely | Legacy sentence composer. **Only `tests/record_test.py` uses it now**; the running hub goes through `summarize()`. |
 | `indexOLD.html` | – | The pre-v10 shell, kept for reference. Nothing loads it. |
