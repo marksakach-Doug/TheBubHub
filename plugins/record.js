@@ -133,13 +133,122 @@ export function createRecord(opts) {
     recordLine(meta.id, text);
   }
 
-  // Legacy path: compat payloads (already-formatted .text passthrough).
-  function recordLegacy(game, p) {
+  function joinNames(names) {
+    const n = (names || []).filter(Boolean);
+    if (!n.length) return 'someone';
+    if (n.length === 1) return n[0];
+    if (n.length === 2) return n[0] + ' and ' + n[1];
+    return n.slice(0, -1).join(', ') + ' and ' + n[n.length - 1];
+  }
+
+  // Legacy ids resolve against the roster, falling back to the local player's
+  // name (not "Someone") so a game that posts an id the hub never saw still
+  // writes a sensible line. Matches bub-record.js's nameOf().
+  function nameOrMe(id) {
+    const s = store.state;
+    if (id === s.me.id) return s.me.name;
+    const m = s.roster.find(function (x) { return x.id === id; });
+    if (m && m.name) return m.name;
+    return s.me.name || 'Someone';
+  }
+
+  // p.players -> resolved names, deduped. Falls back to the whole roster, then
+  // to just me, so a solo game (waltz, daltadka) that sends no players at all
+  // still gets a line.
+  function namesFor(p) {
+    let n = (p.players || []).map(nameOrMe);
+    n = n.filter(function (x, i) { return n.indexOf(x) === i; });
+    if (!n.length) n = store.state.roster.map(function (m) { return m.name; }).filter(Boolean);
+    if (!n.length) n = [store.state.me.name || 'Someone'];
+    return n;
+  }
+
+  function plural(n, word) { return n + ' ' + word + (n === 1 ? '' : 's'); }
+
+  // "<names> played [N rounds|laps] at <title>" — the count is dropped entirely
+  // when it is absent or zero, so the line never reads "played  at Title".
+  function playedAt(names, n, word, title) {
+    return joinNames(names) + ' played ' + (n ? plural(n, word) + ' at ' : '') + title;
+  }
+
+  // Legacy iframe games post structured payloads ({players, laps} and friends)
+  // that used to be turned into a sentence by bub-record.js. The v10 shell no
+  // longer loads that file, so a game that did not send a pre-formatted `text`
+  // was recording nothing at all — silently. These rules are a direct port of
+  // bub-record.js's `sentence()`; the title now comes from the registry's
+  // `meta.title` instead of a hardcoded map, which also fixes Warp Front
+  // recording itself as "warp".
+  function describeLegacy(meta, p) {
+    const title = meta.title || meta.id;
+    const names = namesFor(p);
+
+    if (meta.id === 'chess') {
+      // players is [whiteId, blackId?]; `bot` says black wasn't a person.
+      // `won` is which colour won ('w'/'b'/'draw'), so we never guess an id and
+      // the bot never needs a fake roster entry.
+      const white = names[0] || 'Someone';
+      const black = p.bot ? 'the bot' : (names[1] || 'an opponent');
+      if (p.won === 'b') return black + ' beat ' + white + ' at ' + title;
+      if (p.won === 'draw' || !p.won) return white + ' drew with ' + black + ' at ' + title;
+      return white + ' beat ' + black + ' at ' + title;
+    }
+
+    if (meta.id === 'lotr') {
+      // `win` is the winner's id; everyone else gets listed as beaten.
+      const w = p.win ? nameOrMe(p.win) : names[0];
+      const rest = names.filter(function (n) { return n !== w; });
+      return (w || 'Someone') + (rest.length ? ' beat ' + joinNames(rest) : ' played') + ' at ' + title;
+    }
+
+    if (meta.id === 'warp') {
+      const who = joinNames(names);
+      if (p.win) return who + ' beat the Borg ' + p.ps + '–' + p.bs + ' at ' + title;
+      return who + ' lost to the Borg ' + p.bs + '–' + p.ps + ' at ' + title;
+    }
+
+    if (meta.id === 'blastoff') {
+      // `win` is the winning pilot's id, `score` the red cards they took.
+      const w = p.win ? nameOrMe(p.win) : names[0];
+      const n = (p.score === undefined || p.score === null) ? null : p.score;
+      return w + ' won ' + title + (n !== null ? ' with ' + plural(n, 'red card') : '');
+    }
+
+    if (meta.id === 'grammar') return joinNames(names) + ' lost at ' + title;
+
+    if (meta.id === 'wordbridge') {
+      // Round-based: the line records how far the table got.
+      return playedAt(names, p.rounds, 'round', title);
+    }
+
+    if (meta.id === 'the96game') {
+      // Lap-based: the line records how many times the sentence went round.
+      return playedAt(names, p.laps, 'lap', title);
+    }
+
+    if (meta.id === 'daltadka') {
+      // Solo: the local player is the cook.
+      const me = store.state.me.name || 'Someone';
+      if (p.dish && p.score !== undefined && p.score !== null) {
+        return me + ' cooked ' + p.dish + ' scoring ' + p.score + ' at ' + title;
+      }
+      return me + ' played ' + title;
+    }
+
+    if (meta.id === 'waltz') return (store.state.me.name || 'Someone') + ' scored ' + (p.score || 0) + ' at ' + title;
+
+    // Unknown legacy game: still leave a line rather than silently dropping the
+    // result. New module games use summarize() and never reach this.
+    return joinNames(names) + ' played ' + title;
+  }
+
+  // Legacy path: compat payloads. `text` wins; otherwise describeLegacy()
+  // reconstructs the sentence from the game's own payload shape.
+  function recordLegacy(meta, p) {
     if (!p) return;
     if (p.entry) { addLocal(p.entry); return; } // relay from host
-    const text = p.text || null;
+    const text = p.text || describeLegacy(meta, p);
     if (!text) return; // generic "played X" lines are no longer auto-written
-    recordLine(game, text);
+    recordLine(meta.id, text);
   }
 
   function recordLine(game, text) {
@@ -176,6 +285,7 @@ export function createRecord(opts) {
 
   return {
     recordModule: recordModule, recordLegacy: recordLegacy, recordLine: recordLine,
+    describeLegacy: describeLegacy, joinNames: joinNames,
     addLocal: addLocal, ingest: ingest, load: load, wire: wire, render: render,
     nameOf: nameOf, status: status
   };

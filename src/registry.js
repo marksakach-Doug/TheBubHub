@@ -27,7 +27,7 @@ export async function loadRegistry() {
         kind: 'iframe',
         meta: {
           id: g.id, title: g.title, icon: g.icon || '', color: g.color || '#334155',
-          file: g.file, players: g.players, compat: 'iframe',
+          file: g.file, players: g.players, compat: 'iframe', desc: g.desc || '',
           solo: !!g.solo, soloable: !!g.soloable, lobby: !!g.lobby,
           fill: !!g.fill, grow: !!g.grow, height: g.height || 0,
           noRecord: !!g.noRecord, menuLabel: g.menuLabel || null

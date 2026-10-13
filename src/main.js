@@ -293,9 +293,11 @@ export async function boot() {
       const lum = (0.299 * r + 0.587 * gg + 0.114 * bb) / 255;
       b.style.color = lum > 0.6 ? '#0f172a' : '#fff';
     } catch (e) {}
-    b.title = (g.meta.players && g.meta.players.min !== undefined
-      ? g.meta.players.min + '-' + g.meta.players.max + ' players. '
-      : (g.meta.players || '') + ' ') + (g.kind === 'module' ? 'New module.' : 'Classic.');
+    const count = g.meta.players && g.meta.players.min !== undefined
+      ? g.meta.players.min + '-' + g.meta.players.max + ' players'
+      : (g.meta.players || '');
+    b.title = [count, g.meta.desc, g.kind === 'module' ? 'New module.' : 'Classic.']
+      .filter(Boolean).join(' ');
     b.addEventListener('click', function () { openGame(g.meta.id); });
     return b;
   }
@@ -633,7 +635,8 @@ export async function boot() {
       const g = byId.get(game);
       if (g && g.meta.noRecord) return;
       if (s.inRoom && !s.isHost) return; // host records multiplayer
-      try { record.recordLegacy(game, p); } catch (e) {}
+      const meta = (g && g.meta) || { id: game, title: game };
+      try { record.recordLegacy(meta, p); } catch (e) {}
     };
     window.addEventListener('message', function (e) {
       compat.onMessage(e, {

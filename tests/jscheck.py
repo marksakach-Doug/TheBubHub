@@ -77,8 +77,12 @@ def main(argv):
         targets = [root / a for a in argv[1:]]
     else:
         targets = sorted(root.glob("*.html")) + sorted(root.glob("*.js"))
-        for sub in ("src", "net", "room", "plugins", "public"):
+        for sub in ("src", "net", "room", "plugins", "games", "public"):
             targets += sorted((root / sub).rglob("*.js"))
+        # Legacy iframe games live in public/ and carry their rules in inline
+        # <script> blocks — they moved out of the repo root when v10 adopted
+        # Vite, so they need recursing here too or they stop being checked.
+        targets += sorted((root / "public").rglob("*.html"))
     # inline <script> blocks come from .html; bare .js files parse as modules
     rc = 0
     for t in targets:

@@ -1,7 +1,7 @@
 #!/usr/bin/env bash
 # BubHub quick checks — one command, fail-fast.
 #
-#   ./test.sh                # syntax + record sentences + chess rules
+#   ./test.sh                # syntax + record sentences + dot return + chess rules
 #   ./test.sh --skip-browser # syntax only (fully offline, no Chromium needed)
 #
 # Exit codes: 0 = all green, 1 = a test failed, 2 = environment problem
@@ -108,7 +108,73 @@ else
   fi
 fi
 
-# ---- 4. chess rules (browser) ----
+# ---- 4. legacy record sentences (browser) ----
+step "legacy record sentences — tests/record_legacy_test.py"
+if [ "$BROWSER_OK" = "1" ]; then
+  if python3 tests/record_legacy_test.py; then
+    pass "record_legacy_test"
+  else
+    fail "record_legacy_test"
+    echo "Stopped at first failure." >&2
+    printf '\nResult: %d passed, %d failed, %d skipped\n' "$PASS" "$FAIL" "$SKIPPED"
+    exit 1
+  fi
+else
+  if [ "$SKIP_BROWSER" = "1" ]; then
+    skip "record_legacy_test ($BROWSER_WHY)"
+  else
+    fail "record_legacy_test (no browser: $BROWSER_WHY)"
+    echo "Tip: re-run with --skip-browser for syntax-only checks." >&2
+    printf '\nResult: %d passed, %d failed, %d skipped\n' "$PASS" "$FAIL" "$SKIPPED"
+    exit 1
+  fi
+fi
+
+# ---- 5. dot return rules (browser) ----
+step "dot return rules — tests/dotreturn_test.py"
+if [ "$BROWSER_OK" = "1" ]; then
+  if python3 tests/dotreturn_test.py; then
+    pass "dotreturn_test"
+  else
+    fail "dotreturn_test"
+    echo "Stopped at first failure." >&2
+    printf '\nResult: %d passed, %d failed, %d skipped\n' "$PASS" "$FAIL" "$SKIPPED"
+    exit 1
+  fi
+else
+  if [ "$SKIP_BROWSER" = "1" ]; then
+    skip "dotreturn_test ($BROWSER_WHY)"
+  else
+    fail "dotreturn_test (no browser: $BROWSER_WHY)"
+    echo "Tip: re-run with --skip-browser for syntax-only checks." >&2
+    printf '\nResult: %d passed, %d failed, %d skipped\n' "$PASS" "$FAIL" "$SKIPPED"
+    exit 1
+  fi
+fi
+
+# ---- 6. dot return play test (browser) ----
+step "dot return play test — tests/dotreturn_play.py"
+if [ "$BROWSER_OK" = "1" ]; then
+  if python3 tests/dotreturn_play.py; then
+    pass "dotreturn_play"
+  else
+    fail "dotreturn_play"
+    echo "Stopped at first failure." >&2
+    printf '\nResult: %d passed, %d failed, %d skipped\n' "$PASS" "$FAIL" "$SKIPPED"
+    exit 1
+  fi
+else
+  if [ "$SKIP_BROWSER" = "1" ]; then
+    skip "dotreturn_play ($BROWSER_WHY)"
+  else
+    fail "dotreturn_play (no browser: $BROWSER_WHY)"
+    echo "Tip: re-run with --skip-browser for syntax-only checks." >&2
+    printf '\nResult: %d passed, %d failed, %d skipped\n' "$PASS" "$FAIL" "$SKIPPED"
+    exit 1
+  fi
+fi
+
+# ---- 7. chess rules (browser) ----
 step "chess rules — tests/chess_rules.py"
 if [ "$BROWSER_OK" = "1" ]; then
   if python3 tests/chess_rules.py; then

@@ -56,5 +56,13 @@ window.BUB_GAMES = [
     icon: '🍂', desc: 'You just kind of... muck around.' },
   { id: 'chess', file: 'chess.html', title: 'Chess', players: '2', color: '#c89b6d', fill: true, soloable: true,
     icon: '♞', desc: 'Full-rules chess — you are White, against a friend or a simple greedy bot.' },
+  // Telephone game: write a sentence, the next player draws it, the one after
+  // describes what they see without ever reading it. Not `soloable` and not
+  // `lobby` — the game itself needs a room and at least MIN_PLAYERS (3) people,
+  // so it only lists in-room rather than offering a solo player a dead end.
+  // `fill` because the layout is a viewport-filling flex column around a
+  // fixed 3:2 canvas, not a document that scrolls.
+  { id: 'the96game', file: 'the96game.html', title: 'The 96 Game', players: '3-8', color: '#b5541f', fill: true,
+    icon: '🖍️', desc: 'Telephone for the table — one writes, the next draws, the next describes it blind.' },
     { id:'minigo', title:'MiniGo', file:'minigo.html', icon:'⚫', color:'#c98f55', players:'2', soloable:false, desc:'Go on a tiny 7x7 board.' },
 ];

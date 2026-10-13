@@ -16,10 +16,14 @@ export function createCompat(stageRoot) {
     el.id = 'frame-' + meta.id;
     el.className = 'hidden';
     el.setAttribute('src', file);
-    el.style.minHeight = (meta.height || 420) + 'px';
-    stageRoot.appendChild(el);
-    stageRoot.classList.remove('stage-idle');
-    f = { el: el, ready: false, queue: [] };
+// `fill` = the hub owns the frame height (canvas worlds); `grow` = the frame is
+// sized to the game and the whole page scrolls. They are mutually exclusive, and
+// only `fill` needs a CSS hook, because only `fill` overrides a reported height.
+if (meta.fill) el.classList.add('frame-fill');
+el.style.minHeight = (meta.height || 420) + 'px';
+stageRoot.appendChild(el);
+stageRoot.classList.remove('stage-idle');
+f = { el: el, ready: false, queue: [], meta: meta };
     frames.set(meta.id, f);
     return f;
   }
@@ -82,7 +86,9 @@ export function createCompat(stageRoot) {
       return;
     }
     if (m.k === 'height') {
-      if (f && typeof m.p === 'number') {
+      // `fill` games never own their height — the CSS pins the frame to the
+      // viewport. `grow` games do report it; that's the point of `grow`.
+      if (f && f.meta && !f.meta.fill && typeof m.p === 'number') {
         f.el.style.height = Math.min(Math.max(m.p, 200), 4000) + 'px';
       }
       return;

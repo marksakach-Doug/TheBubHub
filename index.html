@@ -25,7 +25,12 @@ body.focus-mode{margin:0!important;max-width:none!important;padding:0!important;
 body.focus-mode>header,body.focus-mode>footer,body.focus-mode #lobby-ui{display:none!important}
 body.focus-mode #game-stage{position:fixed;inset:44px 0 0 0;z-index:20;margin:0;padding:0}
 body.focus-mode #game-stage .stage-host{border-radius:0;border-left:0;border-right:0;min-height:0;height:100%}
-body.focus-mode #game-stage iframe{height:100%!important;border-radius:0}
+body.focus-mode #game-stage iframe{border-radius:0}
+/* fill = the hub owns the viewport (canvas worlds); the game's reported height
+   is ignored. grow = the frame is sized to the game and the whole page scrolls
+   instead of the frame, so the reported height is honoured as normal.
+   The !important is needed to beat the inline height src/compat.js writes. */
+body.focus-mode #game-stage iframe.frame-fill{height:100%!important;min-height:0}
 body.focus-mode #focus-bar{display:flex;position:fixed;top:0;left:0;right:0;height:44px;z-index:40;align-items:center;gap:10px;padding:0 10px;background:rgba(15,23,42,.97);border-bottom:1px solid #334155}
 body.focus-mode #room-ui{position:fixed;top:44px;right:0;bottom:0;width:min(360px,92vw);z-index:45;background:rgba(15,23,42,.98);border-left:1px solid #334155;padding:12px;margin:0;overflow-y:auto;transform:translateX(105%);transition:transform .25s ease}
 body.focus-mode.drawer-open #room-ui{transform:none}
@@ -131,7 +136,6 @@ body.focus-mode.in-room #chat-pill{display:block;position:fixed;right:12px;botto
     <button id="active-room-id" class="text-xs font-mono text-slate-400 underline mt-1">copy invite link</button>
   </div>
     <div id="game-invites" class="mt-2 flex flex-col gap-2"></div>
-  </div>
   <div id="multiplayer-section" class="bg-slate-800/70 rounded-2xl p-4">
     <h2 class="font-extrabold mb-2">Multiplayer</h2>
     <div id="game-buttons" class="flex flex-wrap gap-2"></div>
