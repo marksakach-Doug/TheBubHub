@@ -41,7 +41,8 @@ const REROLL_RETRY = 400;  // client-side re-ask, must exceed REROLL_CD
 const FINISH_GRACE = 1000; // clock skew allowance when ending the round
 const SHOW_CIRCLE = 0;     // 1 reveals the hidden circle while tuning
 
-const PALETTE = ['#e9e4d8', '#7dd3fc', '#a3e635', '#fbbf24'];
+// One dot is on screen and it is always yours, so there is nothing to
+// colour-match against. The palette went when the other dots did.
 const BEST_KEY = 'dotreturn.best.v2';
 const MAX_DOTS = 4;
 
@@ -55,22 +56,32 @@ function freshState() {
     duration: DURATION,
     returns: 0,             // one group tally, summed over every dot
     players: [],
+    hostId: '',             // owns starting a round; you in the solo corner
+    solo: false,            // was the round just played one player? frozen at start
+    table: [],              // who was actually at the table when it started
     dots: {},               // id -> { a, out, lastReroll }
     over: null
   };
 }
 
-function seatIds(seats) {
+// The hub hands init() the whole room roster under `seats`, which is not who is
+// at this table — `atTable` is. Prefer it, and skip spectators wherever we are
+// given a list of members, because a watcher with a dot is worse than no lobby.
+function tableOf(ctx) {
+  const c = ctx || {};
+  const list = c.atTable || c.seats || [];
   const ids = [];
-  (seats || []).forEach(function (m) {
-    if (m && m.id && ids.indexOf(m.id) < 0 && ids.length < MAX_DOTS) ids.push(m.id);
+  list.forEach(function (m) {
+    if (!m || !m.id || m.spectator) return;
+    if (ids.indexOf(m.id) < 0 && ids.length < MAX_DOTS) ids.push(m.id);
   });
   return ids;
 }
 
 export function init(ctx) {
   const st = freshState();
-  st.players = seatIds(ctx && ctx.seats);
+  st.players = tableOf(ctx);
+  st.hostId = st.players[0] || '';
   st.players.forEach(function (id) {
     st.dots[id] = { a: 0, out: false, lastReroll: 0 };
   });
@@ -95,19 +106,37 @@ export function reduce(state, action, ctx) {
   // Someone opened the table while a round was already running. They join at
   // the centre with a fresh heading, which is the same thing the game does to
   // a dot that drifts home.
+  //
+  // The epoch bump is load-bearing: clients only re-anchor their simulation
+  // when it moves, so without it the newcomer's dot integrates from x=0 on
+  // every client while the host's authoritative heading is ignored, and it
+  // never lines up with anyone else's picture.
   if (kind === 'join') {
     if (players.indexOf(id) >= 0) return same({ dots: dots });
     if (players.length >= MAX_DOTS) return { error: 'Dot Return holds four dots.' };
     players.push(id);
     dots[id] = { a: rng() * Math.PI * 2, out: false, lastReroll: 0 };
-    return same({ players: players, dots: dots });
+    return same({ epoch: state.epoch + 1, players: players, dots: dots });
   }
 
   const mine = dots[id];
   if (players.indexOf(id) < 0 || !mine) return { error: 'You are watching — not seated.' };
 
   if (kind === 'start') {
+    // A round can be begun from the lobby or replayed from the results screen.
+    // Otherwise `over` is terminal and the table is stuck until the host acts.
     if (state.phase === 'play') return { error: 'A round is already running.' };
+    if (state.phase !== 'ready' && state.phase !== 'over') {
+      return { error: 'Wait for the next round.' };
+    }
+    // Host owns the room. The exception is a table of one: whoever is left
+    // holding it may play, which is what makes "Start solo" real and stops the
+    // solo corner from needing a room at all. Tested against the live roster
+    // rather than `state.solo`, which is a record of the round just played.
+    const alone = players.length < 2;
+    if (state.hostId && state.hostId !== id && !alone) {
+      return { error: 'Waiting for the host to start the round.' };
+    }
     players.forEach(function (pid) {
       dots[pid] = { a: rng() * Math.PI * 2, out: false, lastReroll: 0 };
     });
@@ -117,6 +146,8 @@ export function reduce(state, action, ctx) {
       endsAt: now + state.duration * 1000,
       returns: 0,
       over: null,
+      solo: alone,
+      table: players.slice(),
       players: players,
       dots: dots
     });
@@ -179,7 +210,10 @@ export function project(state, playerId) {
 export function summarize(state, nameOf) {
   if (state.phase !== 'over' || !state.over) return null;
   const n = state.over.returns;
-  const who = state.players.map(function (id) { return nameOf(id); })
+  // `table`, not `players`: the roster carries everyone in the room, and a
+  // record line that thanks the whole lobby for a two-person game is a lie.
+  const ids = (state.table && state.table.length) ? state.table : state.players;
+  const who = (ids || []).map(function (id) { return nameOf(id); })
     .filter(function (w) { return !!w; });
   // Same 'A and B' / 'A, B and C' join the record sheet uses elsewhere.
   const names = who.length === 2 ? who[0] + ' and ' + who[1]
@@ -200,21 +234,31 @@ const CSS = [
   'border-radius:50%;display:none;pointer-events:none}',
   '.dr-dot{position:absolute;left:0;top:0;width:10px;height:10px;border-radius:50%;',
   'transform:translate(-50%,-50%);will-change:transform}',
-  '.dr-tag{position:absolute;left:0;top:0;font-size:11px;letter-spacing:.02em;',
-  'opacity:.6;transform:translate(-50%,7px);white-space:nowrap;pointer-events:none}',
   '.dr-hud{position:absolute;top:0;left:0;padding:14px 18px;pointer-events:none}',
   '.dr-time{font-size:1.15rem;font-weight:600;color:#e9e4d8}',
   '.dr-meta{margin-top:2px;font-size:11px;opacity:.65}',
+  // The one thing a watcher most needs to know, and must not have to guess.
+  '.dr-hud.watching .dr-time{color:#fbbf24;letter-spacing:.18em;font-size:.95rem}',
+  '.dr-hud.watching .dr-meta{opacity:.75}',
   '.dr-overlay{position:absolute;inset:0;display:flex;flex-direction:column;',
   'align-items:center;justify-content:center;gap:16px;text-align:center;padding:24px;',
   'background:rgba(21,24,29,.94)}',
   '.dr-overlay[hidden]{display:none}',
   '.dr-title{margin:0;font-size:1.7rem;font-weight:600;color:#e9e4d8}',
+  '.dr-title.observing{color:#fbbf24;letter-spacing:.18em;font-size:1.3rem}',
   '.dr-body{max-width:23rem;margin:0}',
   '.dr-num{font-size:2.4rem;font-weight:700;color:#e9e4d8}',
+  '.dr-btns{display:flex;flex-wrap:wrap;gap:10px;justify-content:center}',
   '.dr-btn{font:inherit;font-weight:600;font-size:1rem;padding:12px 34px;min-height:44px;',
   'border:0;border-radius:8px;background:#e9e4d8;color:#15181d;cursor:pointer}',
+  '.dr-btn.alt{background:transparent;color:#e9e4d8;box-shadow:inset 0 0 0 1px #3a4048}',
   '.dr-btn:disabled{opacity:.4;cursor:default}',
+  // Dots only. The table size is public; who is sitting in it is not our
+  // business to paint, and a name here is the one leak the game cannot undo.
+  '.dr-table{display:flex;gap:9px;justify-content:center;align-items:center;min-height:16px}',
+  '.dr-seat{width:9px;height:9px;border-radius:50%;background:#3a4048}',
+  '.dr-seat.on{background:#e9e4d8}',
+  '.dr-seat.self{box-shadow:0 0 0 2px #15181d,0 0 0 3px #7dd3fc}',
   '.dr-note{font-size:.9rem;color:#a3a8b0;margin:0}',
   '.dr-hi{color:#e9e4d8;font-weight:600}'
 ].join('');
@@ -245,33 +289,46 @@ export function mount(root, api) {
   const wrap = document.createElement('div');
   wrap.className = 'dr-wrap';
   wrap.innerHTML =
-    '<div class="dr-field"><div class="dr-ring"></div></div>' +
+    '<div class="dr-field"><div class="dr-ring"></div><div class="dr-dot" hidden></div></div>' +
     '<div class="dr-hud"><div class="dr-time">120s</div><div class="dr-meta"></div></div>' +
     '<div class="dr-overlay"><h1 class="dr-title">Dot Return</h1>' +
-    '<p class="dr-body"></p><p class="dr-num" hidden></p><p class="dr-note"></p>' +
-    '<button class="dr-btn" type="button">Start</button></div>';
+    '<p class="dr-body"></p><p class="dr-num" hidden></p>' +
+    '<div class="dr-table" hidden></div>' +
+    '<div class="dr-btns"><button class="dr-btn" type="button">Start</button></div>' +
+    '<p class="dr-note"></p></div>';
   root.appendChild(wrap);
 
   const field = wrap.querySelector('.dr-field');
   const ring = wrap.querySelector('.dr-ring');
+  const dotEl = wrap.querySelector('.dr-dot');
+  const hud = wrap.querySelector('.dr-hud');
   const hudTime = wrap.querySelector('.dr-time');
   const hudMeta = wrap.querySelector('.dr-meta');
   const overlay = wrap.querySelector('.dr-overlay');
   const ovTitle = wrap.querySelector('.dr-title');
   const ovBody = wrap.querySelector('.dr-body');
   const ovNum = wrap.querySelector('.dr-num');
+  const ovTable = wrap.querySelector('.dr-table');
   const ovNote = wrap.querySelector('.dr-note');
+  const btns = wrap.querySelector('.dr-btns');
   const btn = wrap.querySelector('.dr-btn');
 
-  const dotEls = {};   // playerId -> { dot, tag }
-  const names = {};    // playerId -> display name
+  // A second, quieter button: "Start solo" when the host is alone in a room.
+  // Without it, being the first one in is a dead end, which is exactly the
+  // "it is single player and nothing else" trap.
+  const btnSolo = document.createElement('button');
+  btnSolo.className = 'dr-btn alt';
+  btnSolo.type = 'button';
+  btnSolo.textContent = 'Start solo';
 
   let view = null;
   let myId = (api.me && api.me.id) || '';
   let unit = 100, w = 0, h = 0;
 
   // The simulation is deliberately not the view: it is integrated locally and
-  // only ever corrected from authoritative headings and a new epoch.
+  // only ever corrected from authoritative headings and a new epoch. Every dot
+  // is integrated even though only yours is painted — the host has to know
+  // where all of them are to count the returns.
   const sim = { epoch: -1, last: 0, acc: 0, dots: {} };
   let rafId = null;
   let running = false;
@@ -283,7 +340,7 @@ export function mount(root, api) {
   let scoredEpoch = -1;
   let joined = false;
 
-  (api.roster || []).forEach(function (m) { names[m.id] = m.name; });
+  const soloCorner = !api.isInRoom;
 
   function measure() {
     w = field.clientWidth || 300;
@@ -375,8 +432,8 @@ export function mount(root, api) {
     }
     if (steps >= MAX_STEPS) sim.acc = 0;
 
-    // Only your own dot reports. Everyone renders it; only its owner decides
-    // when it has drifted home or left the circle.
+    // Only your own dot reports. Only your own dot is painted too, but the
+    // other dots still have to be integrated or the group tally drifts.
     const mine = sim.dots[myId];
     if (mine) {
       const dist = Math.hypot(mine.x, mine.y);
@@ -393,6 +450,11 @@ export function mount(root, api) {
       }
     }
 
+    // A watcher's HUD belongs to OBSERVING. Writing the countdown over it 60
+    // times a second would replace the one thing that tells them they have no
+    // dot — this clock belongs to somebody else's round.
+    if (!mine) return;
+
     const left = Math.max(0, (view.endsAt - Date.now()) / 1000);
     hudTime.textContent = Math.ceil(left) + 's';
     if (left <= 0 && !askedFinish) {
@@ -401,105 +463,177 @@ export function mount(root, api) {
     }
   }
 
-  function dotFor(id) {
-    let els = dotEls[id];
-    if (!els) {
-      const dot = document.createElement('div');
-      dot.className = 'dr-dot';
-      const tag = document.createElement('div');
-      tag.className = 'dr-tag';
-      field.appendChild(dot);
-      field.appendChild(tag);
-      els = dotEls[id] = { dot: dot, tag: tag };
-    }
-    return els;
-  }
-
   function render() {
     if (!view) return;
     const cx = w / 2;
     const cy = h / 2;
     const list = view.players || [];
-    Object.keys(dotEls).forEach(function (id) {
-      // someone left the table: stop painting their dot
-      if (list.indexOf(id) < 0) dotEls[id].dot.style.display = 'none';
-    });
-    list.forEach(function (id, i) {
-      const els = dotFor(id);
-      const s = sim.dots[id] || { x: 0, y: 0 };
-      const colour = PALETTE[i % PALETTE.length];
-      const px = cx + s.x * unit;
-      const py = cy + s.y * unit;
-      els.dot.style.display = view.phase === 'play' ? 'block' : 'none';
-      els.dot.style.transform = 'translate(' + px + 'px,' + py + 'px) translate(-50%,-50%)';
-      els.dot.style.background = colour;
-      els.tag.style.transform = 'translate(' + px + 'px,' + py + 'px) translate(-50%,7px)';
-      els.tag.style.color = colour;
-      els.tag.textContent = (id === myId ? 'you' : (names[id] || 'player'));
-    });
+
+    // One dot, yours. The others are integrated in sim.dots so the tally is
+    // right, but painting them would leak both the table and the shape of the
+    // hidden circle — and a second dot bouncing around is not this game.
+    const playing = view.phase === 'play';
+    const mine = sim.dots[myId];
+    dotEl.hidden = !(playing && mine);
+    if (mine) {
+      dotEl.style.transform = 'translate(' + (cx + mine.x * unit) + 'px,' +
+        (cy + mine.y * unit) + 'px) translate(-50%,-50%)';
+    }
+  }
+
+  // Are you at the table, or looking at one? Everything on screen branches on
+  // this, and it is decided by the state you were actually given a dot in — not
+  // by the hub flag, which is only true for an unseatied guest in a room and is
+  // false for someone who is seated at a table they did not create.
+  function seated() {
+    return !!view && (view.players || []).indexOf(myId) >= 0;
+  }
+
+  // The host is the id the host side picked when the table was created; fall
+  // back to the hub flag for a table that predates this client.
+  function iAmHost() {
+    if (!view) return false;
+    if (view.hostId) return view.hostId === myId;
+    return !!api.isHost;
+  }
+
+  // Dots only: how many, and which one is you. No names, ever. Empty slots are
+  // drawn up to capacity so a lone host can see that room is being made for
+  // people without anyone being named.
+  function renderSeats(list, show) {
+    ovTable.hidden = !show;
+    if (!show) return;
+    ovTable.innerHTML = '';
+    for (let i = 0; i < MAX_DOTS; i++) {
+      const id = list[i];
+      const d = document.createElement('div');
+      d.className = 'dr-seat' + (id ? ' on' : '') + (id === myId ? ' self' : '');
+      ovTable.appendChild(d);
+    }
   }
 
   function renderChrome() {
     if (!view) return;
     const playing = view.phase === 'play';
+    const list = view.players || [];
+    const atTable = seated();
+    const watching = !atTable;
+    const host = iAmHost();
+    const n = list.length;
+    const alone = n < 2;
+
     overlay.hidden = playing;
-    hudTime.parentNode.style.visibility = playing ? 'visible' : 'hidden';
 
-    const list = (view.players || []).map(function (id) {
-      return id === myId ? 'you' : (names[id] || 'a player');
-    });
-    const solo = list.length <= 1;
-    hudMeta.textContent = playing
-      ? (solo ? 'keep it inside' : 'table: ' + list.join(', '))
-      : '';
+    // OBSERVING is a top-of-screen state in every phase, including mid-round.
+    // A watcher who opens a live game previously got no signal at all, and the
+    // frozen field just reads as a broken one.
+    hud.classList.toggle('watching', watching);
+    hud.style.visibility = (playing || watching) ? 'visible' : 'hidden';
+    if (watching) {
+      hudTime.textContent = 'OBSERVING';
+      hudMeta.textContent = n + (n === 1 ? ' dot at the table' : ' dots at the table');
+    } else {
+      hudMeta.textContent = playing ? 'keep it inside' : '';
+    }
 
-    const seated = list.indexOf('you') >= 0;
-    btn.disabled = !seated;
-    btn.textContent = view.phase === 'over' ? 'Play Again' : 'Start';
+    ovTitle.classList.toggle('observing', watching);
+    renderSeats(list, !playing && !watching);
+
+    // Buttons are rebuilt per render because who may start depends on the
+    // table size, which changes while this screen is up.
+    btns.innerHTML = '';
+    const showStart = !playing && !watching;
+    if (showStart) {
+      // Mirrors reduce()'s gate exactly: the host, or whoever is left holding a
+      // table of one. Testing `view.solo` here instead would be wrong — it is
+      // frozen at the last round, so a solo round that someone then joined would
+      // hand the button to a guest the host is about to refuse.
+      const canStart = host || alone;
+      btn.textContent = view.phase === 'over'
+        ? (canStart ? 'Play again' : 'Waiting for host')
+        : 'Start round';
+      btn.disabled = !canStart;
+      btns.appendChild(btn);
+      // Host, alone, in a room: a table of one is a valid game, so say so
+      // rather than greying out the only way forward.
+      if (alone && !soloCorner && host && view.phase === 'ready') {
+        btnSolo.textContent = 'Start solo round';
+        btnSolo.disabled = false;
+        btns.appendChild(btnSolo);
+      }
+    }
 
     if (playing) return;
 
+    if (watching) {
+      ovTitle.textContent = 'Observing';
+      ovBody.innerHTML = 'Someone else started this round.<br>' +
+        'You are watching — your swipe would not move anything, so it is not offered.';
+      ovNum.hidden = true;
+      ovNote.textContent = n + (n === 1 ? ' player is at' : ' players are at') + ' this table.';
+      return;
+    }
+
     if (view.phase === 'over') {
-      const n = view.returns;
-      ovTitle.textContent = solo ? 'Round Over' : 'Table Round Over';
+      const t = view.returns;
+      ovTitle.textContent = alone ? 'Round Over' : 'Table Round Over';
       ovBody.innerHTML = 'The dot stayed out of the ring for <span class="dr-hi">' +
         view.duration + ' seconds</span>, and the group returned it <span class="dr-hi">' +
-        n + '</span> time' + (n === 1 ? '' : 's') + '.';
+        t + '</span> time' + (t === 1 ? '' : 's') + '.';
       ovNum.hidden = false;
-      ovNum.textContent = String(n);
+      ovNum.textContent = String(t);
       const best = readBest();
-      ovNote.textContent = !seated
-        ? '👁 watching — you are not seated at this table'
-        : (solo
-          ? (best === null ? 'your best is still unwritten'
-            : (n <= best ? 'a new personal best'
-              : 'personal best: ' + best + (best === 1 ? ' return' : ' returns')))
-          : '');
-      if (solo && view.epoch !== scoredEpoch) {
+      ovNote.textContent = alone
+        ? (best === null ? 'your best is still unwritten'
+          : (t <= best ? 'a new personal best'
+            : 'personal best: ' + best + (best === 1 ? ' return' : ' returns')))
+        : '';
+      if (alone && view.epoch !== scoredEpoch) {
         scoredEpoch = view.epoch;
-        saveBest(n);
+        saveBest(t);
       }
       return;
     }
 
     ovTitle.textContent = 'Dot Return';
+    // The old copy said "the group tally" to a lone player in an empty room.
     ovBody.innerHTML = 'Keep a slow dot inside a circle you cannot see.<br>' +
       'Swipe anywhere to redirect the drift.<br>' +
       'Each time it drifts back to dead centre it picks a <span class="dr-hi">new direction</span>.<br>' +
-      'The group tally is revealed when the ' + view.duration + 's clock runs out.<br>' +
+      'The ' + (alone ? 'tally' : 'group tally') + ' is revealed when the ' +
+      view.duration + 's clock runs out.<br>' +
       'Goal: <span class="dr-hi">fewest returns.</span>';
     ovNum.hidden = true;
     const best = readBest();
-    ovNote.textContent = seated
-      ? (best === null ? '' : 'personal best: ' + best + (best === 1 ? ' return' : ' returns'))
-      : '👁 watching — you are not seated at this table';
+    ovNote.textContent = lobbyNote(host, alone, n, best);
+  }
+
+  // The status line wordbridge's statusText() would print: who has to act, and
+  // what they are waiting on. Before this, the screen said the same thing to
+  // the host of a full table and to a guest who could not press the button.
+  function lobbyNote(host, alone, n, best) {
+    const personal = best === null ? '' : ' · personal best: ' + best +
+      (best === 1 ? ' return' : ' returns');
+    if (soloCorner) return 'Solo round — you are the whole table.' + personal;
+    if (alone) return host
+      ? 'Nobody else has joined yet. Start solo, or wait for players.'
+      : 'Waiting for another player to join.';
+    if (host) return n + ' at the table' + (n < MAX_DOTS ? ' — invite someone, or start' : ' — table full') + '.';
+    return 'Waiting for the host to start the round.';
   }
 
   // ---- input -------------------------------------------------------------
   let sx = 0, sy = 0, tracking = false;
 
+  // A watcher has no dot, so a swipe from them is a no-op the host will deny.
+  // Silently doing nothing beats letting someone drag a dead field and wonder
+  // whether the game ate it.
+  function canSteer() {
+    return !!view && view.phase === 'play' && seated();
+  }
+
   field.addEventListener('pointerdown', function (e) {
-    if (!view || view.phase !== 'play') return;
+    if (!canSteer()) return;
     tracking = true;
     sx = e.clientX;
     sy = e.clientY;
@@ -507,7 +641,7 @@ export function mount(root, api) {
   });
 
   field.addEventListener('pointerup', function (e) {
-    if (!tracking || !view || view.phase !== 'play') return;
+    if (!tracking || !canSteer()) return;
     tracking = false;
     try { field.releasePointerCapture(e.pointerId); } catch (err) {}
     const dx = e.clientX - sx;
@@ -519,11 +653,16 @@ export function mount(root, api) {
   field.addEventListener('pointercancel', function () { tracking = false; });
   field.addEventListener('contextmenu', function (e) { e.preventDefault(); });
 
-btn.addEventListener('click', function () {
+  // The button's enabled state is cosmetic; reduce() is what actually refuses a
+  // guest, so a crafted send() gains nothing by skipping this check.
+  function askStart() {
     if (!view || view.phase === 'play') return;
-    if ((view.players || []).indexOf(myId) < 0) return;
+    if (!seated()) return;
     api.send({ a: 'start' });
-  });
+  }
+
+  btn.addEventListener('click', askStart);
+  btnSolo.addEventListener('click', askStart);
 
   // ---- sizing ------------------------------------------------------------
   let ro = null;
@@ -540,7 +679,6 @@ btn.addEventListener('click', function () {
       if (!next) return;
       view = next;
       if (typeof next.you === 'string' && next.you) myId = next.you;
-      (api.roster || []).forEach(function (m) { names[m.id] = m.name; });
       measure();
       // A new epoch means a new round: re-anchor the sim from the host's
       // headings rather than correcting into the previous round's positions.
@@ -570,7 +708,6 @@ btn.addEventListener('click', function () {
       stopLoop();
       if (ro) ro.disconnect();
       window.removeEventListener('resize', onResize);
-      Object.keys(dotEls).forEach(function (id) { delete dotEls[id]; });
     }
   };
 }

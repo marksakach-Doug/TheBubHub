@@ -30,19 +30,39 @@ JS_CASES = r"""
   const names = { w1: 'Sam', b1: 'Bo' };
   const nameOf = (id) => names[id] || id;
 
-  // a fresh table with two seated players, exactly as init() would build it
-  const st0 = init({ seats: [{ id: 'w1' }, { id: 'b1' }] });
-  out.push(['init seats two dots', st0.players.join(',') === 'w1,b1' && !!st0.dots.b1]);
+  // ---- init seats the table, not the room.
+  // The hub passes the whole room roster under `seats`; `atTable` is the
+  // filtered list of people who actually opened this game.
+  const room = [
+    { id: 'w1', name: 'Sam', game: 'dotreturn' },
+    { id: 'b1', name: 'Bo', game: 'dotreturn' },
+    { id: 'x1', name: 'Zed', game: 'other' },        // in the room, at another table
+    { id: 'w9', name: 'Eve', game: 'dotreturn', spectator: true }
+  ];
+  const st0 = init({ seats: room, atTable: [room[0], room[1]] });
+  out.push(['init seats the table', st0.players.join(',') === 'w1,b1' && !!st0.dots.b1]);
+  out.push(['init ignores people at other tables', st0.players.indexOf('x1') < 0]);
+  out.push(['init never seats a spectator', st0.players.indexOf('w9') < 0]);
   out.push(['init starts ready', st0.phase === 'ready' && st0.epoch === 0]);
+  out.push(['the first seated player hosts', st0.hostId === 'w1']);
+
+  // Fall back to `seats` when there is no atTable, and still drop spectators.
+  const legacy = init({ seats: [{ id: 'w1' }, { id: 'w9', spectator: true }] });
+  out.push(['init falls back to seats', legacy.players.join(',') === 'w1']);
 
   // ---- start
   const started = reduce(st0, { a: 'start' }, ctx('w1'));
   out.push(['start begins a round', started.phase === 'play' && started.epoch === 1]);
   out.push(['start resets the tally', started.returns === 0]);
-  out.push(['start randomises every heading',
-    started.dots.w1.a !== started.dots.b1.a || true]);
   out.push(['start sets a 120s clock',
     Math.abs((started.endsAt - Date.now()) / 1000 - 120) < 2]);
+  out.push(['the round records its table', started.table.join(',') === 'w1,b1']);
+  out.push(['a two-player round is not solo', started.solo === false]);
+  out.push(['a guest cannot start the round',
+    !!reduce(st0, { a: 'start' }, ctx('b1')).error]);
+
+  const soloStart = reduce(init({ seats: [{ id: 'w1' }] }), { a: 'start' }, ctx('w1'));
+  out.push(['a one-player round is solo', soloStart.solo === true]);
 
   // ---- swipe only moves the sender's dot
   const swiped = reduce(started, { a: 'swipe', ang: 1.5 }, ctx('w1'));
@@ -79,11 +99,17 @@ JS_CASES = r"""
   out.push(['a spectator cannot reroll',
     !!reduce(started, { a: 'reroll' }, ctx('ghost')).error]);
 
-  // ---- join mid-round
+  // ---- join mid-round. The epoch bump is what makes clients re-anchor.
   const joined = reduce(started, { a: 'join' }, ctx('w2'));
   out.push(['join adds the latecomer', joined.players.join(',') === 'w1,b1,w2']);
+  out.push(['join re-anchors every client', joined.epoch === started.epoch + 1]);
+  out.push(['the latecomer starts at the centre heading',
+    joined.dots.w2.a >= 0 && joined.dots.w2.a < Math.PI * 2]);
   out.push(['a dot already at the table is left alone',
     reduce(joined, { a: 'join' }, ctx('w1')).players.length === 3]);
+  out.push(['a full table turns people away',
+    !!reduce(Object.assign({}, joined, { players: ['a', 'b', 'c', 'd'] }),
+      { a: 'join' }, ctx('w2')).error]);
 
   // ---- the clock
   out.push(['the round cannot be ended early',
@@ -97,6 +123,18 @@ JS_CASES = r"""
     reduce(done, { a: 'finish' }, ctx('w1')).phase === 'over' &&
     reduce(done, { a: 'finish' }, ctx('w1')).returns === 1]);
 
+  // ---- a round can be replayed, and only by whoever may start one
+  const replay = reduce(done, { a: 'start' }, ctx('w1'));
+  out.push(['the host can replay a table round', replay.phase === 'play' && replay.epoch > done.epoch]);
+  out.push(['a guest cannot replay a table round',
+    !!reduce(done, { a: 'start' }, ctx('b1')).error]);
+  const soloDone = reduce(Object.assign({}, soloStart, { endsAt: Date.now() - 10 }),
+    { a: 'finish' }, ctx('w1'));
+  const soloAgain = reduce(soloDone, { a: 'start' }, ctx('w1'));
+  out.push(['a solo round replays itself', soloAgain.phase === 'play' && soloAgain.solo === true]);
+  out.push(['a round cannot be started twice',
+    !!reduce(replay, { a: 'start' }, ctx('w1')).error]);
+
   // ---- project: the tally is not in the snapshot until the reveal
   const view = project(started, 'w1');
   out.push(['returns are hidden while playing', view.returns === null && view.over === null]);
@@ -109,15 +147,21 @@ JS_CASES = r"""
   out.push(['the real state was never mutated',
     started.returns === 0 && started.phase === 'play']);
 
-  // ---- the record line
+  // ---- the record line names the table, not the room
+  const crowded = init({ seats: room, atTable: [room[0], room[1]] });
+  const tableDone = reduce(Object.assign({}, reduce(crowded, { a: 'start' }, ctx('w1')),
+    { endsAt: Date.now() - 10 }), { a: 'finish' }, ctx('w1'));
+  out.push(['the record line credits only the table',
+    summarize(tableDone, nameOf) === 'Sam and Bo held the dot for 120s — 0 returns']);
   const soloState = reduce(Object.assign({}, started, {
-    players: ['w1'], dots: { w1: started.dots.w1 }, endsAt: Date.now() - 10
+    players: ['w1'], dots: { w1: started.dots.w1 }, table: ['w1'], endsAt: Date.now() - 10
   }), { a: 'finish' }, ctx('w1'));
   out.push(['solo sentence', summarize(soloState, nameOf) === 'Sam held the dot for 120s — 0 returns']);
   out.push(['table sentence',
     summarize(done, nameOf) === 'Sam and Bo held the dot for 120s — 1 return']);
   const soloHit = reduce(Object.assign({}, started, {
-    players: ['w1'], dots: { w1: started.dots.w1 }, returns: 1, endsAt: Date.now() - 10
+    players: ['w1'], dots: { w1: started.dots.w1 }, table: ['w1'],
+    returns: 1, endsAt: Date.now() - 10
   }), { a: 'finish' }, ctx('w1'));
   out.push(['one is singular', summarize(soloHit, nameOf) === 'Sam held the dot for 120s — 1 return']);
 

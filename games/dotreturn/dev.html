@@ -126,7 +126,12 @@
     }
 
     const me = { id: ME, name: NAME };
-    let state = game.init({ seats: [{ id: ME, name: NAME }] });
+    // Solo corner: a room of one. `atTable` is what the hub now hands a game so
+    // it seats the people actually at the table; `isInRoom`/`isHost` are what
+    // the lobby branches on. Toggle ROOM below to exercise the host paths.
+    const ROOM = new URLSearchParams(location.search).get('room') === '1';
+    const table = [{ id: ME, name: NAME, host: true, game: 'dotreturn' }];
+    let state = game.init({ seats: table, atTable: table, options: {} });
 
     // ---- the readout -------------------------------------------------------
     // Declared before mount(): the game's first update() sends a `join`
@@ -154,8 +159,11 @@
     const api = {
         me: me,
         seats: { 0: ME },
-        roster: [{ id: ME, name: NAME, host: true, game: 'dotreturn' }],
+        roster: table,
+        atTable: table,
         isSpectator: false,
+        isHost: true,
+        isInRoom: ROOM,
         send: (action) => {
             const next = game.reduce(state, action, { from: me, rng: Math.random });
             const kind = (action && action.a) || '?';

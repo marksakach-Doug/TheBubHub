@@ -50,13 +50,17 @@ HARNESS = r"""
 
   // ---- the host, as src/main.js runs it
   const ME = 'me';
-  let state = dr.init({ seats: [{ id: ME, name: 'Sam' }] });
+  const table = [{ id: ME, name: 'Sam', host: true, game: 'dotreturn' }];
+  let state = dr.init({ seats: table, atTable: table, options: {} });
   const intents = [];
   const api = {
     me: { id: ME, name: 'Sam' },
     seats: { 0: ME },
-    roster: [{ id: ME, name: 'Sam', host: true }],
+    roster: table,
+    atTable: table,
     isSpectator: false,
+    isHost: true,
+    isInRoom: false,
     send: (action) => {
       intents.push(action);
       const next = dr.reduce(state, action, { from: { id: ME, name: 'Sam' }, rng: Math.random });
@@ -79,25 +83,36 @@ HARNESS = r"""
   const q = (sel) => shadow.querySelector(sel);
   const field = q('.dr-field');
   const dot = () => q('.dr-dot');
-  const visible = (el) => !!el && el.style.display !== 'none';
+  const visible = (el) => !!el && el.hidden === false;
   const hud = () => q('.dr-hud').textContent;
   const overlayText = () => q('.dr-overlay').textContent;
   const overlayShown = () => q('.dr-overlay').hidden === false;
   const pos = () => dot() ? dot().style.transform : '';
   // the rendered x of the dot, in px, so 'is it at the centre' is measurable
   const dotX = () => parseFloat(pos().replace('translate(', '')) || NaN;
+  const btn = () => q('.dr-btn');
 
   ok('mount builds a field', !!field);
-  ok('lobby offers Start', overlayShown() && q('.dr-btn').textContent === 'Start');
+  ok('lobby offers Start', overlayShown() && btn().textContent === 'Start round');
   ok('lobby explains the centre reroll', overlayText().indexOf('new direction') >= 0);
   ok('no dot is on screen yet', !visible(dot()));
 
+  // ---- the solo lobby says so, rather than talking about a group
+  ok('the solo lobby says it is solo',
+    /you are the whole table/i.test(q('.dr-note').textContent));
+  ok('a solo lobby offers no second button', q('.dr-btns').querySelectorAll('button').length === 1);
+  ok('the lobby counts the table with dots only',
+    q('.dr-table').querySelectorAll('.dr-seat').length === 4 &&
+    q('.dr-table').querySelectorAll('.dr-seat.on').length === 1);
+  ok('the lobby names nobody', !/Sam/.test(overlayText()));
+
   // ---- start a round
-  q('.dr-btn').click();
+  btn().click();
   ok('Start becomes a round', state.phase === 'play' && !overlayShown());
   ok('a dot appears', !!dot());
   ok('the timer is running', /\d+s/.test(hud()));
   ok('the tally is not on the HUD', !/\breturns?\b/.test(hud()) && !/returns/.test(hud()));
+  ok('the HUD never names a player', !/Sam/.test(hud()));
 
   // every round begins at dead centre, so a reroll must be asked for at once
   const headingAtStart = state.dots[ME].a;
@@ -144,7 +159,7 @@ HARNESS = r"""
   ok('the round ended', state.phase === 'over');
   ok('the tally is revealed', overlayShown() && overlayText().indexOf(String(state.returns)) >= 0);
   ok('the timer is put away', q('.dr-hud').style.visibility === 'hidden');
-  ok('Play Again is offered', q('.dr-btn').textContent === 'Play Again');
+  ok('Play again is offered', q('.dr-btn').textContent === 'Play again');
 
   // ---- a second round re-anchors cleanly
   q('.dr-btn').click();
@@ -152,34 +167,140 @@ HARNESS = r"""
   pump(1000);
   ok('the dot is back at the centre', visible(dot()) && Math.abs(dotX() - 200) < 6);
 
-  // ---- a late joiner gets a dot; a spectator gets read-only
+  // ---- a late joiner gets a dot, but you still only see your own
   const joined = dr.reduce(state, { a: 'join' },
     { from: { id: 'you2', name: 'Bo' }, rng: Math.random });
   handle.update(dr.project(joined, ME));
-  const tags = Array.from(shadow.querySelectorAll('.dr-tag')).map((t) => t.textContent);
-  ok('a late joiner gets a dot',
-    shadow.querySelectorAll('.dr-dot').length === 2 && tags.indexOf('you') >= 0);
-  ok('the table is named in the HUD', /table:/.test(hud()));
+  ok('the latecomer is at the table', (joined.players || []).indexOf('you2') >= 0);
+  ok('their arrival re-anchors the round', joined.epoch === state.epoch + 1);
+  ok('a table of two still shows exactly one dot',
+    shadow.querySelectorAll('.dr-dot').length === 1);
+  ok('no player tag is ever painted',
+    shadow.querySelectorAll('.dr-tag').length === 0);
+  ok('no name reaches the screen', !/Sam|Bo/.test(shadow.textContent));
 
+  // ---- the host's HUD says how many are playing, and still names nobody
+  const finished = dr.reduce(Object.assign({}, joined, { endsAt: Date.now() - 10 }),
+    { a: 'finish' }, { from: { id: ME }, rng: Math.random });
+  handle.update(dr.project(finished, ME));
+  ok('the table round ends', finished.phase === 'over');
+  ok('a two-player round is not scored as a personal best',
+    !/personal best/i.test(q('.dr-note').textContent));
+  ok('the lobby offers a replay to the host', q('.dr-btn').textContent === 'Play again');
+  ok('the lobby counts two at the table',
+    q('.dr-table').querySelectorAll('.dr-seat.on').length === 2);
+  ok('the table strip still names nobody',
+    !/Sam|Bo/.test(q('.dr-overlay').textContent));
+
+  // the next round, used by the guest and spectator screens below
+  const live = dr.reduce(finished, { a: 'start' },
+    { from: { id: ME, name: 'Sam' }, rng: Math.random });
+
+  // ---- a guest at that table is told to wait for the host
+  const guestHost = document.createElement('div');
+  guestHost.style.cssText = 'position:relative;width:400px;height:600px';
+  document.body.appendChild(guestHost);
+  const guestShadow = guestHost.attachShadow({ mode: 'open' });
+  const guestSent = [];
+  const guestHandle = dr.mount(guestShadow, Object.assign({}, api, {
+    me: { id: 'you2', name: 'Bo' },
+    isHost: false,
+    isInRoom: true,
+    send: (a) => guestSent.push(a)
+  }));
+  const readyTwo = dr.init({
+    seats: [{ id: ME }, { id: 'you2' }],
+    atTable: [{ id: ME }, { id: 'you2' }]
+  });
+  guestHandle.update(dr.project(readyTwo, 'you2'));
+  const guestBtn = guestShadow.querySelector('.dr-btn');
+  ok('a guest cannot press the host button', !!guestBtn && guestBtn.disabled === true);
+  ok('a guest is told who they are waiting for',
+    /waiting for the host/i.test(guestShadow.querySelector('.dr-note').textContent));
+  ok('a guest is not offered a solo start',
+    guestShadow.querySelectorAll('.dr-btns button').length === 1);
+  ok('a guest is not shown as observing',
+    guestShadow.querySelector('.dr-hud').classList.contains('watching') === false);
+  // mid-round the guest does get a dot — their own, and only their own
+  guestHandle.update(dr.project(live, 'you2'));
+  ok('a guest who is at the table gets a dot during play',
+    guestShadow.querySelector('.dr-dot').hidden === false);
+  ok('a guest is shown exactly one dot',
+    guestShadow.querySelectorAll('.dr-dot').length === 1);
+  ok('the guest screen still names nobody',
+    !/Sam|Bo/.test(guestShadow.textContent));
+  // and the host really does refuse a guest start, not just grey the button out
+  const denied = dr.reduce(readyTwo, { a: 'start' }, { from: { id: 'you2', name: 'Bo' } });
+  ok('the host refuses a guest start', !!denied && !!denied.error);
+  guestHandle.destroy();
+
+  // ---- a host alone in a room is offered a solo start, not a dead end
+  const soloRoom = document.createElement('div');
+  soloRoom.style.cssText = 'position:relative;width:400px;height:600px';
+  document.body.appendChild(soloRoom);
+  const soloShadow = soloRoom.attachShadow({ mode: 'open' });
+  const soloSent = [];
+  const soloHandle = dr.mount(soloShadow, Object.assign({}, api, {
+    isInRoom: true, send: (a) => soloSent.push(a)
+  }));
+  soloHandle.update(dr.project(
+    dr.init({ seats: [{ id: ME, name: 'Sam' }] }), ME));
+  const soloBtns = soloShadow.querySelectorAll('.dr-btns button');
+  ok('a lone host is offered a solo start', soloBtns.length === 2);
+  ok('the lone host is told nobody has joined',
+    /nobody else/i.test(soloShadow.querySelector('.dr-note').textContent));
+  soloBtns[1].click();
+  ok('the solo start sends an intent',
+    soloSent.some((a) => a.a === 'start'));
+  soloHandle.destroy();
+
+  // ---- a spectator gets OBSERVING at the top, in every phase
   const watcherHost = document.createElement('div');
   watcherHost.style.cssText = 'position:relative;width:400px;height:600px';
   document.body.appendChild(watcherHost);
   const watcherShadow = watcherHost.attachShadow({ mode: 'open' });
   const sent = [];
-  const watchHandle = dr.mount(watcherShadow, Object.assign({}, api, {
+  const watchApi = Object.assign({}, api, {
     isSpectator: true,
+    isHost: false,
+    isInRoom: true,
     me: { id: 'you3', name: 'Cy' },
     roster: [{ id: 'you3', name: 'Cy', spectator: true }],
+    atTable: [],
     send: (a) => sent.push(a)
-  }));
-  // with the round over the overlay is up, which is where the reason shows
-  watchHandle.update(dr.project(
-    dr.reduce(Object.assign({}, joined, { endsAt: Date.now() - 10 }), { a: 'finish' }, { from: { id: ME }, rng: Math.random }),
-    'you3'));
+  });
+  const watchHandle = dr.mount(watcherShadow, watchApi);
+  const watchHud = watcherShadow.querySelector('.dr-hud');
+
+  // mid-round, which is the case that used to look like a broken frozen field
+  watchHandle.update(dr.project(live, 'you3'));
+  ok('a spectator watching a live round sees OBSERVING',
+    watchHud.textContent.indexOf('OBSERVING') >= 0);
+  ok('the observing banner is styled as such',
+    watchHud.classList.contains('watching'));
+  ok('a spectator is told how many are playing',
+    /2 dots at the table/.test(watcherShadow.querySelector('.dr-meta').textContent));
+  pump(1500);
+  ok('the round clock never overwrites OBSERVING',
+    watcherShadow.querySelector('.dr-time').textContent === 'OBSERVING');
+
+  const watchField = watcherShadow.querySelector('.dr-field');
+  const swipesBefore = sent.filter((a) => a.a === 'swipe').length;
+  watchField.dispatchEvent(new PointerEvent('pointerdown', { clientX: 200, clientY: 300, bubbles: true }));
+  watchField.dispatchEvent(new PointerEvent('pointerup', { clientX: 260, clientY: 300, bubbles: true }));
+  ok('a spectator cannot steer', sent.filter((a) => a.a === 'swipe').length === swipesBefore);
   ok('a spectator never asks to join', sent.every((a) => a.a !== 'join'));
-  ok('a spectator cannot start the round', watcherShadow.querySelector('.dr-btn').disabled === true);
-  ok('a spectator is told why it is read-only',
-    /watching/.test(watcherShadow.querySelector('.dr-overlay').textContent));
+  ok('a spectator has no button at all', !watcherShadow.querySelector('.dr-btn'));
+  ok('a spectator is not given a dot',
+    watcherShadow.querySelector('.dr-dot').hidden === true);
+
+  // and in the lobby, before anything has started
+  watchHandle.update(dr.project(
+    dr.init({ seats: [{ id: ME }], atTable: [{ id: ME }] }), 'you3'));
+  ok('the lobby says Observing too',
+    watcherShadow.querySelector('.dr-title').textContent.indexOf('Observing') >= 0);
+  ok('the observing title is styled as such',
+    watcherShadow.querySelector('.dr-title').classList.contains('observing'));
   watchHandle.destroy();
 
   // ---- teardown
