@@ -1,0 +1,200 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
+<title>Dot Return — dev</title>
+<!--
+  Dev harness for games/dotreturn/index.js. Not part of the hub and not
+  registered anywhere: the hub finds module games through Vite's
+  import.meta.glob, which needs `npm run dev`, and nothing here needs that.
+
+  It imports the *shipped* game file and stands in for the hub itself — the
+  send -> reduce -> project -> update loop is exactly what src/main.js runs.
+  So what you play here is the real mount(), the real physics, the real rules.
+
+  Serve it over HTTP (ES modules are blocked on file://):
+
+      cd /home/mark/Documents/BubHub && python3 -m http.server 5173
+      # http://localhost:5173/games/dotreturn/dev.html
+      # http://<your-lan-ip>:5173/games/dotreturn/dev.html  for the phone
+
+  Edit a constant in index.js and hit F5.
+-->
+<style>
+    html, body {
+        margin: 0;
+        height: 100%;
+        background: #0b0d10;
+        color: #8b8f98;
+        font: 13px/1.45 ui-monospace, SFMono-Regular, Menlo, Consolas, monospace;
+        overflow: hidden;
+    }
+
+    #stage {
+        position: fixed;
+        inset: 0;
+    }
+
+    /* pointer-events:none so the readout never swallows a swipe */
+    #readout {
+        position: fixed;
+        left: 0;
+        right: 0;
+        bottom: 0;
+        z-index: 2;
+        padding: 6px 10px;
+        background: rgba(11, 13, 16, .88);
+        border-top: 1px solid #22262e;
+        display: flex;
+        gap: 14px;
+        flex-wrap: wrap;
+        pointer-events: none;
+        white-space: nowrap;
+    }
+
+    #readout b { color: #e9e4d8; font-weight: 600; }
+    #readout .bad { color: #f87171; }
+
+    #fatal {
+        position: fixed;
+        inset: 0;
+        z-index: 3;
+        display: none;
+        padding: 32px;
+        background: #0b0d10;
+        color: #fca5a5;
+        font: 14px/1.6 ui-monospace, Menlo, Consolas, monospace;
+        overflow: auto;
+    }
+
+    #fatal code {
+        display: block;
+        margin: 12px 0;
+        padding: 10px 14px;
+        color: #e9e4d8;
+        background: #15181d;
+        border-radius: 8px;
+        white-space: pre-wrap;
+    }
+</style>
+</head>
+<body>
+
+<div id="stage"></div>
+
+<div id="readout">
+    <span>phase <b id="r-phase">–</b></span>
+    <span>epoch <b id="r-epoch">–</b></span>
+    <span>group returns <b id="r-returns">–</b></span>
+    <span>heading <b id="r-heading">–</b></span>
+    <span>intent <b id="r-intent">–</b></span>
+</div>
+
+<div id="fatal"></div>
+
+<script type="module">
+    // An async IIFE rather than top-level await: it keeps the harness inside
+    // what a plain ES2017 parser (tests/jscheck.py) can still check.
+    (async () => {
+    const ME = 'dev';
+    const NAME = 'Dev';
+
+    const fatal = document.getElementById('fatal');
+
+    function die(title, body) {
+        fatal.style.display = 'block';
+        fatal.innerHTML = '<div style="color:#fca5a5;font-weight:700">' + title + '</div>' + body;
+    }
+
+    let game;
+    try {
+        game = await import('./index.js');
+    } catch (e) {
+        if (location.protocol === 'file:') {
+            die('This page needs a server, not a double-click.',
+                '<p>ES modules cannot be imported over <code>file://</code>, so the game file ' +
+                'never loads. From the repo root:</p>' +
+                '<code>python3 -m http.server 5173</code>' +
+                '<p>then open <code>http://localhost:5173/games/dotreturn/dev.html</code></p>');
+        } else {
+            die('Could not load ./index.js',
+                '<p>Serve the <em>repo root</em>, not this folder — the game sits under /games/dotreturn/.</p>' +
+                '<code>' + String(e) + '</code>');
+        }
+        throw e;
+    }
+
+    const me = { id: ME, name: NAME };
+    let state = game.init({ seats: [{ id: ME, name: NAME }] });
+
+    // ---- the readout -------------------------------------------------------
+    // Declared before mount(): the game's first update() sends a `join`
+    // intent, which lands right back here through api.send.
+    const out = {};
+    ['phase', 'epoch', 'returns', 'heading', 'intent'].forEach((k) => {
+        out[k] = document.getElementById('r-' + k);
+    });
+
+    function set(key, text, bad) {
+        const el = out[key];
+        if (!el) return;
+        el.textContent = text;
+        el.className = bad ? 'bad' : '';
+    }
+
+    function paint() {
+        const dot = state.dots[ME] || {};
+        set('phase', state.phase);
+        set('epoch', state.epoch);
+        set('returns', state.phase === 'over' ? state.returns : 'hidden');
+        set('heading', typeof dot.a === 'number' ? dot.a.toFixed(4) + ' rad' : '–');
+    }
+
+    const api = {
+        me: me,
+        seats: { 0: ME },
+        roster: [{ id: ME, name: NAME, host: true, game: 'dotreturn' }],
+        isSpectator: false,
+        send: (action) => {
+            const next = game.reduce(state, action, { from: me, rng: Math.random });
+            const kind = (action && action.a) || '?';
+            if (next && next.error) {
+                set('intent', kind + ' → denied: ' + next.error, true);
+                return;
+            }
+            state = next;
+            set('intent', kind);
+            handle.update(game.project(state, ME));
+            paint();
+        },
+        // Deliberately the raw globals: this harness stands in for the hub, and
+        // the hub is what supplies tracked raf/timers in the real thing.
+        raf: (fn) => requestAnimationFrame(fn),
+        cancelRaf: (id) => cancelAnimationFrame(id),
+        setTimeout: (fn, ms) => setTimeout(fn, ms),
+        setInterval: (fn, ms) => setInterval(fn, ms)
+    };
+
+    const stage = document.getElementById('stage');
+    const handle = game.mount(stage.attachShadow({ mode: 'open' }), api);
+    handle.update(game.project(state, ME));
+    paint();
+
+    // ---- keyboard steering, so a desktop needs no drag ---------------------
+    const KEYS = {
+        ArrowRight: 0, ArrowLeft: Math.PI, ArrowDown: Math.PI / 2, ArrowUp: -Math.PI / 2,
+        d: 0, a: Math.PI, s: Math.PI / 2, w: -Math.PI / 2
+    };
+
+    document.addEventListener('keydown', (e) => {
+        const ang = KEYS[e.key];
+        if (ang === undefined) return;
+        e.preventDefault();
+        api.send({ a: 'swipe', ang: ang });
+    });
+    })();
+</script>
+
+</body>
+</html>
