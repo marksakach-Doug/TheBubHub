@@ -218,7 +218,29 @@ else
   fi
 fi
 
-# ---- 10. chess rules (browser) ----
+# ---- 10. dot return paint test (browser) ----
+step "dot return paint test — tests/dotreturn_paint_test.py"
+if [ "$BROWSER_OK" = "1" ]; then
+  if python3 tests/dotreturn_paint_test.py; then
+    pass "dotreturn_paint_test"
+  else
+    fail "dotreturn_paint_test"
+    echo "Stopped at first failure." >&2
+    printf '\nResult: %d passed, %d failed, %d skipped\n' "$PASS" "$FAIL" "$SKIPPED"
+    exit 1
+  fi
+else
+  if [ "$SKIP_BROWSER" = "1" ]; then
+    skip "dotreturn_paint_test ($BROWSER_WHY)"
+  else
+    fail "dotreturn_paint_test (no browser: $BROWSER_WHY)"
+    echo "Tip: re-run with --skip-browser for syntax-only checks." >&2
+    printf '\nResult: %d passed, %d failed, %d skipped\n' "$PASS" "$FAIL" "$SKIPPED"
+    exit 1
+  fi
+fi
+
+# ---- 11. chess rules (browser) ----
 step "chess rules — tests/chess_rules.py"
 if [ "$BROWSER_OK" = "1" ]; then
   if python3 tests/chess_rules.py; then

@@ -130,6 +130,20 @@ HARNESS = r"""
   // not be able to start a second loop
   ok('exactly one frame loop is running', cbs.size === 1);
 
+  // ---- the dot must be PAINTED, not merely present
+  // It shipped invisible once: PALETTE went, `.dr-dot` never gained a
+  // background, and every DOM check still passed — the element existed, moved,
+  // reported hidden:false, and the game was unplayable. So assert paint, not
+  // structure. The rectangle goes back to Python for a real pixel check.
+  const cs = getComputedStyle(dot());
+  const r = dot().getBoundingClientRect();
+  ok('the dot is not transparent', cs.backgroundColor !== 'rgba(0, 0, 0, 0)');
+  ok('the dot is opaque and visible', cs.opacity !== '0' && cs.visibility === 'visible');
+  ok('the dot has a real size', r.width >= 4 && r.height >= 4);
+  ok('nothing is painted over the dot',
+    shadow.elementFromPoint(r.x + r.width / 2, r.y + r.height / 2) === dot());
+  ok('the dot is round', parseFloat(getComputedStyle(dot()).borderTopLeftRadius) >= 4);
+
   // ---- a swipe is direction only
   const headingBeforeSwipe = state.dots[ME].a;
   field.dispatchEvent(new PointerEvent('pointerdown', { clientX: 200, clientY: 300, bubbles: true }));
@@ -326,8 +340,10 @@ def main():
         got = pg.evaluate("(" + HARNESS + ")", src)
         br.close()
 
+    results = list(got)
+
     bad = 0
-    for name, ok in got:
+    for name, ok in results:
         bad += not ok
         print(("  ok   " if ok else "  FAIL ") + name)
     for e in errors:
@@ -335,7 +351,8 @@ def main():
         print("  FAIL page error: " + e)
 
     print()
-    print("%d/%d play checks passed" % (len(got) + len(errors) - bad, len(got) + len(errors)))
+    print("%d/%d play checks passed" % (len(results) + len(errors) - bad,
+                                        len(results) + len(errors)))
     return 1 if bad else 0
 
 

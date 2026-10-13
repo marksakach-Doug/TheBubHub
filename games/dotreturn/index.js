@@ -233,6 +233,10 @@ const CSS = [
   '.dr-ring{position:absolute;left:50%;top:50%;border:1px solid rgba(255,255,255,.25);',
   'border-radius:50%;display:none;pointer-events:none}',
   '.dr-dot{position:absolute;left:0;top:0;width:10px;height:10px;border-radius:50%;',
+  // Its own colour, not one picked per player from a palette at paint time:
+  // when PALETTE went with the other dots, this rule inherited nothing and the
+  // dot shipped as a transparent box — present, moving, and invisible.
+  'background:#e9e4d8;',
   'transform:translate(-50%,-50%);will-change:transform}',
   '.dr-hud{position:absolute;top:0;left:0;padding:14px 18px;pointer-events:none}',
   '.dr-time{font-size:1.15rem;font-weight:600;color:#e9e4d8}',
