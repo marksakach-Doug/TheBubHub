@@ -1,6 +1,10 @@
 {
   "$schema": "node_modules/wrangler/config-schema.json",
   "name": "thebubhub",
+  // Not a secret — it just stops `wrangler deploy` from having to guess which
+  // account it is publishing to. The credential is CLOUDFLARE_API_TOKEN, which
+  // is deliberately NOT in this file.
+  "account_id": "720f5f1b973ef322438767b42fe9cd66",
   "compatibility_date": "2026-10-06",
   "observability": {
     "enabled": true
