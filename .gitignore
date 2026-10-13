@@ -8,6 +8,16 @@ __pycache__/
 Thumbs.db
 *.swp
 
-# Vite / node (v10 hub shell; legacy .html games need no build)
+# Cloudflare deploy credentials — never commit a live API token. The working
+# copy lives in ~/.config/bubhub/cloudflare-token (mode 600), outside the repo;
+# deploy with CLOUDFLARE_API_TOKEN="$(cat ~/.config/bubhub/cloudflare-token)".
+# tests/secrets_test.py enforces this.
+CLOUDFLARE_API_TOKEN
+.env
+.env.*
+*.token
+
+# Vite / node / wrangler (v10 hub shell; legacy .html games need no build)
 node_modules/
 dist/
+.wrangler/

@@ -86,7 +86,18 @@ else
   exit 1
 fi
 
-# ---- 3. record sentences (browser) ----
+# ---- 3. secrets (no browser needed) ----
+step "secrets — tests/secrets_test.py"
+if python3 tests/secrets_test.py; then
+  pass "secrets_test"
+else
+  fail "secrets_test"
+  echo "Stopped at first failure." >&2
+  printf '\nResult: %d passed, %d failed, %d skipped\n' "$PASS" "$FAIL" "$SKIPPED"
+  exit 1
+fi
+
+# ---- 4. record sentences (browser) ----
 step "record sentences — tests/record_test.py"
 if [ "$BROWSER_OK" = "1" ]; then
   if python3 tests/record_test.py; then
@@ -108,7 +119,7 @@ else
   fi
 fi
 
-# ---- 4. legacy record sentences (browser) ----
+# ---- 5. legacy record sentences (browser) ----
 step "legacy record sentences — tests/record_legacy_test.py"
 if [ "$BROWSER_OK" = "1" ]; then
   if python3 tests/record_legacy_test.py; then
@@ -130,7 +141,29 @@ else
   fi
 fi
 
-# ---- 5. dot return rules (browser) ----
+# ---- 6. module registry (browser) ----
+step "module registry — tests/module_registry_test.py"
+if [ "$BROWSER_OK" = "1" ]; then
+  if python3 tests/module_registry_test.py; then
+    pass "module_registry_test"
+  else
+    fail "module_registry_test"
+    echo "Stopped at first failure." >&2
+    printf '\nResult: %d passed, %d failed, %d skipped\n' "$PASS" "$FAIL" "$SKIPPED"
+    exit 1
+  fi
+else
+  if [ "$SKIP_BROWSER" = "1" ]; then
+    skip "module_registry_test ($BROWSER_WHY)"
+  else
+    fail "module_registry_test (no browser: $BROWSER_WHY)"
+    echo "Tip: re-run with --skip-browser for syntax-only checks." >&2
+    printf '\nResult: %d passed, %d failed, %d skipped\n' "$PASS" "$FAIL" "$SKIPPED"
+    exit 1
+  fi
+fi
+
+# ---- 7. dot return rules (browser) ----
 step "dot return rules — tests/dotreturn_test.py"
 if [ "$BROWSER_OK" = "1" ]; then
   if python3 tests/dotreturn_test.py; then
@@ -152,7 +185,7 @@ else
   fi
 fi
 
-# ---- 6. dot return play test (browser) ----
+# ---- 8. dot return play test (browser) ----
 step "dot return play test — tests/dotreturn_play.py"
 if [ "$BROWSER_OK" = "1" ]; then
   if python3 tests/dotreturn_play.py; then
@@ -174,7 +207,7 @@ else
   fi
 fi
 
-# ---- 7. chess rules (browser) ----
+# ---- 9. chess rules (browser) ----
 step "chess rules — tests/chess_rules.py"
 if [ "$BROWSER_OK" = "1" ]; then
   if python3 tests/chess_rules.py; then

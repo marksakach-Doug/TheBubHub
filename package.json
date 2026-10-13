@@ -8,7 +8,9 @@
     "build": "vite build",
     "preview": "vite preview",
     "deploy": "bun run build && wrangler deploy",
-    "serve": "python3 -m http.server 5173"
+    "serve": "python3 -m http.server 5173",
+    "test": "./test.sh",
+    "test:syntax": "./test.sh --skip-browser"
   },
   "dependencies": {
     "peerjs": "^1.5.2"
