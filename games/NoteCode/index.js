@@ -176,11 +176,6 @@ export function mount(root, api) {
   const scaleOf = () => SCALES[(view && view.cfg && view.cfg.scale) || 'pent'];
   const perUnit = () => (view && view.cfg ? view.cfg.perUnit : 1);
 
-  // Scroll the whole game inside its own box, so it works in a short phone viewport.
-  root.style.height = '100%';
-  root.style.overflowY = 'auto';
-  root.style.touchAction = 'pan-y';
-
   // One note: a short plucked tone starting at audio time `when`.
   const note = (hz, when) => {
     const o = ac.createOscillator(), g = ac.createGain();
@@ -214,7 +209,7 @@ export function mount(root, api) {
     + `${'<i class="w"></i>'.repeat(fb.white)}${'<i class="b"></i>'.repeat(fb.blue)}</span>`;
 
   root.innerHTML = `<style>
-    .k{background:#000080;color:#ff0;font:16px 'Times New Roman',serif;padding:10px;min-height:100%;box-sizing:border-box}
+    .k{background:#000080;color:#ff0;font:16px 'Times New Roman',serif;padding:10px;height:100%;overflow-y:auto;-webkit-overflow-scrolling:touch;touch-action:pan-y;box-sizing:border-box}
     h1{color:#0ff;font:bold 22px Georgia;text-shadow:3px 3px #f0f;margin:4px 0}
     #kyle{font:10px/1.05 'Courier New',monospace;color:#0f0;margin:0}
     .top{display:flex;align-items:flex-start;gap:10px;margin-bottom:4px}
