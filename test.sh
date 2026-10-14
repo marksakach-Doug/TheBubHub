@@ -284,5 +284,27 @@ else
   fi
 fi
 
+# ---- 13. the 96 game play test (browser) ----
+step "the 96 game play test — tests/t96_play.py"
+if [ "$BROWSER_OK" = "1" ]; then
+  if python3 tests/t96_play.py; then
+    pass "t96_play"
+  else
+    fail "t96_play"
+    echo "Stopped at first failure." >&2
+    printf '\nResult: %d passed, %d failed, %d skipped\n' "$PASS" "$FAIL" "$SKIPPED"
+    exit 1
+  fi
+else
+  if [ "$SKIP_BROWSER" = "1" ]; then
+    skip "t96_play ($BROWSER_WHY)"
+  else
+    fail "t96_play (no browser: $BROWSER_WHY)"
+    echo "Tip: re-run with --skip-browser for syntax-only checks." >&2
+    printf '\nResult: %d passed, %d failed, %d skipped\n' "$PASS" "$FAIL" "$SKIPPED"
+    exit 1
+  fi
+fi
+
 printf '\nALL GREEN (%d passed, %d skipped)\n' "$PASS" "$SKIPPED"
 exit 0

@@ -224,6 +224,7 @@ var hostCanvas = {};    // stepKey -> [strokes]
 
 // ---------- local-only ----------
 var myArt = null;       // my private input this step: {k:'text'|'canvas', ...}
+var briefs = {};        // stepKey -> brief, for briefs that arrive before their turn
 var myStrokes = [];     // my own drawing, optimistic (the host holds the truth)
 var draft = null;       // stroke in progress
 var drawing = false;
@@ -247,7 +248,7 @@ function fresh(){
           order: ids, names: names,
           lap: 0, starter: 0, step: 0, phase: 'play',
           lapsPlayed: 0, chain: null };
-    hostText = {}; hostCanvas = {};
+    hostText = {}; hostCanvas = {}; briefs = {};
     reported = false;
     lastKey = '';
     beginStep();
@@ -257,18 +258,23 @@ function fresh(){
 function beginStep(){
     myArt = null; myStrokes = []; draft = null; drawing = false;
     $('t96-say').value = '';
+    // State FIRST, brief second. The brief is tagged with the step it is FOR,
+    // but a guest can still be a step behind when it lands, so publishing the
+    // snapshot before the artifact removes the race instead of depending on the
+    // order two separate messages happen to arrive in.
+    broadcast();
     // Hand exactly one artifact to exactly one player. Self-delivery is
     // short-circuited: a message to yourself cannot round-trip through the hub.
     if (S.step > 0 && isHost()){
         var a = actorId();
         var prev = stepKeyFor(S.lap, S.step - 1);
+        var tag = stepKeyFor(S.lap, S.step);
         if (stepKind() === 'text'){
-            pushTo(a, PFX_C + S.step + '|' + JSON.stringify(hostCanvas[prev] || []));
+            pushTo(a, PFX_C + tag + '|' + JSON.stringify(hostCanvas[prev] || []));
         } else {
-            pushTo(a, PFX_T + S.step + '|' + (hostText[prev] || ''));
+            pushTo(a, PFX_T + tag + '|' + (hostText[prev] || ''));
         }
     }
-    broadcast();
 }
 function stepKeyFor(lap, step){ return lap + ':' + step; }
 
@@ -276,14 +282,6 @@ function advance(){
     S.step++;
     if (S.step >= S.order.length){ revealLap(); return; }
     beginStep();
-}
-
-// The actor left mid-lap: skip their turn rather than let the table stall.
-function skipStep(){
-    if (!S || S.phase !== 'play') return;
-    hostText[stepKey()] = '(that player left)';
-    hostCanvas[stepKey()] = [];
-    advance();
 }
 
 function revealLap(){
@@ -309,7 +307,7 @@ function nextLap(){
     S.lap++;
     S.starter = (S.starter + 1) % Math.max(1, S.order.length);
     S.step = 0; S.phase = 'play'; S.chain = null;
-    hostText = {}; hostCanvas = {};
+    hostText = {}; hostCanvas = {}; briefs = {};
     lastKey = '';
     beginStep();
 }
@@ -319,27 +317,40 @@ function pushTo(id, payload){
     Hub.up('denied', { to: id, text: payload });
 }
 
+// A brief is addressed to the step it is FOR, and can land before the state
+// that creates that step. So it is parked by key and picked up when its turn
+// actually arrives, rather than being compared against whatever step the
+// client happens to be sitting on when the message shows up.
+function applyBrief(){
+    var k = stepKey();
+    var ahead = S ? stepKeyFor(S.lap, S.step + 1) : '';
+    myArt = (iAmActor() && briefs[k]) ? briefs[k] : null;
+    // Keep this turn and the one after it. Everything else is a sentence the
+    // table has moved past, and a stale brief sitting in a client's memory is
+    // exactly the thing this game must not have.
+    Object.keys(briefs).forEach(function(key){
+        if (key !== k && key !== ahead) delete briefs[key];
+    });
+}
+
 function onDenied(text){
     if (!text) return;
-    if (text.indexOf(PFX_T) === 0){
-        var i = text.indexOf('|', PFX_T.length);
-        if (i < 0) return;
-        var stepNum = parseInt(text.slice(PFX_T.length, i), 10);
-        if (stepNum !== S.step) return;              // stale brief from a finished turn
-        myArt = { k:'text', step: stepNum, t: text.slice(i + 1) };
-        render(); return;
-    }
-    if (text.indexOf(PFX_C) === 0){
-        var j = text.indexOf('|', PFX_C.length);
-        if (j < 0) return;
-        var stepNum2 = parseInt(text.slice(PFX_C.length, j), 10);
-        if (stepNum2 !== S.step) return;
+    var isText = text.indexOf(PFX_T) === 0;
+    var pfx = isText ? PFX_T : PFX_C;
+    if (!isText && text.indexOf(PFX_C) !== 0) { toast(text); return; }
+    var i = text.indexOf('|', pfx.length);
+    if (i < 0) return;
+    var key = text.slice(pfx.length, i);
+    if (!/^\d+:\d+$/.test(key)) return;
+    if (isText){
+        briefs[key] = { k:'text', key:key, t: text.slice(i + 1) };
+    } else {
         var a = null;
-        try { a = JSON.parse(text.slice(j + 1)); } catch(e){}
-        myArt = { k:'canvas', step: stepNum2, c: Array.isArray(a) ? a : [] };
-        render(); return;
+        try { a = JSON.parse(text.slice(i + 1)); } catch(e){}
+        briefs[key] = { k:'canvas', key:key, c: Array.isArray(a) ? a : [] };
     }
-    toast(text);
+    applyBrief();
+    render();
 }
 
 // ---------- host validation ----------
@@ -371,7 +382,9 @@ function handleStroke(d, from){
     if (e) return e;
     if (stepKind() !== 'draw') return 'It is your turn to write, not to draw.';
     if (d.lap !== S.lap || d.step !== S.step) return 'That turn has moved on.';
-    if (!COLOURS.indexOf(d.c) && d.c !== PAPER) return 'Bad colour.';
+    // `indexOf` returns 0 for the first colour, and `!0` is true — so this
+    // used to reject COLOURS[0], which is the default pen. Compare to -1.
+    if (COLOURS.indexOf(d.c) === -1 && d.c !== PAPER) return 'Bad colour.';
     var pts = d.pts;
     if (!pts || pts.length < 2) return 'Empty stroke.';
     if (pts.length > MAXPTS) return 'Stroke too long.';
@@ -459,7 +472,11 @@ function act(d){
 
 function pushStroke(pts){
     if (!pts || pts.length < 2) return;
-    var d = { a:'stroke', c: penColour, w: (penColour === PAPER) ? ERASER_W : PEN_W, pts: pts };
+    // `lap`/`step` must ride along, exactly as act() stamps them. Without them
+    // the host's handleStroke() rejects every stroke as "That turn has moved
+    // on" — which is to say nothing could be drawn, by anyone, ever.
+    var d = { a:'stroke', c: penColour, w: (penColour === PAPER) ? ERASER_W : PEN_W,
+              pts: pts, lap: S.lap, step: S.step };
     if (isHost()){
         var err = handleStroke(d, { id: myId(), name: myName() });
         if (err) toast(err);
@@ -522,7 +539,7 @@ function myList(){
     return isHost() ? (hostCanvas[stepKey()] || []) : myStrokes;
 }
 function viewList(){
-    if (myArt && myArt.step !== S.step) myArt = null;
+    applyBrief();
     if (!S || S.phase !== 'play') return [];
     if (stepKind() === 'draw') return myList();
     // A describer sees the drawing they must describe, and nothing else.
@@ -595,8 +612,11 @@ function render(){
     var big = st.querySelector('b'), small = st.querySelector('small');
 
     if (S.phase === 'reveal'){
+        var nextStarter = S.order.length ? S.order[(S.starter + 1) % S.order.length] : null;
         big.textContent = 'Lap ' + (S.lap + 1) + ' — that is what the table made of it.';
-        small.textContent = 'Next lap starts with ' + nm(S.order[(S.starter + 1) % S.order.length]) + ' writing.';
+        small.textContent = nextStarter
+            ? 'Next lap starts with ' + nm(nextStarter) + ' writing.'
+            : 'Everyone has left the table. Host to start a new game.';
     } else if (paused()){
         big.textContent = 'Paused';
         small.textContent = 'The host disconnected. It resumes when they return.';
@@ -655,7 +675,11 @@ function render(){
 
     if (S.phase === 'reveal') renderChain();
 
-    canvas.style.visibility = (!list.length && S.phase !== 'reveal') ? 'hidden' : 'visible';
+    // The board stays visible and clickable even when it is blank. Hiding it
+    // here was fatal: a fresh drawing turn has no strokes yet, `visibility:
+    // hidden` takes no pointer events, so the first stroke — the one that makes
+    // the list non-empty and would have un-hidden it — could never be drawn.
+    // The idle overlay sits on top and is already `pointer-events:none`.
     drawBoard();
 }
 
@@ -702,14 +726,50 @@ function buildSwatches(){
 }
 
 // ---------- misc ----------
+// Names are live and membership is not. A rename has to reach the seat strip
+// and the "Waiting for X" line mid-game, because `nm()` prefers S.names over
+// the roster and a stale name there outlives the person who had it.
+function syncNames(){
+    if (!S || !S.names) return false;
+    var changed = false;
+    Hub.roster.forEach(function(m){
+        if (S.names[m.id] !== m.name){ S.names[m.id] = m.name; changed = true; }
+    });
+    return changed;
+}
+
+// Anyone who leaves is dropped from the running order, so the lap cannot stall
+// on a turn nobody is left to take. Anyone who joins waits for the next lap:
+// the chain length has to stay stable once a lap has started, and the reveal
+// walks S.order exactly as it was at the top of the lap.
+function syncTable(){
+    if (!S) return false;
+    var changed = syncNames();
+    if (S.phase !== 'play') return changed;
+    var ids = Hub.roster.map(function(m){ return m.id; });
+    var kept = S.order.filter(function(id){ return ids.indexOf(id) !== -1; });
+    if (kept.length === S.order.length) return changed;
+    if (!kept.length){ S.order = kept; return true; }
+    var at = (S.starter + S.step) % S.order.length;
+    var actor = S.order[at];
+    S.order = kept;
+    var seat = kept.indexOf(actor);
+    if (seat >= 0){ S.step = seat; return true; }
+    // The player whose turn it was left. Record the abandoned turn so the
+    // reveal is honest about it, then park the cursor one turn back and let
+    // advance() walk forward onto whoever is next in the new order.
+    hostText[stepKeyFor(S.lap, at)] = '(that player left)';
+    hostCanvas[stepKeyFor(S.lap, at)] = [];
+    S.step = Math.min(at - 1, kept.length - 1);
+    advance();
+    return true;
+}
+
 function onRoster(){
     if (isHost()){
         // Never auto-start: three people arriving does not mean the host has
         // agreed to begin. The Start button is the host's decision.
-        if (S && S.phase === 'play' &&
-            Hub.roster.map(function(m){ return m.id; }).indexOf(actorId()) === -1){
-            skipStep(); return;
-        }
+        syncTable();
         broadcast();
     } else {
         render();
@@ -739,7 +799,7 @@ function reportResult(){
 }
 function doReset(){
     reportResult();
-    S = null; hostText = {}; hostCanvas = {};
+    S = null; hostText = {}; hostCanvas = {}; briefs = {};
     myArt = null; myStrokes = []; draft = null; lastKey = ''; reported = false;
     render();
 }
