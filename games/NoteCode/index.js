@@ -3,13 +3,13 @@ const NOTES = ['C', 'D', 'E', 'G', 'A', "C'"];          // C major pentatonic, o
 const HZ = [262, 294, 330, 392, 440, 523];
 const WORDS = ['None', 'One', 'Two', 'Three', 'Four', 'Five', 'Six', 'Seven', 'Eight', 'Nine', 'Ten'];
 const KYLE = `    _______
-   /_______\\
+   /_______\\___
   ( 0   o   )
    (   U   )
     \\_____/
    __|   |__
   /  |   |  \\
- /   |__|   \\
+ /   |___|   \\
      |   |
     _|   |_
 `;
@@ -81,15 +81,15 @@ export function mount(root, api) {
   </style>
   <div class="k">
     <marquee>★ Welcome to Kyle's Music Page   ★ Kyle knows the code.</marquee>
-    <h1>Kyle Knows the Code</h1>
+    <h1>Kyle Knows the Code</h1><span class="r">
     <div class="top">
       <pre id="kyle">${KYLE}</pre>
       <div id="bubble">I'm Kyle and I know the code.</div>
     </div>
-    <p id="meta"></p>
+    <p id="meta"></p></span> right note, right spot &nbsp; <span class="w"></span> right note, wrong spot
     <div id="slots"></div>
     <div id="pad">${NOTES.map((n, i) => `<button data-i="${i}">${n}</button>`).join('')}</div>
-    <div id="ctl"></div><p>               <span class="r"></span> right note, right spot &nbsp; <span class="w"></span> right note, wrong spot</p>
+    <div id="ctl"></div>
     <div class="board" id="board"></div>
   </div>`;
   bubble("I'm Kyle. I know the code.");
