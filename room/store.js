@@ -91,7 +91,18 @@ export function createStore() {
     },
 
     // Hub-owned seating: seat 0..n. Spectators are roster members with no seat.
+    // Whoever opens a game takes the lowest free seat — not only seat 0. Only
+    // seat 0 was ever claimed, so every guest in a room resolved to
+    // isSpectator() === true and could never join a table.
     claimSeat(seat, playerId) { s.seats[seat] = playerId; emit(); },
+    claimFreeSeat(playerId) {
+      const taken = Object.keys(s.seats).map(Number);
+      let seat = 0;
+      while (taken.indexOf(seat) >= 0) seat++;
+      s.seats[seat] = playerId;
+      emit();
+      return seat;
+    },
     freeSeat(seat) { delete s.seats[seat]; emit(); },
     mySeat() {
       const ids = Object.keys(s.seats);

@@ -372,8 +372,10 @@ export async function boot() {
       return;
     }
     store.setOpenGame(id);
-    // hub-owned seating: first open claims seat 0 for opener if free
-    if (s.seats[0] === undefined && !store.isSpectator()) store.claimSeat(0, s.me.id);
+    // hub-owned seating: whoever opens the game takes the lowest free seat.
+    // A guest's claim stays local (broadcastRoster only sends for the host),
+    // but that is all isSpectator() needs to stop lying.
+    if (store.mySeat() === null) store.claimFreeSeat(s.me.id);
     store.setPresence(s.me.id, id);
     broadcastRoster();
     mountGame(g);
@@ -600,6 +602,14 @@ export async function boot() {
         } else {
           // compat: feed into host iframe; legacy onDown reads (p, from)
           compat.down(m.p.game, 'intent', m.p.action, m.p.from);
+        }
+      } else if (m.p && m.p.denied) {
+        // The host refused one of our intents. This used to vanish, which is
+        // why a refused action looked like nothing happening. Route it to the
+        // mounted module if it wants it; legacy games keep the old path.
+        const g = byId.get(m.p.game);
+        if (g && g.kind === 'module' && moduleHandle && typeof moduleHandle.denied === 'function') {
+          try { moduleHandle.denied(m.p.text); } catch (e) {}
         }
       }
     } else if (m.type === T.STATE) {
