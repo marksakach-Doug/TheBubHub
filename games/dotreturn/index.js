@@ -298,6 +298,11 @@ export function summarize(state, nameOf) {
 const CSS = [
   '.dr-wrap{position:absolute;inset:0;display:flex;flex-direction:column;',
   'overflow:hidden;background:#15181d;color:#8b8f98;',
+  // A stray thumb on the phone selects text instead of steering. Each line
+  // below kills a different failure: standard selection, the iOS prefixed
+  // form, the long-press callout popup, and the grey tap flash.
+  'user-select:none;-webkit-user-select:none;-webkit-touch-callout:none;',
+  '-webkit-tap-highlight-color:transparent;',
   'font:15px/1.5 system-ui,-apple-system,Segoe UI,sans-serif}',
   '.dr-field{position:relative;flex:1;overflow:hidden;touch-action:none;cursor:crosshair}',
   '.dr-ring{position:absolute;left:50%;top:50%;border:1px solid rgba(255,255,255,.25);',

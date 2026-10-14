@@ -119,6 +119,11 @@ HARNESS = r"""
   const btn = () => q('.dr-btn');
 
   ok('mount builds a field', !!field);
+  // a stray thumb on the phone must steer, never select: nothing in the game
+  // is selectable, on either engine's property
+  const wrapStyle = getComputedStyle(q('.dr-wrap'));
+  ok('the game is not selectable',
+    wrapStyle.userSelect === 'none' && wrapStyle.webkitUserSelect === 'none');
   ok('the game is called Focus', dr.meta.title === 'Focus');
   ok('lobby offers Start', overlayShown() && btn().textContent === 'Start round');
   ok('the lobby title is Focus', q('.dr-title').textContent === 'Focus');
