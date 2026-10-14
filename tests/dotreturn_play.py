@@ -35,12 +35,35 @@ HARNESS = r"""
   const out = [];
   const ok = (name, cond) => out.push([name, !!cond]);
 
-  // ---- a fake clock so 30 seconds of drift costs nothing
+  // best scores live in localStorage, which an opaque test origin may not
+  // have — fall back to memory so the best assertions mean something either
+  // way.
+  const memStore = {};
+  window.__mem = memStore;
+  try {
+    localStorage.getItem('x');
+  } catch (e) {
+    Object.defineProperty(window, 'localStorage', { value: {
+      getItem: (k) => (k in memStore ? memStore[k] : null),
+      setItem: (k, v) => { memStore[k] = String(v); },
+      removeItem: (k) => { delete memStore[k]; },
+      clear: () => { Object.keys(memStore).forEach((k) => delete memStore[k]); }
+    }});
+  }
+
+  // ---- a fake clock so 30 seconds of drift costs nothing. Date.now runs on
+  // the same clock, so exit/in intervals accrue fake seconds exactly like a
+  // real round. `frozen` is the hidden-tab stand-in: time passes, no frames.
   let clock = 0, nextId = 1;
+  let frozen = false;
+  const t0 = Date.now();
+  Date.now = () => t0 + clock;
   const cbs = new Map();
   const pump = (ms) => {
     const step = 1000 / 60;
-    for (let t = 0; t < ms; t += step) {
+    const target = clock + ms;
+    if (frozen) { clock = target; return; }
+    while (clock < target) {
       clock += step;
       const running = Array.from(cbs.values());
       cbs.clear();
@@ -102,7 +125,7 @@ HARNESS = r"""
     /you are the whole table/i.test(q('.dr-note').textContent));
   ok('a solo lobby offers no second button', q('.dr-btns').querySelectorAll('button').length === 1);
   ok('the lobby counts the table with dots only',
-    q('.dr-table').querySelectorAll('.dr-seat').length === 4 &&
+    q('.dr-table').querySelectorAll('.dr-seat').length === 10 &&
     q('.dr-table').querySelectorAll('.dr-seat.on').length === 1);
   ok('the lobby names nobody', !/Sam/.test(overlayText()));
 
@@ -162,27 +185,30 @@ HARNESS = r"""
   field.dispatchEvent(new PointerEvent('pointerup', { clientX: 202, clientY: 301, bubbles: true }));
   ok('a tap does not steer', intents.filter((a) => a.a === 'swipe').length === swipesSoFar);
 
-  // ---- drift out of the hidden circle and back: the shared tally
-  const returnsBefore = state.returns;
+  // ---- drift out of the hidden circle: the lapse count, and away time
+  const lapsesBefore = state.lapses;
   pump(60000);
   ok('leaving the circle is reported', intents.some((a) => a.a === 'exit'));
-  ok('the host counted the return', state.returns > returnsBefore);
-  const counted = state.returns;
-  ok('the same exit is never counted twice', state.returns === counted);
+  ok('the host counted the lapse', state.lapses > lapsesBefore);
+  const counted = state.lapses;
+  ok('the same exit is never counted twice', state.lapses === counted);
 
-  // ---- the clock runs out, and only then does the tally appear
+  // ---- the clock runs out, and only then does the score appear
   ok('the tally is still hidden', q('.dr-num').hidden === true);
   state.endsAt = Date.now() - 10;           // the host's clock, forced to expire
   api.send({ a: 'finish' });
   ok('the round ended', state.phase === 'over');
-  ok('the tally is revealed', overlayShown() && overlayText().indexOf(String(state.returns)) >= 0);
+  ok('the score is revealed', overlayShown() &&
+    overlayText().indexOf(state.over.perPlayer.toFixed(1) + 's') >= 0);
+  ok('the held percentage is revealed', /held the ring \d+%/.test(overlayText()));
+  ok('lapses are displayed', new RegExp(state.over.lapses + ' lapses?').test(overlayText()));
   ok('the timer is put away', q('.dr-hud').style.visibility === 'hidden');
   ok('Play again is offered', q('.dr-btn').textContent === 'Play again');
 
   // ---- a second round re-anchors cleanly
   q('.dr-btn').click();
   api.send({ a: 'revealend' });
-  ok('a new round starts', state.phase === 'play' && state.returns === 0);
+  ok('a new round starts', state.phase === 'play' && state.lapses === 0);
   pump(1000);
   ok('the dot is back at the centre', visible(dot()) && Math.abs(dotX() - 200) < 6);
 
@@ -204,8 +230,10 @@ HARNESS = r"""
     { a: 'finish' }, { from: { id: ME }, rng: Math.random });
   handle.update(dr.project(finished, ME));
   ok('the table round ends', finished.phase === 'over');
-  ok('a two-player round is not scored as a personal best',
-    !/personal best/i.test(q('.dr-note').textContent));
+  // you2 joined that round mid-round, so the frozen table is one player: the
+  // benched joiner is seated but never counted in the divisor
+  ok('a benched joiner is not counted in the divisor',
+    /best 0\.0s, 1 player/.test(q('.dr-note').textContent));
   ok('the lobby offers a replay to the host', q('.dr-btn').textContent === 'Play again');
   ok('the lobby counts two at the table',
     q('.dr-table').querySelectorAll('.dr-seat.on').length === 2);
@@ -323,6 +351,130 @@ HARNESS = r"""
   ok('the observing title is styled as such',
     watcherShadow.querySelector('.dr-title').classList.contains('observing'));
   watchHandle.destroy();
+
+  // ---- scoring: away seconds per player, not the lapse count
+  localStorage.clear();
+  state = dr.init({ seats: table, atTable: table, options: {} });
+  handle.update(dr.project(state, ME));
+
+  // a round nobody steers: the dot leaves after R/V = 4s and stays out
+  q('.dr-btn').click();
+  api.send({ a: 'revealend' });
+  ok('the neglect round plays', state.phase === 'play');
+  pump(125000); // the full round; the client sends finish at 0
+  ok('a neglected round ends itself', state.phase === 'over');
+  ok('neglect costs about 116s away per player',
+    state.over.perPlayer > 110 && state.over.perPlayer < 120);
+  ok('one lapse per neglected dot', state.over.lapses === 1);
+  ok('the held percentage is shown', /held the ring \d+%/.test(overlayText()));
+  ok('the neglect best is saved with its table size',
+    localStorage.getItem('dotreturn.best.v3') === state.over.perPlayer.toFixed(1) + '|1');
+
+  // a 9.4 saves as 9.4, not 9: hide at once, frozen, for exactly 9400 ms
+  state = dr.init({ seats: table, atTable: table, options: {} });
+  handle.update(dr.project(state, ME));
+  q('.dr-btn').click();
+  api.send({ a: 'revealend' });
+  Object.defineProperty(document, 'hidden', { configurable: true, get: () => true });
+  document.dispatchEvent(new Event('visibilitychange'));
+  frozen = true;
+  pump(9400);
+  frozen = false;
+  delete document.hidden;
+  document.dispatchEvent(new Event('visibilitychange'));
+  pump(20);
+  state.endsAt = Date.now() - 10;
+  api.send({ a: 'finish' });
+  ok('a best of 9.4 saves as 9.4, not 9',
+    state.phase === 'over' && state.over.perPlayer === 9.4 &&
+    localStorage.getItem('dotreturn.best.v3') === '9.4|1');
+  ok('the note reads the best in seconds',
+    /best 9\.4s, 1 player/.test(q('.dr-note').textContent));
+
+  // perfect attention: steer back to the centre whenever it wanders
+  q('.dr-btn').click();
+  api.send({ a: 'revealend' });
+  const dotPos = () => {
+    const m = /translate\(([-\d.]+)px,\s*([-\d.]+)px\)/.exec(pos());
+    return m ? [parseFloat(m[1]), parseFloat(m[2])] : null;
+  };
+  for (let i = 0; i < 120 && state.phase === 'play'; i++) {
+    pump(1000);
+    if (state.phase !== 'play') break;
+    const p = dotPos();
+    if (p && Math.hypot(p[0] - 200, p[1] - 300) > 8) {
+      const ang = Math.atan2(300 - p[1], 200 - p[0]);
+      field.dispatchEvent(new PointerEvent('pointerdown', { clientX: 200, clientY: 300, bubbles: true }));
+      field.dispatchEvent(new PointerEvent('pointerup',
+        { clientX: 200 + Math.cos(ang) * 30, clientY: 300 + Math.sin(ang) * 30, bubbles: true }));
+    }
+  }
+  state.endsAt = Date.now() - 10;
+  api.send({ a: 'finish' });
+  ok('perfect attention costs almost nothing',
+    state.phase === 'over' && state.over.perPlayer < 5);
+
+  // a hidden tab counts as away: time passes, no frames run
+  q('.dr-btn').click();
+  api.send({ a: 'revealend' });
+  pump(1000);
+  Object.defineProperty(document, 'hidden', { configurable: true, get: () => true });
+  ok('hiddenness is faked', document.hidden === true);
+  document.dispatchEvent(new Event('visibilitychange'));
+  frozen = true;
+  pump(10000);
+  frozen = false;
+  delete document.hidden;
+  document.dispatchEvent(new Event('visibilitychange'));
+  pump(500);
+  ok('a hidden tab for 10s costs at least 10s', state.dots[ME].away >= 10000);
+  state.endsAt = Date.now() - 10;
+  api.send({ a: 'finish' });
+  ok('the hidden-tab round ends', state.phase === 'over');
+
+  // ---- ten tabs share one table and all finish together
+  const TABS = 10;
+  let tState = dr.init({
+    seats: Array.from({ length: TABS }, (_, i) => ({ id: 'p' + i })),
+    atTable: Array.from({ length: TABS }, (_, i) => ({ id: 'p' + i }))
+  });
+  const tabs = [];
+  for (let i = 0; i < TABS; i++) {
+    const id = 'p' + i;
+    const el = document.createElement('div');
+    el.style.cssText = 'position:relative;width:400px;height:600px';
+    document.body.appendChild(el);
+    const sh = el.attachShadow({ mode: 'open' });
+    const rec = { id: id, sh: sh, handle: null, send: null };
+    const tapi = {
+      me: { id: id, name: id }, seats: {}, roster: [], atTable: [],
+      isSpectator: false, isHost: id === 'p0', isInRoom: true,
+      send: (a) => {
+        const nx = dr.reduce(tState, a, { from: { id: id, name: id }, rng: Math.random });
+        if (!nx || nx.error) return;
+        tState = nx;
+        tabs.forEach((t) => { if (t.handle) t.handle.update(dr.project(tState, t.id)); });
+      },
+      raf: (fn) => { const rid = nextId++; cbs.set(rid, fn); return rid; },
+      cancelRaf: (rid) => { cbs.delete(rid); }
+    };
+    rec.send = tapi.send;
+    rec.handle = dr.mount(sh, tapi);
+    tabs.push(rec);
+  }
+  tabs.forEach((t) => t.handle.update(dr.project(tState, t.id)));
+  ok('ten players share the table', tState.players.length === 10);
+  tabs[0].sh.querySelector('.dr-btn').click();
+  tabs[0].send({ a: 'revealend' });
+  pump(2000);
+  tState.endsAt = Date.now() - 10;
+  tabs[0].send({ a: 'finish' });
+  ok('a 10-tab round completes',
+    tState.phase === 'over' && tState.over.players === 10 &&
+    tabs.every((t) => t.sh.querySelector('.dr-overlay').hidden === false &&
+      t.sh.querySelector('.dr-overlay').textContent.indexOf(
+        tState.over.perPlayer.toFixed(1) + 's') >= 0));
+  tabs.forEach((t) => t.handle.destroy());
 
   // ---- teardown
   handle.destroy();

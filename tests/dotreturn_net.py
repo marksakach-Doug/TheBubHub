@@ -30,6 +30,21 @@ HARNESS = r"""
   const out = [];
   const ok = (name, cond) => out.push([name, !!cond]);
 
+  // best scores live in localStorage, which an opaque test origin may not
+  // have — fall back to memory so the best assertions mean something either
+  // way.
+  const memStore = {};
+  try {
+    localStorage.getItem('x');
+  } catch (e) {
+    Object.defineProperty(window, 'localStorage', { value: {
+      getItem: (k) => (k in memStore ? memStore[k] : null),
+      setItem: (k, v) => { memStore[k] = String(v); },
+      removeItem: (k) => { delete memStore[k]; },
+      clear: () => { Object.keys(memStore).forEach((k) => delete memStore[k]); }
+    }});
+  }
+
   // ---- a fake clock shared by every client
   let clock = 0, nextId = 1;
   const cbs = new Map();
@@ -147,7 +162,6 @@ HARNESS = r"""
   pump(2500);
   ok('the guest dot drifts', dotX(guest) !== gx0);
   const gx = dotX(guest);
-  const r0 = state.returns;
   const hBefore = state.dots.h.a;
   if (gx >= 200) swipe(guest, 200, 260); else swipe(guest, 200, 140);
   const gSwipe = guest.sent.filter((a) => a.a === 'swipe').pop();
@@ -162,11 +176,11 @@ HARNESS = r"""
   pump(1500);
   ok('the host dot still moves on its own', dotX(host) !== hx0);
 
-  // ---- the shared tally counts the guest's crossing
+  // ---- the shared lapse count records the guest's crossing
   let guard = 0;
-  while (state.returns === r0 && guard < 40) { pump(5000); guard++; }
-  ok('the guest crossing reached the shared tally', state.returns > r0);
-  ok('returns stay hidden mid-round',
+  while (state.lapses < 1 && guard < 40) { pump(5000); guard++; }
+  ok('the guest crossing reached the shared count', state.lapses >= 1);
+  ok('lapses stay hidden mid-round',
     guest.shadow.querySelector('.dr-num').hidden === true);
 
   // ---- a watcher gets OBSERVING in every phase, and no dot at all
@@ -204,15 +218,15 @@ HARNESS = r"""
   ok('the refusal reaches the player',
     late.shadow.querySelector('.dr-toast').textContent.toLowerCase().indexOf('next round') >= 0);
 
-  // ---- the clock runs out: one tally, both screens
+  // ---- the clock runs out: one score, both screens
   state.endsAt = Date.now() - 10;
   hubSend('h', { a: 'finish' });
   ok('the round ended', state.phase === 'over');
-  const tally = String(state.returns);
-  ok('the host reveals the tally', overlayText(host).indexOf(tally) >= 0);
-  ok('the guest reveals the same tally', overlayText(guest).indexOf(tally) >= 0);
-  ok('a two-player round is not scored as a personal best',
-    !/personal best/i.test(guest.shadow.querySelector('.dr-note').textContent));
+  const per = state.over.perPlayer.toFixed(1) + 's';
+  ok('the host reveals the score', overlayText(host).indexOf(per) >= 0);
+  ok('the guest reveals the same score', overlayText(guest).indexOf(per) >= 0);
+  ok('both tables share one best',
+    /best \d+\.\d+s, 2 players/.test(guest.shadow.querySelector('.dr-note').textContent));
 
   // ---- replay unbenches the waiter, and a watcher still gets no dot
   hubSend('h', { a: 'start' });
