@@ -282,8 +282,12 @@ export function summarize(state, nameOf) {
   const names = who.length === 2 ? who[0] + ' and ' + who[1]
     : (who.length > 2 ? who.slice(0, -1).join(', ') + ' and ' + who[who.length - 1]
       : (who[0] || 'Someone'));
-  return names + ' held the dot for ' + state.duration + 's, averaging ' +
-    Number(state.over.perPlayer || 0).toFixed(1) + 's away each';
+  const n = Number(state.over.perPlayer || 0).toFixed(1);
+  // One player simply let it get away; two or more share the average.
+  // "let" is past tense for every subject, so no singular branch is needed.
+  return who.length < 2
+    ? names + ' let the dot get away for ' + n + ' seconds'
+    : names + ' let the dot get away for an average of ' + n + ' seconds';
 }
 
 // ----------------------------------------------------------------- mount ----

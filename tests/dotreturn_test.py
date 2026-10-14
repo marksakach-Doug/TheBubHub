@@ -180,19 +180,19 @@ JS_CASES = r"""
   const tableDone = reduce(Object.assign({}, crowdedPlay,
     { endsAt: Date.now() - 10 }), { a: 'finish' }, ctx('w1'));
   out.push(['the record line credits only the table',
-    summarize(tableDone, nameOf) === 'Sam and Bo held the dot for 70s, averaging 0.0s away each']);
+    summarize(tableDone, nameOf) === 'Sam and Bo let the dot get away for an average of 0.0 seconds']);
   const soloState = reduce(Object.assign({}, played, {
     players: ['w1'], dots: { w1: played.dots.w1 }, table: ['w1'], endsAt: Date.now() - 10
   }), { a: 'finish' }, ctx('w1'));
-  out.push(['solo sentence', summarize(soloState, nameOf) === 'Sam held the dot for 70s, averaging 0.0s away each']);
+  out.push(['solo sentence', summarize(soloState, nameOf) === 'Sam let the dot get away for 0.0 seconds']);
   out.push(['table sentence',
-    summarize(done, nameOf) === 'Sam and Bo held the dot for 70s, averaging 0.0s away each']);
+    summarize(done, nameOf) === 'Sam and Bo let the dot get away for an average of 0.0 seconds']);
   const soloHit = reduce(Object.assign({}, played, {
     players: ['w1'], dots: { w1: played.dots.w1 }, table: ['w1'],
     lapses: 1, endsAt: Date.now() - 10
   }), { a: 'finish' }, ctx('w1'));
   out.push(['lapses do not reach the record line',
-    summarize(soloHit, nameOf) === 'Sam held the dot for 70s, averaging 0.0s away each']);
+    summarize(soloHit, nameOf) === 'Sam let the dot get away for 0.0 seconds']);
 
   // ---- away time is scored, lapses are only displayed. Date.now is stubbed
   // for this block and restored after, so nothing above or below can tell.
@@ -234,7 +234,15 @@ JS_CASES = r"""
   out.push(['lapses are displayed, never scored',
     tick2Done.over.lapses === 2 && tick2Done.over.perPlayer === 2]);
   out.push(['the record line averages away time',
-    summarize(tick2Done, nameOf) === 'Sam and Bo held the dot for 70s, averaging 2.0s away each']);
+    summarize(tick2Done, nameOf) === 'Sam and Bo let the dot get away for an average of 2.0 seconds']);
+  // three players take the comma branch: 'Ann, Bo and Cy'
+  const names3 = { w1: 'Ann', b1: 'Bo', w2: 'Cy' };
+  const nameOf3 = (id) => names3[id] || id;
+  const trioDone = Object.assign({}, tick2Done, {
+    players: ['w1', 'b1', 'w2'], table: ['w1', 'b1', 'w2']
+  });
+  out.push(['three-player sentence',
+    summarize(trioDone, nameOf3) === 'Ann, Bo and Cy let the dot get away for an average of 2.0 seconds']);
   const tickReplay = reduce(tick2Done, { a: 'start' }, ctx('w1'));
   out.push(['start resets away time and lapses',
     tickReplay.lapses === 0 && tickReplay.dots.w1.away === 0 && tickReplay.dots.w1.out === false]);
