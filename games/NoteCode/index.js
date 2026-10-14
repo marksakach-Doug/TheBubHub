@@ -1,16 +1,15 @@
-// games/kyle/index.js — Kyle Knows the Code: a musical mastermind game
+// games/kyle/index.js — Kyle Knows the Code
 const NOTES = ['C', 'D', 'E', 'G', 'A', "C'"];          // C major pentatonic, one octave
 const HZ = [262, 294, 330, 392, 440, 523];
 const WORDS = ['None', 'One', 'Two', 'Three', 'Four', 'Five', 'Six', 'Seven', 'Eight', 'Nine', 'Ten'];
-const KYLE = `
-    _______
+const KYLE = `    _______
    /_______\\
-  ( ><   >< )
-   (   ,   )
+  ( 0   o )
+   (   U  )
     \\_____/
    __|   |__
   /  |   |  \\
- /___|   |___\\
+ /   |   |   \\
      |   |
     _|   |_
 `;
@@ -18,7 +17,7 @@ const pick = (rng, len) => Array.from({ length: len }, () => Math.floor(rng() * 
 const fresh = (len, rng, wins = 0) => ({ len, wins, code: pick(rng, len), rows: [], won: false });
 
 export const meta = { id: 'kyle', title: 'Kyle Knows the Code', players: '1+', color: '#ff00ff',
-  icon: '🎵', desc: 'Crack the five-note melody Kyle is hiding.', soloable: true };
+  icon: '🎵', desc: 'Crack the five-note melody that Kyle knows.', soloable: true };
 
 export function init() { return fresh(3, Math.random); }
 
@@ -81,12 +80,11 @@ export function mount(root, api) {
     .slot{display:inline-block;width:52px;height:44px;line-height:44px;border:2px inset #888;background:#fff;color:#000;text-align:center;margin:3px;font:bold 18px Arial}
   </style>
   <div class="k">
-    <marquee>★ Welcome to Kyle's Music Page ★ Sign my guestbook ★</marquee>
+    <marquee>★ Welcome to Kyle's Music Page   ★ Kyle knows the code.</marquee>
     <h1>Kyle Knows the Code</h1>
-    <p><b>Kyle knows the code.</b></p>
     <div class="top">
       <pre id="kyle">${KYLE}</pre>
-      <div id="bubble">I'm Kyle. I know the code.</div>
+      <div id="bubble">I'm Kyle and I know the code.</div>
     </div>
     <p id="meta"></p>
     <div id="slots"></div>
