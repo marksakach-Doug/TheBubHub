@@ -24,8 +24,10 @@ export const meta = {
 
 // Geometry is in fractions of the shorter side of the field, which is what the
 // original full-screen prototype meant by vmin.
-const R = 0.03;          // radius of the hidden circle the dot must stay inside
-const V = 0.002;         // drift speed, per second
+// Tuning: R/V = 4.0s for dot to leave circle with no input (V = R/4).
+// R=0.045 gives ~17.55px radius on 390px viewport; V=0.01125 gives ~4.39px/s.
+const R = 0.045;          // radius of the hidden circle the dot must stay inside
+const V = 0.01125;        // drift speed, per second (kept consistent with R/V=4.0)
 const DURATION = 120;    // round length, seconds
 const DT = 1 / 60;       // fixed integration step
 const MAX_STEPS = 8;     // catch-up cap, so a backgrounded tab cannot spiral
@@ -33,13 +35,14 @@ const MAX_STEPS = 8;     // catch-up cap, so a backgrounded tab cannot spiral
 // "Back at the centre" is a tolerance, not a point: a dot that clips past the
 // exact middle still counts, and the wider release stops it oscillating on the
 // boundary and rerolling over and over.
-const CENTER = R * 0.2;
+const CENTER = R * 0.15;
 const CENTER_RELEASE = R * 0.35;
 
 const REROLL_CD = 300;      // host-side floor between two rerolls for one dot
 const REROLL_RETRY = 400;  // client-side re-ask, must exceed REROLL_CD
 const FINISH_GRACE = 1000; // clock skew allowance when ending the round
 const SHOW_CIRCLE = 0;     // 1 reveals the hidden circle while tuning
+const REVEAL_TIME = 3000;  // 3s reveal before clock starts
 
 // One dot is on screen and it is always yours, so there is nothing to
 // colour-match against. The palette went when the other dots did.
@@ -51,8 +54,9 @@ const MAX_DOTS = 4;
 function freshState() {
   return {
     epoch: 0,               // bumped per round; clients re-anchor their sim on it
-    phase: 'ready',         // 'ready' | 'play' | 'over'
+    phase: 'ready',         // 'ready' | 'reveal' | 'play' | 'running' | 'over'
     endsAt: 0,
+    revealEndsAt: 0,
     duration: DURATION,
     returns: 0,             // one group tally, summed over every dot
     players: [],
@@ -125,7 +129,7 @@ export function reduce(state, action, ctx) {
   if (kind === 'start') {
     // A round can be begun from the lobby or replayed from the results screen.
     // Otherwise `over` is terminal and the table is stuck until the host acts.
-    if (state.phase === 'play') return { error: 'A round is already running.' };
+    if (state.phase === 'play' || state.phase === 'reveal') return { error: 'A round is already running.' };
     if (state.phase !== 'ready' && state.phase !== 'over') {
       return { error: 'Wait for the next round.' };
     }
@@ -142,8 +146,9 @@ export function reduce(state, action, ctx) {
     });
     return same({
       epoch: state.epoch + 1,
-      phase: 'play',
-      endsAt: now + state.duration * 1000,
+      phase: 'reveal',
+      revealEndsAt: now + REVEAL_TIME,
+      endsAt: now + REVEAL_TIME + state.duration * 1000,
       returns: 0,
       over: null,
       solo: alone,
@@ -157,6 +162,11 @@ export function reduce(state, action, ctx) {
     if (state.phase !== 'play') return same({});
     if (now < state.endsAt - FINISH_GRACE) return { error: 'The clock is still running.' };
     return same({ phase: 'over', over: { returns: state.returns }, dots: dots });
+  }
+
+  if (kind === 'revealend') {
+    if (state.phase !== 'reveal') return same({});
+    return same({ phase: 'play' });
   }
 
   if (state.phase !== 'play') return { error: 'Wait for the next round.' };
@@ -232,6 +242,8 @@ const CSS = [
   '.dr-field{position:relative;flex:1;overflow:hidden;touch-action:none;cursor:crosshair}',
   '.dr-ring{position:absolute;left:50%;top:50%;border:1px solid rgba(255,255,255,.25);',
   'border-radius:50%;display:none;pointer-events:none}',
+  '.dr-centre{position:absolute;left:50%;top:50%;border:1px solid rgba(255,255,255,.4);',
+  'border-radius:50%;display:none;pointer-events:none}',
   '.dr-dot{position:absolute;left:0;top:0;width:10px;height:10px;border-radius:50%;',
   // Its own colour, not one picked per player from a palette at paint time:
   // when PALETTE went with the other dots, this rule inherited nothing and the
@@ -244,6 +256,10 @@ const CSS = [
   // The one thing a watcher most needs to know, and must not have to guess.
   '.dr-hud.watching .dr-time{color:#fbbf24;letter-spacing:.18em;font-size:.95rem}',
   '.dr-hud.watching .dr-meta{opacity:.75}',
+  '.dr-toast{position:absolute;top:calc(100% + 8px);left:50%;transform:translateX(-50%);',
+  'color:#e9e4d8;font-size:0.95rem;opacity:0;transition:opacity 0.15s ease-in-out;',
+  'white-space:nowrap;pointer-events:none;will-change:opacity}',
+  '.dr-toast.show{opacity:1;transition:opacity 0.1s ease-in-out}',
   '.dr-overlay{position:absolute;inset:0;display:flex;flex-direction:column;',
   'align-items:center;justify-content:center;gap:16px;text-align:center;padding:24px;',
   'background:rgba(21,24,29,.94)}',
@@ -293,8 +309,8 @@ export function mount(root, api) {
   const wrap = document.createElement('div');
   wrap.className = 'dr-wrap';
   wrap.innerHTML =
-    '<div class="dr-field"><div class="dr-ring"></div><div class="dr-dot" hidden></div></div>' +
-    '<div class="dr-hud"><div class="dr-time">120s</div><div class="dr-meta"></div></div>' +
+    '<div class="dr-field"><div class="dr-ring"></div><div class="dr-centre"></div><div class="dr-dot" hidden></div></div>' +
+    '<div class="dr-hud"><div class="dr-time">120s</div><div class="dr-meta"></div><div class="dr-toast"></div></div>' +
     '<div class="dr-overlay"><h1 class="dr-title">Dot Return</h1>' +
     '<p class="dr-body"></p><p class="dr-num" hidden></p>' +
     '<div class="dr-table" hidden></div>' +
@@ -304,10 +320,12 @@ export function mount(root, api) {
 
   const field = wrap.querySelector('.dr-field');
   const ring = wrap.querySelector('.dr-ring');
+  const centre = wrap.querySelector('.dr-centre');
   const dotEl = wrap.querySelector('.dr-dot');
   const hud = wrap.querySelector('.dr-hud');
   const hudTime = wrap.querySelector('.dr-time');
   const hudMeta = wrap.querySelector('.dr-meta');
+  const toast = wrap.querySelector('.dr-toast');
   const overlay = wrap.querySelector('.dr-overlay');
   const ovTitle = wrap.querySelector('.dr-title');
   const ovBody = wrap.querySelector('.dr-body');
@@ -337,12 +355,14 @@ export function mount(root, api) {
   let rafId = null;
   let running = false;
   let askedFinish = false;
+  let askedRevealEnd = false;
   let pendingReroll = false;
   let lastRerollReq = 0;
   let latched = false;
   let localOut = false;
   let scoredEpoch = -1;
   let joined = false;
+  let toastTimer = null;
 
   const soloCorner = !api.isInRoom;
 
@@ -350,12 +370,15 @@ export function mount(root, api) {
     w = field.clientWidth || 300;
     h = field.clientHeight || 300;
     unit = Math.min(w, h);
-    if (SHOW_CIRCLE) {
-      ring.style.display = 'block';
-      ring.style.width = R * 2 * unit + 'px';
-      ring.style.height = R * 2 * unit + 'px';
-      ring.style.transform = 'translate(-50%,-50%)';
-    }
+    const ringShow = SHOW_CIRCLE ? true : false;
+    ring.style.display = ringShow ? 'block' : 'none';
+    ring.style.width = R * 2 * unit + 'px';
+    ring.style.height = R * 2 * unit + 'px';
+    ring.style.transform = 'translate(-50%,-50%)';
+    const centreR = R * 0.2;
+    centre.style.width = centreR * 2 * unit + 'px';
+    centre.style.height = centreR * 2 * unit + 'px';
+    centre.style.transform = 'translate(-50%,-50%)';
   }
 
   function resetSim() {
@@ -367,6 +390,7 @@ export function mount(root, api) {
       sim.dots[id] = { x: 0, y: 0, a: d.a || 0 };
     });
     askedFinish = false;
+    askedRevealEnd = false;
     pendingReroll = false;
     latched = false;
     localOut = false;
@@ -386,6 +410,17 @@ export function mount(root, api) {
     rafId = null;
   }
 
+  function showToast(text) {
+    if (!toast) return;
+    if (toastTimer) clearTimeout(toastTimer);
+    toast.textContent = text;
+    toast.classList.add('show');
+    toastTimer = setTimeout(function () {
+      toast.classList.remove('show');
+      toastTimer = null;
+    }, 1200);
+  }
+
   function frame(now) {
     rafId = null;
     advance(now);
@@ -393,12 +428,22 @@ export function mount(root, api) {
     // `running`, not rafId, is the guard: advance() can send an intent, which
     // comes straight back through update() mid-frame, and a null-check here
     // would let that nested start() add a second loop.
-    if (running && view && view.phase === 'play') rafId = api.raf(frame);
+    if (running && view && (view.phase === 'play' || view.phase === 'reveal')) rafId = api.raf(frame);
   }
 
   function advance(now) {
-    if (!view || view.phase !== 'play') return;
+    if (!view) return;
     if (view.epoch !== sim.epoch) { resetSim(); sim.last = now; return; }
+
+    if (view.phase === 'reveal') {
+      if (view.revealEndsAt && now >= view.revealEndsAt - 10 && !askedRevealEnd) {
+        askedRevealEnd = true;
+        api.send({ a: 'revealend' });
+      }
+      sim.last = now;
+      return;
+    }
+    if (view.phase !== 'play') return;
 
     const dt = sim.last ? Math.min(0.25, (now - sim.last) / 1000) : 0;
     sim.last = now;
@@ -445,6 +490,7 @@ export function mount(root, api) {
       if (!latched && !pendingReroll && dist <= CENTER && now - lastRerollReq > REROLL_RETRY) {
         lastRerollReq = now;
         pendingReroll = true;
+        showToast('Dot hit dead center');
         api.send({ a: 'reroll' });
       }
       const out = dist > R;
@@ -459,11 +505,20 @@ export function mount(root, api) {
     // dot — this clock belongs to somebody else's round.
     if (!mine) return;
 
-    const left = Math.max(0, (view.endsAt - Date.now()) / 1000);
-    hudTime.textContent = Math.ceil(left) + 's';
-    if (left <= 0 && !askedFinish) {
-      askedFinish = true;
-      api.send({ a: 'finish' });
+    let left;
+    if (view.phase === 'reveal') {
+      left = Math.max(0, ((view.revealEndsAt || Date.now()) - Date.now()) / 1000);
+      hudTime.textContent = Math.ceil(left) + 's';
+    } else if (view.phase === 'play') {
+      left = Math.max(0, (view.endsAt - Date.now()) / 1000);
+      hudTime.textContent = Math.ceil(left) + 's';
+      if (left <= 0 && !askedFinish) {
+        askedFinish = true;
+        api.send({ a: 'finish' });
+      }
+    } else {
+      left = Math.max(0, (view.endsAt - Date.now()) / 1000);
+      hudTime.textContent = Math.ceil(left) + 's';
     }
   }
 
@@ -518,7 +573,8 @@ export function mount(root, api) {
 
   function renderChrome() {
     if (!view) return;
-    const playing = view.phase === 'play';
+    const playing = view.phase === 'play' || view.phase === 'reveal';
+    const inPlay = view.phase === 'play';
     const list = view.players || [];
     const atTable = seated();
     const watching = !atTable;
@@ -537,7 +593,7 @@ export function mount(root, api) {
       hudTime.textContent = 'OBSERVING';
       hudMeta.textContent = n + (n === 1 ? ' dot at the table' : ' dots at the table');
     } else {
-      hudMeta.textContent = playing ? 'keep it inside' : '';
+      hudMeta.textContent = inPlay ? 'keep it inside' : '';
     }
 
     ovTitle.classList.toggle('observing', watching);
@@ -567,7 +623,7 @@ export function mount(root, api) {
       }
     }
 
-    if (playing) return;
+    if (inPlay) return;
 
     if (watching) {
       ovTitle.textContent = 'Observing';
@@ -689,9 +745,41 @@ export function mount(root, api) {
       if (next.epoch !== sim.epoch) {
         stopLoop();
         resetSim();
-        if (next.phase === 'play') startLoop();
+        if (next.phase === 'reveal') {
+          startLoop();
+          if (SHOW_CIRCLE) {
+            ring.style.display = 'block';
+          } else {
+            ring.style.display = 'none';
+          }
+          centre.style.display = 'block';
+          askedRevealEnd = false;
+        } else if (next.phase === 'play') {
+          startLoop();
+          showToast('Dot is moving');
+          if (SHOW_CIRCLE) {
+            ring.style.display = 'block';
+          } else {
+            ring.style.display = 'none';
+          }
+          centre.style.display = 'none';
+        }
+      } else if (next.phase === 'reveal') {
+        startLoop();
+        if (SHOW_CIRCLE) {
+          ring.style.display = 'block';
+        } else {
+          ring.style.display = 'none';
+        }
+        centre.style.display = 'block';
       } else if (next.phase === 'play') {
         startLoop();
+        if (SHOW_CIRCLE) {
+          ring.style.display = 'block';
+        } else {
+          ring.style.display = 'none';
+        }
+        centre.style.display = 'none';
       } else {
         stopLoop();
       }
