@@ -263,9 +263,9 @@ function beginStep(){
         var a = actorId();
         var prev = stepKeyFor(S.lap, S.step - 1);
         if (stepKind() === 'text'){
-            pushTo(a, PFX_C + S.lap + ':' + (S.step-1) + '|' + JSON.stringify(hostCanvas[prev] || []));
+            pushTo(a, PFX_C + S.step + '|' + JSON.stringify(hostCanvas[prev] || []));
         } else {
-            pushTo(a, PFX_T + S.lap + ':' + (S.step-1) + '|' + (hostText[prev] || ''));
+            pushTo(a, PFX_T + S.step + '|' + (hostText[prev] || ''));
         }
     }
     broadcast();
@@ -324,19 +324,19 @@ function onDenied(text){
     if (text.indexOf(PFX_T) === 0){
         var i = text.indexOf('|', PFX_T.length);
         if (i < 0) return;
-        var key = text.slice(PFX_T.length, i);
-        if (key !== stepKey()) return;              // stale brief from a finished turn
-        myArt = { k:'text', key:key, t: text.slice(i + 1) };
+        var stepNum = parseInt(text.slice(PFX_T.length, i), 10);
+        if (stepNum !== S.step) return;              // stale brief from a finished turn
+        myArt = { k:'text', step: stepNum, t: text.slice(i + 1) };
         render(); return;
     }
     if (text.indexOf(PFX_C) === 0){
         var j = text.indexOf('|', PFX_C.length);
         if (j < 0) return;
-        var k2 = text.slice(PFX_C.length, j);
-        if (k2 !== stepKey()) return;
+        var stepNum2 = parseInt(text.slice(PFX_C.length, j), 10);
+        if (stepNum2 !== S.step) return;
         var a = null;
         try { a = JSON.parse(text.slice(j + 1)); } catch(e){}
-        myArt = { k:'canvas', key:k2, c: Array.isArray(a) ? a : [] };
+        myArt = { k:'canvas', step: stepNum2, c: Array.isArray(a) ? a : [] };
         render(); return;
     }
     toast(text);
@@ -522,10 +522,7 @@ function myList(){
     return isHost() ? (hostCanvas[stepKey()] || []) : myStrokes;
 }
 function viewList(){
-    // A brief belonging to a turn that has already been answered is dropped
-    // here rather than lingering in memory: a stale sentence sitting in a
-    // client's memory is exactly the thing this game must not have.
-    if (myArt && myArt.key && myArt.key !== stepKey()) myArt = null;
+    if (myArt && myArt.step !== S.step) myArt = null;
     if (!S || S.phase !== 'play') return [];
     if (stepKind() === 'draw') return myList();
     // A describer sees the drawing they must describe, and nothing else.
@@ -604,13 +601,15 @@ function render(){
         big.textContent = 'Paused';
         small.textContent = 'The host disconnected. It resumes when they return.';
     } else if (iAmActor()){
-        big.textContent = stepKind() === 'text'
-            ? (S.step === 0 ? 'Your turn to start it off' : 'Describe what you can see')
-            : 'Draw what they described';
-        small.textContent = stepKind() === 'text'
-            ? (S.step === 0 ? 'One sentence. Something a person could draw. You will not see it again.'
-                            : 'Describe ONLY the drawing in front of you. You cannot see the original sentence — do not guess at it.')
-            : 'You can only see the words they wrote. You have not seen the drawing.';
+        var sk = stepKind();
+        if (sk === 'text'){
+            big.textContent = S.step === 0 ? 'Your turn to start it off' : 'Describe what you can see';
+            small.textContent = S.step === 0 ? 'One sentence. Something a person could draw. You will not see it again.'
+                                            : 'Describe ONLY the drawing in front of you. You cannot see the original sentence — do not guess at it.';
+        } else {
+            big.textContent = myArt && myArt.t ? '"' + myArt.t + '"' : 'Draw what they described';
+            small.textContent = myArt && myArt.t ? 'Draw this sentence on the canvas below.' : 'Waiting for the sentence…';
+        }
     } else {
         big.textContent = 'Waiting for ' + nm(actorId());
         small.textContent = stepKind() === 'text' ? 'They are writing a description.' : 'They are drawing.';
@@ -641,7 +640,10 @@ function render(){
         if (S.phase === 'reveal'){ bs.textContent = ''; ss.textContent = ''; }
         else if (writing && S.step === 0){ bs.textContent = 'Your sentence starts it all'; ss.textContent = 'Nobody else will ever see this word for word.'; }
         else if (writing){ bs.textContent = 'Describe the drawing'; ss.textContent = (myArt && myArt.k === 'canvas') ? 'What is actually in front of you?' : 'Waiting for the drawing…'; }
-        else if (drawing2){ bs.textContent = 'Draw it'; ss.textContent = 'The words are below.'; }
+        else if (drawing2){
+            bs.textContent = myArt && myArt.t ? '"' + myArt.t + '"' : 'Draw it';
+            ss.textContent = myArt && myArt.t ? 'Draw the sentence above on the canvas.' : 'Waiting for the words…';
+        }
         else { bs.textContent = nm(actorId()) + (stepKind() === 'text' ? ' is writing' : ' is drawing'); ss.textContent = 'Nothing to see until the reveal.'; }
     }
 
