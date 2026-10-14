@@ -80,13 +80,13 @@ export function mount(root, api) {
     .slot{display:inline-block;width:52px;height:44px;line-height:44px;border:2px inset #888;background:#fff;color:#000;text-align:center;margin:3px;font:bold 18px Arial}
   </style>
   <div class="k">
-    <marquee>★ Welcome to Kyle's Music Page   ★ Kyle knows the code.</marquee>
-    <h1>Kyle Knows the Code</h1><span class="r">
+    <marquee>★ Welcome to Kyle's Music Page   ★ Kyle knows the code.<span class="r"> = Right note, right spot. <span class="w"> = Right note, wrong spot.</marquee>
+    <h1>Kyle Knows the Code</h1>
     <div class="top">
       <pre id="kyle">${KYLE}</pre>
       <div id="bubble">I'm Kyle and I know the code.</div>
     </div>
-    <p id="meta"></p></span> right note, right spot &nbsp; <span class="w"></span> right note, wrong spot
+    <p id="meta"></p>
     <div id="slots"></div>
     <div id="pad">${NOTES.map((n, i) => `<button data-i="${i}">${n}</button>`).join('')}</div>
     <div id="ctl"></div>
