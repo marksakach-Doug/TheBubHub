@@ -18,8 +18,10 @@ Two kinds of game:
 | Reaches the hub via | `api.send()` → `reduce()` → `project()` | a `postMessage` bridge |
 | Test it with | a `dev.html` harness | open the file |
 
-`games/example/index.js` is a complete, commented reference. `games/dotreturn/`
-is a real one with its own harness and tests.
+`games/dotreturn/` is the one real module game, with its own harness and
+tests — copy it to start a new one. The six exports every module game needs
+(`meta`, `init`, `reduce`, `project`, `mount`, `summarize`) are listed in the
+contract table above.
 
 ## The loop
 

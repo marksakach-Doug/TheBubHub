@@ -16,7 +16,7 @@ There are two kinds of game:
 | Networking | hub calls your `reduce()` and `project()` | you implement host/guest yourself |
 | Seating | hub-owned, handed to you | you implement it |
 
-Start with [`games/example/index.js`](games/example/index.js) — it is a complete,
+Start with [`games/dotreturn/index.js`](games/dotreturn/index.js) — it is a complete,
 working game in one file and is the shortest path to understanding the contract.
 
 ---
@@ -39,7 +39,7 @@ working game in one file and is the shortest path to understanding the contract.
 1. **Run the hub.** `npm install` then `npm run dev`, and open
    <http://localhost:5173>. (ES modules need HTTP — `file://` will not work.)
 2. **Create `games/<id>/index.js`** exporting the six functions in
-   [the module contract](#the-module-contract). Copy `games/example/index.js`.
+   [the module contract](#the-module-contract). Copy `games/dotreturn/index.js`.
 3. **Reload.** `src/registry.js` globs `games/*/index.js` at boot, so the button,
    its tooltip, invites and the record entry all appear on their own. There is
    no other file to edit.
