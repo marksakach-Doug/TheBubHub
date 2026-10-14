@@ -1,6 +1,6 @@
 // games/kyle/index.js — Kyle Knows the Code
 const C4 = 261.63;
-const SIZE = 6;                                          // every scale has six pitches
+const MAX_SIZE = 6;                                      // full scale has six pitches
 const NAMES = ['C', 'C#', 'D', 'Eb', 'E', 'F', 'F#', 'G', 'Ab', 'A', 'Bb', 'B'];
 const WORDS = ['None', 'One', 'Two', 'Three', 'Four', 'Five', 'Six', 'Seven', 'Eight', 'Nine', 'Ten'];
 const KYLE = `    _______
@@ -22,7 +22,7 @@ const sixNote = (name, group, semis) => ({ name, group, labels: semis.map((s) =>
 // Microtone scales: six pitches that equally divide a given interval (in cents).
 // Pitches sit at i * interval / 6 for i = 0..5, so the interval itself is not repeated.
 const micro = (name, group, cents) => {
-  const at = Array.from({ length: SIZE }, (_, i) => (cents * i) / SIZE);
+  const at = Array.from({ length: MAX_SIZE }, (_, i) => (cents * i) / MAX_SIZE);
   return { name, group, labels: at.map((_, i) => String(i + 1)), hz: at.map((c) => +(C4 * 2 ** (c / 1200)).toFixed(2)) };
 };
 
@@ -42,14 +42,16 @@ export const SCALES = {
 export const meta = { id: 'kyle', title: 'Kyle Knows the Code', players: '1+', color: '#ff00ff',
   icon: '🎵', desc: 'Crack the melody that Kyle knows.', soloable: true };
 
-const DEFAULT_CFG = { ears: false, scale: 'pent', social: false, perUnit: 1 };
+const DEFAULT_CFG = { ears: false, scale: 'pent', scaleSize: 6, perUnit: 1, startLen: 3, social: false };
 const sanitize = (c = {}) => ({
   ears: !!c.ears,
   scale: SCALES[c.scale] ? c.scale : 'pent',
-  social: !!c.social,
+  scaleSize: Math.min(MAX_SIZE, Math.max(3, parseInt(c.scaleSize, 10) || 6)),
   perUnit: Math.min(5, Math.max(1, parseInt(c.perUnit, 10) || 1)),
+  startLen: Math.min(10, Math.max(2, parseInt(c.startLen, 10) || 3)),
+  social: !!c.social,
 });
-const pick = (rng, n) => Array.from({ length: n }, () => Math.floor(rng() * SIZE));
+const pick = (rng, n, size) => Array.from({ length: n }, () => Math.floor(rng() * size));
 // A unit is one symbol of the code: a short melody of perUnit pitches.
 const key = (u) => u.join(',');
 const sortKey = (u) => key(u.slice().sort((a, b) => a - b));   // same pitches, any order
@@ -57,7 +59,7 @@ const sameUnits = (A, B) => A.every((u, i) => key(u) === key(B[i]));
 const nounFor = (k) => (k > 1 ? 'melody' : 'note');
 
 export function init() {
-  return { phase: 'home', cfg: DEFAULT_CFG, wins: 0, len: 3, code: null, rows: [], won: false, over: false, clues: [], seats: null };
+  return { phase: 'home', cfg: DEFAULT_CFG, wins: 0, len: DEFAULT_CFG.startLen, code: null, rows: [], won: false, over: false, clues: [], seats: null };
 }
 
 // Scores a guess against the code, unit by unit. Each unit is classified once, in this order:
@@ -100,7 +102,7 @@ function say(fb, noun) {
 // Builds a fresh round. In Social Code Break, the table gets players+1 prefilled clues,
 // dealt round-robin, so no single player holds the full set but the group together has enough.
 function startRound(cfg, len, wins, rng, players) {
-  const code = Array.from({ length: len }, () => pick(rng, cfg.perUnit));
+  const code = Array.from({ length: len }, () => pick(rng, cfg.perUnit, cfg.scaleSize));
   const s = { phase: 'play', cfg, len, wins, code, rows: [], won: false, over: false, clues: [], seats: null };
   if (!cfg.social) return s;
   const seats = Array.isArray(players) ? players.slice() : [];
@@ -109,7 +111,7 @@ function startRound(cfg, len, wins, rng, players) {
   const noun = nounFor(cfg.perUnit);
   for (let k = 0; k < total; k++) {
     let g;
-    do { g = Array.from({ length: len }, () => pick(rng, cfg.perUnit)); }
+    do { g = Array.from({ length: len }, () => pick(rng, cfg.perUnit, cfg.scaleSize)); }
     while (sameUnits(g, code) || s.clues.some((c) => sameUnits(c.g, g)));
     const fb = scoreUnits(g, code);
     s.clues.push({ g, ...fb, text: say(fb, noun), seat: k % seats.length });
@@ -122,15 +124,19 @@ export function reduce(s, a, ctx) {
   const rng = (ctx && ctx.rng) || Math.random;
   const players = ctx && ctx.players;
   if (a.a === 'home') return { ...s, phase: 'home' };
-  if (a.a === 'start') return startRound(sanitize(a.cfg), 3, s.wins || 0, rng, players);
+  if (a.a === 'start') {
+    const cfg = sanitize(a.cfg);
+    return startRound(cfg, cfg.startLen, s.wins || 0, rng, players);
+  }
   if (s.phase !== 'play') return { error: 'Pick a mode and start a round first.' };
   if (a.a === 'next') {
     if (!(s.won || s.over)) return { error: 'Finish this round first.' };
-    return startRound(s.cfg, s.len < 10 ? s.len + 1 : 3, s.wins, rng, players);
+    return startRound(s.cfg, s.len < 10 ? s.len + 1 : s.cfg.startLen, s.wins, rng, players);
   }
   if (s.won || s.over) return { error: 'Round finished. Start the next one.' };
   const k = s.cfg.perUnit;
-  if (a.a !== 'guess' || !Array.isArray(a.g) || a.g.length !== s.len * k || a.g.some((n) => !(n >= 0 && n < SIZE)))
+  const size = s.cfg.scaleSize;
+  if (a.a !== 'guess' || !Array.isArray(a.g) || a.g.length !== s.len * k || a.g.some((n) => !(n >= 0 && n < size)))
     return { error: `Kyle wants exactly ${s.len * k} notes.` };
   const g = Array.from({ length: s.len }, (_, i) => a.g.slice(i * k, i * k + k));
   const fb = scoreUnits(g, s.code);
@@ -167,13 +173,20 @@ const scaleOptions = () => {
   return Object.entries(groups).map(([g, opts]) => `<optgroup label="${g}">${opts.join('')}</optgroup>`).join('');
 };
 
+const scaleSizeOptions = () => [3, 4, 5, 6]
+  .map((n) => `<option value="${n}">${n} notes</option>`).join('');
+
 const perUnitOptions = () => [1, 2, 3, 4, 5]
   .map((n) => `<option value="${n}">${n === 1 ? '1 note (single notes)' : `${n}-note melody`}</option>`).join('');
+
+const startLenOptions = () => [2, 3, 4, 5, 6, 7, 8, 9, 10]
+  .map((n) => `<option value="${n}">${n} units</option>`).join('');
 
 export function mount(root, api) {
   let view = null, sel = [], len = 0, seen = 0, wonSeen = false, endSeen = false, ac, bubbleTimer = 0, lastPhase = null;
   const $ = (q) => root.querySelector(q);
   const scaleOf = () => SCALES[(view && view.cfg && view.cfg.scale) || 'pent'];
+  const scaleSize = () => (view && view.cfg ? view.cfg.scaleSize : 6);
   const perUnit = () => (view && view.cfg ? view.cfg.perUnit : 1);
 
   // One note: a short plucked tone starting at audio time `when`.
@@ -248,7 +261,9 @@ export function mount(root, api) {
       <h2>Choose your game</h2>
       <label><input type="checkbox" id="ears"> Ears only (no note letters; tap a feedback unit to hear its melody)</label>
       <label>Scale <select id="scale">${scaleOptions()}</select></label>
+      <label>Notes in scale <select id="scalesize">${scaleSizeOptions()}</select></label>
       <label>Notes per unit <select id="perunit">${perUnitOptions()}</select></label>
+      <label>Starting units <select id="startlen">${startLenOptions()}</select></label>
       <label><input type="checkbox" id="social"> Multiplayer Social Code Break (2+ players; shared clues, one guess for the table)</label>
       <p><button id="start">Start</button></p>
     </div>
@@ -280,7 +295,9 @@ export function mount(root, api) {
       if (lastPhase !== 'home') {
         $('#ears').checked = !!view.cfg.ears;
         $('#scale').value = view.cfg.scale;
+        $('#scalesize').value = String(view.cfg.scaleSize || 6);
         $('#perunit').value = String(view.cfg.perUnit);
+        $('#startlen').value = String(view.cfg.startLen || 3);
         $('#social').checked = !!view.cfg.social;
       }
       $('#start').disabled = spec;
@@ -290,10 +307,12 @@ export function mount(root, api) {
     lastPhase = 'play';
 
     const sc = scaleOf();
+    const size = scaleSize();
     const ears = view.cfg.ears;
     const k = perUnit();
     const end = view.won || view.over;
     $('#meta').textContent = `Units in this code: ${view.len}${k > 1 ? ` (${k}-note melodies)` : ''}`
+      + ` · Scale: ${size} notes`
       + ` · Rounds cracked: ${view.wins}`
       + `${view.cfg.social ? ' · Social: one guess for the whole table' : ''}${spec ? ' · 👁 watching' : ''}`;
 
@@ -309,7 +328,7 @@ export function mount(root, api) {
       slots += `<span class="grp">${inner}</span>`;
     }
     $('#slots').innerHTML = slots;
-    $('#pad').innerHTML = sc.labels.map((n, i) => `<button data-i="${i}" ${off}>${ears ? '♪' : n}</button>`).join('');
+    $('#pad').innerHTML = sc.labels.slice(0, size).map((n, i) => `<button data-i="${i}" ${off}>${ears ? '♪' : n}</button>`).join('');
 
     const clueCards = view.clues.map((c, n) =>
       `<div class="card clue"><b>Clue ${n + 1}</b> ${unitSpans(c.g)} ${pips(c)}<br><small>${c.text}</small></div>`);
@@ -320,10 +339,11 @@ export function mount(root, api) {
       ...clueCards, ...guessCards,
     ].join('');
 
+    const nextLen = view.len < 10 ? view.len + 1 : view.cfg.startLen;
     $('#ctl').innerHTML = end
       ? `<p><b>${view.won ? 'You cracked it!' : (view.cfg.social ? 'The one guess missed.' : 'Out of guesses.')}</b>
            The code was ${unitSpans(view.code)}.</p>
-         <button data-a="next" ${off}>Next round (${view.len < 10 ? view.len + 1 : 3} units)</button>`
+         <button data-a="next" ${off}>Next round (${nextLen} units)</button>`
       : `<button data-a="clear" ${off}>Clear</button> <button data-a="submit" ${off}>Ask Kyle</button>`;
   };
 
@@ -336,7 +356,9 @@ export function mount(root, api) {
       api.send({ a: 'start', cfg: {
         ears: $('#ears').checked,
         scale: $('#scale').value,
+        scaleSize: $('#scalesize').value,
         perUnit: $('#perunit').value,
+        startLen: $('#startlen').value,
         social: $('#social').checked,
       } });
       return;
