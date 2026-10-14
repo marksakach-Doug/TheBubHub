@@ -50,8 +50,9 @@ const sanitize = (c = {}) => ({
   perUnit: Math.min(5, Math.max(1, parseInt(c.perUnit, 10) || 1)),
 });
 const pick = (rng, n) => Array.from({ length: n }, () => Math.floor(rng() * SIZE));
-// A unit is one symbol of the code: a short melody of perUnit pitches. Units are compared by key.
+// A unit is one symbol of the code: a short melody of perUnit pitches.
 const key = (u) => u.join(',');
+const sortKey = (u) => key(u.slice().sort((a, b) => a - b));   // same pitches, any order
 const sameUnits = (A, B) => A.every((u, i) => key(u) === key(B[i]));
 const nounFor = (k) => (k > 1 ? 'melody' : 'note');
 
@@ -59,18 +60,40 @@ export function init() {
   return { phase: 'home', cfg: DEFAULT_CFG, wins: 0, len: 3, code: null, rows: [], won: false, over: false, clues: [], seats: null };
 }
 
-// Scores units against the code. Works on any array of comparable keys.
-function score(g, code) {
-  let red = 0; const cu = {}, gu = {};
-  g.forEach((n, i) => { if (n === code[i]) red++; else { gu[n] = (gu[n] || 0) + 1; cu[code[i]] = (cu[code[i]] || 0) + 1; } });
-  let white = 0; for (const k in gu) white += Math.min(gu[k], cu[k] || 0);
-  return [red, white];
+// Scores a guess against the code, unit by unit. Each unit is classified once, in this order:
+//   red    exact melody in the right slot
+//   white  exact melody in a different slot
+//   orange same notes, wrong order, in the right slot
+//   blue   same notes, wrong order, in a different slot
+function scoreUnits(g, code) {
+  const n = code.length;
+  const gUsed = Array(n).fill(false), cUsed = Array(n).fill(false);
+  const out = { red: 0, white: 0, orange: 0, blue: 0 };
+  for (let i = 0; i < n; i++) if (key(g[i]) === key(code[i])) { out.red++; gUsed[i] = cUsed[i] = true; }
+  for (let i = 0; i < n; i++) {
+    if (gUsed[i]) continue;
+    const j = code.findIndex((c, j2) => !cUsed[j2] && key(c) === key(g[i]));
+    if (j >= 0) { out.white++; gUsed[i] = cUsed[j] = true; }
+  }
+  for (let i = 0; i < n; i++) {
+    if (gUsed[i]) continue;
+    if (!cUsed[i] && sortKey(g[i]) === sortKey(code[i])) { out.orange++; gUsed[i] = cUsed[i] = true; }
+  }
+  for (let i = 0; i < n; i++) {
+    if (gUsed[i]) continue;
+    const j = code.findIndex((c, j2) => !cUsed[j2] && sortKey(c) === sortKey(g[i]));
+    if (j >= 0) { out.blue++; gUsed[i] = cUsed[j] = true; }
+  }
+  return out;
 }
 
-function say(red, white, noun) {
+function say(fb, noun) {
   const p = [];
-  if (red) p.push(`${WORDS[red]} ${red === 1 ? `${noun} is` : `${noun}s are`} right and in the right spot.`);
-  if (white) p.push(`${WORDS[white]} ${white === 1 ? `${noun} is` : `${noun}s are`} right, but in the wrong spot.`);
+  const pl = (n) => (n === 1 ? noun : `${noun}s`);
+  if (fb.red) p.push(`${WORDS[fb.red]} ${pl(fb.red)} ${fb.red === 1 ? 'is' : 'are'} right and in the right spot.`);
+  if (fb.orange) p.push(`${WORDS[fb.orange]} ${pl(fb.orange)} ${fb.orange === 1 ? 'has' : 'have'} the right notes out of order, in the right spot.`);
+  if (fb.white) p.push(`${WORDS[fb.white]} ${pl(fb.white)} ${fb.white === 1 ? 'is' : 'are'} right, but in the wrong spot.`);
+  if (fb.blue) p.push(`${WORDS[fb.blue]} ${pl(fb.blue)} ${fb.blue === 1 ? 'has' : 'have'} the right notes out of order, in the wrong spot.`);
   return p.join(' ') || `None of those ${noun}s are in the code.`;
 }
 
@@ -88,8 +111,8 @@ function startRound(cfg, len, wins, rng, players) {
     let g;
     do { g = Array.from({ length: len }, () => pick(rng, cfg.perUnit)); }
     while (sameUnits(g, code) || s.clues.some((c) => sameUnits(c.g, g)));
-    const [red, white] = score(g.map(key), code.map(key));
-    s.clues.push({ g, red, white, text: say(red, white, noun), seat: k % seats.length });
+    const fb = scoreUnits(g, code);
+    s.clues.push({ g, ...fb, text: say(fb, noun), seat: k % seats.length });
   }
   s.seats = seats;
   return s;
@@ -110,11 +133,11 @@ export function reduce(s, a, ctx) {
   if (a.a !== 'guess' || !Array.isArray(a.g) || a.g.length !== s.len * k || a.g.some((n) => !(n >= 0 && n < SIZE)))
     return { error: `Kyle wants exactly ${s.len * k} notes.` };
   const g = Array.from({ length: s.len }, (_, i) => a.g.slice(i * k, i * k + k));
-  const [red, white] = score(g.map(key), s.code.map(key));
-  const won = red === s.len;
+  const fb = scoreUnits(g, s.code);
+  const won = fb.red === s.len;
   return {
     ...s,
-    rows: [...s.rows, { g, red, white, text: say(red, white, nounFor(k)) }],
+    rows: [...s.rows, { g, ...fb, text: say(fb, nounFor(k)) }],
     won,
     over: !won && !!s.cfg.social,                         // social: the table's one guess is spent
     wins: s.wins + (won ? 1 : 0),
@@ -153,6 +176,11 @@ export function mount(root, api) {
   const scaleOf = () => SCALES[(view && view.cfg && view.cfg.scale) || 'pent'];
   const perUnit = () => (view && view.cfg ? view.cfg.perUnit : 1);
 
+  // Scroll the whole game inside its own box, so it works in a short phone viewport.
+  root.style.height = '100%';
+  root.style.overflowY = 'auto';
+  root.style.touchAction = 'pan-y';
+
   // One note: a short plucked tone starting at audio time `when`.
   const note = (hz, when) => {
     const o = ac.createOscillator(), g = ac.createGain();
@@ -182,37 +210,45 @@ export function mount(root, api) {
   const unitLabel = (u) => (view.cfg.ears ? '***' : u.map((i) => scaleOf().labels[i]).join('-'));
   const unitSpans = (units) => units.map((u) =>
     `<span class="nt" data-p="${u.join(',')}">${unitLabel(u)}</span>`).join(' ');
-  const pips = (red, white) => `<span>${'<i class="r"></i>'.repeat(red)}${'<i class="w"></i>'.repeat(white)}</span>`;
+  const pips = (fb) => `<span>${'<i class="r"></i>'.repeat(fb.red)}${'<i class="o"></i>'.repeat(fb.orange)}`
+    + `${'<i class="w"></i>'.repeat(fb.white)}${'<i class="b"></i>'.repeat(fb.blue)}</span>`;
 
   root.innerHTML = `<style>
-    .k{background:#000080;color:#ff0;font:16px 'Times New Roman',serif;padding:12px;min-height:100%}
-    h1{color:#0ff;font:bold 24px Georgia;text-shadow:3px 3px #f0f;margin:6px 0}
-    #kyle{font:14px/1.1 'Courier New',monospace;color:#0f0;margin:0}
-    #bubble{position:relative;background:#fff;color:#000;border:3px solid #000;padding:10px;min-height:60px;min-width:200px;font:bold 16px Arial;visibility:hidden}
-    #bubble:before{content:'';position:absolute;left:-18px;top:20px;border:9px solid transparent;border-right:9px solid #000}
-    .top{display:flex;align-items:center;gap:16px;flex-wrap:wrap;margin-bottom:8px}
-    .board{display:flex;flex-wrap:wrap;gap:8px;margin:10px 0}
-    .card{border:2px ridge #0f0;background:#000;padding:6px 8px;white-space:nowrap}
+    .k{background:#000080;color:#ff0;font:16px 'Times New Roman',serif;padding:10px;min-height:100%;box-sizing:border-box}
+    h1{color:#0ff;font:bold 22px Georgia;text-shadow:3px 3px #f0f;margin:4px 0}
+    #kyle{font:10px/1.05 'Courier New',monospace;color:#0f0;margin:0}
+    .top{display:flex;align-items:flex-start;gap:10px;margin-bottom:4px}
+    #bubble{flex:1;position:relative;background:#fff;color:#000;border:3px solid #000;padding:8px;min-height:44px;min-width:0;font:bold 15px Arial;visibility:hidden;margin-right:12px}
+    #bubble:before{content:'';position:absolute;right:-18px;top:14px;border:9px solid transparent;border-left:9px solid #000}
+    .tr{display:flex;flex-direction:column;align-items:flex-end;flex-shrink:0}
+    #modes{min-width:0;min-height:36px;font-size:14px;margin:0 0 4px 0}
+    .board{display:flex;flex-wrap:wrap;gap:6px;margin:8px 0}
+    .card{border:2px ridge #0f0;background:#000;padding:5px 7px;white-space:nowrap}
     .clue{border-color:#ff0}
     .nt{cursor:pointer;color:#0ff;text-decoration:underline dotted;font-family:'Courier New',monospace}
-    .r,.w{display:inline-block;width:14px;height:14px;border-radius:50%;border:1px solid #000;margin-left:3px}
-    .r{background:#f00}.w{background:#fff}
-    button{font:bold 16px Arial;min-width:48px;min-height:44px;margin:3px;background:#c0c0c0;border:3px outset #eee;cursor:pointer}
+    .r,.w,.o,.b{display:inline-block;width:14px;height:14px;border-radius:50%;border:1px solid #000;margin-left:3px}
+    .r{background:#f00}.w{background:#fff}.o{background:#ffa500}.b{background:#1e90ff;border-color:#fff}
+    button{font:bold 16px Arial;min-width:44px;min-height:44px;margin:3px;background:#c0c0c0;border:3px outset #eee;cursor:pointer}
     select{font:16px Arial;min-height:36px;max-width:100%}
     #slots{display:flex;flex-wrap:wrap;align-items:center}
-    .grp{display:inline-flex;margin-right:14px}
-    .slot{display:inline-block;width:52px;height:44px;line-height:44px;border:2px inset #888;background:#fff;color:#000;text-align:center;margin:3px;font:bold 18px Arial}
+    .grp{display:inline-flex;margin-right:12px}
+    .slot{display:inline-block;width:46px;height:40px;line-height:40px;border:2px inset #888;background:#fff;color:#000;text-align:center;margin:3px;font:bold 17px Arial}
     #home label{display:block;margin:12px 0}
     #home input[type=checkbox]{transform:scale(1.4);margin-right:10px}
     #home h2{color:#0ff;font:bold 20px Georgia;margin:6px 0}
+    details{margin:6px 0;font-size:14px}
+    summary{cursor:pointer;color:#0ff}
   </style>
   <div class="k">
     <marquee>★ welcome to Kyle's Music  Page   ★ Kyle knows  the code.<span class="r">     Right note, right spot. <span class="w">     Right note, wrong spot.</marquee>
-    <h1>Kyle Knows the Code</h1>
     <div class="top">
-      <pre id="kyle">${KYLE}</pre>
       <div id="bubble">I'm Kyle and I know the code.</div>
+      <div class="tr">
+        <button id="modes" style="display:none">Modes</button>
+        <pre id="kyle">${KYLE}</pre>
+      </div>
     </div>
+    <h1>Kyle Knows the Code</h1>
     <div id="home" style="display:none">
       <h2>Choose your game</h2>
       <label><input type="checkbox" id="ears"> Ears only (no note letters; tap a feedback unit to hear its melody)</label>
@@ -226,6 +262,10 @@ export function mount(root, api) {
       <div id="slots"></div>
       <div id="pad"></div>
       <div id="ctl"></div>
+      <details><summary>Dot key</summary>
+        <p><i class="r"></i> right melody, right slot &nbsp; <i class="w"></i> right melody, wrong slot<br>
+        <i class="o"></i> right notes, wrong order, right slot &nbsp; <i class="b"></i> right notes, wrong order, wrong slot</p>
+      </details>
       <div class="board" id="board"></div>
     </div>
   </div>`;
@@ -238,6 +278,8 @@ export function mount(root, api) {
     const home = view.phase === 'home';
     $('#home').style.display = home ? 'block' : 'none';
     $('#game').style.display = home ? 'none' : 'block';
+    $('#modes').style.display = home ? 'none' : 'inline-block';
+    $('#modes').disabled = spec;
     if (home) {
       // Load the last-used settings when entering the home screen, not on every update.
       if (lastPhase !== 'home') {
@@ -275,9 +317,9 @@ export function mount(root, api) {
     $('#pad').innerHTML = sc.labels.map((n, i) => `<button data-i="${i}" ${off}>${ears ? '♪' : n}</button>`).join('');
 
     const clueCards = view.clues.map((c, n) =>
-      `<div class="card clue"><b>Clue ${n + 1}</b> ${unitSpans(c.g)} ${pips(c.red, c.white)}<br><small>${c.text}</small></div>`);
+      `<div class="card clue"><b>Clue ${n + 1}</b> ${unitSpans(c.g)} ${pips(c)}<br><small>${c.text}</small></div>`);
     const guessCards = view.rows.map((r, n) =>
-      `<div class="card"><b>${n + 1}.</b> ${unitSpans(r.g)} ${pips(r.red, r.white)}</div>`);
+      `<div class="card"><b>${n + 1}.</b> ${unitSpans(r.g)} ${pips(r)}</div>`);
     $('#board').innerHTML = [
       view.cfg.social ? `<p>Your clues: ${view.clues.length} of ${view.totalClues} held by the table.</p>` : '',
       ...clueCards, ...guessCards,
@@ -286,10 +328,8 @@ export function mount(root, api) {
     $('#ctl').innerHTML = end
       ? `<p><b>${view.won ? 'You cracked it!' : (view.cfg.social ? 'The one guess missed.' : 'Out of guesses.')}</b>
            The code was ${unitSpans(view.code)}.</p>
-         <button data-a="next" ${off}>Next round (${view.len < 10 ? view.len + 1 : 3} units)</button>
-         <button data-a="home" ${off}>Modes</button>`
-      : `<button data-a="clear" ${off}>Clear</button> <button data-a="submit" ${off}>Ask Kyle</button>
-         <button data-a="home" ${off}>Modes</button>`;
+         <button data-a="next" ${off}>Next round (${view.len < 10 ? view.len + 1 : 3} units)</button>`
+      : `<button data-a="clear" ${off}>Clear</button> <button data-a="submit" ${off}>Ask Kyle</button>`;
   };
 
   root.addEventListener('click', (e) => {
@@ -306,6 +346,8 @@ export function mount(root, api) {
       } });
       return;
     }
+    const modes = e.target.closest('#modes');
+    if (modes) { if (!api.isSpectator) { sel = []; api.send({ a: 'home' }); } return; }
     const nt = e.target.closest('.nt');                    // replay a unit's melody: local only, allowed for spectators
     if (nt) { playMelody(nt.dataset.p.split(',').map(Number)); return; }
     const b = e.target.closest('button');
@@ -315,7 +357,6 @@ export function mount(root, api) {
     else if (b.dataset.a === 'clear') { sel = []; render(); }
     else if (b.dataset.a === 'submit' && sel.length === need) { api.send({ a: 'guess', g: sel }); sel = []; }
     else if (b.dataset.a === 'next') { sel = []; api.send({ a: 'next' }); }
-    else if (b.dataset.a === 'home') { sel = []; api.send({ a: 'home' }); }
   });
 
   return {
