@@ -381,9 +381,9 @@ HARNESS = r"""
   state = dr.init({ seats: table, atTable: table, options: {} });
   handle.update(dr.project(state, ME));
 
-  // a round nobody steers: the dot leaves after R/V = 4s and stays out.
+  // a round nobody steers: the dot leaves after R/V = 5s and stays out.
   // Wind bends the path but never below half speed along the heading, so the
-  // exit lands between 2.7s (full tailwind) and 8s (full headwind).
+  // exit lands between 3.3s (full tailwind) and 10s (full headwind).
   q('.dr-btn').click();
   api.send({ a: 'revealend' });
   ok('the neglect round plays', state.phase === 'play');

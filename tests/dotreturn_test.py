@@ -35,7 +35,7 @@ JS_CASES = r"""
 
   // ---- tuning invariants: a wider circle, the same speed-to-radius ratio.
   out.push(['the circle grew 15%', Math.abs(R / 0.036 - 1.15) < 0.001]);
-  out.push(['V holds the R/V ratio', Math.abs(R / V - 4) < 0.001]);
+  out.push(['V holds the R/V ratio', Math.abs(R / V - 5) < 0.001]);
   out.push(['the wind pushes at half drift speed', WIND === 0.50]);
 
   // ---- init seats the table, not the room.
