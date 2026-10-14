@@ -25,9 +25,9 @@ export const meta = {
 // Geometry is in fractions of the shorter side of the field, which is what the
 // original full-screen prototype meant by vmin.
 // Tuning: R/V = 4.0s for dot to leave circle with no input (V = R/4).
-// R=0.045 gives ~17.55px radius on 390px viewport; V=0.01125 gives ~4.39px/s.
-const R = 0.045;          // radius of the hidden circle the dot must stay inside
-const V = 0.01125;        // drift speed, per second (kept consistent with R/V=4.0)
+// R=0.036 gives ~14.04px radius on 390px viewport; V=0.009 gives ~3.51px/s.
+const R = 0.036;          // radius of the hidden circle the dot must stay inside
+const V = 0.009;        // drift speed, per second (kept consistent with R/V=4.0)
 const DURATION = 120;    // round length, seconds
 const DT = 1 / 60;       // fixed integration step
 const MAX_STEPS = 8;     // catch-up cap, so a backgrounded tab cannot spiral
@@ -676,9 +676,13 @@ export function mount(root, api) {
 
     ovTitle.textContent = 'Dot Return';
     // The old copy said "the group tally" to a lone player in an empty room.
-    ovBody.innerHTML = 'Keep a slow dot inside a circle you cannot see.<br>' +
-      'Swipe anywhere to redirect the drift.<br>' +
-      'Each time it drifts back to dead centre it picks a <span class="dr-hi">new direction</span>.<br>' +
+    ovBody.innerHTML = 'Keep a dot inside the invisible circle.<br>' +
+      'It is moving.<br>' +
+      'Swipe anywhere to redirect the dot.<br>' +
+      'You are scored on returns. A return is when the dot returns to the circle after leaving.<br>' +
+      'Try to get the fewest possible returns. Groups are all working together against the dot.<br>' +
+      'Each member has their own dots and scored are added together. Bigger groups end up with higher numbers.<br>' +
+      'Each time it hits dead centre it picks a <span class="dr-hi">new direction</span>.<br>' +
       'The ' + (alone ? 'tally' : 'group tally') + ' is revealed when the ' +
       view.duration + 's clock runs out.<br>' +
       'Goal: <span class="dr-hi">fewest returns.</span>';
