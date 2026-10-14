@@ -103,12 +103,20 @@ JS_CASES = r"""
   out.push(['a spectator cannot reroll',
     !!reduce(played, { a: 'reroll' }, ctx('ghost')).error]);
 
-  // ---- join mid-round. The epoch bump is what makes clients re-anchor.
+  // ---- join mid-round. The latecomer is seated but benched until the next
+  // round: handing them a heading now would bump the epoch and re-anchor
+  // every running dot back to dead centre. A lobby join still re-anchors.
   const joined = reduce(played, { a: 'join' }, ctx('w2'));
   out.push(['join adds the latecomer', joined.players.join(',') === 'w1,b1,w2']);
-  out.push(['join re-anchors every client', joined.epoch === played.epoch + 1]);
-  out.push(['the latecomer starts at the centre heading',
-    joined.dots.w2.a >= 0 && joined.dots.w2.a < Math.PI * 2]);
+  out.push(['a mid-round join does not re-anchor the table', joined.epoch === played.epoch]);
+  out.push(['the latecomer is benched until the next round', joined.dots.w2.benched === true]);
+  out.push(['a benched dot cannot steer',
+    !!reduce(joined, { a: 'swipe', ang: 1 }, ctx('w2')).error]);
+  out.push(['a benched dot cannot touch the tally',
+    !!reduce(joined, { a: 'exit' }, ctx('w2')).error]);
+  const lobbyJoin = reduce(st0, { a: 'join' }, ctx('w2'));
+  out.push(['a lobby join still re-anchors', lobbyJoin.epoch === st0.epoch + 1]);
+  out.push(['a lobby join is not benched', lobbyJoin.dots.w2.benched === false]);
   out.push(['a dot already at the table is left alone',
     reduce(joined, { a: 'join' }, ctx('w1')).players.length === 3]);
   out.push(['a full table turns people away',

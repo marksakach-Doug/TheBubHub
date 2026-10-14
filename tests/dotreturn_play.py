@@ -186,12 +186,13 @@ HARNESS = r"""
   pump(1000);
   ok('the dot is back at the centre', visible(dot()) && Math.abs(dotX() - 200) < 6);
 
-  // ---- a late joiner gets a dot, but you still only see your own
+  // ---- a late joiner waits for the next round, and you still only see your own
   const joined = dr.reduce(state, { a: 'join' },
     { from: { id: 'you2', name: 'Bo' }, rng: Math.random });
   handle.update(dr.project(joined, ME));
   ok('the latecomer is at the table', (joined.players || []).indexOf('you2') >= 0);
-  ok('their arrival re-anchors the round', joined.epoch === state.epoch + 1);
+  ok('their arrival does not re-anchor the round', joined.epoch === state.epoch);
+  ok('the latecomer is benched until the next round', joined.dots.you2.benched === true);
   ok('a table of two still shows exactly one dot',
     shadow.querySelectorAll('.dr-dot').length === 1);
   ok('no player tag is ever painted',

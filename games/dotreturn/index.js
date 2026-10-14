@@ -107,20 +107,23 @@ export function reduce(state, action, ctx) {
 
   if (!id) return { error: 'No identity — reopen the game.' };
 
-  // Someone opened the table while a round was already running. They join at
-  // the centre with a fresh heading, which is the same thing the game does to
-  // a dot that drifts home.
-  //
-  // The epoch bump is load-bearing: clients only re-anchor their simulation
-  // when it moves, so without it the newcomer's dot integrates from x=0 on
-  // every client while the host's authoritative heading is ignored, and it
-  // never lines up with anyone else's picture.
+  // Someone opened the table while a round was already running. They are
+  // seated, but their dot waits for the next round: handing them a heading
+  // now would bump the epoch and re-anchor every running dot back to dead
+  // centre, which is the teleport a mid-round join used to cause.
   if (kind === 'join') {
     if (players.indexOf(id) >= 0) return same({ dots: dots });
     if (players.length >= MAX_DOTS) return { error: 'Dot Return holds four dots.' };
     players.push(id);
-    dots[id] = { a: rng() * Math.PI * 2, out: false, lastReroll: 0 };
-    return same({ epoch: state.epoch + 1, players: players, dots: dots });
+    const live = state.phase === 'play' || state.phase === 'reveal';
+    dots[id] = live
+      ? { a: 0, out: false, lastReroll: 0, benched: true }
+      : { a: rng() * Math.PI * 2, out: false, lastReroll: 0, benched: false };
+    return same({
+      epoch: live ? state.epoch : state.epoch + 1,
+      players: players,
+      dots: dots
+    });
   }
 
   const mine = dots[id];
@@ -142,7 +145,9 @@ export function reduce(state, action, ctx) {
       return { error: 'Waiting for the host to start the round.' };
     }
     players.forEach(function (pid) {
-      dots[pid] = { a: rng() * Math.PI * 2, out: false, lastReroll: 0 };
+      // A new round unbenches everyone: anyone who waited out the last one
+      // joins the motion from dead centre with the rest of the table.
+      dots[pid] = { a: rng() * Math.PI * 2, out: false, lastReroll: 0, benched: false };
     });
     return same({
       epoch: state.epoch + 1,
@@ -168,6 +173,11 @@ export function reduce(state, action, ctx) {
     if (state.phase !== 'reveal') return same({});
     return same({ phase: 'play' });
   }
+
+  // A benched dot joined mid-round and waits for the next one. It must not
+  // steer, reroll, or touch the tally in this one — start/finish above still
+  // apply, so the table is never stuck waiting on someone who cannot act.
+  if (mine.benched) return { error: 'Your dot starts with the next round.' };
 
   if (state.phase !== 'play') return { error: 'Wait for the next round.' };
 
@@ -363,6 +373,8 @@ export function mount(root, api) {
   let scoredEpoch = -1;
   let joined = false;
   let toastTimer = null;
+  let lastDenied = '';
+  let lastDeniedAt = 0;
 
   const soloCorner = !api.isInRoom;
 
@@ -396,8 +408,11 @@ export function mount(root, api) {
     sim.epoch = view.epoch;
     sim.acc = 0;
     sim.dots = {};
+    // Benched dots joined mid-round and own no motion in this one: they start
+    // with the next round, so they get no entry here and no dot on screen.
     (view.players || []).forEach(function (id) {
       const d = view.dots[id] || {};
+      if (d.benched) return;
       sim.dots[id] = { x: 0, y: 0, a: d.a || 0 };
     });
     askedFinish = false;
@@ -452,12 +467,11 @@ export function mount(root, api) {
         api.send({ a: 'revealend' });
       }
       sim.last = now;
-      if (!sim.dots[myId]) {
-        const d = (view.dots && view.dots[myId]) || {};
-        sim.dots[myId] = { x: 0, y: 0, a: d.a || 0 };
-      }
-      const mineR = sim.dots[myId];
-      if (mineR && view.revealEndsAt) {
+      // No dot is invented here. resetSim() already built one for everyone at
+      // the table, and creating one for `myId` unconditionally gave anyone
+      // watching a dot of their own: it drifted, could not be steered, and its
+      // exit/in intents were refused host-side.
+      if (myDot() && view.revealEndsAt) {
         hudTime.textContent = Math.ceil(view.duration) + 's';
       }
       return;
@@ -468,10 +482,12 @@ export function mount(root, api) {
     sim.last = now;
 
     // A dot that appears mid-round (someone opened the table late) starts at
-    // the centre with whatever heading the host gave it.
+    // the centre with whatever heading the host gave it. Benched dots joined
+    // mid-round and own no motion in this one — they are never added here.
     (view.players || []).forEach(function (id) {
       if (sim.dots[id]) return;
       const d = view.dots[id] || {};
+      if (d.benched) return;
       sim.dots[id] = { x: 0, y: 0, a: d.a || 0 };
     });
 
@@ -502,7 +518,9 @@ export function mount(root, api) {
 
     // Only your own dot reports. Only your own dot is painted too, but the
     // other dots still have to be integrated or the group tally drifts.
-    const mine = sim.dots[myId];
+    // A watcher — or a dot benched until the next round — has no mine, so
+    // nothing below reports, rerolls, or overwrites the HUD.
+    const mine = myDot();
     if (mine) {
       const dist = Math.hypot(mine.x, mine.y);
       if (dist > CENTER_RELEASE) { latched = false; pendingReroll = false; }
@@ -551,7 +569,7 @@ export function mount(root, api) {
     // right, but painting them would leak both the table and the shape of the
     // hidden circle — and a second dot bouncing around is not this game.
     const visible = view.phase === 'play' || view.phase === 'reveal';
-    const mine = sim.dots[myId];
+    const mine = myDot();
     dotEl.hidden = !(visible && mine);
     if (mine) {
       dotEl.style.transform = 'translate(' + (cx + mine.x * unit) + 'px,' +
@@ -565,6 +583,22 @@ export function mount(root, api) {
   // false for someone who is seated at a table they did not create.
   function seated() {
     return !!view && (view.players || []).indexOf(myId) >= 0;
+  }
+
+  // Your dot joined a round already in progress. You are at the table, but
+  // you own no motion in this round — it starts with the next one.
+  function benched() {
+    if (!view || !seated()) return false;
+    const d = (view.dots || {})[myId] || {};
+    return !!d.benched;
+  }
+
+  // Your integrated dot, and only when you are meant to have one: seated and
+  // not benched. A watcher must never be handed a dot — one that drifts and
+  // cannot be steered reads as a broken game, which is exactly what shipped.
+  function myDot() {
+    if (!seated() || benched()) return null;
+    return sim.dots[myId] || null;
   }
 
   // The host is the id the host side picked when the table was created; fall
@@ -596,6 +630,7 @@ export function mount(root, api) {
     const inPlay = view.phase === 'play';
     const list = view.players || [];
     const atTable = seated();
+    const waiting = benched();
     const watching = !atTable;
     const host = iAmHost();
     const n = list.length;
@@ -605,17 +640,22 @@ export function mount(root, api) {
 
     // OBSERVING is a top-of-screen state in every phase, including mid-round.
     // A watcher who opens a live game previously got no signal at all, and the
-    // frozen field just reads as a broken one.
-    hud.classList.toggle('watching', watching);
+    // frozen field just reads as a broken one. A benched player is at the
+    // table but owns no dot in this round, so they get their own waiting line
+    // rather than OBSERVING or a countdown that belongs to someone else.
+    hud.classList.toggle('watching', watching || waiting);
     hud.style.visibility = (playing || watching) ? 'visible' : 'hidden';
     if (watching) {
       hudTime.textContent = 'OBSERVING';
       hudMeta.textContent = n + (n === 1 ? ' dot at the table' : ' dots at the table');
+    } else if (waiting) {
+      hudTime.textContent = 'NEXT ROUND';
+      hudMeta.textContent = 'your dot starts with the next one';
     } else {
       hudMeta.textContent = inPlay ? 'keep it inside' : '';
     }
 
-    ovTitle.classList.toggle('observing', watching);
+    ovTitle.classList.toggle('observing', watching || waiting);
     renderSeats(list, !playing && !watching);
 
     // Buttons are rebuilt per render because who may start depends on the
@@ -681,7 +721,7 @@ export function mount(root, api) {
       'Swipe anywhere to redirect the dot.<br>' +
       'You are scored on returns. A return is when the dot returns to the circle after leaving.<br>' +
       'Try to get the fewest possible returns. Groups are all working together against the dot.<br>' +
-      'Each member has their own dots and scored are added together. Bigger groups end up with higher numbers.<br>' +
+      'Each member has their own dots and scores are added together. Bigger groups end up with higher numbers.<br>' +
       'Each time it hits dead centre it picks a <span class="dr-hi">new direction</span>.<br>' +
       'The ' + (alone ? 'tally' : 'group tally') + ' is revealed when the ' +
       view.duration + 's clock runs out.<br>' +
@@ -710,9 +750,10 @@ export function mount(root, api) {
 
   // A watcher has no dot, so a swipe from them is a no-op the host will deny.
   // Silently doing nothing beats letting someone drag a dead field and wonder
-  // whether the game ate it.
+  // whether the game ate it. A benched dot steers with the next round, not this
+  // one, so it is refused here and in reduce().
   function canSteer() {
-    return !!view && view.phase === 'play' && seated();
+    return !!view && view.phase === 'play' && seated() && !benched();
   }
 
   field.addEventListener('pointerdown', function (e) {
@@ -789,15 +830,28 @@ export function mount(root, api) {
       renderChrome();
       render();
       // init() seats whoever was in the room when the table was created, so
-      // this is how somebody who opened it later gets a dot mid-round. It waits
-      // for the first update() because a send from inside mount() comes back
-      // before the hub has even assigned the handle to route it. A spectator
-      // must not ask — read-only has to mean read-only — and the hub hands
-      // reduce() no seat map, so this guard is all there is.
+      // this is how somebody who opened it later gets seated. During a live
+      // round that means benched until the next one, not a dot mid-round.
+      // It waits for the first update() because a send from inside mount()
+      // comes back before the hub has even assigned the handle to route it.
+      // A spectator must not ask — read-only has to mean read-only — and the
+      // hub hands reduce() no seat map, so this guard is all there is.
       if (!joined && !api.isSpectator) {
         joined = true;
         api.send({ a: 'join' });
       }
+    },
+    // The hub calls this when the host refuses one of our intents. It used to
+    // vanish, which is why a refused action looked like nothing happening.
+    // Same-text repeats are throttled: a refusal that fires every frame would
+    // otherwise pin the toast on screen.
+    denied: function (text) {
+      const msg = String(text || 'The host refused that.');
+      const now = Date.now();
+      if (msg === lastDenied && now - lastDeniedAt < 1500) return;
+      lastDenied = msg;
+      lastDeniedAt = now;
+      showToast(msg);
     },
     destroy: function () {
       stopLoop();
