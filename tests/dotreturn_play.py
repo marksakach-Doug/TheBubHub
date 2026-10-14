@@ -116,7 +116,9 @@ HARNESS = r"""
   const btn = () => q('.dr-btn');
 
   ok('mount builds a field', !!field);
+  ok('the game is called Focus', dr.meta.title === 'Focus');
   ok('lobby offers Start', overlayShown() && btn().textContent === 'Start round');
+  ok('the lobby title is Focus', q('.dr-title').textContent === 'Focus');
   ok('lobby explains the centre reroll', overlayText().indexOf('new direction') >= 0);
   ok('no dot is on screen yet', !visible(dot()));
 
@@ -133,9 +135,23 @@ HARNESS = r"""
   btn().click();
   ok('Start opens the reveal', state.phase === 'reveal' && !overlayShown());
   ok('the reveal shows the ring and the dot', !!dot() && !dot().hidden);
-  ok('the HUD clock is paused during the reveal', hud().indexOf('120s') >= 0);
+  ok('the HUD clock is paused during the reveal', hud().indexOf('70s') >= 0);
+  // the reveal banner: a 3-2-1 countdown above "Keep the dot inside this circle."
+  const rev = () => q('.dr-reveal');
+  const say = () => q('.dr-say');
+  const cnt = () => q('.dr-count');
+  ok('the reveal banner is shown', rev() && rev().style.display === 'flex');
+  ok('the reveal sentence sits above the circle',
+    say() && say().textContent === 'Keep the dot inside this circle.');
+  pump(50); // one frame fills the countdown from the real reveal clock
+  ok('the countdown counts to the start', cnt() && /^[123]$/.test(cnt().textContent));
+  ok('the countdown sits above the sentence',
+    cnt().compareDocumentPosition(say()) & Node.DOCUMENT_POSITION_FOLLOWING);
+  ok('the banner rests on the circle top',
+    Math.abs(parseFloat(rev().style.bottom) - 314.4) < 2);
   api.send({ a: 'revealend' });
   ok('Start becomes a round', state.phase === 'play' && !overlayShown());
+  ok('the banner leaves with the reveal', rev().style.display === 'none');
   ok('a dot appears', !!dot());
   ok('the timer is running', /\d+s/.test(hud()));
   ok('the tally is not on the HUD', !/\breturns?\b/.test(hud()) && !/returns/.test(hud()));
@@ -199,7 +215,8 @@ HARNESS = r"""
   api.send({ a: 'finish' });
   ok('the round ended', state.phase === 'over');
   ok('the score is revealed', overlayShown() &&
-    overlayText().indexOf(state.over.perPlayer.toFixed(1) + 's') >= 0);
+    overlayText().indexOf('The dot was out of the circle for ' +
+      state.over.perPlayer.toFixed(1) + ' out of 70 seconds.') >= 0);
   ok('the held percentage is revealed', /held the ring \d+%/.test(overlayText()));
   ok('lapses are displayed', new RegExp(state.over.lapses + ' lapses?').test(overlayText()));
   ok('the timer is put away', q('.dr-hud').style.visibility === 'hidden');
@@ -361,10 +378,10 @@ HARNESS = r"""
   q('.dr-btn').click();
   api.send({ a: 'revealend' });
   ok('the neglect round plays', state.phase === 'play');
-  pump(125000); // the full round; the client sends finish at 0
+  pump(75000); // the full round; the client sends finish at 0
   ok('a neglected round ends itself', state.phase === 'over');
-  ok('neglect costs about 116s away per player',
-    state.over.perPlayer > 110 && state.over.perPlayer < 120);
+  ok('neglect costs about 69s away per player',
+    state.over.perPlayer > 60 && state.over.perPlayer < 70);
   ok('one lapse per neglected dot', state.over.lapses === 1);
   ok('the held percentage is shown', /held the ring \d+%/.test(overlayText()));
   ok('the neglect best is saved with its table size',
@@ -398,7 +415,7 @@ HARNESS = r"""
     const m = /translate\(([-\d.]+)px,\s*([-\d.]+)px\)/.exec(pos());
     return m ? [parseFloat(m[1]), parseFloat(m[2])] : null;
   };
-  for (let i = 0; i < 120 && state.phase === 'play'; i++) {
+  for (let i = 0; i < 70 && state.phase === 'play'; i++) {
     pump(1000);
     if (state.phase !== 'play') break;
     const p = dotPos();

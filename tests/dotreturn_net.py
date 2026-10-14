@@ -222,7 +222,7 @@ HARNESS = r"""
   state.endsAt = Date.now() - 10;
   hubSend('h', { a: 'finish' });
   ok('the round ended', state.phase === 'over');
-  const per = state.over.perPlayer.toFixed(1) + 's';
+  const per = 'Each dot averaged ' + state.over.perPlayer.toFixed(1) + ' out of 70 seconds outside.';
   ok('the host reveals the score', overlayText(host).indexOf(per) >= 0);
   ok('the guest reveals the same score', overlayText(guest).indexOf(per) >= 0);
   ok('both tables share one best',

@@ -30,6 +30,9 @@ JS_CASES = r"""
   const names = { w1: 'Sam', b1: 'Bo' };
   const nameOf = (id) => names[id] || id;
 
+  out.push(['the game is called Focus', meta.title === 'Focus']);
+  out.push(['the module id is unchanged', meta.id === 'dotreturn']);
+
   // ---- init seats the table, not the room.
   // The hub passes the whole room roster under `seats`; `atTable` is the
   // filtered list of people who actually opened this game.
@@ -54,8 +57,8 @@ JS_CASES = r"""
   const started = reduce(st0, { a: 'start' }, ctx('w1'));
   out.push(['start begins a round', started.phase === 'reveal' && started.epoch === 1]);
   out.push(['start resets lapses', started.lapses === 0]);
-  out.push(['start sets a 120s clock after the reveal',
-    Math.abs((started.endsAt - started.revealEndsAt) / 1000 - 120) < 0.5]);
+  out.push(['start sets a 70s clock after the reveal',
+    Math.abs((started.endsAt - started.revealEndsAt) / 1000 - 70) < 0.5]);
   out.push(['the round records its table', started.table.join(',') === 'w1,b1']);
   out.push(['a two-player round is not solo', started.solo === false]);
   out.push(['a guest cannot start the round',
@@ -177,19 +180,19 @@ JS_CASES = r"""
   const tableDone = reduce(Object.assign({}, crowdedPlay,
     { endsAt: Date.now() - 10 }), { a: 'finish' }, ctx('w1'));
   out.push(['the record line credits only the table',
-    summarize(tableDone, nameOf) === 'Sam and Bo held the dot for 120s, averaging 0.0s away each']);
+    summarize(tableDone, nameOf) === 'Sam and Bo held the dot for 70s, averaging 0.0s away each']);
   const soloState = reduce(Object.assign({}, played, {
     players: ['w1'], dots: { w1: played.dots.w1 }, table: ['w1'], endsAt: Date.now() - 10
   }), { a: 'finish' }, ctx('w1'));
-  out.push(['solo sentence', summarize(soloState, nameOf) === 'Sam held the dot for 120s, averaging 0.0s away each']);
+  out.push(['solo sentence', summarize(soloState, nameOf) === 'Sam held the dot for 70s, averaging 0.0s away each']);
   out.push(['table sentence',
-    summarize(done, nameOf) === 'Sam and Bo held the dot for 120s, averaging 0.0s away each']);
+    summarize(done, nameOf) === 'Sam and Bo held the dot for 70s, averaging 0.0s away each']);
   const soloHit = reduce(Object.assign({}, played, {
     players: ['w1'], dots: { w1: played.dots.w1 }, table: ['w1'],
     lapses: 1, endsAt: Date.now() - 10
   }), { a: 'finish' }, ctx('w1'));
   out.push(['lapses do not reach the record line',
-    summarize(soloHit, nameOf) === 'Sam held the dot for 120s, averaging 0.0s away each']);
+    summarize(soloHit, nameOf) === 'Sam held the dot for 70s, averaging 0.0s away each']);
 
   // ---- away time is scored, lapses are only displayed. Date.now is stubbed
   // for this block and restored after, so nothing above or below can tell.
@@ -231,7 +234,7 @@ JS_CASES = r"""
   out.push(['lapses are displayed, never scored',
     tick2Done.over.lapses === 2 && tick2Done.over.perPlayer === 2]);
   out.push(['the record line averages away time',
-    summarize(tick2Done, nameOf) === 'Sam and Bo held the dot for 120s, averaging 2.0s away each']);
+    summarize(tick2Done, nameOf) === 'Sam and Bo held the dot for 70s, averaging 2.0s away each']);
   const tickReplay = reduce(tick2Done, { a: 'start' }, ctx('w1'));
   out.push(['start resets away time and lapses',
     tickReplay.lapses === 0 && tickReplay.dots.w1.away === 0 && tickReplay.dots.w1.out === false]);

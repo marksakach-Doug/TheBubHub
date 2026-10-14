@@ -1,4 +1,4 @@
-// Dot Return — a module game.
+// Focus — a module game.
 //
 // The contract has no tick: state only moves through reduce(), so this game
 // splits its physics from its authority. Every client integrates the dots with
@@ -14,7 +14,7 @@
 
 export const meta = {
   id: 'dotreturn',
-  title: 'Dot Return',
+  title: 'Focus',
   players: { min: 1, max: 10 },
   color: '#e9e4d8',
   icon: '⚪',
@@ -28,7 +28,7 @@ export const meta = {
 // R=0.036 gives ~14.04px radius on 390px viewport; V=0.009 gives ~3.51px/s.
 const R = 0.036;          // radius of the hidden circle the dot must stay inside
 const V = 0.009;        // drift speed, per second (kept consistent with R/V=4.0)
-const DURATION = 120;    // round length, seconds
+const DURATION = 70;    // round length, seconds
 const DT = 1 / 60;       // fixed integration step
 const MAX_STEPS = 8;     // catch-up cap, so a backgrounded tab cannot spiral
 
@@ -113,7 +113,7 @@ export function reduce(state, action, ctx) {
   // centre, which is the teleport a mid-round join used to cause.
   if (kind === 'join') {
     if (players.indexOf(id) >= 0) return same({ dots: dots });
-    if (players.length >= MAX_DOTS) return { error: 'Dot Return holds ' + MAX_DOTS + ' dots.' };
+    if (players.length >= MAX_DOTS) return { error: 'Focus holds ' + MAX_DOTS + ' dots.' };
     players.push(id);
     const live = state.phase === 'play' || state.phase === 'reveal';
     dots[id] = live
@@ -313,6 +313,13 @@ const CSS = [
   'color:#e9e4d8;font-size:0.95rem;opacity:0;transition:opacity 0.15s ease-in-out;',
   'white-space:nowrap;pointer-events:none;will-change:opacity}',
   '.dr-toast.show{opacity:1;transition:opacity 0.1s ease-in-out}',
+  // The reveal banner sits directly above the circle: the round countdown on
+  // top, the one instruction beneath it. Shown to everyone, like the ring.
+  '.dr-reveal{position:absolute;left:50%;transform:translateX(-50%);display:none;',
+  'flex-direction:column;align-items:center;gap:6px;text-align:center;',
+  'pointer-events:none;z-index:2}',
+  '.dr-count{font-size:1.6rem;font-weight:700;color:#e9e4d8}',
+  '.dr-say{font-size:.95rem;color:#e9e4d8}',
   '.dr-overlay{position:absolute;inset:0;display:flex;flex-direction:column;',
   'align-items:center;justify-content:center;gap:16px;text-align:center;padding:24px;',
   'background:rgba(21,24,29,.94)}',
@@ -321,6 +328,10 @@ const CSS = [
   '.dr-title.observing{color:#fbbf24;letter-spacing:.18em;font-size:1.3rem}',
   '.dr-body{max-width:23rem;margin:0}',
   '.dr-num{font-size:2.4rem;font-weight:700;color:#e9e4d8}',
+  // The results screen reads a full sentence, not a bare number, so it drops
+  // to body size with only the seconds emphasized.
+  '.dr-num.long{font-size:1.15rem;font-weight:400;line-height:1.5;max-width:24rem}',
+  '.dr-num.long .dr-hi{font-size:2rem;font-weight:700}',
   '.dr-btns{display:flex;flex-wrap:wrap;gap:10px;justify-content:center}',
   '.dr-btn{font:inherit;font-weight:600;font-size:1rem;padding:12px 34px;min-height:44px;',
   'border:0;border-radius:8px;background:#e9e4d8;color:#15181d;cursor:pointer}',
@@ -379,9 +390,11 @@ export function mount(root, api) {
   const wrap = document.createElement('div');
   wrap.className = 'dr-wrap';
   wrap.innerHTML =
-    '<div class="dr-field"><div class="dr-ring"></div><div class="dr-centre"></div><div class="dr-dot" hidden></div></div>' +
-    '<div class="dr-hud"><div class="dr-time">120s</div><div class="dr-meta"></div></div><div class="dr-toast"></div>' +
-    '<div class="dr-overlay"><h1 class="dr-title">Dot Return</h1>' +
+    '<div class="dr-field"><div class="dr-ring"></div><div class="dr-centre"></div>' +
+    '<div class="dr-reveal"><div class="dr-count"></div><div class="dr-say">Keep the dot inside this circle.</div></div>' +
+    '<div class="dr-dot" hidden></div></div>' +
+    '<div class="dr-hud"><div class="dr-time">70s</div><div class="dr-meta"></div></div><div class="dr-toast"></div>' +
+    '<div class="dr-overlay"><h1 class="dr-title">Focus</h1>' +
     '<p class="dr-body"></p><p class="dr-num" hidden></p>' +
     '<div class="dr-table" hidden></div>' +
     '<div class="dr-btns"><button class="dr-btn" type="button">Start</button></div>' +
@@ -391,6 +404,8 @@ export function mount(root, api) {
   const field = wrap.querySelector('.dr-field');
   const ring = wrap.querySelector('.dr-ring');
   const centre = wrap.querySelector('.dr-centre');
+  const rev = wrap.querySelector('.dr-reveal');
+  const count = wrap.querySelector('.dr-count');
   const dotEl = wrap.querySelector('.dr-dot');
   const hud = wrap.querySelector('.dr-hud');
   const hudTime = wrap.querySelector('.dr-time');
@@ -445,12 +460,15 @@ export function mount(root, api) {
     if (view.phase === 'reveal') {
       ring.style.display = 'block';
       centre.style.display = 'block';
+      rev.style.display = 'flex';
     } else if (view.phase === 'play') {
       ring.style.display = SHOW_CIRCLE ? 'block' : 'none';
       centre.style.display = 'none';
+      rev.style.display = 'none';
     } else {
       ring.style.display = SHOW_CIRCLE ? 'block' : 'none';
       centre.style.display = 'none';
+      rev.style.display = 'none';
     }
   }
 
@@ -464,6 +482,8 @@ export function mount(root, api) {
     centre.style.width = CENTER * 2 * unit + 'px';
     centre.style.height = CENTER * 2 * unit + 'px';
     centre.style.transform = 'translate(-50%,-50%)';
+    // The banner's bottom edge rests on the circle's top edge, at any size.
+    rev.style.bottom = (h / 2 + R * unit) + 'px';
   }
 
   function resetSim() {
@@ -533,6 +553,11 @@ export function mount(root, api) {
       // the table, and creating one for `myId` unconditionally gave anyone
       // watching a dot of their own: it drifted, could not be steered, and its
       // exit/in intents were refused host-side.
+      // The countdown belongs to everyone, watcher or not, so it updates
+      // outside the myDot() guard below — unlike the paused round clock.
+      if (view.revealEndsAt) {
+        count.textContent = Math.max(1, Math.ceil((view.revealEndsAt - Date.now()) / 1000));
+      }
       if (myDot() && view.revealEndsAt) {
         hudTime.textContent = Math.ceil(view.duration) + 's';
       }
@@ -750,6 +775,7 @@ export function mount(root, api) {
       ovBody.innerHTML = 'Someone else started this round.<br>' +
         'You are watching — your swipe would not move anything, so it is not offered.';
       ovNum.hidden = true;
+      ovNum.className = 'dr-num';
       ovNote.textContent = n + (n === 1 ? ' player is at' : ' players are at') + ' this table.';
       return;
     }
@@ -762,7 +788,12 @@ export function mount(root, api) {
         Math.round(100 * (1 - per / view.duration))));
       ovTitle.textContent = alone ? 'Round Over' : 'Table Round Over';
       ovNum.hidden = false;
-      ovNum.textContent = per.toFixed(1) + 's';
+      ovNum.className = 'dr-num long';
+      ovNum.innerHTML = alone
+        ? 'The dot was out of the circle for <span class="dr-hi">' + per.toFixed(1) +
+          '</span> out of ' + view.duration + ' seconds.'
+        : 'Each dot averaged <span class="dr-hi">' + per.toFixed(1) +
+          '</span> out of ' + view.duration + ' seconds outside.';
       ovBody.innerHTML = 'Average time away from the centre, per dot.<br>' +
         'The table held the ring <span class="dr-hi">' + held + '%</span> of the round.<br>' +
         laps + (laps === 1 ? ' lapse' : ' lapses') + ' along the way.';
@@ -775,7 +806,7 @@ export function mount(root, api) {
       return;
     }
 
-    ovTitle.textContent = 'Dot Return';
+    ovTitle.textContent = 'Focus';
     // Solo drops the team lines and says "your score": the average is over
     // one dot, but it still compares with every table size.
     if (alone) {
@@ -795,6 +826,7 @@ export function mount(root, api) {
         'Each time a dot reaches dead center it picks a <span class="dr-hi">new direction</span>.';
     }
     ovNum.hidden = true;
+    ovNum.className = 'dr-num';
     const best = readBest();
     ovNote.textContent = lobbyNote(host, alone, n, best);
   }
