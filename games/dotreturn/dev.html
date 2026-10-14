@@ -86,7 +86,8 @@
 <div id="readout">
     <span>phase <b id="r-phase">–</b></span>
     <span>epoch <b id="r-epoch">–</b></span>
-    <span>group returns <b id="r-returns">–</b></span>
+    <span>lapses <b id="r-lapses">–</b></span>
+    <span>away <b id="r-away">–</b></span>
     <span>heading <b id="r-heading">–</b></span>
     <span>intent <b id="r-intent">–</b></span>
 </div>
@@ -137,7 +138,7 @@
     // Declared before mount(): the game's first update() sends a `join`
     // intent, which lands right back here through api.send.
     const out = {};
-    ['phase', 'epoch', 'returns', 'heading', 'intent'].forEach((k) => {
+    ['phase', 'epoch', 'lapses', 'away', 'heading', 'intent'].forEach((k) => {
         out[k] = document.getElementById('r-' + k);
     });
 
@@ -152,7 +153,8 @@
         const dot = state.dots[ME] || {};
         set('phase', state.phase);
         set('epoch', state.epoch);
-        set('returns', state.phase === 'over' ? state.returns : 'hidden');
+        set('lapses', state.phase === 'over' ? state.lapses : 'hidden');
+        set('away', state.phase === 'over' && state.over ? state.over.perPlayer.toFixed(1) + 's' : 'hidden');
         set('heading', typeof dot.a === 'number' ? dot.a.toFixed(4) + ' rad' : '–');
     }
 

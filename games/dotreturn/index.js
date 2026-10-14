@@ -15,7 +15,7 @@
 export const meta = {
   id: 'dotreturn',
   title: 'Dot Return',
-  players: { min: 1, max: 4 },
+  players: { min: 1, max: 10 },
   color: '#e9e4d8',
   icon: '⚪',
   desc: 'Swipe to steer a slow dot around a centre you cannot see — every time it drifts home it picks a new direction.',
@@ -46,8 +46,8 @@ const REVEAL_TIME = 3000;  // 3s reveal before clock starts
 
 // One dot is on screen and it is always yours, so there is nothing to
 // colour-match against. The palette went when the other dots did.
-const BEST_KEY = 'dotreturn.best.v2';
-const MAX_DOTS = 4;
+const BEST_KEY = 'dotreturn.best.v3';
+const MAX_DOTS = 10;
 
 // ---------------------------------------------------------------- state ----
 
@@ -58,12 +58,12 @@ function freshState() {
     endsAt: 0,
     revealEndsAt: 0,
     duration: DURATION,
-    returns: 0,             // one group tally, summed over every dot
+    lapses: 0,              // crossings out of the circle, displayed never scored
     players: [],
     hostId: '',             // owns starting a round; you in the solo corner
     solo: false,            // was the round just played one player? frozen at start
     table: [],              // who was actually at the table when it started
-    dots: {},               // id -> { a, out, lastReroll }
+    dots: {},               // id -> { a, out, outSince, away, lastReroll, benched }
     over: null
   };
 }
@@ -113,12 +113,12 @@ export function reduce(state, action, ctx) {
   // centre, which is the teleport a mid-round join used to cause.
   if (kind === 'join') {
     if (players.indexOf(id) >= 0) return same({ dots: dots });
-    if (players.length >= MAX_DOTS) return { error: 'Dot Return holds four dots.' };
+    if (players.length >= MAX_DOTS) return { error: 'Dot Return holds ' + MAX_DOTS + ' dots.' };
     players.push(id);
     const live = state.phase === 'play' || state.phase === 'reveal';
     dots[id] = live
-      ? { a: 0, out: false, lastReroll: 0, benched: true }
-      : { a: rng() * Math.PI * 2, out: false, lastReroll: 0, benched: false };
+      ? { a: 0, out: false, outSince: null, away: 0, lastReroll: 0, benched: true }
+      : { a: rng() * Math.PI * 2, out: false, outSince: null, away: 0, lastReroll: 0, benched: false };
     return same({
       epoch: live ? state.epoch : state.epoch + 1,
       players: players,
@@ -146,15 +146,16 @@ export function reduce(state, action, ctx) {
     }
     players.forEach(function (pid) {
       // A new round unbenches everyone: anyone who waited out the last one
-      // joins the motion from dead centre with the rest of the table.
-      dots[pid] = { a: rng() * Math.PI * 2, out: false, lastReroll: 0, benched: false };
+      // joins the motion from dead centre with the rest of the table. Away
+      // time and lapses reset with it — the score belongs to one round.
+      dots[pid] = { a: rng() * Math.PI * 2, out: false, outSince: null, away: 0, lastReroll: 0, benched: false };
     });
     return same({
       epoch: state.epoch + 1,
       phase: 'reveal',
       revealEndsAt: now + REVEAL_TIME,
       endsAt: now + REVEAL_TIME + state.duration * 1000,
-      returns: 0,
+      lapses: 0,
       over: null,
       solo: alone,
       table: players.slice(),
@@ -166,7 +167,36 @@ export function reduce(state, action, ctx) {
   if (kind === 'finish') {
     if (state.phase !== 'play') return same({});
     if (now < state.endsAt - FINISH_GRACE) return { error: 'The clock is still running.' };
-    return same({ phase: 'over', over: { returns: state.returns }, dots: dots });
+    // Close any interval still open at the clock, not at now: a dot that was
+    // out when time expired was away until then, however late finish arrives.
+    // A dropped player's dot freezes where it was, and this is what settles
+    // it — out means away until the end, in means nothing more accrues.
+    const end = Math.min(now, state.endsAt);
+    Object.keys(dots).forEach(function (pid) {
+      const d = dots[pid];
+      if (d && d.out && d.outSince !== null && d.outSince !== undefined) {
+        dots[pid] = Object.assign({}, d, {
+          away: d.away + Math.max(0, end - d.outSince),
+          out: false,
+          outSince: null
+        });
+      }
+    });
+    let away = 0;
+    Object.keys(dots).forEach(function (pid) {
+      away += (dots[pid] && dots[pid].away) || 0;
+    });
+    const table = (state.table && state.table.length) ? state.table : players;
+    const n = table.length || 1;
+    // perPlayer is seconds to one decimal: the headline number, and the saved
+    // best. Divided by the frozen table, not the live roster, so a benched
+    // mid-round joiner is never counted.
+    const perPlayer = Math.round((away / 1000 / n) * 10) / 10;
+    return same({
+      phase: 'over',
+      over: { away: away, lapses: state.lapses, players: table.length, perPlayer: perPlayer, duration: state.duration },
+      dots: dots
+    });
   }
 
   if (kind === 'revealend') {
@@ -197,15 +227,21 @@ export function reduce(state, action, ctx) {
   }
 
   if (kind === 'exit') {
-    // Latched, so a client that re-reports a crossing cannot inflate the tally.
+    // Latched, so a client that re-reports a crossing cannot inflate the
+    // count. Lapses are displayed, never scored — the score is away time.
     if (mine.out) return same({ dots: dots });
-    dots[id] = Object.assign({}, mine, { out: true });
-    return same({ dots: dots, returns: state.returns + 1 });
+    dots[id] = Object.assign({}, mine, { out: true, outSince: Math.min(now, state.endsAt) });
+    return same({ dots: dots, lapses: state.lapses + 1 });
   }
 
   if (kind === 'in') {
     if (!mine.out) return same({ dots: dots });
-    dots[id] = Object.assign({}, mine, { out: false });
+    const since = (mine.outSince !== null && mine.outSince !== undefined) ? mine.outSince : now;
+    dots[id] = Object.assign({}, mine, {
+      out: false,
+      outSince: null,
+      away: (mine.away || 0) + Math.max(0, Math.min(now, state.endsAt) - since)
+    });
     return same({ dots: dots });
   }
 
@@ -215,12 +251,20 @@ export function reduce(state, action, ctx) {
 // -------------------------------------------------------------- project ----
 
 export function project(state, playerId) {
-  // The whole point of the round is the reveal, so the tally simply is not in
-  // the snapshot until the clock runs out.
+  // The whole point of the round is the reveal, so the score simply is not in
+  // the snapshot until the clock runs out. Dots are stripped to heading and
+  // bench flag: everyone's `out` flag, and now `away`, would otherwise leak
+  // the shape of the hidden circle to the whole table mid-round.
   const hidden = state.phase !== 'over';
+  const dots = {};
+  Object.keys(state.dots || {}).forEach(function (id) {
+    const d = state.dots[id] || {};
+    dots[id] = { a: d.a, benched: !!d.benched };
+  });
   return Object.assign({}, state, {
     you: playerId || '',
-    returns: hidden ? null : state.returns,
+    dots: dots,
+    lapses: hidden ? null : state.lapses,
     over: hidden ? null : state.over
   });
 }
@@ -229,7 +273,6 @@ export function project(state, playerId) {
 
 export function summarize(state, nameOf) {
   if (state.phase !== 'over' || !state.over) return null;
-  const n = state.over.returns;
   // `table`, not `players`: the roster carries everyone in the room, and a
   // record line that thanks the whole lobby for a two-person game is a lie.
   const ids = (state.table && state.table.length) ? state.table : state.players;
@@ -239,8 +282,8 @@ export function summarize(state, nameOf) {
   const names = who.length === 2 ? who[0] + ' and ' + who[1]
     : (who.length > 2 ? who.slice(0, -1).join(', ') + ' and ' + who[who.length - 1]
       : (who[0] || 'Someone'));
-  return names + ' held the dot for ' + state.duration + 's — ' +
-    n + (n === 1 ? ' return' : ' returns');
+  return names + ' held the dot for ' + state.duration + 's, averaging ' +
+    Number(state.over.perPlayer || 0).toFixed(1) + 's away each';
 }
 
 // ----------------------------------------------------------------- mount ----
@@ -293,20 +336,37 @@ const CSS = [
   '.dr-hi{color:#e9e4d8;font-weight:600}'
 ].join('');
 
+ // Best is per-player away seconds with the table size it was set at, so the
+// record reads "best 6.2s, 4 players". Stored as "6.2|4"; parseFloat reads
+// the score and ignores the tail, which is why 9.4 survives where parseInt
+// truncated it to 9.
 function readBest() {
   try {
     const raw = localStorage.getItem(BEST_KEY);
-    return raw === null ? null : parseInt(raw, 10);
+    if (raw === null) return null;
+    const score = parseFloat(raw);
+    if (!isFinite(score)) return null;
+    const at = raw.indexOf('|');
+    const players = at >= 0 ? parseInt(raw.slice(at + 1), 10) : 1;
+    return { score: score, players: players };
   } catch (e) {
     return null;
   }
 }
 
-function saveBest(n) {
+function saveBest(score, players) {
   try {
     const b = readBest();
-    if (b === null || n < b) localStorage.setItem(BEST_KEY, String(n));
+    if (b === null || score < b.score) {
+      localStorage.setItem(BEST_KEY, score.toFixed(1) + '|' + players);
+    }
   } catch (e) { /* incognito */ }
+}
+
+function bestLine(best) {
+  if (!best) return 'your best is still unwritten';
+  return 'best ' + best.score.toFixed(1) + 's, ' + best.players +
+    (best.players === 1 ? ' player' : ' players');
 }
 
 export function mount(root, api) {
@@ -370,11 +430,13 @@ export function mount(root, api) {
   let lastRerollReq = 0;
   let latched = false;
   let localOut = false;
-  let scoredEpoch = -1;
   let joined = false;
   let toastTimer = null;
   let lastDenied = '';
   let lastDeniedAt = 0;
+  let dead = false; // set by destroy(): a dead handle ignores updates and
+  // starts no loops, so an intent sent from destroy() cannot re-animate it
+  // — or any other dead handle — through the host's broadcast.
 
   const soloCorner = !api.isInRoom;
 
@@ -423,7 +485,7 @@ export function mount(root, api) {
   }
 
   function startLoop() {
-    if (running) return;
+    if (dead || running) return;
     running = true;
     sim.last = 0;
     rafId = api.raf(frame);
@@ -527,7 +589,6 @@ export function mount(root, api) {
       if (!latched && !pendingReroll && dist <= CENTER && now - lastRerollReq > REROLL_RETRY) {
         lastRerollReq = now;
         pendingReroll = true;
-        showToast('Dot hit dead center');
         api.send({ a: 'reroll' });
       }
       const out = dist > R;
@@ -694,38 +755,45 @@ export function mount(root, api) {
     }
 
     if (view.phase === 'over') {
-      const t = view.returns;
+      const o = view.over || {};
+      const per = Number(o.perPlayer || 0);
+      const laps = o.lapses || 0;
+      const held = Math.max(0, Math.min(100,
+        Math.round(100 * (1 - per / view.duration))));
       ovTitle.textContent = alone ? 'Round Over' : 'Table Round Over';
-      ovBody.innerHTML = 'The dot stayed out of the ring for <span class="dr-hi">' +
-        view.duration + ' seconds</span>, and the group returned it <span class="dr-hi">' +
-        t + '</span> time' + (t === 1 ? '' : 's') + '.';
       ovNum.hidden = false;
-      ovNum.textContent = String(t);
-      const best = readBest();
-      ovNote.textContent = alone
-        ? (best === null ? 'your best is still unwritten'
-          : (t <= best ? 'a new personal best'
-            : 'personal best: ' + best + (best === 1 ? ' return' : ' returns')))
-        : '';
-      if (alone && view.epoch !== scoredEpoch) {
-        scoredEpoch = view.epoch;
-        saveBest(t);
-      }
+      ovNum.textContent = per.toFixed(1) + 's';
+      ovBody.innerHTML = 'Average time away from the centre, per dot.<br>' +
+        'The table held the ring <span class="dr-hi">' + held + '%</span> of the round.<br>' +
+        laps + (laps === 1 ? ' lapse' : ' lapses') + ' along the way.';
+      // Every table saves, not only solo ones: the score is per-player, so
+      // games of any size compare and share one best. saveBest only writes
+      // when strictly better, so calling it on every over-render is safe —
+      // a stale epoch guard skipped the save whenever epochs restarted.
+      saveBest(per, o.players || n || 1);
+      ovNote.textContent = bestLine(readBest());
       return;
     }
 
     ovTitle.textContent = 'Dot Return';
-    // The old copy said "the group tally" to a lone player in an empty room.
-    ovBody.innerHTML = 'Keep a dot inside the invisible circle.<br>' +
-      'It is moving.<br>' +
-      'Swipe anywhere to redirect the dot.<br>' +
-      'You are scored on returns. A return is when the dot returns to the circle after leaving.<br>' +
-      'Try to get the fewest possible returns. Groups are all working together against the dot.<br>' +
-      'Each member has their own dots and scores are added together. Bigger groups end up with higher numbers.<br>' +
-      'Each time it hits dead centre it picks a <span class="dr-hi">new direction</span>.<br>' +
-      'The ' + (alone ? 'tally' : 'group tally') + ' is revealed when the ' +
-      view.duration + 's clock runs out.<br>' +
-      'Goal: <span class="dr-hi">fewest returns.</span>';
+    // Solo drops the team lines and says "your score": the average is over
+    // one dot, but it still compares with every table size.
+    if (alone) {
+      ovBody.innerHTML = 'Keep your dot inside an invisible circle. ' +
+        'Swipe anywhere to steer it; the dot never stops drifting.<br>' +
+        'Your score is the time your dot spent away from the center.<br>' +
+        'It is revealed when the ' + view.duration + 's clock ends.<br>' +
+        'Less is better.<br>' +
+        'Each time a dot reaches dead center it picks a <span class="dr-hi">new direction</span>.';
+    } else {
+      ovBody.innerHTML = 'One table, one team.<br>' +
+        'Each of you keeps your own dot inside an invisible circle. ' +
+        'Swipe anywhere to steer it; the dot never stops drifting.<br>' +
+        'The table shares a single score: the average time your dots spent away from the center.<br>' +
+        'It is revealed when the ' + view.duration + 's clock ends.<br>' +
+        'Less is better.<br>' +
+        'Each time a dot reaches dead center it picks a <span class="dr-hi">new direction</span>.';
+    }
     ovNum.hidden = true;
     const best = readBest();
     ovNote.textContent = lobbyNote(host, alone, n, best);
@@ -735,8 +803,7 @@ export function mount(root, api) {
   // what they are waiting on. Before this, the screen said the same thing to
   // the host of a full table and to a guest who could not press the button.
   function lobbyNote(host, alone, n, best) {
-    const personal = best === null ? '' : ' · personal best: ' + best +
-      (best === 1 ? ' return' : ' returns');
+    const personal = best === null ? '' : ' · ' + bestLine(best);
     if (soloCorner) return 'Solo round — you are the whole table.' + personal;
     if (alone) return host
       ? 'Nobody else has joined yet. Start solo, or wait for players.'
@@ -788,6 +855,21 @@ export function mount(root, api) {
   btn.addEventListener('click', askStart);
   btnSolo.addEventListener('click', askStart);
 
+  // A hidden tab freezes the sim — the step cap stops the spiral — which would
+  // freeze the penalty too. Report the exit on hide; the first frame back
+  // sends `in` if the dot is inside, so the hidden seconds count as away.
+  // A closed tab sends nothing, so a dropped player's dot freezes where it
+  // was; finish() settles it — out at the drop means away until the clock, in
+  // means nothing more accrues. Accepted: presence is the hub's job, not this
+  // game's.
+  function onVis() {
+    if (document.hidden && view && view.phase === 'play' && myDot() && !localOut) {
+      localOut = true;
+      api.send({ a: 'exit' });
+    }
+  }
+  document.addEventListener('visibilitychange', onVis);
+
   // ---- sizing ------------------------------------------------------------
   let ro = null;
   if (typeof ResizeObserver === 'function') {
@@ -800,7 +882,7 @@ export function mount(root, api) {
 
   return {
     update: function (next) {
-      if (!next) return;
+      if (dead || !next) return;
       const prevPhase = view ? view.phase : null;
       view = next;
       if (typeof next.you === 'string' && next.you) myId = next.you;
@@ -846,7 +928,7 @@ export function mount(root, api) {
     // Same-text repeats are throttled: a refusal that fires every frame would
     // otherwise pin the toast on screen.
     denied: function (text) {
-      const msg = String(text || 'The host refused that.');
+      if (dead) return;      const msg = String(text || 'The host refused that.');
       const now = Date.now();
       if (msg === lastDenied && now - lastDeniedAt < 1500) return;
       lastDenied = msg;
@@ -854,6 +936,13 @@ export function mount(root, api) {
       showToast(msg);
     },
     destroy: function () {
+      // Best effort: leaving mid-round reports the exit so the table is not
+      // scored as if the dot sat inside. A closed tab cannot be caught.
+      try {
+        if (view && view.phase === 'play' && myDot() && !localOut) api.send({ a: 'exit' });
+      } catch (e) {}
+      dead = true;
+      document.removeEventListener('visibilitychange', onVis);
       stopLoop();
       if (ro) ro.disconnect();
       window.removeEventListener('resize', onResize);
