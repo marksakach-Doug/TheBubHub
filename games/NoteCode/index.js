@@ -1,6 +1,6 @@
 // games/kyle/index.js — Kyle Knows the Code
 const C4 = 261.63;
-const SIZE = 6;                                          // every scale has six notes
+const SIZE = 6;                                          // every scale has six pitches
 const NAMES = ['C', 'C#', 'D', 'Eb', 'E', 'F', 'F#', 'G', 'Ab', 'A', 'Bb', 'B'];
 const WORDS = ['None', 'One', 'Two', 'Three', 'Four', 'Five', 'Six', 'Seven', 'Eight', 'Nine', 'Ten'];
 const KYLE = `    _______
@@ -19,8 +19,8 @@ const KYLE = `    _______
 const et = (semis) => semis.map((s) => +(C4 * 2 ** (s / 12)).toFixed(2));
 const sixNote = (name, group, semis) => ({ name, group, labels: semis.map((s) => NAMES[s % 12]), hz: et(semis) });
 
-// Microtone scales: six notes that equally divide a given interval (in cents).
-// Notes sit at i * interval / 6 for i = 0..5, so the interval itself is not repeated.
+// Microtone scales: six pitches that equally divide a given interval (in cents).
+// Pitches sit at i * interval / 6 for i = 0..5, so the interval itself is not repeated.
 const micro = (name, group, cents) => {
   const at = Array.from({ length: SIZE }, (_, i) => (cents * i) / SIZE);
   return { name, group, labels: at.map((_, i) => String(i + 1)), hz: at.map((c) => +(C4 * 2 ** (c / 1200)).toFixed(2)) };
@@ -42,15 +42,24 @@ export const SCALES = {
 export const meta = { id: 'kyle', title: 'Kyle Knows the Code', players: '1+', color: '#ff00ff',
   icon: '🎵', desc: 'Crack the melody that Kyle knows.', soloable: true };
 
-const DEFAULT_CFG = { ears: false, scale: 'pent', social: false };
-const sanitize = (c = {}) => ({ ears: !!c.ears, scale: SCALES[c.scale] ? c.scale : 'pent', social: !!c.social });
-const pick = (rng, len) => Array.from({ length: len }, () => Math.floor(rng() * SIZE));
-const sameArr = (a, b) => a.length === b.length && a.every((n, i) => n === b[i]);
+const DEFAULT_CFG = { ears: false, scale: 'pent', social: false, perUnit: 1 };
+const sanitize = (c = {}) => ({
+  ears: !!c.ears,
+  scale: SCALES[c.scale] ? c.scale : 'pent',
+  social: !!c.social,
+  perUnit: Math.min(5, Math.max(1, parseInt(c.perUnit, 10) || 1)),
+});
+const pick = (rng, n) => Array.from({ length: n }, () => Math.floor(rng() * SIZE));
+// A unit is one symbol of the code: a short melody of perUnit pitches. Units are compared by key.
+const key = (u) => u.join(',');
+const sameUnits = (A, B) => A.every((u, i) => key(u) === key(B[i]));
+const nounFor = (k) => (k > 1 ? 'melody' : 'note');
 
 export function init() {
   return { phase: 'home', cfg: DEFAULT_CFG, wins: 0, len: 3, code: null, rows: [], won: false, over: false, clues: [], seats: null };
 }
 
+// Scores units against the code. Works on any array of comparable keys.
 function score(g, code) {
   let red = 0; const cu = {}, gu = {};
   g.forEach((n, i) => { if (n === code[i]) red++; else { gu[n] = (gu[n] || 0) + 1; cu[code[i]] = (cu[code[i]] || 0) + 1; } });
@@ -58,27 +67,29 @@ function score(g, code) {
   return [red, white];
 }
 
-function say(red, white) {
+function say(red, white, noun) {
   const p = [];
-  if (red) p.push(`${WORDS[red]} ${red === 1 ? 'note is' : 'notes are'} right and in the right spot.`);
-  if (white) p.push(`${WORDS[white]} ${white === 1 ? 'note is' : 'notes are'} right, but in the wrong spot.`);
-  return p.join(' ') || 'None of those notes are in the code.';
+  if (red) p.push(`${WORDS[red]} ${red === 1 ? `${noun} is` : `${noun}s are`} right and in the right spot.`);
+  if (white) p.push(`${WORDS[white]} ${white === 1 ? `${noun} is` : `${noun}s are`} right, but in the wrong spot.`);
+  return p.join(' ') || `None of those ${noun}s are in the code.`;
 }
 
 // Builds a fresh round. In Social Code Break, the table gets players+1 prefilled clues,
 // dealt round-robin, so no single player holds the full set but the group together has enough.
 function startRound(cfg, len, wins, rng, players) {
-  const code = pick(rng, len);
+  const code = Array.from({ length: len }, () => pick(rng, cfg.perUnit));
   const s = { phase: 'play', cfg, len, wins, code, rows: [], won: false, over: false, clues: [], seats: null };
   if (!cfg.social) return s;
   const seats = Array.isArray(players) ? players.slice() : [];
   if (seats.length < 2) return { error: 'Social Code Break needs at least 2 players.' };
   const total = seats.length + 1;
+  const noun = nounFor(cfg.perUnit);
   for (let k = 0; k < total; k++) {
     let g;
-    do { g = pick(rng, len); } while (sameArr(g, code) || s.clues.some((c) => sameArr(c.g, g)));
-    const [red, white] = score(g, code);
-    s.clues.push({ g, red, white, text: say(red, white), seat: k % seats.length });
+    do { g = Array.from({ length: len }, () => pick(rng, cfg.perUnit)); }
+    while (sameUnits(g, code) || s.clues.some((c) => sameUnits(c.g, g)));
+    const [red, white] = score(g.map(key), code.map(key));
+    s.clues.push({ g, red, white, text: say(red, white, noun), seat: k % seats.length });
   }
   s.seats = seats;
   return s;
@@ -95,13 +106,15 @@ export function reduce(s, a, ctx) {
     return startRound(s.cfg, s.len < 10 ? s.len + 1 : 3, s.wins, rng, players);
   }
   if (s.won || s.over) return { error: 'Round finished. Start the next one.' };
-  if (a.a !== 'guess' || !Array.isArray(a.g) || a.g.length !== s.len || a.g.some((n) => !(n >= 0 && n < SIZE)))
-    return { error: `Kyle wants exactly ${s.len} notes.` };
-  const [red, white] = score(a.g, s.code);
+  const k = s.cfg.perUnit;
+  if (a.a !== 'guess' || !Array.isArray(a.g) || a.g.length !== s.len * k || a.g.some((n) => !(n >= 0 && n < SIZE)))
+    return { error: `Kyle wants exactly ${s.len * k} notes.` };
+  const g = Array.from({ length: s.len }, (_, i) => a.g.slice(i * k, i * k + k));
+  const [red, white] = score(g.map(key), s.code.map(key));
   const won = red === s.len;
   return {
     ...s,
-    rows: [...s.rows, { g: a.g, red, white, text: say(red, white) }],
+    rows: [...s.rows, { g, red, white, text: say(red, white, nounFor(k)) }],
     won,
     over: !won && !!s.cfg.social,                         // social: the table's one guess is spent
     wins: s.wins + (won ? 1 : 0),
@@ -131,18 +144,33 @@ const scaleOptions = () => {
   return Object.entries(groups).map(([g, opts]) => `<optgroup label="${g}">${opts.join('')}</optgroup>`).join('');
 };
 
+const perUnitOptions = () => [1, 2, 3, 4, 5]
+  .map((n) => `<option value="${n}">${n === 1 ? '1 note (single notes)' : `${n}-note melody`}</option>`).join('');
+
 export function mount(root, api) {
   let view = null, sel = [], len = 0, seen = 0, wonSeen = false, endSeen = false, ac, bubbleTimer = 0, lastPhase = null;
   const $ = (q) => root.querySelector(q);
   const scaleOf = () => SCALES[(view && view.cfg && view.cfg.scale) || 'pent'];
-  const tone = (hz) => {
-    ac = ac || new AudioContext();
+  const perUnit = () => (view && view.cfg ? view.cfg.perUnit : 1);
+
+  // One note: a short plucked tone starting at audio time `when`.
+  const note = (hz, when) => {
     const o = ac.createOscillator(), g = ac.createGain();
     o.frequency.value = hz;
-    g.gain.exponentialRampToValueAtTime(0.001, ac.currentTime + 0.6);
-    o.connect(g).connect(ac.destination); o.start(); o.stop(ac.currentTime + 0.6);
+    g.gain.setValueAtTime(0.5, when);
+    g.gain.exponentialRampToValueAtTime(0.001, when + 0.4);
+    o.connect(g).connect(ac.destination);
+    o.start(when); o.stop(when + 0.4);
   };
-  const playIdx = (i) => tone(scaleOf().hz[i]);
+  // A melody: the pitches played one after another. A single pitch is a one-note melody.
+  const playMelody = (idxs) => {
+    ac = ac || new AudioContext();
+    const hz = scaleOf().hz;
+    const t0 = ac.currentTime + 0.02;
+    idxs.forEach((i, j) => note(hz[i], t0 + j * 0.35));
+  };
+  const playIdx = (i) => playMelody([i]);
+
   // Speech bubble: always visible, text fades out after a few seconds.
   const bubble = (text) => {
     const my = ++bubbleTimer;
@@ -150,9 +178,10 @@ export function mount(root, api) {
     $('#bubble').style.visibility = 'visible';
     api.setTimeout(() => { if (my === bubbleTimer) $('#bubble').style.visibility = 'hidden'; }, 5000);
   };
-  // Note names are clickable so anyone can replay a note (essential in ears-only mode).
-  const noteSpans = (g) => g.map((i) =>
-    `<span class="nt" data-p="${i}">${view.cfg.ears ? '***' : scaleOf().labels[i]}</span>`).join(' ');
+  // Each unit is clickable and plays its whole melody. In ears-only mode the letters are hidden.
+  const unitLabel = (u) => (view.cfg.ears ? '***' : u.map((i) => scaleOf().labels[i]).join('-'));
+  const unitSpans = (units) => units.map((u) =>
+    `<span class="nt" data-p="${u.join(',')}">${unitLabel(u)}</span>`).join(' ');
   const pips = (red, white) => `<span>${'<i class="r"></i>'.repeat(red)}${'<i class="w"></i>'.repeat(white)}</span>`;
 
   root.innerHTML = `<style>
@@ -170,6 +199,8 @@ export function mount(root, api) {
     .r{background:#f00}.w{background:#fff}
     button{font:bold 16px Arial;min-width:48px;min-height:44px;margin:3px;background:#c0c0c0;border:3px outset #eee;cursor:pointer}
     select{font:16px Arial;min-height:36px;max-width:100%}
+    #slots{display:flex;flex-wrap:wrap;align-items:center}
+    .grp{display:inline-flex;margin-right:14px}
     .slot{display:inline-block;width:52px;height:44px;line-height:44px;border:2px inset #888;background:#fff;color:#000;text-align:center;margin:3px;font:bold 18px Arial}
     #home label{display:block;margin:12px 0}
     #home input[type=checkbox]{transform:scale(1.4);margin-right:10px}
@@ -184,8 +215,9 @@ export function mount(root, api) {
     </div>
     <div id="home" style="display:none">
       <h2>Choose your game</h2>
-      <label><input type="checkbox" id="ears"> Ears only (no note letters; tap a feedback note to hear it)</label>
+      <label><input type="checkbox" id="ears"> Ears only (no note letters; tap a feedback unit to hear its melody)</label>
       <label>Scale <select id="scale">${scaleOptions()}</select></label>
+      <label>Notes per unit <select id="perunit">${perUnitOptions()}</select></label>
       <label><input type="checkbox" id="social"> Multiplayer Social Code Break (2+ players; shared clues, one guess for the table)</label>
       <p><button id="start">Start</button></p>
     </div>
@@ -211,6 +243,7 @@ export function mount(root, api) {
       if (lastPhase !== 'home') {
         $('#ears').checked = !!view.cfg.ears;
         $('#scale').value = view.cfg.scale;
+        $('#perunit').value = String(view.cfg.perUnit);
         $('#social').checked = !!view.cfg.social;
       }
       $('#start').disabled = spec;
@@ -221,17 +254,30 @@ export function mount(root, api) {
 
     const sc = scaleOf();
     const ears = view.cfg.ears;
+    const k = perUnit();
     const end = view.won || view.over;
-    $('#meta').textContent = `Notes in this code: ${view.len} · Rounds cracked: ${view.wins}`
+    $('#meta').textContent = `Units in this code: ${view.len}${k > 1 ? ` (${k}-note melodies)` : ''}`
+      + ` · Rounds cracked: ${view.wins}`
       + `${view.cfg.social ? ' · Social: one guess for the whole table' : ''}${spec ? ' · 👁 watching' : ''}`;
-    $('#slots').innerHTML = Array.from({ length: view.len }, (_, k) =>
-      `<span class="slot">${sel[k] !== undefined ? (ears ? '***' : sc.labels[sel[k]]) : '·'}</span>`).join('');
+
+    // Slots are grouped by unit: k boxes per unit, filled left to right.
+    let slots = '';
+    for (let u = 0; u < view.len; u++) {
+      let inner = '';
+      for (let j = 0; j < k; j++) {
+        const p = u * k + j;
+        const txt = sel[p] !== undefined ? (ears ? '***' : sc.labels[sel[p]]) : '·';
+        inner += `<span class="slot">${txt}</span>`;
+      }
+      slots += `<span class="grp">${inner}</span>`;
+    }
+    $('#slots').innerHTML = slots;
     $('#pad').innerHTML = sc.labels.map((n, i) => `<button data-i="${i}" ${off}>${ears ? '♪' : n}</button>`).join('');
 
     const clueCards = view.clues.map((c, n) =>
-      `<div class="card clue"><b>Clue ${n + 1}</b> ${noteSpans(c.g)} ${pips(c.red, c.white)}<br><small>${c.text}</small></div>`);
+      `<div class="card clue"><b>Clue ${n + 1}</b> ${unitSpans(c.g)} ${pips(c.red, c.white)}<br><small>${c.text}</small></div>`);
     const guessCards = view.rows.map((r, n) =>
-      `<div class="card"><b>${n + 1}.</b> ${noteSpans(r.g)} ${pips(r.red, r.white)}</div>`);
+      `<div class="card"><b>${n + 1}.</b> ${unitSpans(r.g)} ${pips(r.red, r.white)}</div>`);
     $('#board').innerHTML = [
       view.cfg.social ? `<p>Your clues: ${view.clues.length} of ${view.totalClues} held by the table.</p>` : '',
       ...clueCards, ...guessCards,
@@ -239,8 +285,8 @@ export function mount(root, api) {
 
     $('#ctl').innerHTML = end
       ? `<p><b>${view.won ? 'You cracked it!' : (view.cfg.social ? 'The one guess missed.' : 'Out of guesses.')}</b>
-           The code was ${noteSpans(view.code)}.</p>
-         <button data-a="next" ${off}>Next round (${view.len < 10 ? view.len + 1 : 3} notes)</button>
+           The code was ${unitSpans(view.code)}.</p>
+         <button data-a="next" ${off}>Next round (${view.len < 10 ? view.len + 1 : 3} units)</button>
          <button data-a="home" ${off}>Modes</button>`
       : `<button data-a="clear" ${off}>Clear</button> <button data-a="submit" ${off}>Ask Kyle</button>
          <button data-a="home" ${off}>Modes</button>`;
@@ -252,16 +298,22 @@ export function mount(root, api) {
     if (start) {
       if (api.isSpectator) return;
       sel = [];
-      api.send({ a: 'start', cfg: { ears: $('#ears').checked, scale: $('#scale').value, social: $('#social').checked } });
+      api.send({ a: 'start', cfg: {
+        ears: $('#ears').checked,
+        scale: $('#scale').value,
+        perUnit: $('#perunit').value,
+        social: $('#social').checked,
+      } });
       return;
     }
-    const nt = e.target.closest('.nt');                    // replay a note: local only, allowed for spectators
-    if (nt) { playIdx(+nt.dataset.p); return; }
+    const nt = e.target.closest('.nt');                    // replay a unit's melody: local only, allowed for spectators
+    if (nt) { playMelody(nt.dataset.p.split(',').map(Number)); return; }
     const b = e.target.closest('button');
     if (!b || api.isSpectator) return;
-    if (b.dataset.i !== undefined) { if (sel.length < len) { sel.push(+b.dataset.i); playIdx(+b.dataset.i); render(); } }
+    const need = len * perUnit();
+    if (b.dataset.i !== undefined) { if (sel.length < need) { sel.push(+b.dataset.i); playIdx(+b.dataset.i); render(); } }
     else if (b.dataset.a === 'clear') { sel = []; render(); }
-    else if (b.dataset.a === 'submit' && sel.length === len) { api.send({ a: 'guess', g: sel }); sel = []; }
+    else if (b.dataset.a === 'submit' && sel.length === need) { api.send({ a: 'guess', g: sel }); sel = []; }
     else if (b.dataset.a === 'next') { sel = []; api.send({ a: 'next' }); }
     else if (b.dataset.a === 'home') { sel = []; api.send({ a: 'home' }); }
   });
