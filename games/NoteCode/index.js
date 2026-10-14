@@ -4,12 +4,12 @@ const HZ = [262, 294, 330, 392, 440, 523];
 const WORDS = ['None', 'One', 'Two', 'Three', 'Four', 'Five', 'Six', 'Seven', 'Eight', 'Nine', 'Ten'];
 const KYLE = `    _______
    /_______\\
-  ( 0   o )
-   (   U  )
+  ( 0   o   )
+   (   U   )
     \\_____/
    __|   |__
   /  |   |  \\
- /   |   |   \\
+ /   |__|   \\
      |   |
     _|   |_
 `;
@@ -67,7 +67,7 @@ export function mount(root, api) {
   };
   root.innerHTML = `<style>
     .k{background:#000080;color:#ff0;font:16px 'Times New Roman',serif;padding:12px;min-height:100%}
-    h1{color:#0ff;font:bold 34px Georgia;text-shadow:3px 3px #f0f;margin:6px 0}
+    h1{color:#0ff;font:bold 24px Georgia;text-shadow:3px 3px #f0f;margin:6px 0}
     #kyle{font:14px/1.1 'Courier New',monospace;color:#0f0;margin:0}
     #bubble{position:relative;background:#fff;color:#000;border:3px solid #000;padding:10px;min-height:60px;min-width:200px;font:bold 16px Arial;visibility:hidden}
     #bubble:before{content:'';position:absolute;left:-18px;top:20px;border:9px solid transparent;border-right:9px solid #000}
@@ -89,9 +89,8 @@ export function mount(root, api) {
     <p id="meta"></p>
     <div id="slots"></div>
     <div id="pad">${NOTES.map((n, i) => `<button data-i="${i}">${n}</button>`).join('')}</div>
-    <div id="ctl"></div>
+    <div id="ctl"></div><p>               <span class="r"></span> right note, right spot &nbsp; <span class="w"></span> right note, wrong spot</p>
     <div class="board" id="board"></div>
-    <p><span class="r"></span> right note, right spot &nbsp; <span class="w"></span> right note, wrong spot</p>
   </div>`;
   bubble("I'm Kyle. I know the code.");
   const render = () => {
