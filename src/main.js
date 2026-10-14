@@ -606,10 +606,12 @@ export async function boot() {
       } else if (m.p && m.p.denied) {
         // The host refused one of our intents. This used to vanish, which is
         // why a refused action looked like nothing happening. Route it to the
-        // mounted module if it wants it; legacy games keep the old path.
+        // mounted module if it wants it; legacy games use compat.down.
         const g = byId.get(m.p.game);
         if (g && g.kind === 'module' && moduleHandle && typeof moduleHandle.denied === 'function') {
           try { moduleHandle.denied(m.p.text); } catch (e) {}
+        } else {
+          compat.down(m.p.game, 'denied', { text: m.p.text });
         }
       }
     } else if (m.type === T.STATE) {
