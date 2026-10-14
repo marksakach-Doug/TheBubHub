@@ -54,7 +54,10 @@ HARNESS = r"""
   // ---- a fake clock so 30 seconds of drift costs nothing. Date.now runs on
   // the same clock, so exit/in intervals accrue fake seconds exactly like a
   // real round. `frozen` is the hidden-tab stand-in: time passes, no frames.
-  let clock = 0, nextId = 1;
+  // The clock starts at 10000, not 0: production rAF timestamps are ms since
+  // page load (large), and the reroll retry gate compares against them, so a
+  // zero-based clock would hold the first reroll past the CENTER dwell.
+  let clock = 10000, nextId = 1;
   let frozen = false;
   const t0 = Date.now();
   Date.now = () => t0 + clock;
@@ -381,15 +384,15 @@ HARNESS = r"""
   state = dr.init({ seats: table, atTable: table, options: {} });
   handle.update(dr.project(state, ME));
 
-  // a round nobody steers: the dot leaves after R/V = 5s and stays out.
+  // a round nobody steers: the dot leaves after R/V = 3s and stays out.
   // Wind bends the path but never below half speed along the heading, so the
-  // exit lands between 3.3s (full tailwind) and 10s (full headwind).
+  // exit lands between 2s (full tailwind) and 6s (full headwind).
   q('.dr-btn').click();
   api.send({ a: 'revealend' });
   ok('the neglect round plays', state.phase === 'play');
   pump(75000); // the full round; the client sends finish at 0
   ok('a neglected round ends itself', state.phase === 'over');
-  ok('neglect costs about 69s away per player',
+  ok('neglect costs about 70s away per player',
     state.over.perPlayer > 60 && state.over.perPlayer < 72);
   ok('one lapse per neglected dot', state.over.lapses === 1);
   ok('the held percentage is shown', /held the ring \d+%/.test(overlayText()));

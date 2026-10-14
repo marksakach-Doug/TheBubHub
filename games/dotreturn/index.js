@@ -24,12 +24,12 @@ export const meta = {
 
 // Geometry is in fractions of the shorter side of the field, which is what the
 // original full-screen prototype meant by vmin.
-// Tuning: R/V = 5.0s for dot to leave circle with no input (V = R/5).
-// R=0.0414 gives ~16.15px radius on 390px viewport; V=0.00828 gives ~3.23px/s.
+// Tuning: R/V = 3.0s for dot to leave circle with no input (V = R/3).
+// R=0.02484 gives ~9.69px radius on 390px viewport; V=0.00828 gives ~3.23px/s.
 // Wind pushes every dot at WIND*V on top of its heading, so the still-dot
-// exit time breathes around 5s instead of landing on it.
-const R = 0.0414;          // radius of the hidden circle the dot must stay inside
-const V = 0.00828;        // drift speed, per second (kept consistent with R/V=5.0)
+// exit time breathes around 3s instead of landing on it.
+const R = 0.02484;          // radius of the hidden circle the dot must stay inside
+const V = 0.00828;        // drift speed, per second (kept consistent with R/V=3.0)
 const WIND = 0.50;        // wind push as a fraction of V; re-rolled every 15-25s
 const DURATION = 70;    // round length, seconds
 const DT = 1 / 60;       // fixed integration step
