@@ -147,10 +147,16 @@ HARNESS = r"""
   ok('the countdown counts to the start', cnt() && /^[123]$/.test(cnt().textContent));
   ok('the countdown sits above the sentence',
     cnt().compareDocumentPosition(say()) & Node.DOCUMENT_POSITION_FOLLOWING);
-  ok('the banner rests on the circle top',
-    Math.abs(parseFloat(rev().style.bottom) - 314.4) < 2);
+  ok('the banner rests on the circle top', (function () {
+    const ringR = parseFloat(q('.dr-ring').style.width) / 2;
+    return Math.abs(parseFloat(rev().style.bottom) - (300 + ringR)) < 2;
+  })());
   api.send({ a: 'revealend' });
   ok('Start becomes a round', state.phase === 'play' && !overlayShown());
+  // Baseline before any pump: with a tailwind the dot can leave in 2.7s, so
+  // by the time the lapse section runs below it may already be out — and an
+  // exited dot never comes back, so no second lapse would follow.
+  const lapsesBefore = state.lapses;
   ok('the banner leaves with the reveal', rev().style.display === 'none');
   ok('a dot appears', !!dot());
   ok('the timer is running', /\d+s/.test(hud()));
@@ -202,7 +208,7 @@ HARNESS = r"""
   ok('a tap does not steer', intents.filter((a) => a.a === 'swipe').length === swipesSoFar);
 
   // ---- drift out of the hidden circle: the lapse count, and away time
-  const lapsesBefore = state.lapses;
+  // (lapsesBefore was captured before the first pump — see above)
   pump(60000);
   ok('leaving the circle is reported', intents.some((a) => a.a === 'exit'));
   ok('the host counted the lapse', state.lapses > lapsesBefore);
@@ -227,7 +233,8 @@ HARNESS = r"""
   api.send({ a: 'revealend' });
   ok('a new round starts', state.phase === 'play' && state.lapses === 0);
   pump(1000);
-  ok('the dot is back at the centre', visible(dot()) && Math.abs(dotX() - 200) < 6);
+  // wind pushes up to 0.5V on top of the drift, so 1s can carry the dot ~6px
+  ok('the dot is back at the centre', visible(dot()) && Math.abs(dotX() - 200) < 8);
 
   // ---- a late joiner waits for the next round, and you still only see your own
   const joined = dr.reduce(state, { a: 'join' },
@@ -374,14 +381,16 @@ HARNESS = r"""
   state = dr.init({ seats: table, atTable: table, options: {} });
   handle.update(dr.project(state, ME));
 
-  // a round nobody steers: the dot leaves after R/V = 4s and stays out
+  // a round nobody steers: the dot leaves after R/V = 4s and stays out.
+  // Wind bends the path but never below half speed along the heading, so the
+  // exit lands between 2.7s (full tailwind) and 8s (full headwind).
   q('.dr-btn').click();
   api.send({ a: 'revealend' });
   ok('the neglect round plays', state.phase === 'play');
   pump(75000); // the full round; the client sends finish at 0
   ok('a neglected round ends itself', state.phase === 'over');
   ok('neglect costs about 69s away per player',
-    state.over.perPlayer > 60 && state.over.perPlayer < 70);
+    state.over.perPlayer > 60 && state.over.perPlayer < 72);
   ok('one lapse per neglected dot', state.over.lapses === 1);
   ok('the held percentage is shown', /held the ring \d+%/.test(overlayText()));
   ok('the neglect best is saved with its table size',
@@ -408,13 +417,34 @@ HARNESS = r"""
   ok('the note reads the best in seconds',
     /best 9\.4s, 1 player/.test(q('.dr-note').textContent));
 
-  // perfect attention: steer back to the centre whenever it wanders
-  q('.dr-btn').click();
-  api.send({ a: 'revealend' });
+  // wind: a fixed heading still bends off course. Seed the wind straight
+  // down, swipe right, and read the slope: pure heading would run flat.
   const dotPos = () => {
     const m = /translate\(([-\d.]+)px,\s*([-\d.]+)px\)/.exec(pos());
     return m ? [parseFloat(m[1]), parseFloat(m[2])] : null;
   };
+  state = dr.init({ seats: table, atTable: table, options: {} });
+  handle.update(dr.project(state, ME));
+  const realRandom = Math.random;
+  Math.random = () => 0.25;
+  q('.dr-btn').click();
+  api.send({ a: 'revealend' });
+  pump(500); // let the centre reroll land, then take the heading ourselves
+  field.dispatchEvent(new PointerEvent('pointerdown', { clientX: 200, clientY: 300, bubbles: true }));
+  field.dispatchEvent(new PointerEvent('pointerup', { clientX: 260, clientY: 300, bubbles: true }));
+  const w0 = dotPos();
+  pump(4000);
+  Math.random = realRandom;
+  const w1 = dotPos();
+  ok('the wind pushes the dot off its heading', !!w0 && !!w1 && w1[0] > w0[0] && w1[1] > w0[1]);
+  ok('the push is half the drift speed', !!w0 && !!w1 &&
+    Math.abs((w1[1] - w0[1]) / (w1[0] - w0[0]) - 0.5) < 0.15);
+  state.endsAt = Date.now() - 10;
+  api.send({ a: 'finish' });
+
+  // perfect attention: steer back to the centre whenever it wanders
+  q('.dr-btn').click();
+  api.send({ a: 'revealend' });
   for (let i = 0; i < 70 && state.phase === 'play'; i++) {
     pump(1000);
     if (state.phase !== 'play') break;

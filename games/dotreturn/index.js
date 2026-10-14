@@ -25,9 +25,12 @@ export const meta = {
 // Geometry is in fractions of the shorter side of the field, which is what the
 // original full-screen prototype meant by vmin.
 // Tuning: R/V = 4.0s for dot to leave circle with no input (V = R/4).
-// R=0.036 gives ~14.04px radius on 390px viewport; V=0.009 gives ~3.51px/s.
-const R = 0.036;          // radius of the hidden circle the dot must stay inside
-const V = 0.009;        // drift speed, per second (kept consistent with R/V=4.0)
+// R=0.0414 gives ~16.15px radius on 390px viewport; V=0.01035 gives ~4.04px/s.
+// Wind pushes every dot at WIND*V on top of its heading, so the still-dot
+// exit time breathes around 4s instead of landing on it.
+const R = 0.0414;          // radius of the hidden circle the dot must stay inside
+const V = 0.01035;        // drift speed, per second (kept consistent with R/V=4.0)
+const WIND = 0.50;        // wind push as a fraction of V; re-rolled every 15-25s
 const DURATION = 70;    // round length, seconds
 const DT = 1 / 60;       // fixed integration step
 const MAX_STEPS = 8;     // catch-up cap, so a backgrounded tab cannot spiral
@@ -440,7 +443,7 @@ export function mount(root, api) {
   // only ever corrected from authoritative headings and a new epoch. Every dot
   // is integrated even though only yours is painted — the host has to know
   // where all of them are to count the returns.
-  const sim = { epoch: -1, last: 0, acc: 0, dots: {} };
+  const sim = { epoch: -1, last: 0, acc: 0, dots: {}, windA: 0, windAt: 0 };
   let rafId = null;
   let running = false;
   let askedFinish = false;
@@ -494,6 +497,12 @@ export function mount(root, api) {
     sim.epoch = view.epoch;
     sim.acc = 0;
     sim.dots = {};
+    // Every round starts with a fresh hidden wind. It is client-local on
+    // purpose: each dot's position is only ever read for its owner's dot
+    // (painting and exit/in reporting), so per-client weather can never
+    // desync the table — and the host never sees a position at all.
+    sim.windA = Math.random() * Math.PI * 2;
+    sim.windAt = Date.now() + 15000 + Math.random() * 10000;
     // Benched dots joined mid-round and own no motion in this one: they start
     // with the next round, so they get no entry here and no dot on screen.
     (view.players || []).forEach(function (id) {
@@ -596,13 +605,21 @@ export function mount(root, api) {
 
     sim.acc += dt;
     let steps = 0;
+    // The wind re-rolls on its own 15-25s clock, checked once per frame
+    // against wall time so a backgrounded tab picks up where it should.
+    if (Date.now() >= sim.windAt) {
+      sim.windA = Math.random() * Math.PI * 2;
+      sim.windAt = Date.now() + 15000 + Math.random() * 10000;
+    }
+    const wx = Math.cos(sim.windA) * WIND * V * DT;
+    const wy = Math.sin(sim.windA) * WIND * V * DT;
     while (sim.acc >= DT && steps < MAX_STEPS) {
       sim.acc -= DT;
       steps++;
       Object.keys(sim.dots).forEach(function (id) {
         const s = sim.dots[id];
-        s.x += Math.cos(s.a) * V * DT;
-        s.y += Math.sin(s.a) * V * DT;
+        s.x += Math.cos(s.a) * V * DT + wx;
+        s.y += Math.sin(s.a) * V * DT + wy;
       });
     }
     if (steps >= MAX_STEPS) sim.acc = 0;
@@ -816,6 +833,7 @@ export function mount(root, api) {
     if (alone) {
       ovBody.innerHTML = 'Keep your dot inside an invisible circle. ' +
         'Swipe anywhere to steer it; the dot never stops drifting.<br>' +
+        'A hidden wind pushes the dot, and it changes every 15-25 seconds.<br>' +
         'Your score is the time your dot spent away from the center.<br>' +
         'It is revealed when the ' + view.duration + 's clock ends.<br>' +
         'Less is better.<br>' +
@@ -824,6 +842,7 @@ export function mount(root, api) {
       ovBody.innerHTML = 'One table, one team.<br>' +
         'Each of you keeps your own dot inside an invisible circle. ' +
         'Swipe anywhere to steer it; the dot never stops drifting.<br>' +
+        'A hidden wind pushes the dot, and it changes every 15-25 seconds.<br>' +
         'The table shares a single score: the average time your dots spent away from the center.<br>' +
         'It is revealed when the ' + view.duration + 's clock ends.<br>' +
         'Less is better.<br>' +
