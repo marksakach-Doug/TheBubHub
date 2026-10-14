@@ -256,7 +256,7 @@ const CSS = [
   // The one thing a watcher most needs to know, and must not have to guess.
   '.dr-hud.watching .dr-time{color:#fbbf24;letter-spacing:.18em;font-size:.95rem}',
   '.dr-hud.watching .dr-meta{opacity:.75}',
-  '.dr-toast{position:absolute;top:calc(100% + 8px);left:50%;transform:translateX(-50%);',
+  '.dr-toast{position:absolute;top:14px;left:50%;transform:translateX(-50%);z-index:3;',
   'color:#e9e4d8;font-size:0.95rem;opacity:0;transition:opacity 0.15s ease-in-out;',
   'white-space:nowrap;pointer-events:none;will-change:opacity}',
   '.dr-toast.show{opacity:1;transition:opacity 0.1s ease-in-out}',
@@ -310,7 +310,7 @@ export function mount(root, api) {
   wrap.className = 'dr-wrap';
   wrap.innerHTML =
     '<div class="dr-field"><div class="dr-ring"></div><div class="dr-centre"></div><div class="dr-dot" hidden></div></div>' +
-    '<div class="dr-hud"><div class="dr-time">120s</div><div class="dr-meta"></div><div class="dr-toast"></div></div>' +
+    '<div class="dr-hud"><div class="dr-time">120s</div><div class="dr-meta"></div></div><div class="dr-toast"></div>' +
     '<div class="dr-overlay"><h1 class="dr-title">Dot Return</h1>' +
     '<p class="dr-body"></p><p class="dr-num" hidden></p>' +
     '<div class="dr-table" hidden></div>' +
@@ -366,18 +366,29 @@ export function mount(root, api) {
 
   const soloCorner = !api.isInRoom;
 
+  function updateRings() {
+    if (!view) return;
+    if (view.phase === 'reveal') {
+      ring.style.display = 'block';
+      centre.style.display = 'block';
+    } else if (view.phase === 'play') {
+      ring.style.display = SHOW_CIRCLE ? 'block' : 'none';
+      centre.style.display = 'none';
+    } else {
+      ring.style.display = SHOW_CIRCLE ? 'block' : 'none';
+      centre.style.display = 'none';
+    }
+  }
+
   function measure() {
     w = field.clientWidth || 300;
     h = field.clientHeight || 300;
     unit = Math.min(w, h);
-    const ringShow = SHOW_CIRCLE ? true : false;
-    ring.style.display = ringShow ? 'block' : 'none';
     ring.style.width = R * 2 * unit + 'px';
     ring.style.height = R * 2 * unit + 'px';
     ring.style.transform = 'translate(-50%,-50%)';
-    const centreR = R * 0.2;
-    centre.style.width = centreR * 2 * unit + 'px';
-    centre.style.height = centreR * 2 * unit + 'px';
+    centre.style.width = CENTER * 2 * unit + 'px';
+    centre.style.height = CENTER * 2 * unit + 'px';
     centre.style.transform = 'translate(-50%,-50%)';
   }
 
@@ -436,11 +447,19 @@ export function mount(root, api) {
     if (view.epoch !== sim.epoch) { resetSim(); sim.last = now; return; }
 
     if (view.phase === 'reveal') {
-      if (view.revealEndsAt && now >= view.revealEndsAt - 10 && !askedRevealEnd) {
+      if (!askedRevealEnd && Date.now() >= (view.revealEndsAt || 0)) {
         askedRevealEnd = true;
         api.send({ a: 'revealend' });
       }
       sim.last = now;
+      if (!sim.dots[myId]) {
+        const d = (view.dots && view.dots[myId]) || {};
+        sim.dots[myId] = { x: 0, y: 0, a: d.a || 0 };
+      }
+      const mineR = sim.dots[myId];
+      if (mineR && view.revealEndsAt) {
+        hudTime.textContent = Math.ceil(view.duration) + 's';
+      }
       return;
     }
     if (view.phase !== 'play') return;
@@ -531,9 +550,9 @@ export function mount(root, api) {
     // One dot, yours. The others are integrated in sim.dots so the tally is
     // right, but painting them would leak both the table and the shape of the
     // hidden circle — and a second dot bouncing around is not this game.
-    const playing = view.phase === 'play';
+    const visible = view.phase === 'play' || view.phase === 'reveal';
     const mine = sim.dots[myId];
-    dotEl.hidden = !(playing && mine);
+    dotEl.hidden = !(visible && mine);
     if (mine) {
       dotEl.style.transform = 'translate(' + (cx + mine.x * unit) + 'px,' +
         (cy + mine.y * unit) + 'px) translate(-50%,-50%)';
@@ -716,7 +735,7 @@ export function mount(root, api) {
   // The button's enabled state is cosmetic; reduce() is what actually refuses a
   // guest, so a crafted send() gains nothing by skipping this check.
   function askStart() {
-    if (!view || view.phase === 'play') return;
+    if (!view || view.phase === 'play' || view.phase === 'reveal') return;
     if (!seated()) return;
     api.send({ a: 'start' });
   }
@@ -737,6 +756,7 @@ export function mount(root, api) {
   return {
     update: function (next) {
       if (!next) return;
+      const prevPhase = view ? view.phase : null;
       view = next;
       if (typeof next.you === 'string' && next.you) myId = next.you;
       measure();
@@ -747,42 +767,21 @@ export function mount(root, api) {
         resetSim();
         if (next.phase === 'reveal') {
           startLoop();
-          if (SHOW_CIRCLE) {
-            ring.style.display = 'block';
-          } else {
-            ring.style.display = 'none';
-          }
-          centre.style.display = 'block';
           askedRevealEnd = false;
         } else if (next.phase === 'play') {
           startLoop();
           showToast('Dot is moving');
-          if (SHOW_CIRCLE) {
-            ring.style.display = 'block';
-          } else {
-            ring.style.display = 'none';
-          }
-          centre.style.display = 'none';
         }
       } else if (next.phase === 'reveal') {
         startLoop();
-        if (SHOW_CIRCLE) {
-          ring.style.display = 'block';
-        } else {
-          ring.style.display = 'none';
-        }
-        centre.style.display = 'block';
       } else if (next.phase === 'play') {
         startLoop();
-        if (SHOW_CIRCLE) {
-          ring.style.display = 'block';
-        } else {
-          ring.style.display = 'none';
-        }
-        centre.style.display = 'none';
+        if (prevPhase === 'reveal') showToast('Dot is moving');
       } else {
         stopLoop();
       }
+      if (next.phase === 'reveal') hudTime.textContent = Math.ceil(next.duration) + 's';
+      updateRings();
       renderChrome();
       render();
       // init() seats whoever was in the room when the table was created, so

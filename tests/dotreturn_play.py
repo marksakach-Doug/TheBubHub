@@ -106,8 +106,12 @@ HARNESS = r"""
     q('.dr-table').querySelectorAll('.dr-seat.on').length === 1);
   ok('the lobby names nobody', !/Sam/.test(overlayText()));
 
-  // ---- start a round
+  // ---- start a round (3s reveal, then play)
   btn().click();
+  ok('Start opens the reveal', state.phase === 'reveal' && !overlayShown());
+  ok('the reveal shows the ring and the dot', !!dot() && !dot().hidden);
+  ok('the HUD clock is paused during the reveal', hud().indexOf('120s') >= 0);
+  api.send({ a: 'revealend' });
   ok('Start becomes a round', state.phase === 'play' && !overlayShown());
   ok('a dot appears', !!dot());
   ok('the timer is running', /\d+s/.test(hud()));
@@ -177,6 +181,7 @@ HARNESS = r"""
 
   // ---- a second round re-anchors cleanly
   q('.dr-btn').click();
+  api.send({ a: 'revealend' });
   ok('a new round starts', state.phase === 'play' && state.returns === 0);
   pump(1000);
   ok('the dot is back at the centre', visible(dot()) && Math.abs(dotX() - 200) < 6);
@@ -207,7 +212,8 @@ HARNESS = r"""
     !/Sam|Bo/.test(q('.dr-overlay').textContent));
 
   // the next round, used by the guest and spectator screens below
-  const live = dr.reduce(finished, { a: 'start' },
+  const live = dr.reduce(dr.reduce(finished, { a: 'start' },
+    { from: { id: ME, name: 'Sam' }, rng: Math.random }), { a: 'revealend' },
     { from: { id: ME, name: 'Sam' }, rng: Math.random });
 
   // ---- a guest at that table is told to wait for the host

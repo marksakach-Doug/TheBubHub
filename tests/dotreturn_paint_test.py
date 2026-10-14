@@ -69,7 +69,8 @@ HARNESS = r"""
   const handle = dr.mount(shadow, api);
   handle.update(dr.project(state, ME));
 
-  shadow.querySelector('.dr-btn').click();   // start a round
+  shadow.querySelector('.dr-btn').click();   // start a round (reveal)
+  api.send({ a: 'revealend' });              // the 3s teach is over
   pump(1200);                                // drift it clear of the centre
 
   const dot = shadow.querySelector('.dr-dot');
