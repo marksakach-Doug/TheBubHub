@@ -46,6 +46,10 @@ f = { el: el, ready: false, queue: [], meta: meta };
     stageRoot.classList.remove('stage-idle');
     openId = meta.id;
     document.body.classList.add('focus-mode');
+    // fill games pin the frame to the viewport (no scroll); every other game
+    // gets the scrollable stage so tall content stays reachable under the
+    // fixed focus bar while the body stays locked.
+    document.body.classList.toggle('stage-scroll', !meta.fill);
   }
 
   function close(gameId) {
@@ -59,10 +63,20 @@ f = { el: el, ready: false, queue: [], meta: meta };
     if (id === openId) openId = null;
     if (!openId) {
       let anyVisible = false;
-      frames.forEach(function (x) { if (!x.el.classList.contains('hidden')) anyVisible = true; });
+      let anyScroll = false;
+      frames.forEach(function (x) {
+        if (!x.el.classList.contains('hidden')) {
+          anyVisible = true;
+          if (!(x.meta && x.meta.fill)) anyScroll = true;
+        }
+      });
       if (!anyVisible) {
-        document.body.classList.remove('focus-mode', 'drawer-open');
+        document.body.classList.remove('focus-mode', 'drawer-open', 'stage-scroll');
         if (!stageRoot.querySelector('.stage-host')) stageRoot.classList.add('stage-idle');
+      } else {
+        // another game is still visible (e.g. one close raced another open):
+        // keep the scroll mode matching what remains on screen.
+        document.body.classList.toggle('stage-scroll', anyScroll);
       }
     }
   }

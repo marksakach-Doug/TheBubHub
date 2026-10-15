@@ -17,7 +17,12 @@ export function createStage(rootEl) {
     c.rafIds.length = 0; c.timeouts.length = 0; c.intervals.length = 0;
     rootEl.innerHTML = '';
     rootEl.classList.add('stage-idle');
-    document.body.classList.remove('focus-mode', 'drawer-open');
+    // Only drop the shell modes when no legacy frame is still visible — a
+    // module clear racing an iframe open must not strip the stage out from
+    // under it (open re-asserts both classes anyway).
+    if (!rootEl.querySelector('iframe:not(.hidden)')) {
+      document.body.classList.remove('focus-mode', 'drawer-open', 'stage-scroll');
+    }
   }
 
   function errorCard(meta, err) {
@@ -87,6 +92,10 @@ export function createStage(rootEl) {
       return null;
     }
     document.body.classList.add('focus-mode');
+    // Module games have no fill flag: Focus is a bounded canvas (no overflow,
+    // so the scrollable stage is harmless) while Kyle is a long document that
+    // needs it. Default modules to scroll mode unless they opt into fill.
+    document.body.classList.toggle('stage-scroll', !meta.fill);
     return {
       update: function (view) {
         try { if (rec.handle && typeof rec.handle.update === 'function') rec.handle.update(view); } catch (e) {
