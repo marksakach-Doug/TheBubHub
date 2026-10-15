@@ -1,5 +1,6 @@
 // games/kyle/index.js — Kyle Knows the Code
 const WORDS = ['None', 'One', 'Two', 'Three', 'Four', 'Five', 'Six', 'Seven', 'Eight', 'Nine', 'Ten'];
+const SEEN_KEY = 'kyle.key.v1';   // first-ever round: the Key legend starts open
 const KYLE = `    _______
    /_______\\___
   ( 0   o   )
@@ -27,39 +28,39 @@ export const SCALES = {
 // Rule limits what a unit may be (see RULES).
 export const PATHS = {
   classic: { name: 'Classic Melodies', blurb: 'Plain Mastermind, in tunes.', levels: [
-    { name: 'Pocket Duets', S: 4, k: 2, form: 'AB', tip: 'I know two 2-note melodies. Red: right melody, right spot. White: right melody, wrong spot.' },
+    { name: 'Pocket Duets', S: 4, k: 2, form: 'AB', tip: 'I know two secret 2-note melodies. Tap notes below to fill both slots, then Ask Kyle. Red: right melody, right spot. White: right melody, wrong spot.' },
     { name: 'Pentatonic Call & Response', S: 5, k: 2, form: 'AB' },
-    { name: 'Pentatonic Breeze', S: 5, k: 1, form: 'ABCD', tip: 'Single notes now, not melodies.' },
+    { name: 'Pentatonic Breeze', S: 5, k: 1, form: 'ABCD', tip: 'Single notes now, not melodies — four lone notes to place. Same red and white clues.' },
     { name: 'Hexatonic Twin Phrases', S: 6, k: 2, form: 'AB' },
-    { name: 'Double Triads', S: 3, k: 3, form: 'AB' },
-    { name: 'Three Little Intervals', S: 3, k: 2, form: 'ABC' },
+    { name: 'Double Triads', S: 3, k: 3, form: 'AB', tip: 'Three-note melodies now. Fill both slots — six notes — and Ask Kyle.' },
+    { name: 'Three Little Intervals', S: 3, k: 2, form: 'ABC', tip: 'Three melodies to crack this time: A, B and C. Work them one at a time.' },
     { name: 'Classic Mastermind', S: 6, k: 1, form: 'ABCD' },
     { name: 'Tetratonic Stretch', S: 4, k: 1, form: 'ABCDE' },
     { name: 'Triad Telegraph', S: 3, k: 1, form: 'ABCDEF' },
     { name: 'Lucky Sevens Triad', S: 3, k: 1, form: 'ABCDEFG' },
   ] },
   pegs: { name: 'Orange & Blue', blurb: 'Right notes, wrong order: the extra clues.', levels: [
-    { name: 'Tetratonic Trio', S: 4, k: 2, form: 'ABC', tip: 'Orange: right notes, wrong order, right spot. Blue: right notes, wrong order, wrong spot.' },
+    { name: 'Tetratonic Trio', S: 4, k: 2, form: 'ABC', tip: 'New path, two new clues — and three slots to fill before you Ask Kyle. Orange: right notes, wrong order, right spot. Blue: right notes, wrong order, wrong spot. Red and white work as ever.' },
     { name: 'Pentatonic Phrasebook', S: 5, k: 2, form: 'ABC' },
     { name: 'Triple Triad Motifs', S: 3, k: 3, form: 'ABC' },
   ] },
   songs: { name: 'Song Forms', blurb: 'Crack the motifs, hear the whole song.', levels: [
-    { name: 'Tin Pan Alley Hook', S: 5, k: 2, form: 'AABA', tip: 'My song repeats two melodies, A and B. Crack them. ▶ plays the whole song.' },
-    { name: 'Hexatonic Chorus', S: 6, k: 2, form: 'ABAB' },
+    { name: 'Tin Pan Alley Hook', S: 5, k: 2, form: 'AABA', tip: 'My song is built from two melodies in the shape A-A-B-A. Crack them both — fill both slots and Ask Kyle — and ▶ plays the whole song.' },
+    { name: 'Hexatonic Chorus', S: 6, k: 2, form: 'ABAB', tip: 'The song swaps back and forth this time: A-B-A-B. Still just two melodies to crack.' },
     { name: 'Mini Rondo', S: 4, k: 2, form: 'ABAC', tip: 'Three melodies this time: A, B and C.' },
-    { name: 'Folk Ballad Arch', S: 4, k: 3, form: 'ABBA' },
-    { name: 'Pentatonic Rondo', S: 5, k: 2, form: 'ABACA' },
-    { name: 'Blues Riff Cycle', S: 5, k: 3, form: 'AABA' },
-    { name: 'Sixteen-Note Chiptune', S: 4, k: 4, form: 'AABA' },
+    { name: 'Folk Ballad Arch', S: 4, k: 3, form: 'ABBA', tip: 'An arch this time: A-B-B-A. The middle repeats — crack B and half the song falls into place.' },
+    { name: 'Pentatonic Rondo', S: 5, k: 2, form: 'ABACA', tip: 'Five parts, three melodies: A-B-A-C-A. A carries the song — pin it down first.' },
+    { name: 'Blues Riff Cycle', S: 5, k: 3, form: 'AABA', tip: 'A tough one: 3-note melodies. Crack one motif at a time — A sounds three times, so start there.' },
+    { name: 'Sixteen-Note Chiptune', S: 4, k: 4, form: 'AABA', tip: 'The final exam: 4-note melodies, eight notes a guess. Work one motif at a time and trust the pips.' },
   ] },
   calls: { name: 'Call & Response', blurb: 'Kyle plays a call. You crack the answer.', levels: [
-    { name: "Kyle's 8-Note Jam", S: 5, k: 2, form: 'abAB', tip: 'I play a call (lowercase). You crack the answer. ▶ plays both together.' },
+    { name: "Kyle's 8-Note Jam", S: 5, k: 2, form: 'abAB', tip: 'Lowercase is me: I play my call openly and it stays on screen, already solved. CAPITALS are you: fill both slots and Ask Kyle, exactly like before. ▶ plays us both together.' },
     { name: 'Hexatonic Trading Fours', S: 6, k: 2, form: 'abAB' },
     { name: 'Twelve-Note Trading Triplets', S: 4, k: 3, form: 'abAB' },
-    { name: 'Interleaved Duet', S: 5, k: 3, form: 'aAbB', tip: 'Now we trade: my call, your answer, twice.' },
+    { name: 'Interleaved Duet', S: 5, k: 3, form: 'aAbB', tip: 'Now we trade twice over: my call, your answer, my call, your answer. And the melodies are 3 notes long — work one motif at a time.' },
   ] },
   motifs: { name: 'Constrained Motifs', blurb: 'Stepwise runs, turns and sweeps.', levels: [
-    { name: 'Resolved Call & Response', S: 5, k: 3, form: 'abAB', rule: 'step', tip: 'I play a call, you crack the answer. Every melody moves one scale step at a time.' },
+    { name: 'Resolved Call & Response', S: 5, k: 3, form: 'abAB', rule: 'step', tip: 'New path, same game: fill both slots, Ask Kyle. Every melody moves one scale step at a time — no leaps. My call is open; your answer is hidden.' },
     { name: 'Stepwise Duet Walk', S: 6, k: 2, form: 'ABC', rule: 'step' },
     { name: 'Stepwise Sixteen-Note Chorale', S: 5, k: 4, form: 'AABA', rule: 'step', tip: 'My tune repeats two melodies, A and B: crack them.' },
     { name: 'Walking Triplets', S: 4, k: 3, form: 'ABC', rule: 'step' },
@@ -71,13 +72,13 @@ export const PATHS = {
     { name: 'Rising & Falling Triads', S: 5, k: 3, form: 'ABC', rule: 'sweep' },
   ] },
   rhythm: { name: 'Morse Melody', blurb: 'One pitch. Crack the rhythm.', levels: [
-    { name: 'Morse Hello', S: 3, k: 1, form: 'ABC', scale: 'rhythm', tip: 'One pitch. The numbers are note lengths: 1 is shortest. Crack the rhythm.' },
+    { name: 'Morse Hello', S: 3, k: 1, form: 'ABC', scale: 'rhythm', tip: 'One pitch here — the numbers are note lengths, 1 is shortest. Tap lengths to fill the three slots, then Ask Kyle. You are cracking rhythm, not melody.' },
     { name: 'Four Lengths', S: 4, k: 1, form: 'ABC', scale: 'rhythm' },
     { name: 'Rhythm Pair', S: 3, k: 2, form: 'AB', scale: 'rhythm', tip: 'Each unit is two lengths now.' },
     { name: 'Morse Tap', S: 3, k: 1, form: 'ABCD', scale: 'rhythm' },
     { name: 'Rhythm Duets', S: 4, k: 2, form: 'AB', scale: 'rhythm' },
     { name: 'Morse Five', S: 3, k: 1, form: 'ABCDE', scale: 'rhythm' },
-    { name: 'Rhythm Triplets', S: 3, k: 3, form: 'AB', scale: 'rhythm' },
+    { name: 'Rhythm Triplets', S: 3, k: 3, form: 'AB', scale: 'rhythm', tip: 'Three lengths per unit now — each slot holds a little rhythm of its own.' },
     { name: 'Rhythm Mastermind', S: 6, k: 1, form: 'ABCD', scale: 'rhythm' },
   ] },
 };
@@ -125,9 +126,12 @@ const SAY = {
   white: ['is', 'are', 'right, but in the wrong spot'],
   blue: ['has', 'have', 'the right notes out of order, in the wrong spot'],
 };
-const say = (fb, noun) => Object.entries(SAY).filter(([c]) => fb[c])
-  .map(([c, [one, many, t]]) => `${WORDS[fb[c]]} ${noun}${fb[c] > 1 ? 's' : ''} ${fb[c] > 1 ? many : one} ${t}.`).join(' ')
-  || `None of those ${noun}s are in the code.`;
+const say = (fb, noun) => {
+  const plural = noun === 'melody' ? 'melodies' : `${noun}s`;
+  return Object.entries(SAY).filter(([c]) => fb[c])
+    .map(([c, [one, many, t]]) => `${WORDS[fb[c]]} ${fb[c] > 1 ? plural : noun} ${fb[c] > 1 ? many : one} ${t}.`).join(' ')
+    || `None of those ${plural} are in the code.`;
+};
 
 // Builds a round of the path's current level: a hidden code, plus any units Kyle plays openly.
 function startRound(s, path, rng) {
@@ -207,7 +211,7 @@ export function mount(root, api) {
       <button data-a="home">« Home</button>
       <p id="meta"></p><p id="given"></p><p><tt id="slots"></tt></p>
       <div id="pad"></div><div id="ctl"></div>
-      <details><summary>Key</summary>
+      <details id="key"><summary>Key</summary>
         <p><i class="red"></i> right melody, right slot &nbsp; <i class="white"></i> right melody, wrong slot<br>
         <i class="orange"></i> right notes, wrong order, right slot &nbsp; <i class="blue"></i> right notes, wrong order, wrong slot<br>
         Form: CAPITALS are the units you crack, lowercase are Kyle's. Click an underlined melody to hear it; ▶ plays the whole tune.</p>
@@ -215,6 +219,11 @@ export function mount(root, api) {
       <hr><div id="board"></div>
     </div>
   </div>`;
+
+  // First-ever round: the legend starts open, so the pips mean something
+  // while Kyle's tip is still on screen. Afterwards it stays as the player
+  // left it — render() never touches it.
+  try { if (!localStorage.getItem(SEEN_KEY)) $('#key').open = true; } catch (e) { $('#key').open = true; }
 
   const render = () => {
     const off = api.isSpectator ? 'disabled' : '';
@@ -254,7 +263,10 @@ export function mount(root, api) {
   return {
     update(v) {
       view = v;
-      if (v.phase === 'play' && v.round !== round) { round = v.round; sel = []; seen = 0; talk(v.cfg.tip || 'A new code. I know it.'); }
+      if (v.phase === 'play' && v.round !== round) {
+        round = v.round; sel = []; seen = 0; talk(v.cfg.tip || 'A new code. I know it.');
+        try { localStorage.setItem(SEEN_KEY, '1'); } catch (e) { /* incognito */ }
+      }
       if (v.rows.length > seen) talk(v.rows[v.rows.length - 1].text + (v.won ? ' You cracked it!' : ''));
       seen = v.rows.length;
       render();

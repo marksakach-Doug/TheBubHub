@@ -92,6 +92,10 @@ JS_CASES = r"""
   const exactBeatsOrange = reduce(t1, { a: 'guess', g: [0, 1, 3, 2] }, ctx('dev'));
   out.push(['an exact unit scores red, not orange',
     exactBeatsOrange.rows[0].red === 1 && exactBeatsOrange.rows[0].orange === 1]);
+  out.push(['melody pluralises to melodies',
+    exact.rows[0].text === 'Two melodies are right and in the right spot.']);
+  out.push(['zero-feedback line pluralises too',
+    miss.rows[0].text === 'None of those melodies are in the code.']);
 
   // ---- level rules
   const stepState = Object.assign({}, t1, {
@@ -125,6 +129,24 @@ JS_CASES = r"""
   const home = reduce(exact, { a: 'home' }, ctx('dev'));
   out.push(['home returns to the menu', home.phase === 'home']);
   out.push(['nothing is recorded from home', summarize(home, nameOf) === null]);
+
+  // ---- tips: every path opener teaches the loop, every new concept is
+  // introduced where it first appears, and the hard finales coach.
+  const tipOf = (path, name) => PATHS[path].levels.find((l) => l.name === name).tip || '';
+  out.push(['every path opener has a tip that teaches Ask Kyle',
+    Object.keys(PATHS).every((p) => /Ask Kyle/.test(PATHS[p].levels[0].tip || ''))]);
+  out.push(['calls opener explains lowercase vs CAPITALS',
+    /lowercase/i.test(tipOf('calls', "Kyle's 8-Note Jam")) &&
+    /CAPITALS/.test(tipOf('calls', "Kyle's 8-Note Jam"))]);
+  ['Double Triads', 'Three Little Intervals'].forEach((n) =>
+    out.push([n + ' introduces its novelty: ' + (tipOf('classic', n).slice(0, 40)) + '…',
+      !!tipOf('classic', n)]));
+  [['songs', 'Hexatonic Chorus'], ['songs', 'Folk Ballad Arch'], ['songs', 'Pentatonic Rondo'],
+   ['rhythm', 'Rhythm Triplets']].forEach(([p, n]) =>
+    out.push([n + ' introduces its shape', !!tipOf(p, n)]));
+  [['songs', 'Blues Riff Cycle'], ['songs', 'Sixteen-Note Chiptune'],
+   ['calls', 'Interleaved Duet']].forEach(([p, n]) =>
+    out.push([n + ' coaches one motif at a time', /motif/i.test(tipOf(p, n))]));
 
   return out;
 }
