@@ -3,13 +3,13 @@
 <head>
 <meta charset="UTF-8">
 <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
-<title>Kyle Knows the Code — dev</title>
+<title>Kyle Knows the Code: dev</title>
 <!--
   Dev harness for games/kyle/index.js. Not part of the hub and not
   registered anywhere: the hub finds module games through Vite's
   import.meta.glob, which needs `npm run dev`, and nothing here needs that.
 
-  It imports the *shipped* game file and stands in for the hub itself — the
+  It imports the *shipped* game file and stands in for the hub itself: the
   send -> reduce -> project -> update loop is exactly what src/main.js runs.
   So what you play here is the real mount(), the real rules.
 
@@ -83,11 +83,11 @@
 <div id="stage"></div>
 
 <div id="readout">
-    <span>phase <b id="r-phase">–</b></span>
-    <span>round <b id="r-round">–</b></span>
-    <span>rows <b id="r-rows">–</b></span>
-    <span>won <b id="r-won">–</b></span>
-    <span>intent <b id="r-intent">–</b></span>
+    <span>phase <b id="r-phase">-</b></span>
+    <span>round <b id="r-round">-</b></span>
+    <span>rows <b id="r-rows">-</b></span>
+    <span>won <b id="r-won">-</b></span>
+    <span>intent <b id="r-intent">-</b></span>
 </div>
 
 <div id="fatal"></div>
@@ -118,7 +118,7 @@
                 '<p>then open <code>http://localhost:5173/games/kyle/dev.html</code></p>');
         } else {
             die('Could not load ./index.js',
-                '<p>Serve the <em>repo root</em>, not this folder — the game sits under /games/kyle/.</p>' +
+                '<p>Serve the <em>repo root</em>, not this folder: the game sits under /games/kyle/.</p>' +
                 '<code>' + String(e) + '</code>');
         }
         throw e;

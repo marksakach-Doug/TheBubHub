@@ -473,6 +473,11 @@ export async function boot() {
       // route denial to sender when possible
       if (from && from.id !== store.state.me.id) {
         ensureNet().sendTo(from.id, msg(T.INTENT, { game: gameId, denied: true, text: next.error }));
+      } else if (stage.current && stage.current.id === gameId && moduleHandle &&
+          typeof moduleHandle.denied === 'function') {
+        // local refusal (host or solo): without this the sender's action
+        // silently vanishes, which reads as a frozen game.
+        try { moduleHandle.denied(next.error); } catch (e) {}
       }
       return;
     }

@@ -4,7 +4,7 @@
 Follows tests/dotreturn_test.py: loads the *shipped* source and exercises it,
 rather than re-implementing the rules in Python. The game module is an ES
 module, so the `export` keywords are stripped and the remainder is injected
-as a classic script — nothing about the logic changes.
+as a classic script: nothing about the logic changes.
 
 The parts worth guarding are the ones the table and the record sheet depend
 on: unit scoring priority (red > white > orange > blue), the level rules
@@ -103,6 +103,8 @@ JS_CASES = r"""
   });
   out.push(['step rule rejects a leap',
     !!reduce(stepState, { a: 'guess', g: [0, 2, 1, 2] }, ctx('dev')).error]);
+  out.push(['step refusal teaches with an example',
+    (reduce(stepState, { a: 'guess', g: [0, 2, 1, 2] }, ctx('dev')).error || '').indexOf('Try C-D-E') >= 0]);
   out.push(['step rule accepts adjacent moves',
     !reduce(stepState, { a: 'guess', g: [0, 1, 2, 1] }, ctx('dev')).error]);
   const turnState = Object.assign({}, t1, {
@@ -112,6 +114,8 @@ JS_CASES = r"""
     !reduce(turnState, { a: 'guess', g: [1, 2, 1, 2, 3, 2] }, ctx('dev')).error]);
   out.push(['turn rule rejects a run',
     !!reduce(turnState, { a: 'guess', g: [0, 1, 2, 2, 3, 2] }, ctx('dev')).error]);
+  out.push(['turn refusal teaches with an example',
+    (reduce(turnState, { a: 'guess', g: [0, 1, 2, 2, 3, 2] }, ctx('dev')).error || '').indexOf('Try D-E-D') >= 0]);
   const sweepState = Object.assign({}, t1, {
     cfg: { S: 6, k: 3, form: 'AB', name: 'x', rule: 'sweep' }, code: [[0, 1, 2], [3, 2, 1]]
   });
@@ -119,6 +123,8 @@ JS_CASES = r"""
     !reduce(sweepState, { a: 'guess', g: [0, 1, 2, 3, 2, 1] }, ctx('dev')).error]);
   out.push(['sweep rule rejects a turn',
     !!reduce(sweepState, { a: 'guess', g: [0, 2, 1, 3, 2, 1] }, ctx('dev')).error]);
+  out.push(['sweep refusal teaches with an example',
+    (reduce(sweepState, { a: 'guess', g: [0, 2, 1, 3, 2, 1] }, ctx('dev')).error || '').indexOf('Try C-D-E') >= 0]);
 
   // ---- project: the code stays hidden until it is cracked
   out.push(['code is hidden while playing', project(t1, 'dev').code === null]);
