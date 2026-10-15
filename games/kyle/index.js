@@ -1,6 +1,4 @@
-// games/kyle/index.js: Kyle Knows the Code
-const WORDS = ['None', 'One', 'Two', 'Three', 'Four', 'Five', 'Six', 'Seven', 'Eight', 'Nine', 'Ten'];
-const SEEN_KEY = 'kyle.key.v1';   // first-ever round: the Key legend starts open
+// games/kyle/index.js: Kyle Knows the Code (bare bones: answer Kyle's call with his secret twist)
 const KYLE = `    _______
    /_______\\___
   ( 0   o   )
@@ -13,219 +11,135 @@ const KYLE = `    _______
     _|   |_
 `;
 
-// A scale is six pitches (hz) with labels. A rhythm scale adds `dur`: its shortest and longest note, in seconds;
-// the S lengths in play are spread evenly between them.
-export const SCALES = {
-  pent: { labels: ['C', 'D', 'E', 'G', 'A', "C'"], hz: [262, 294, 330, 392, 440, 523] },
-  rhythm: { labels: ['1', '2', '3', '4', '5', '6'], hz: Array(6).fill(262), dur: [0.12, 0.78] },
-};
+// One scale, eight notes. A melody is a list of positions on it (0 = lowest).
+const SCALE = { labels: ['C', 'D', 'E', 'G', 'A', "C'", "D'", "E'"], hz: [262, 294, 330, 392, 440, 523, 587, 659] };
+const S = SCALE.labels.length;
 
-// A path is a list of levels, easiest first. A level is:
-//   name, S (notes of the scale in use), k (notes per unit), form, and optionally scale (default 'pent'), rule,
-//   and tip (what Kyle says when the level starts; only where something is new).
-// Form is the shape of the whole tune. CAPITALS are units you crack (A, B, ...); lowercase are units Kyle plays (a, b, ...).
-//   'AB' = plain Mastermind, 'AABA' = a song built from two motifs, 'abAB' = Kyle's call, then your response.
-// Rule limits what a unit may be (see RULES).
-export const PATHS = {
-  classic: { name: 'Classic Melodies', blurb: 'Plain Mastermind, in tunes.', levels: [
-    { name: 'Pocket Duets', S: 4, k: 2, form: 'AB', tip: 'I know two secret 2-note melodies. Tap notes below to fill both slots, then Ask Kyle. Red: right melody, right spot. White: right melody, wrong spot.' },
-    { name: 'Pentatonic Call & Response', S: 5, k: 2, form: 'AB' },
-    { name: 'Pentatonic Breeze', S: 5, k: 1, form: 'ABCD', tip: 'Single notes now, not melodies: four lone notes to place. Same red and white clues.' },
-    { name: 'Hexatonic Twin Phrases', S: 6, k: 2, form: 'AB' },
-    { name: 'Double Triads', S: 3, k: 3, form: 'AB', tip: 'Three-note melodies now. Fill both slots (six notes) and Ask Kyle.' },
-    { name: 'Three Little Intervals', S: 3, k: 2, form: 'ABC', tip: 'Three melodies to crack this time: A, B and C. Work them one at a time.' },
-    { name: 'Classic Mastermind', S: 6, k: 1, form: 'ABCD' },
-    { name: 'Tetratonic Stretch', S: 4, k: 1, form: 'ABCDE' },
-    { name: 'Triad Telegraph', S: 3, k: 1, form: 'ABCDEF' },
-    { name: 'Lucky Sevens Triad', S: 3, k: 1, form: 'ABCDEFG' },
-  ] },
-  pegs: { name: 'Orange & Blue', blurb: 'Right notes, wrong order: the extra clues.', levels: [
-    { name: 'Tetratonic Trio', S: 4, k: 2, form: 'ABC', tip: 'New path, two new clues, and three slots to fill before you Ask Kyle. Orange: right notes, wrong order, right spot. Blue: right notes, wrong order, wrong spot. Red and white work as ever.' },
-    { name: 'Pentatonic Phrasebook', S: 5, k: 2, form: 'ABC' },
-    { name: 'Triple Triad Motifs', S: 3, k: 3, form: 'ABC' },
-  ] },
-  songs: { name: 'Song Forms', blurb: 'Crack the motifs, hear the whole song.', levels: [
-    { name: 'Tin Pan Alley Hook', S: 5, k: 2, form: 'AABA', tip: 'My song is built from two melodies in the shape A-A-B-A. Crack them both (fill both slots and Ask Kyle) and ▶ plays the whole song.' },
-    { name: 'Hexatonic Chorus', S: 6, k: 2, form: 'ABAB', tip: 'The song swaps back and forth this time: A-B-A-B. Still just two melodies to crack.' },
-    { name: 'Mini Rondo', S: 4, k: 2, form: 'ABAC', tip: 'Three melodies this time: A, B and C.' },
-    { name: 'Folk Ballad Arch', S: 4, k: 3, form: 'ABBA', tip: 'An arch this time: A-B-B-A. The middle repeats: crack B and half the song falls into place.' },
-    { name: 'Pentatonic Rondo', S: 5, k: 2, form: 'ABACA', tip: 'Five parts, three melodies: A-B-A-C-A. A carries the song, so pin it down first.' },
-    { name: 'Blues Riff Cycle', S: 5, k: 3, form: 'AABA', tip: 'A tough one: 3-note melodies. Crack one motif at a time: A sounds three times, so start there.' },
-    { name: 'Sixteen-Note Chiptune', S: 4, k: 4, form: 'AABA', tip: 'The final exam: 4-note melodies, eight notes a guess. Work one motif at a time and trust the pips.' },
-  ] },
-  calls: { name: 'Call & Response', blurb: 'Kyle plays a call. You crack the answer.', levels: [
-    { name: "Kyle's 8-Note Jam", S: 5, k: 2, form: 'abAB', tip: 'Lowercase is me: I play my call openly and it stays on screen, already solved. CAPITALS are you: fill both slots and Ask Kyle, exactly like before. ▶ plays us both together.' },
-    { name: 'Hexatonic Trading Fours', S: 6, k: 2, form: 'abAB' },
-    { name: 'Twelve-Note Trading Triplets', S: 4, k: 3, form: 'abAB' },
-    { name: 'Interleaved Duet', S: 5, k: 3, form: 'aAbB', tip: 'Now we trade twice over: my call, your answer, my call, your answer. And the melodies are 3 notes long, so work one motif at a time.' },
-  ] },
-  motifs: { name: 'Constrained Motifs', blurb: 'Stepwise runs, turns and sweeps.', levels: [
-    { name: 'Resolved Call & Response', S: 5, k: 3, form: 'abAB', rule: 'step', tip: 'New path, same game: fill both slots, Ask Kyle. Every melody moves one scale step at a time, no leaps. My call is open; your answer is hidden.' },
-    { name: 'Stepwise Duet Walk', S: 6, k: 2, form: 'ABC', rule: 'step' },
-    { name: 'Stepwise Sixteen-Note Chorale', S: 5, k: 4, form: 'AABA', rule: 'step', tip: 'My tune repeats two melodies, A and B: crack them.' },
-    { name: 'Walking Triplets', S: 4, k: 3, form: 'ABC', rule: 'step' },
-    { name: 'Baroque Mordents', S: 6, k: 3, form: 'ABC', rule: 'turn', tip: 'Every melody is a neighbor turn: X-Y-X, with Y one step from X.' },
-    { name: 'Sweeping Arpeggio Hook', S: 6, k: 3, form: 'AABA', rule: 'sweep', tip: 'Every melody rises or falls the whole way.' },
-    { name: 'Pentatonic Runs & Turns', S: 5, k: 3, form: 'ABC', rule: 'step' },
-    { name: 'Pentatonic Stepwise Quartet', S: 5, k: 2, form: 'ABCD', rule: 'step' },
-    { name: 'Stepwise Rondo Finale', S: 5, k: 3, form: 'ABACA', rule: 'step' },
-    { name: 'Rising & Falling Triads', S: 5, k: 3, form: 'ABC', rule: 'sweep' },
-  ] },
-  rhythm: { name: 'Morse Melody', blurb: 'One pitch. Crack the rhythm.', levels: [
-    { name: 'Morse Hello', S: 3, k: 1, form: 'ABC', scale: 'rhythm', tip: 'One pitch here: the numbers are note lengths, 1 is shortest. Tap lengths to fill the three slots, then Ask Kyle. You are cracking rhythm, not melody.' },
-    { name: 'Four Lengths', S: 4, k: 1, form: 'ABC', scale: 'rhythm' },
-    { name: 'Rhythm Pair', S: 3, k: 2, form: 'AB', scale: 'rhythm', tip: 'Each unit is two lengths now.' },
-    { name: 'Morse Tap', S: 3, k: 1, form: 'ABCD', scale: 'rhythm' },
-    { name: 'Rhythm Duets', S: 4, k: 2, form: 'AB', scale: 'rhythm' },
-    { name: 'Morse Five', S: 3, k: 1, form: 'ABCDE', scale: 'rhythm' },
-    { name: 'Rhythm Triplets', S: 3, k: 3, form: 'AB', scale: 'rhythm', tip: 'Three lengths per unit now: each slot holds a little rhythm of its own.' },
-    { name: 'Rhythm Mastermind', S: 6, k: 1, form: 'ABCD', scale: 'rhythm' },
-  ] },
-};
-
-const RULES = {
-  step: (u) => u.every((n, i) => !i || Math.abs(n - u[i - 1]) === 1),                              // adjacent scale steps only
-  turn: (u) => u.length === 3 && u[0] === u[2] && Math.abs(u[0] - u[1]) === 1,                      // X-Y-X neighbor turn
-  sweep: (u) => u.every((n, i) => !i || n > u[i - 1]) || u.every((n, i) => !i || n < u[i - 1]),   // strictly rising or falling
-};
-
-// Plain words for each rule, plus one legal example in the level's own
-// labels, so a refused guess teaches instead of just blocking.
-const RULE_HOW = {
-  step: 'every melody must walk one scale step at a time, no leaps',
-  turn: 'every melody must step out and back, like X-Y-X',
-  sweep: 'every melody must keep rising or keep falling all the way',
-};
-function ruleExample(rule, labels) {
-  const L = (idxs) => idxs.map((i) => labels[i]).join('-');
-  if (rule === 'turn') return L([1, 2, 1]);
-  return L([0, 1, 2]);   // step and sweep both allow a plain rise
-}
-function ruleHelp(cfg) {
-  const labels = SCALES[cfg.scale || 'pent'].labels;
-  return `Those notes break this level's rule: ${RULE_HOW[cfg.rule]}. Try ${ruleExample(cfg.rule, labels)}.`;
-}
-// Client-side twin of the rule check in reduce(): lets mount() refuse a
-// guess with an explanation before anything is sent (and sent notes stay put).
-function breaksRule(flat, cfg) {
-  if (!cfg || !cfg.rule || !cfg.k) return false;
-  const units = Array.from({ length: flat.length / cfg.k }, (_, i) => flat.slice(i * cfg.k, i * cfg.k + cfg.k));
-  return !units.every(RULES[cfg.rule]);
-}
+// Each level hides one twist that turns Kyle's call into his answer:
+//   inv    upside down, mirrored around the call's first note        rev    backwards
+//   shift  slide the whole thing by this many scale steps (2 = a third)
+//   land   no fixed slide: the answer must END on this position (0 = home), so the slide is whatever gets it there
+// `how` is what Kyle says when you crack it; `tip` is what he says when the level starts.
+export const LEVELS = [
+  { how: 'Same shape, a third higher.', T: { shift: 2 },
+    tip: 'I play a call. My answer is that same tune with a secret twist. Use the tools, then Ask Kyle: I play both, then score you.' },
+  { how: 'Upside down.', T: { inv: 1 } },
+  { how: 'Backwards.', T: { rev: 1 } },
+  { how: 'Upside down, then up a third.', T: { inv: 1, shift: 2 } },
+  { how: 'Upside down, landing on home.', T: { inv: 1, land: 0 },
+    tip: 'New: my answer always ends on home (C). That tells you where the whole answer has to sit.' },
+  { how: 'Backwards and upside down, landing on the fifth.', T: { rev: 1, inv: 1, land: 3 },
+    tip: 'Now my answer ends on the fifth (G).' },
+];
 
 export const meta = { id: 'kyle', title: 'Kyle Knows the Code', players: '1+', color: '#ff00ff',
-  icon: '🎵', desc: 'Crack the melody that Kyle knows.', soloable: true };
+  icon: '🎵', desc: "Answer Kyle's call with his secret twist.", soloable: true };
 
-// A unit is one symbol of the code: a short melody of k pitches.
-const key = (u) => u.join(',');
-const sortKey = (u) => key(u.slice().sort((a, b) => a - b));   // same pitches, any order
-const count = (form, re) => new Set(form.match(re)).size;
-const pick = (rng, n, size) => Array.from({ length: n }, () => Math.floor(rng() * size));
-const unit = (rng, c) => { let u; do u = pick(rng, c.k, c.S); while (c.rule && !RULES[c.rule](u)); return u; };
+// Kyle's answer to a call: mirror (around the first note), then reverse, then slide.
+const apply = (c, T, land) => {
+  const u = T.inv ? c.map((x) => 2 * c[0] - x) : c.slice();
+  if (T.rev) u.reverse();
+  const s = land == null ? T.shift || 0 : land - u[u.length - 1];
+  return u.map((x) => x + s);
+};
+const inRange = (u) => u.every((x) => x >= 0 && x < S);
+
+// A random call whose answer stays in range and differs from the call. The call and its unslid twist
+// must also fit the range together, so the on-screen tools can always get there without leaving it.
+function makeCall(rng, len, T, land) {
+  for (;;) {
+    const c = [Math.floor(rng() * S)];
+    while (c.length < len) c.push(c[c.length - 1] + (rng() < 0.5 ? -1 : 1) * (1 + Math.floor(rng() * 3)));
+    const a = apply(c, T, land), both = [...c, ...apply(c, { ...T, shift: 0 }, null)];
+    if (inRange(c) && inRange(a) && a.join() !== c.join() && Math.max(...both) - Math.min(...both) < S) return c;
+  }
+}
+
+// Three scores per guess: pitch (notes in place), contour (steps going the right way), size (steps the right distance).
+const steps = (u) => u.slice(1).map((x, i) => x - u[i]);
+const score = (g, a) => {
+  const sg = steps(g), sa = steps(a);
+  return { pitch: g.filter((x, i) => x === a[i]).length,
+    contour: sg.filter((x, i) => Math.sign(x) === Math.sign(sa[i])).length,
+    size: sg.filter((x, i) => Math.abs(x) === Math.abs(sa[i])).length };
+};
+const tell = (sc, m) => (sc.contour === 0 && sc.size === m - 1 ? 'Right distances, but you went the wrong way.'
+  : sc.contour === m - 1 && sc.size < m - 1 ? 'Right shape, wrong distances.'
+  : sc.contour === m - 1 ? 'Right shape and distances, wrong height. Slide it.'
+  : `${sc.pitch} of ${m} notes in place.`);
 
 export function init() {
-  return { phase: 'home', round: 0, prog: {}, rows: [], won: false, wonBy: null, code: null, given: [] };
+  return { phase: 'home', round: 0, prog: 0, stage: 'find', call: [], T: null, land: null, rows: [], won: false, wonBy: null, say: '' };
 }
 
-// Scores a guess against the code, unit by unit. Each unit is classified once, in this order:
-//   red    exact melody in the right slot       white  exact melody in a different slot
-//   orange same notes, wrong order, right slot  blue   same notes, wrong order, different slot
-function scoreUnits(g, code) {
-  const n = code.length, gu = Array(n).fill(false), cu = Array(n).fill(false);
-  const out = { red: 0, white: 0, orange: 0, blue: 0 };
-  const pass = (name, f, anySlot) => {
-    for (let i = 0; i < n; i++) {
-      if (gu[i]) continue;
-      const j = anySlot ? code.findIndex((c, x) => !cu[x] && f(c) === f(g[i])) : (!cu[i] && f(code[i]) === f(g[i]) ? i : -1);
-      if (j >= 0) { out[name]++; gu[i] = cu[j] = true; }
-    }
-  };
-  pass('red', key, false); pass('white', key, true); pass('orange', sortKey, false); pass('blue', sortKey, true);
-  return out;
-}
-
-const SAY = {
-  red: ['is', 'are', 'right and in the right spot'],
-  orange: ['has', 'have', 'the right notes out of order, in the right spot'],
-  white: ['is', 'are', 'right, but in the wrong spot'],
-  blue: ['has', 'have', 'the right notes out of order, in the wrong spot'],
-};
-const say = (fb, noun) => {
-  const plural = noun === 'melody' ? 'melodies' : `${noun}s`;
-  return Object.entries(SAY).filter(([c]) => fb[c])
-    .map(([c, [one, many, t]]) => `${WORDS[fb[c]]} ${fb[c] > 1 ? plural : noun} ${fb[c] > 1 ? many : one} ${t}.`).join(' ')
-    || `None of those ${plural} are in the code.`;
-};
-
-// Builds a round of the path's current level: a hidden code, plus any units Kyle plays openly.
-function startRound(s, path, rng) {
-  const levels = PATHS[path].levels, lvl = (s.prog[path] || 0) % levels.length, cfg = levels[lvl];
-  const draw = (re) => Array.from({ length: count(cfg.form, re) }, () => unit(rng, cfg));
-  return { ...s, phase: 'play', round: s.round + 1, path, lvl, cfg, code: draw(/[A-Z]/g), given: draw(/[a-z]/g), rows: [], won: false, wonBy: null };
+function startLevel(s, lvl, rng) {
+  const { land, ...T } = LEVELS[lvl].T;
+  return { ...s, phase: 'play', round: s.round + 1, lvl, stage: 'find', T, land: land == null ? null : land,
+    call: makeCall(rng, 4, T, land), rows: [], won: false, wonBy: null, say: LEVELS[lvl].tip || 'A new call. Find the twist.' };
 }
 
 export function reduce(s, a, ctx) {
   const rng = (ctx && ctx.rng) || Math.random;
   const fromId = (ctx && ctx.from && ctx.from.id) || '';
   if (a.a === 'home') return { ...s, phase: 'home' };
-  if (a.a === 'play') return PATHS[a.path] ? startRound(s, a.path, rng) : { error: 'No such path.' };
-  if (s.phase !== 'play') return { error: 'Pick a path first.' };
-  if (a.a === 'next') return s.won ? startRound(s, s.path, rng) : { error: 'Finish this round first.' };
+  if (a.a === 'play') return startLevel(s, s.prog % LEVELS.length, rng);
+  if (s.phase !== 'play') return { error: 'Press Play first.' };
+  if (a.a === 'next') return s.won ? startLevel(s, (s.lvl + 1) % LEVELS.length, rng) : { error: 'Finish this round first.' };
   if (s.won) return { error: 'Round finished. Start the next one.' };
-  const { k, S, rule } = s.cfg, H = s.code.length;
-  if (a.a !== 'guess' || !Array.isArray(a.g) || a.g.length !== H * k || a.g.some((n) => !Number.isInteger(n) || n < 0 || n >= S))
-    return { error: `Kyle wants exactly ${H * k} notes.` };
-  const g = Array.from({ length: H }, (_, i) => a.g.slice(i * k, i * k + k));
-  if (rule && !g.every(RULES[rule])) return { error: ruleHelp(s.cfg) };
-  const fb = scoreUnits(g, s.code), won = fb.red === H;
-  return { ...s, rows: [...s.rows, { g, ...fb, text: say(fb, k > 1 ? 'melody' : 'note') }], won,
-    wonBy: won ? fromId : s.wonBy,
-    prog: won ? { ...s.prog, [s.path]: s.lvl + 1 } : s.prog };
+  const m = s.call.length;
+  if (a.a !== 'guess' || !Array.isArray(a.g) || a.g.length !== m || a.g.some((n) => !Number.isInteger(n) || n < 0 || n >= S))
+    return { error: `Kyle wants exactly ${m} notes.` };
+  const sc = score(a.g, apply(s.call, s.T, s.land));
+  const row = { g: a.g, call: s.call, stage: s.stage, ...sc, text: tell(sc, m) };
+  if (sc.pitch < m) return { ...s, rows: [...s.rows, row] };
+  if (s.stage === 'find') {            // cracked: Kyle throws a longer call under the same twist, to prove it was not luck
+    row.text = `Cracked: ${LEVELS[s.lvl].how} Now prove it: ${m + 1} notes, same twist.`;
+    return { ...s, rows: [...s.rows, row], stage: 'proof', call: makeCall(rng, m + 1, s.T, s.land) };
+  }
+  row.text = `Proved it${s.rows.some((r) => r.stage === 'proof') ? '' : ' on the first try'}!`;
+  return { ...s, rows: [...s.rows, row], won: true, wonBy: fromId, prog: Math.max(s.prog, s.lvl + 1) };
 }
 
-// The code stays hidden until it is cracked.
-export function project(s) { return { ...s, code: s.won ? s.code : null }; }
-
-const TOUR_KEY = 'kyle.tour.v1';   // guided first round: shown once, skippable
+// The twist stays hidden.
+export function project(s) { return { ...s, T: null }; }
 
 export function mount(root, api) {
-  let view = null, sel = [], seen = 0, round = 0, ac, tour = 0;
+  let view = null, draft = [], seen = 0, revealed = 0, round = 0, callKey = '', ac, timer;
   const $ = (q) => root.querySelector(q);
   const talk = (t) => { $('#bubble').textContent = t; };
-  const sc = () => SCALES[view.cfg.scale || 'pent'];
-  const need = () => count(view.cfg.form, /[A-Z]/g) * view.cfg.k;
+  const L = SCALE.labels;
 
-  // Guided first round. Steps: 1 pick notes, 2 ask Kyle, then the first
-  // answered row teaches the pips and the tour ends. Spectators never tour.
-  const tourSeen = () => { try { return !!localStorage.getItem(TOUR_KEY); } catch (e) { return false; } };
-  const tourEnd = () => { tour = 0; try { localStorage.setItem(TOUR_KEY, '1'); } catch (e) { /* incognito */ } };
-  const tourStep1 = () => {
-    const H = need() / view.cfg.k;
-    const what = view.cfg.k > 1 ? `They fill ${H} melodies of ${view.cfg.k} notes.` : `They fill ${H} single notes.`;
-    return `First game ever. Tap ${need()} notes below, any notes at all. ${what}`;
-  };
-
-  // One note at audio time t. Pitched scales pluck; rhythm scales hold for d seconds, then release.
-  const note = (hz, t, d, hold) => {
+  const note = (hz, t) => {
     const o = ac.createOscillator(), g = ac.createGain();
     o.frequency.value = hz;
     g.gain.setValueAtTime(0.5, t);
-    g.gain.setValueAtTime(0.5, hold ? t + d : t);
-    g.gain.exponentialRampToValueAtTime(0.001, t + d + (hold ? 0.05 : 0.1));
+    g.gain.exponentialRampToValueAtTime(0.001, t + 0.4);
     o.connect(g).connect(ac.destination);
-    o.start(t); o.stop(t + d + 0.1);
+    o.start(t); o.stop(t + 0.4);
   };
-  const play = (idxs) => {
+  // Plays melodies back to back; returns how many seconds that takes.
+  const play = (...seqs) => {
     ac = ac || new AudioContext();
-    const { hz, dur } = sc();
     let t = ac.currentTime + 0.02;
-    for (const i of idxs) { const d = dur ? dur[0] + ((dur[1] - dur[0]) * i) / (view.cfg.S - 1) : 0.3; note(hz[i], t, d, !!dur); t += d + 0.05; }
+    const t0 = t;
+    seqs.forEach((q, n) => { if (n) t += 0.4; q.forEach((i) => { note(SCALE.hz[i], t); t += 0.35; }); });
+    return t - t0;
   };
 
-  // The whole tune for a set of cracked units: the form's letters, filled in. Kyle's units are lowercase.
-  const full = (u) => [...view.cfg.form].flatMap((c) => (c < 'a' ? u[c.charCodeAt(0) - 65] : view.given[c.charCodeAt(0) - 97]));
-  const spans = (units) => units.map((u) => `<u data-p="${u}">${u.map((i) => sc().labels[i]).join('-')}</u>`).join(' ');
-  const pips = (fb) => ['red', 'orange', 'white', 'blue'].map((c) => `<i class="${c}"></i>`.repeat(fb[c])).join('');
+  // Piano roll: one row per scale note, high at the top. Cells are tappable when editing.
+  const roll = (u, edit) => [...L.keys()].reverse().map((r) => L[r].padEnd(3) +
+    u.map((x, c) => `<u ${edit ? `data-c="${c}" data-r="${r}"` : ''}>${x === r ? '●' : '·'}</u>`).join('')).join('\n');
+  const dots = (x, max) => '●'.repeat(x) + '○'.repeat(max - x);
+  const chan = (r) => `<b class="red">pitch ${dots(r.pitch, r.g.length)}</b> <b class="orange">shape ${dots(r.contour, r.g.length - 1)}</b> <b class="blue">size ${dots(r.size, r.g.length - 1)}</b>`;
+
+  // The tools mirror what a composer does to a motif. Each one plays its result.
+  const tool = (t) => {
+    const d = draft;
+    const p = t === 'up' ? d.map((x) => x + 1) : t === 'down' ? d.map((x) => x - 1) : t === 'flip' ? d.map((x) => 2 * d[0] - x)
+      : t === 'rev' ? d.slice().reverse() : view.call.slice();
+    if (p.some((x) => x < 0 || x >= L.length)) return talk('No room: that would leave my range. Slide it first.');
+    draft = p; play(p); render();
+  };
 
   root.innerHTML = `<style>
     .k{background:#000080;color:#ff0;font:16px 'Times New Roman',serif;padding:10px;height:100%;overflow-y:auto;-webkit-overflow-scrolling:touch;touch-action:pan-y;box-sizing:border-box}
@@ -234,123 +148,88 @@ export function mount(root, api) {
     pre{font:10px/1.05 'Courier New',monospace;color:#0f0;margin:0}
     #bubble{background:#fff;color:#000;border:3px solid #000;padding:8px;font:bold 15px Arial}
     u{color:#0ff;cursor:pointer;font-family:'Courier New',monospace}
-    i{display:inline-block;width:14px;height:14px;border-radius:50%;border:1px solid #fff;margin-left:3px}
-    .red{background:red}.orange{background:orange}.white{background:white}.blue{background:dodgerblue}
+    .rl{font:16px/1.4 'Courier New',monospace;color:#ff0}
+    .rl u{display:inline-block;width:34px;text-align:center;text-decoration:none}
+    .red{color:#f55}.orange{color:orange}.blue{color:#6af}
     button{font:bold 16px Arial;min-width:44px;min-height:44px;margin:3px}
-    #callbox,#codebox{border:2px solid #0f0;padding:6px;margin:6px 0}
-    #callbox h3,#codebox h3{margin:0 0 4px;font:bold 15px Arial;color:#0f0}
-    #tour{background:#fff;color:#000;border:3px solid #000;padding:8px;font:bold 15px Arial;margin:6px 0}
+    #callbox,#work{border:2px solid #0f0;padding:6px;margin:6px 0}
+    h3{margin:0 0 4px;font:bold 15px Arial;color:#0f0}
   </style>
   <div class="k">
-    <marquee>★ welcome to Kyle's Music Page ★ Kyle knows the code ★</marquee>
-    <table width="100%"><tr><td id="bubble">I'm Kyle. I know the code.</td><td><pre>${KYLE}</pre></td></tr></table>
+    <marquee>★ welcome to Kyle's Music Page ★ Kyle knows the twist ★</marquee>
+    <table width="100%"><tr><td id="bubble">I'm Kyle. I know the twist.</td><td><pre>${KYLE}</pre></td></tr></table>
     <h1>Kyle Knows the Code</h1><hr>
     <div id="home"></div>
     <div id="game" hidden>
       <button data-a="home">« Home</button>
-      <div id="tour" hidden><span>Kyle is teaching this round.</span> <button data-a="tour-skip">Skip tour</button></div>
       <p id="meta"></p>
-      <div id="callbox" hidden><h3>Kyle's call (solved, just listen)</h3><p id="given"></p></div>
-      <div id="codebox"><h3>Your code (crack this)</h3><p><tt id="slots"></tt></p>
-      <div id="pad"></div><div id="ctl"></div></div>
-      <details id="key"><summary>Key</summary>
-        <p><i class="red"></i> right melody, right slot &nbsp; <i class="white"></i> right melody, wrong slot<br>
-        <i class="orange"></i> right notes, wrong order, right slot &nbsp; <i class="blue"></i> right notes, wrong order, wrong slot<br>
-        Form: CAPITALS are the units you crack, lowercase are Kyle's. Click an underlined melody to hear it; ▶ plays the whole tune.</p>
+      <div id="callbox"></div><div id="work"></div><div id="end"></div>
+      <details><summary>Key</summary>
+        <p>Every guess: I play my call, then your answer, then score it.
+        <b class="red">pitch</b> notes in the right place. <b class="orange">shape</b> steps going the right way, up or down.
+        <b class="blue">size</b> steps the right distance. Tap a dot on the roll to move a note.
+        ▲▼ slide the whole answer. Flip turns it upside down. Reverse runs it backwards.</p>
       </details>
       <hr><div id="board"></div>
     </div>
   </div>`;
 
-  // First-ever round: the legend starts open, so the pips mean something
-  // while Kyle's tip is still on screen. Afterwards it stays as the player
-  // left it: render() never touches it.
-  try { if (!localStorage.getItem(SEEN_KEY)) $('#key').open = true; } catch (e) { $('#key').open = true; }
-
   const render = () => {
     const off = api.isSpectator ? 'disabled' : '';
     const home = view.phase === 'home';
     $('#home').hidden = !home; $('#game').hidden = home;
-    $('#tour').hidden = !(tour === 1 || tour === 2);
     if (home) {
-      $('#home').innerHTML = '<h2>Choose a path</h2>' + Object.entries(PATHS).map(([id, p]) =>
-        `<p><button data-path="${id}" ${off}>${p.name}</button> ${p.blurb} <small>(${Math.min(view.prog[id] || 0, p.levels.length)}/${p.levels.length} cleared)</small></p>`).join('');
+      $('#home').innerHTML = `<p>I play a call. You answer with the same tune, changed by a twist I will not name. Find the twist, then prove it.</p>
+        <p><button data-a="play" ${off}>${view.prog ? 'Continue' : 'Play'}</button> <small>(${Math.min(view.prog, LEVELS.length)}/${LEVELS.length} cleared)</small></p>`;
       return;
     }
-    const { k, S, form, name } = view.cfg, c = sc(), p = PATHS[view.path], H = need() / k;
-    $('#meta').textContent = `${p.name} · level ${view.lvl + 1} of ${p.levels.length}: ${name} · ${S} ${sc().dur ? 'lengths' : 'notes'} · ${k}-note units · form ${form}${api.isSpectator ? ' · 👁 watching' : ''}`;
-    $('#callbox').hidden = !view.given.length;
-    $('#given').innerHTML = view.given.length ? `Kyle plays: ${spans(view.given)}` : '';
-    $('#slots').textContent = Array.from({ length: H }, (_, u) =>
-      Array.from({ length: k }, (_, j) => c.labels[sel[u * k + j]] || '_').join(' ')).join(' | ');
-    $('#pad').innerHTML = c.labels.slice(0, S).map((n, i) => `<button data-i="${i}" ${off}>${n}</button>`).join('');
-    $('#ctl').innerHTML = view.won
-      ? `<p><b>You cracked it!</b> The code was ${spans(view.code)} <u data-p="${full(view.code)}">▶</u></p><button data-a="next" ${off}>Next game</button>`
-      : `<button data-a="clear" ${off}>Clear</button> <button data-a="submit" ${off}>Ask Kyle</button>`;
-    $('#board').innerHTML = view.rows.map((r, n) =>
-      `<p><tt>${n + 1}.</tt> <u data-p="${full(r.g)}">▶</u> ${spans(r.g)} ${pips(r)}</p>`).join('');
-    // Tour step 1 to 2: the slots just filled up.
-    if (tour === 1 && view.phase === 'play' && sel.length >= need()) {
-      tour = 2;
-      talk('Good. Now press Ask Kyle and I will answer with colored dots.');
-    }
+    const { call, land, rows, won } = view, busy = revealed < rows.length;
+    $('#meta').textContent = `Level ${view.lvl + 1} of ${LEVELS.length} · ${view.stage === 'proof' ? 'proof: same twist, new call' : 'find the twist'} · ${call.length}-note call${land != null ? ` · my answer ends on ${L[land]}` : ''}${api.isSpectator ? ' · 👁 watching' : ''}`;
+    $('#callbox').innerHTML = `<h3>Kyle's call</h3><pre class="rl">${roll(call)}</pre><button data-p="${call}">▶ Hear the call</button>`;
+    $('#work').hidden = busy || won;
+    $('#work').innerHTML = `<h3>Your answer</h3><pre class="rl">${roll(draft, true)}</pre>
+      ${['up:▲', 'down:▼', 'flip:Flip', 'rev:Reverse', 'reset:Reset'].map((t) => `<button data-t="${t.split(':')[0]}" ${off}>${t.split(':')[1]}</button>`).join('')}<br>
+      <button data-p="${call}|${draft}">▶ Play both</button> <button data-a="submit" ${off}>Ask Kyle</button>`;
+    $('#end').innerHTML = busy ? '<p>♪ Kyle is answering…</p>' : won ? `<p><b>You proved it!</b></p><button data-a="next" ${off}>Next level</button>` : '';
+    $('#board').innerHTML = rows.map((r, n) =>
+      `<p><tt>${n + 1}.</tt> <u data-p="${r.call}|${r.g}">▶</u> ${r.g.map((i) => L[i]).join('-')} ${n < revealed ? chan(r) : '…'}</p>`).join('');
   };
 
   root.addEventListener('click', (e) => {
-    const t = e.target.closest('[data-p],[data-i],[data-a],[data-path]');
+    const t = e.target.closest('[data-p],[data-t],[data-c],[data-a]');
     if (!t || !view) return;
+    ac = ac || new AudioContext();                            // created inside the tap, so the browser allows sound later
+    if (ac.state === 'suspended') ac.resume();
     const d = t.dataset;
-    if (d.p) return play(d.p.split(',').map(Number));        // listening is local, so spectators may do it
-    if (api.isSpectator) return;
-    if (d.path) { sel = []; api.send({ a: 'play', path: d.path }); }
-    else if (d.i !== undefined) { if (sel.length < need()) { sel.push(+d.i); play([+d.i]); render(); } }
-    else if (d.a === 'clear') { sel = []; render(); }
-    else if (d.a === 'submit') {
-      if (sel.length !== need()) return;
-      // Refuse an illegal melody here with an explanation, keeping the notes
-      // in the slots. The host still re-checks (reduce is the authority).
-      if (view.cfg.rule && breaksRule(sel, view.cfg)) { talk(ruleHelp(view.cfg)); return; }
-      api.send({ a: 'guess', g: sel }); sel = [];
-    }
-    else if (d.a === 'tour-skip') {
-      const tip = (view.phase === 'play' && view.cfg) ? (view.cfg.tip || 'A new code. I know it.') : 'Pick a path.';
-      tourEnd(); talk(tip); render();
-    }
-    else { if (d.a === 'home') tour = 0; sel = []; api.send({ a: d.a }); }                  // home, next
+    if (d.p) return play(...d.p.split('|').map((q) => q.split(',').map(Number)));   // listening is local, so spectators may do it
+    if (api.isSpectator || revealed < view.rows.length) return;
+    if (d.t) tool(d.t);
+    else if (d.c !== undefined) { draft[+d.c] = +d.r; play([+d.r]); render(); }
+    else api.send(d.a === 'submit' ? { a: 'guess', g: draft } : { a: d.a });          // submit, home, play, next
   });
 
   return {
     update(v) {
+      const first = !view;
       view = v;
-      if (v.phase === 'play' && v.round !== round) {
-        round = v.round; sel = []; seen = 0; talk(v.cfg.tip || 'A new code. I know it.');
-        try { localStorage.setItem(SEEN_KEY, '1'); } catch (e) { /* incognito */ }
-        // Guided first round, once ever, never for spectators.
-        if (tour === 0 && !tourSeen() && !api.isSpectator) { tour = 1; talk(tourStep1()); }
-      }
-      if (v.rows.length > seen) {
-        const row = v.rows[v.rows.length - 1];
-        talk(row.text + (v.won ? ' You cracked it!' : ''));
-        // Tour step 2 to done: the first answered row teaches the pips.
-        if (tour === 2) {
-          talk(`I answered, see the dots on your row above. ${row.text} Every answer narrows the code. Keep guessing.` +
-            (v.won ? ' You cracked it!' : ''));
-          tourEnd();
-        }
+      if (first || v.round !== round) { round = v.round; seen = revealed = v.rows.length; if (v.phase === 'play') talk(v.say); }
+      if (v.phase === 'play' && v.call.join() !== callKey) { callKey = v.call.join(); draft = v.call.slice(); }
+      if (v.rows.length > seen) {            // Kyle plays call then answer first; the scores pop up only afterwards
+        const r = v.rows[v.rows.length - 1], n = v.rows.length;
+        clearTimeout(timer);
+        timer = setTimeout(() => { revealed = n; talk(view.rows[n - 1].text); render(); }, play(r.call, r.g) * 1000);
       }
       seen = v.rows.length;
       render();
     },
     denied(text) { talk(String(text || 'Kyle refused that.')); },
-    destroy() { if (ac) ac.close(); },
+    destroy() { clearTimeout(timer); if (ac) ac.close(); },
   };
 }
 
 export function summarize(s, nameOf) {
   if (!s || !s.won || s.phase !== 'play') return null;
-  const lvl = (s.cfg && s.cfg.name) || 'the code';
   let who = 'Someone';
-  try { who = nameOf(s.wonBy) || 'Someone'; } catch (e) { who = 'Someone'; }
-  const n = (s.rows || []).length;
-  return `${who} cracked ${lvl} in ${n} ${n === 1 ? 'try' : 'tries'}`;
+  try { who = nameOf(s.wonBy) || who; } catch (e) { /* keep the default */ }
+  return `${who} proved level ${s.lvl + 1} in ${s.rows.length} ${s.rows.length === 1 ? 'try' : 'tries'}`;
 }
