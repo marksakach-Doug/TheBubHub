@@ -3,9 +3,9 @@
 <head>
 <meta charset="UTF-8">
 <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
-<title>Kyle Knows the Code: dev</title>
+<title>Music Bridge: dev</title>
 <!--
-  Dev harness for games/kyle/index.js. Not part of the hub and not
+  Dev harness for games/musicbridge/index.js. Not part of the hub and not
   registered anywhere: the hub finds module games through Vite's
   import.meta.glob, which needs `npm run dev`, and nothing here needs that.
 
@@ -16,7 +16,7 @@
   Serve it over HTTP (ES modules are blocked on file://):
 
       cd /home/mark/Documents/BubHub && python3 -m http.server 5173
-      # http://localhost:5173/games/kyle/dev.html
+      # http://localhost:5173/games/musicbridge/dev.html
 
   Edit a constant in index.js and hit F5.
 -->
@@ -85,8 +85,8 @@
 <div id="readout">
     <span>phase <b id="r-phase">-</b></span>
     <span>round <b id="r-round">-</b></span>
-    <span>rows <b id="r-rows">-</b></span>
-    <span>won <b id="r-won">-</b></span>
+    <span>locked <b id="r-locked">-</b></span>
+    <span>found <b id="r-found">-</b></span>
     <span>intent <b id="r-intent">-</b></span>
 </div>
 
@@ -115,10 +115,10 @@
                 '<p>ES modules cannot be imported over <code>file://</code>, so the game file ' +
                 'never loads. From the repo root:</p>' +
                 '<code>python3 -m http.server 5173</code>' +
-                '<p>then open <code>http://localhost:5173/games/kyle/dev.html</code></p>');
+                '<p>then open <code>http://localhost:5173/games/musicbridge/dev.html</code></p>');
         } else {
             die('Could not load ./index.js',
-                '<p>Serve the <em>repo root</em>, not this folder: the game sits under /games/kyle/.</p>' +
+                '<p>Serve the <em>repo root</em>, not this folder: the game sits under /games/musicbridge/.</p>' +
                 '<code>' + String(e) + '</code>');
         }
         throw e;
@@ -129,12 +129,12 @@
     // it seats the people actually at the table; `isInRoom`/`isHost` are what
     // the lobby branches on.
     const ROOM = new URLSearchParams(location.search).get('room') === '1';
-    const table = [{ id: ME, name: NAME, host: true, game: 'kyle' }];
+    const table = [{ id: ME, name: NAME, host: true, game: 'musicbridge' }];
     let state = game.init({ seats: table, atTable: table, options: {} });
 
     // ---- the readout -------------------------------------------------------
     const out = {};
-    ['phase', 'round', 'rows', 'won', 'intent'].forEach((k) => {
+    ['phase', 'round', 'locked', 'found', 'intent'].forEach((k) => {
         out[k] = document.getElementById('r-' + k);
     });
 
@@ -148,8 +148,8 @@
     function paint() {
         set('phase', state.phase);
         set('round', String(state.round));
-        set('rows', String((state.rows || []).length));
-        set('won', state.won ? 'yes' : 'no');
+        set('locked', String(Object.keys(state.locked || {}).length) + '/' + String((state.order || []).length));
+        set('found', String(state.found || 0));
     }
 
     const api = {

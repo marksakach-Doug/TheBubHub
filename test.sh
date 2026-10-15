@@ -262,22 +262,22 @@ else
   fi
 fi
 
-# ---- 12. kyle rules (browser) ----
-step "kyle rules — tests/kyle_test.py"
+# ---- 12. music bridge rules (browser) ----
+step "music bridge rules — tests/musicbridge_test.py"
 if [ "$BROWSER_OK" = "1" ]; then
-  if python3 tests/kyle_test.py; then
-    pass "kyle_test"
+  if python3 tests/musicbridge_test.py; then
+    pass "musicbridge_test"
   else
-    fail "kyle_test"
+    fail "musicbridge_test"
     echo "Stopped at first failure." >&2
     printf '\nResult: %d passed, %d failed, %d skipped\n' "$PASS" "$FAIL" "$SKIPPED"
     exit 1
   fi
 else
   if [ "$SKIP_BROWSER" = "1" ]; then
-    skip "kyle_test ($BROWSER_WHY)"
+    skip "musicbridge_test ($BROWSER_WHY)"
   else
-    fail "kyle_test (no browser: $BROWSER_WHY)"
+    fail "musicbridge_test (no browser: $BROWSER_WHY)"
     echo "Tip: re-run with --skip-browser for syntax-only checks." >&2
     printf '\nResult: %d passed, %d failed, %d skipped\n' "$PASS" "$FAIL" "$SKIPPED"
     exit 1

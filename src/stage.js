@@ -93,8 +93,9 @@ export function createStage(rootEl) {
     }
     document.body.classList.add('focus-mode');
     // Module games have no fill flag: Focus is a bounded canvas (no overflow,
-    // so the scrollable stage is harmless) while Kyle is a long document that
-    // needs it. Default modules to scroll mode unless they opt into fill.
+    // so the scrollable stage is harmless) while Music Bridge is a compact
+    // composer that fits without it. Default modules to scroll mode unless
+    // they opt into fill.
     document.body.classList.toggle('stage-scroll', !meta.fill);
     return {
       update: function (view) {
