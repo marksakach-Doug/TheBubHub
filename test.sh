@@ -262,7 +262,29 @@ else
   fi
 fi
 
-# ---- 12. chess rules (browser) ----
+# ---- 12. kyle rules (browser) ----
+step "kyle rules — tests/kyle_test.py"
+if [ "$BROWSER_OK" = "1" ]; then
+  if python3 tests/kyle_test.py; then
+    pass "kyle_test"
+  else
+    fail "kyle_test"
+    echo "Stopped at first failure." >&2
+    printf '\nResult: %d passed, %d failed, %d skipped\n' "$PASS" "$FAIL" "$SKIPPED"
+    exit 1
+  fi
+else
+  if [ "$SKIP_BROWSER" = "1" ]; then
+    skip "kyle_test ($BROWSER_WHY)"
+  else
+    fail "kyle_test (no browser: $BROWSER_WHY)"
+    echo "Tip: re-run with --skip-browser for syntax-only checks." >&2
+    printf '\nResult: %d passed, %d failed, %d skipped\n' "$PASS" "$FAIL" "$SKIPPED"
+    exit 1
+  fi
+fi
+
+# ---- 13. chess rules (browser) ----
 step "chess rules — tests/chess_rules.py"
 if [ "$BROWSER_OK" = "1" ]; then
   if python3 tests/chess_rules.py; then
@@ -284,7 +306,7 @@ else
   fi
 fi
 
-# ---- 13. the 96 game play test (browser) ----
+# ---- 14. the 96 game play test (browser) ----
 step "the 96 game play test — tests/t96_play.py"
 if [ "$BROWSER_OK" = "1" ]; then
   if python3 tests/t96_play.py; then
