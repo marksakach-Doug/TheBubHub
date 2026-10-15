@@ -1,4 +1,4 @@
-// games/kyle/index.js: Kyle Vibe Prompt Game Maker & Window Length Tester
+// games/kyle/index.js: Kyle Vibe Prompt & Rhythm Game Maker (No Call & Response)
 const KYLE = `    _______
    /_______\\___
   ( 0   o   )
@@ -33,10 +33,11 @@ const PLAY_B = String.raw`    _______  ♫
     _|   |_
 `;
 const FRAMES = [KYLE, PLAY_A, PLAY_B];
-
-// Eight-note pentatonic scale (0 = lowest)
 const SCALE = { labels: ['C', 'D', 'E', 'G', 'A', "C'", "D'", "E'"], hz: [262, 294, 330, 392, 440, 523, 587, 659] };
 const S = SCALE.labels.length;
+const STORAGE_KEY = 'kyle_vibe_prompts_txt_v2';
+const DUR_SYM = { q: '●', e: '♪', t: '▴' };
+const DUR_LBL = { q: '♩1', e: '♫8', t: '3t' };
 
 export const meta = {
   id: 'kyle',
@@ -44,48 +45,15 @@ export const meta = {
   players: '1+',
   color: '#ff00ff',
   icon: '🎵',
-  desc: 'Test call/response window lengths and record vibe prompts to a .txt file.',
+  desc: 'Compose with tempo, swing, eighths & triplets, and record vibe prompts to .txt.',
   soloable: true
 };
 
-const STORAGE_KEY = 'kyle_vibe_prompts_txt_v1';
-
-// Generate a pleasant random call of any window length
-function randomCall(len, rng = Math.random) {
-  const c = [Math.floor(rng() * S)];
-  while (c.length < len) {
-    const step = (rng() < 0.5 ? -1 : 1) * (1 + Math.floor(rng() * 3));
-    const next = Math.max(0, Math.min(S - 1, c[c.length - 1] + step));
-    c.push(next);
-  }
-  return c;
-}
-
 export function init() {
-  return {
-    phase: 'maker',
-    callLen: 4,
-    respLen: 4,
-    call: [0, 2, 3, 2],
-    say: "Type a vibe prompt below and test how different call & response window lengths feel!"
-  };
+  return { phase: 'maker' };
 }
 
-export function reduce(s, a, ctx) {
-  const rng = (ctx && ctx.rng) || Math.random;
-  if (a.a === 'setCallLen') {
-    const callLen = Number(a.len) || 4;
-    return { ...s, callLen, call: randomCall(callLen, rng) };
-  }
-  if (a.a === 'setRespLen') {
-    return { ...s, respLen: Number(a.len) || 4 };
-  }
-  if (a.a === 'newCall') {
-    return { ...s, call: randomCall(s.callLen, rng) };
-  }
-  if (a.a === 'setCall' && Array.isArray(a.call)) {
-    return { ...s, call: a.call, callLen: a.call.length };
-  }
+export function reduce(s) {
   return s;
 }
 
@@ -93,440 +61,238 @@ export function project(s) {
   return { ...s };
 }
 
-export function mount(root, api) {
-  let view = init();
-  let call = [0, 2, 3, 2];
-  let callLen = 4;
-  let respLen = 4;
-  let stepMs = 320; // Tempo: 450 (Slow), 320 (Normal), 200 (Fast)
-  let editTarget = 'resp'; // 'resp' | 'call'
-  let draft = [];
-  let promptText = '';
-  let formatMode = 'plain'; // 'plain' | 'window' | 'full'
+export function mount(root) {
+  let winLen = 8, bpm = 120, swing = 50, curDur = 'q', formatMode = 'plain', promptText = '';
   let savedLines = [];
+  let draft = [
+    { p: 0, d: 'q' }, { p: 2, d: 'e' }, { p: 3, d: 'e' }, { p: 4, d: 'q' },
+    { p: 3, d: 't' }, { p: 2, d: 't' }, { p: 0, d: 't' }, { p: 0, d: 'q' }
+  ];
   let ac, anim, animEnd;
 
   try {
     const raw = localStorage.getItem(STORAGE_KEY);
     if (raw) savedLines = raw.split('\n').filter((x) => x.trim().length > 0);
-  } catch (e) { /* ignore storage errors */ }
+  } catch (e) {}
 
   const $ = (q) => root.querySelector(q);
   const L = SCALE.labels;
-
-  const saveToStorage = () => {
-    try {
-      localStorage.setItem(STORAGE_KEY, savedLines.join('\n'));
-    } catch (e) { /* ignore */ }
-  };
-
-  const showFrame = (i) => {
-    const k = $('#kyle');
-    if (k) k.textContent = FRAMES[i];
-  };
-
+  const save = () => { try { localStorage.setItem(STORAGE_KEY, savedLines.join('\n')); } catch (e) {} };
+  const show = (i) => { const k = $('#kyle'); if (k) k.textContent = FRAMES[i]; };
   const updateBubble = () => {
     const b = $('#bubble');
-    if (!b) return;
-    b.textContent = promptText.trim()
-      ? `"${promptText.trim()}"`
-      : `Testing [${callLen}-note Call -> ${respLen}-note Response]. Type a vibe prompt below!`;
+    if (b) b.textContent = promptText.trim() ? `"${promptText.trim()}"` : `Type a Vibe Prompt below! Compose a ${winLen}-slot tune with Tempo, Swing, Eighths & Triplets.`;
   };
 
-  const play = (...seqs) => {
-    let totalSec = 0.4;
+  const play = (seq = draft) => {
+    if (!seq.length) return 0;
+    const beatSec = 60 / bpm, swingRatio = swing / 100;
+    let totalSec = 0.25;
     try {
       const Ctx = window.AudioContext || window.webkitAudioContext;
       if (Ctx) {
         ac = ac || new Ctx();
         if (ac.state === 'suspended') ac.resume();
-        const stepSec = stepMs / 1000;
-        let t = ac.currentTime + 0.02;
-        const t0 = t;
-        seqs.forEach((q, n) => {
-          if (n) t += stepSec * 1.15;
-          q.forEach((i) => {
-            if (i != null && SCALE.hz[i]) {
-              const o = ac.createOscillator(), g = ac.createGain();
-              o.frequency.value = SCALE.hz[i];
-              g.gain.setValueAtTime(0.45, t);
-              g.gain.exponentialRampToValueAtTime(0.001, t + stepSec * 1.1);
-              o.connect(g).connect(ac.destination);
-              o.start(t);
-              o.stop(t + stepSec * 1.1);
-            }
-            t += stepSec;
-          });
+        let t = ac.currentTime + 0.02, t0 = t, eParity = 0;
+        seq.forEach((it) => {
+          let beats = 1;
+          if (it.d === 'e') { beats = eParity % 2 === 0 ? swingRatio : 1 - swingRatio; eParity++; }
+          else if (it.d === 't') { beats = 1 / 3; eParity = 0; }
+          else { beats = 1; eParity = 0; }
+          const stepSec = beats * beatSec;
+          if (it.p >= 0 && SCALE.hz[it.p]) {
+            const o = ac.createOscillator(), g = ac.createGain();
+            o.frequency.value = SCALE.hz[it.p];
+            g.gain.setValueAtTime(0.45, t);
+            g.gain.exponentialRampToValueAtTime(0.001, t + stepSec * 0.92);
+            o.connect(g).connect(ac.destination);
+            o.start(t); o.stop(t + stepSec * 0.95);
+          }
+          t += stepSec;
         });
         totalSec = Math.max(0.25, t - t0);
       }
-    } catch (e) {
-      totalSec = 0.4;
-    }
+    } catch (e) {}
     let n = 0;
-    clearInterval(anim);
-    clearTimeout(animEnd);
-    anim = setInterval(() => showFrame(1 + (n++ % 2)), 175);
-    animEnd = setTimeout(() => { clearInterval(anim); showFrame(0); }, totalSec * 1000);
+    clearInterval(anim); clearTimeout(animEnd);
+    anim = setInterval(() => show(1 + (n++ % 2)), 160);
+    animEnd = setTimeout(() => { clearInterval(anim); show(0); }, totalSec * 1000);
     return totalSec;
   };
 
-  // Piano roll for any window length
   const roll = (u, len) =>
-    [...L.keys()]
-      .reverse()
-      .map((r) => L[r].padEnd(3) + Array.from({ length: len }, (_, i) => (u[i] === r ? '●' : '·')).join('  '))
-      .join('\n');
-
-  const runTool = (t) => {
-    const target = editTarget === 'call' ? call : draft;
-    const maxLen = editTarget === 'call' ? callLen : respLen;
-
-    if (t === 'clear') {
-      if (editTarget === 'call') call = [];
-      else draft = [];
-    } else if (t === ' backspace') {
-      if (editTarget === 'call') call = call.slice(0, -1);
-      else draft = draft.slice(0, -1);
-    } else if (t === 'copy') {
-      if (!call.length) return;
-      // Append call into draft up to respLen (clicking twice fills an 8-note window with two 4-note calls)
-      if (draft.length === 0 || draft.length >= respLen) {
-        draft = call.slice(0, respLen);
-      } else {
-        draft = [...draft, ...call].slice(0, respLen);
-      }
-      play(draft);
-      renderRolls();
-      return;
-    } else if (target.length === 0) {
-      return;
-    } else {
-      const p =
-        t === 'up'
-          ? target.map((x) => x + 1)
-          : t === 'down'
-          ? target.map((x) => x - 1)
-          : t === 'flip'
-          ? target.map((x) => 2 * target[0] - x)
-          : target.slice().reverse();
-      if (p.some((x) => x < 0 || x >= S)) {
-        const b = $('#bubble');
-        if (b) b.textContent = 'No room: that would leave the 8-note scale range. Slide ▲/▼ first!';
-        return;
-      }
-      if (editTarget === 'call') call = p.slice(0, maxLen);
-      else draft = p.slice(0, maxLen);
-    }
-    const after = editTarget === 'call' ? call : draft;
-    if (after.length) play(after);
-    renderRolls();
-  };
-
-  const formatLine = (rawPrompt) => {
-    const clean = rawPrompt.trim();
-    if (!clean) return '';
-    if (formatMode === 'window') {
-      return `[${callLen}->${respLen}] ${clean}`;
-    }
-    if (formatMode === 'full') {
-      const cNotes = call.map((i) => L[i]).join('-');
-      const rNotes = draft.length ? ` | resp:${draft.map((i) => L[i]).join('-')}` : '';
-      return `[${callLen}->${respLen} | call:${cNotes}${rNotes}] ${clean}`;
-    }
-    return clean;
-  };
-
-  const appendPrompt = () => {
-    const input = $('#promptInput');
-    const val = (input ? input.value : promptText).trim();
-    if (!val) return;
-    const line = formatLine(val);
-    savedLines.push(line);
-    saveToStorage();
-    promptText = '';
-    if (input) input.value = '';
-    renderTxtArea();
-    updateBubble();
-  };
-
-  const downloadTxt = () => {
-    const area = $('#txtOutput');
-    const content = area ? area.value : savedLines.join('\n');
-    const blob = new Blob([content + (content.endsWith('\n') ? '' : '\n')], { type: 'text/plain;charset=utf-8' });
-    const url = URL.createObjectURL(blob);
-    const a = document.createElement('a');
-    a.href = url;
-    a.download = 'vibe_prompts.txt';
-    document.body.appendChild(a);
-    a.click();
-    document.body.removeChild(a);
-    URL.revokeObjectURL(url);
-  };
+    [...L.keys()].reverse().map((r) =>
+      L[r].padEnd(3) + Array.from({ length: len }, (_, i) => {
+        const it = u[i];
+        if (!it) return '·';
+        if (it.p === r) return DUR_SYM[it.d] || '●';
+        if (it.p === -1 && r === 3) return '-';
+        return '·';
+      }).join('  ')
+    ).join('\n');
 
   root.innerHTML = `<style>
-    .k{background:#000080;color:#ff0;font:15px 'Times New Roman',serif;padding:12px;height:100%;overflow-y:auto;-webkit-overflow-scrolling:touch;box-sizing:border-box}
+    .k{background:#000080;color:#ff0;font:15px 'Times New Roman',serif;padding:10px;height:100%;overflow-y:auto;box-sizing:border-box}
     h1{color:#0ff;font:bold 22px Georgia;text-shadow:2px 2px #f0f;margin:4px 0}
     h3{margin:0 0 6px;font:bold 14px Arial;color:#0f0}
-    td{vertical-align:top}
-    pre{font:10px/1.05 'Courier New',monospace;color:#0f0;margin:0}
+    td{vertical-align:top} pre{font:10px/1.05 'Courier New',monospace;color:#0f0;margin:0}
     #bubble{background:#fff;color:#000;border:3px solid #000;padding:10px;font:bold 16px Arial;min-height:42px}
     .rl{font:15px/1.35 'Courier New',monospace;color:#ff0;background:#000044;padding:8px;border:1px dashed #0ff;overflow-x:auto}
-    button{font:bold 13px Arial;min-height:36px;margin:2px;padding:4px 10px;cursor:pointer;background:#ddd;color:#000;border:2px outset #fff}
+    button{font:bold 13px Arial;min-height:34px;margin:2px;padding:4px 8px;cursor:pointer;background:#ddd;color:#000;border:2px outset #fff}
     button.on{background:#0ff;color:#000;border:2px solid #fff}
-    button.go{background:#0f0;color:#000;font-size:14px}
-    #keys button{background:#fff;color:#000;min-width:40px;min-height:74px;font-size:15px}
+    button.go{background:#0f0;color:#000}
+    button.rhy-cell{min-width:34px;min-height:28px;padding:2px 4px;margin:1px;font:bold 12px monospace;background:#002266;color:#0ff;border:1px solid #0ff}
+    #keys button{background:#fff;color:#000;min-width:42px;min-height:74px;font-size:15px}
     .box{border:2px solid #0f0;padding:8px;margin:8px 0;background:#000055}
     .maker-box{border:2px solid #0ff;padding:8px;margin:8px 0;background:#001144}
-    .grid2{display:grid;grid-template-columns:1fr 1fr;gap:8px}
-    @media(max-width:650px){.grid2{grid-template-columns:1fr}}
-    input[type="text"],textarea{width:100%;box-sizing:border-box;font:bold 14px 'Courier New',monospace;padding:8px;background:#000033;color:#0f0;border:2px solid #0ff}
+    .srow{display:flex;align-items:center;gap:8px;margin:6px 0;flex-wrap:wrap;font:13px Arial}
+    input[type="range"]{flex:1;min-width:130px;accent-color:#0ff}
+    input[type="text"],textarea{width:100%;box-sizing:border-box;font:bold 14px monospace;padding:8px;background:#000033;color:#0f0;border:2px solid #0ff}
   </style>
   <div class="k">
-    <marquee>★ KYLE'S VIBE PROMPT GAME MAKER ★ Test Window Lengths & Record Prompts to .txt ★</marquee>
+    <marquee>★ KYLE'S VIBE PROMPT STUDIO ★ Tempo + Swing + Eighths & Triplets ★</marquee>
     <table width="100%"><tr><td id="bubble"></td><td width="130"><pre id="kyle">${KYLE}</pre></td></tr></table>
-    <h1>Kyle Vibe Prompt Studio</h1>
-
-    <!-- 1. WINDOW LENGTH & TEMPO CONTROLS -->
+    <h1>Kyle Vibe Prompt Game Maker</h1>
     <div class="maker-box">
-      <h3>1. Window Lengths & Tempo</h3>
-      <div id="winControls"></div>
-    </div>
-
-    <!-- 2. CALL & RESPONSE SANDBOX -->
-    <div class="grid2">
-      <div class="box" id="callBox"></div>
-      <div class="box" id="respBox"></div>
-    </div>
-
-    <!-- 3. KEYBOARD & COMPOSER TOOLS -->
-    <div class="box">
-      <div id="targetToggle" style="margin-bottom:6px"></div>
-      <div id="keys">${L.map((n, i) => `<button data-k="${i}">${n}</button>`).join('')}</div>
-      <div style="margin-top:6px">
-        ${[
-          'copy:Copy Call → Resp',
-          'up:▲ Slide Up',
-          'down:▼ Slide Down',
-          'flip:Flip (Invert)',
-          'rev:Reverse',
-          ' backspace:⌫ Undo Note',
-          'clear:Clear'
-        ]
-          .map((t) => `<button data-t="${t.split(':')[0]}">${t.split(':')[1]}</button>`)
-          .join('')}
+      <h3>1. Window Length, Tempo & Swing</h3>
+      <div id="winRow" style="margin-bottom:6px"></div>
+      <div class="srow">
+        <b style="min-width:155px" id="bpmLbl">Tempo: 120 BPM</b>
+        <input id="bpmS" type="range" min="60" max="220" step="2" value="120">
+        <button data-bpm="85">Slow</button><button data-bpm="120">Med</button><button data-bpm="165">Fast</button>
       </div>
-      <div style="margin-top:6px">
-        <button class="go" data-play="both">▶ Play Call + Response Together</button>
-        <button data-play="call">▶ Hear Call Only</button>
-        <button data-play="resp">▶ Hear Response Only</button>
+      <div class="srow">
+        <b style="min-width:155px" id="swLbl">Swing: 50% (Straight)</b>
+        <input id="swS" type="range" min="50" max="75" step="1" value="50">
+        <button data-sw="50">Straight</button><button data-sw="62">Swing</button><button data-sw="67">Shuffle</button>
       </div>
     </div>
-
-    <!-- 4. VIBE PROMPT RECORDER (.TXT) -->
+    <div class="box" id="pianoBox"></div>
     <div class="maker-box">
       <h3>2. Record Vibe Prompts to .txt</h3>
-      <div style="margin-bottom:6px" id="fmtControls"></div>
+      <div id="fmtRow" style="margin-bottom:6px"></div>
       <div style="display:flex;gap:6px;margin-bottom:8px">
-        <input id="promptInput" type="text" placeholder="Type a vibe prompt (e.g. 'Answer me like you're trying not to get caught') and hit Enter..." />
-        <button class="go" data-act="append" style="white-space:nowrap">+ Append (Enter)</button>
+        <input id="pInp" type="text" placeholder="Type a vibe prompt and press Enter...">
+        <button class="go" data-act="append">+ Append</button>
       </div>
       <div style="display:flex;justify-content:space-between;align-items:center;flex-wrap:wrap;margin-bottom:4px">
-        <small id="lineCount" style="color:#0ff;font-family:monospace">0 prompts recorded</small>
+        <small id="lCnt" style="color:#0ff;font-family:monospace"></small>
         <div>
-          <label style="cursor:pointer;background:#ddd;color:#000;padding:4px 8px;font:bold 12px Arial;border:2px outset #fff;margin-right:4px">
-            📂 Load/Append Existing .txt <input id="fileLoader" type="file" accept=".txt" style="display:none">
-          </label>
-          <button data-act="copytxt">📋 Copy All</button>
-          <button class="go" data-act="download">⬇ Download vibe_prompts.txt</button>
-          <button data-act="cleartxt" style="background:#922;color:#fff">Clear List</button>
+          <button data-act="copytxt">Copy All</button>
+          <button class="go" data-act="download">⬇ Download .txt</button>
+          <button data-act="cleartxt" style="background:#922;color:#fff">Clear</button>
         </div>
       </div>
-      <textarea id="txtOutput" rows="8" placeholder="Appended vibe prompts will appear here... You can also edit this text directly before downloading."></textarea>
+      <textarea id="txtOut" rows="7"></textarea>
     </div>
   </div>`;
 
-  const renderControls = () => {
-    $('#winControls').innerHTML = `
-      <div style="margin-bottom:4px">
-        <b>Kyle's Call Window:</b>
-        ${[2, 3, 4, 5, 6, 8]
-          .map((n) => `<button class="${callLen === n ? 'on' : ''}" data-clen="${n}">${n} notes</button>`)
-          .join('')}
-        <button data-act="randCall" style="background:#ff0;color:#000">🎲 New Random Call</button>
+  const renderPiano = () => {
+    $('#winRow').innerHTML = `<b>Window Slots: </b>` + [4, 6, 8, 10, 12, 16].map((n) => `<button class="${winLen === n ? 'on' : ''}" data-wlen="${n}">${n}</button>`).join('');
+    $('#fmtRow').innerHTML = `<b>.txt Format: </b><button class="${formatMode === 'plain' ? 'on' : ''}" data-fmt="plain">Plain Text</button><button class="${formatMode === 'meta' ? 'on' : ''}" data-fmt="meta">With [${winLen} slots | ${bpm} BPM | ${swing}% swing]</button>`;
+    const rhyRow = Array.from({ length: winLen }, (_, i) =>
+      draft[i] ? `<button class="rhy-cell" data-tog="${i}">${DUR_LBL[draft[i].d]}</button>` : `<button class="rhy-cell" disabled style="opacity:.3">--</button>`
+    ).join('');
+    $('#pianoBox').innerHTML = `
+      <h3>Your Melody (${draft.length}/${winLen} slots)</h3>
+      <pre class="rl">${roll(draft, winLen)}</pre>
+      <div style="margin:4px 0 8px;font:12px monospace;color:#0ff">Tap to change note rhythm (♩1 / ♫8 / 3t):<br>${rhyRow}</div>
+      <div style="margin-bottom:6px">
+        <b>Key Speed: </b>
+        <button class="${curDur === 'q' ? 'on' : ''}" data-dur="q">♩ Quarter (●)</button>
+        <button class="${curDur === 'e' ? 'on' : ''}" data-dur="e">♫ Eighth (♪)</button>
+        <button class="${curDur === 't' ? 'on' : ''}" data-dur="t">🎶 Triplet (▴)</button>
+        <button data-key="-1" style="background:#557;color:#fff">+ Rest (-)</button>
       </div>
-      <div style="margin-bottom:4px">
-        <b>Player Response Window:</b>
-        ${[2, 3, 4, 5, 6, 8, 10, 12]
-          .map((n) => `<button class="${respLen === n ? 'on' : ''}" data-rlen="${n}">${n} notes</button>`)
-          .join('')}
+      <div id="keys">${L.map((n, i) => `<button data-key="${i}">${n}</button>`).join('')}</div>
+      <div style="margin-top:6px">
+        <b>Grooves: </b>
+        <button data-grv="all_q">All ♩</button><button data-grv="all_e">All ♫</button><button data-grv="all_t">All 3</button>
+        <button data-grv="bounce">Bounce (♩ ♫♫)</button><button data-grv="gallop">Gallop (♩ 333)</button>
       </div>
-      <div>
-        <b>Playback Speed:</b>
-        ${[
-          { ms: 440, lbl: 'Slow' },
-          { ms: 320, lbl: 'Normal' },
-          { ms: 200, lbl: 'Fast' }
-        ]
-          .map((s) => `<button class="${stepMs === s.ms ? 'on' : ''}" data-tempo="${s.ms}">${s.lbl}</button>`)
-          .join('')}
-      </div>
-    `;
-
-    $('#targetToggle').innerHTML = `
-      <b>Piano Keys & Tools Target:</b>
-      <button class="${editTarget === 'resp' ? 'on' : ''}" data-target="resp">✏️ Editing Player Response (${draft.length}/${respLen})</button>
-      <button class="${editTarget === 'call' ? 'on' : ''}" data-target="call">✏️ Editing Kyle's Call (${call.length}/${callLen})</button>
-    `;
-
-    $('#fmtControls').innerHTML = `
-      <b>.txt Line Format:</b>
-      <button class="${formatMode === 'plain' ? 'on' : ''}" data-fmt="plain">Plain Text Only</button>
-      <button class="${formatMode === 'window' ? 'on' : ''}" data-fmt="window">With Window Tag [${callLen}->${respLen}]</button>
-      <button class="${formatMode === 'full' ? 'on' : ''}" data-fmt="full">With Window + Notes</button>
-    `;
-  };
-
-  const renderRolls = () => {
-    $('#callBox').innerHTML = `
-      <h3>Kyle's Call (${call.length}/${callLen} notes): ${call.map((i) => L[i]).join('-') || 'empty'}</h3>
-      <pre class="rl">${roll(call, callLen)}</pre>
-    `;
-    $('#respBox').innerHTML = `
-      <h3>Player Response (${draft.length}/${respLen} notes): ${draft.map((i) => L[i]).join('-') || 'empty'}</h3>
-      <pre class="rl">${roll(draft, respLen)}</pre>
-    `;
-    renderControls();
+      <div style="margin-top:6px">
+        <b>Pitch: </b>
+        <button data-tl="up">▲</button><button data-tl="down">▼</button><button data-tl="flip">Flip</button><button data-tl="rev">Reverse</button>
+        <button data-tl="rand" style="background:#ff0">🎲 Random</button><button data-tl="back">⌫</button><button data-tl="clear">Clear</button>
+        <button class="go" data-act="play">▶ Play Tune</button>
+      </div>`;
     updateBubble();
   };
 
-  const renderTxtArea = () => {
-    const area = $('#txtOutput');
-    if (area) area.value = savedLines.join('\n');
-    const lc = $('#lineCount');
-    if (lc) lc.textContent = `${savedLines.length} prompt${savedLines.length === 1 ? '' : 's'} recorded (auto-saved)`;
+  const renderTxt = () => {
+    $('#txtOut').value = savedLines.join('\n');
+    $('#lCnt').textContent = `${savedLines.length} prompts recorded`;
   };
 
-  // Input listeners
-  const pInput = $('#promptInput');
-  pInput.addEventListener('input', (e) => {
-    promptText = e.target.value;
-    updateBubble();
-  });
-  pInput.addEventListener('keydown', (e) => {
-    if (e.key === 'Enter') {
-      e.preventDefault();
-      appendPrompt();
-    }
-  });
+  const append = () => {
+    const val = $('#pInp').value.trim();
+    if (!val) return;
+    savedLines.push(formatMode === 'meta' ? `[${winLen} slots | ${bpm} BPM | ${swing}% swing] ${val}` : val);
+    save();
+    promptText = ''; $('#pInp').value = '';
+    renderTxt(); updateBubble();
+  };
 
-  const tArea = $('#txtOutput');
-  tArea.addEventListener('input', (e) => {
-    savedLines = e.target.value.split('\n').filter((x) => x.trim().length > 0);
-    saveToStorage();
-    const lc = $('#lineCount');
-    if (lc) lc.textContent = `${savedLines.length} prompt${savedLines.length === 1 ? '' : 's'} recorded (auto-saved)`;
-  });
-
-  const fLoader = $('#fileLoader');
-  fLoader.addEventListener('change', (e) => {
-    const file = e.target.files && e.target.files[0];
-    if (!file) return;
-    const reader = new FileReader();
-    reader.onload = () => {
-      const existing = String(reader.result || '')
-        .split(/\r?\n/)
-        .filter((x) => x.trim().length > 0);
-      savedLines = [...existing, ...savedLines];
-      saveToStorage();
-      renderTxtArea();
-      const b = $('#bubble');
-      if (b) b.textContent = `Loaded ${existing.length} prompts from ${file.name}! New prompts will append to the bottom.`;
-    };
-    reader.readAsText(file);
-  });
+  $('#bpmS').addEventListener('input', (e) => { bpm = +e.target.value; $('#bpmLbl').textContent = `Tempo: ${bpm} BPM`; renderPiano(); });
+  $('#bpmS').addEventListener('change', () => play());
+  $('#swS').addEventListener('input', (e) => { swing = +e.target.value; $('#swLbl').textContent = `Swing: ${swing}%`; renderPiano(); });
+  $('#swS').addEventListener('change', () => play());
+  $('#pInp').addEventListener('input', (e) => { promptText = e.target.value; updateBubble(); });
+  $('#pInp').addEventListener('keydown', (e) => { if (e.key === 'Enter') { e.preventDefault(); append(); } });
+  $('#txtOut').addEventListener('input', (e) => { savedLines = e.target.value.split('\n').filter((x) => x.trim()); save(); $('#lCnt').textContent = `${savedLines.length} prompts recorded`; });
 
   root.addEventListener('click', (e) => {
-    const t = e.target.closest('button');
-    if (!t) return;
-    const d = t.dataset;
-
-    if (d.clen) {
-      callLen = Number(d.clen);
-      if (call.length > callLen) call = call.slice(0, callLen);
-      else while (call.length < callLen) call.push(randomCall(1)[0]);
-      play(call);
-      renderRolls();
-    } else if (d.rlen) {
-      respLen = Number(d.rlen);
-      if (draft.length > respLen) draft = draft.slice(0, respLen);
-      renderRolls();
-    } else if (d.tempo) {
-      stepMs = Number(d.tempo);
-      play(call, draft);
-      renderControls();
-    } else if (d.target) {
-      editTarget = d.target;
-      renderControls();
-    } else if (d.fmt) {
-      formatMode = d.fmt;
-      renderControls();
-    } else if (d.k !== undefined) {
-      const noteIdx = Number(d.k);
-      if (editTarget === 'call') {
-        call = [...call, noteIdx].slice(-callLen);
-      } else {
-        draft = [...draft, noteIdx].slice(-respLen);
+    const b = e.target.closest('button');
+    if (!b) return;
+    const d = b.dataset;
+    if (d.wlen) { winLen = +d.wlen; draft = draft.slice(0, winLen); renderPiano(); }
+    else if (d.bpm) { bpm = +d.bpm; $('#bpmS').value = bpm; $('#bpmLbl').textContent = `Tempo: ${bpm} BPM`; play(); renderPiano(); }
+    else if (d.sw) { swing = +d.sw; $('#swS').value = swing; $('#swLbl').textContent = `Swing: ${swing}%`; play(); renderPiano(); }
+    else if (d.dur) { curDur = d.dur; renderPiano(); }
+    else if (d.tog !== undefined) {
+      const i = +d.tog, ord = ['q', 'e', 't'];
+      if (draft[i]) { draft[i].d = ord[(ord.indexOf(draft[i].d) + 1) % 3]; play(); renderPiano(); }
+    } else if (d.key !== undefined) {
+      const it = { p: +d.key, d: curDur };
+      draft = [...draft, it].slice(-winLen);
+      play([it]); renderPiano();
+    } else if (d.grv) {
+      draft.forEach((it, i) => {
+        it.d = d.grv === 'all_q' ? 'q' : d.grv === 'all_e' ? 'e' : d.grv === 'all_t' ? 't' : d.grv === 'bounce' ? (i % 3 === 0 ? 'q' : 'e') : (i % 4 === 0 ? 'q' : 't');
+      });
+      play(); renderPiano();
+    } else if (d.tl) {
+      if (d.tl === 'clear') draft = [];
+      else if (d.tl === 'back') draft = draft.slice(0, -1);
+      else if (d.tl === 'rev') draft = draft.slice().reverse();
+      else if (d.tl === 'rand') {
+        const dp = ['q', 'q', 'e', 'e', 't'];
+        let c = Math.floor(Math.random() * S);
+        draft = Array.from({ length: winLen }, () => {
+          c = Math.max(0, Math.min(S - 1, c + (Math.random() < 0.5 ? -1 : 1) * (1 + Math.floor(Math.random() * 2))));
+          return { p: c, d: dp[Math.floor(Math.random() * dp.length)] };
+        });
+      } else if (draft.length) {
+        const fp = (draft.find((x) => x.p >= 0) || { p: 0 }).p;
+        const nx = draft.map((it) => ({ p: it.p < 0 ? -1 : d.tl === 'up' ? it.p + 1 : d.tl === 'down' ? it.p - 1 : 2 * fp - it.p, d: it.d }));
+        if (!nx.some((it) => it.p !== -1 && (it.p < 0 || it.p >= S))) draft = nx;
       }
-      play([noteIdx]);
-      renderRolls();
-    } else if (d.t) {
-      runTool(d.t);
-    } else if (d.play) {
-      if (d.play === 'call') play(call);
-      else if (d.play === 'resp') play(draft);
-      else play(call, draft);
-    } else if (d.act === 'randCall') {
-      call = randomCall(callLen);
-      play(call);
-      renderRolls();
-    } else if (d.act === 'append') {
-      appendPrompt();
-    } else if (d.act === 'download') {
-      downloadTxt();
-    } else if (d.act === 'copytxt') {
-      const content = $('#txtOutput').value;
-      if (navigator.clipboard) navigator.clipboard.writeText(content);
-      const b = $('#bubble');
-      if (b) b.textContent = 'Copied all prompts to clipboard!';
-    } else if (d.act === 'cleartxt') {
-      if (confirm('Clear all recorded prompts?')) {
-        savedLines = [];
-        saveToStorage();
-        renderTxtArea();
-      }
+      if (draft.length) play();
+      renderPiano();
+    } else if (d.fmt) { formatMode = d.fmt; renderPiano(); }
+    else if (d.act === 'play') play();
+    else if (d.act === 'append') append();
+    else if (d.act === 'copytxt') { if (navigator.clipboard) navigator.clipboard.writeText($('#txtOut').value); }
+    else if (d.act === 'cleartxt') { savedLines = []; save(); renderTxt(); }
+    else if (d.act === 'download') {
+      const blob = new Blob([$('#txtOut').value + '\n'], { type: 'text/plain' });
+      const a = document.createElement('a');
+      a.href = URL.createObjectURL(blob); a.download = 'vibe_prompts.txt'; a.click();
     }
   });
 
-  renderRolls();
-  renderTxtArea();
-
-  return {
-    update(v) {
-      view = v || view;
-    },
-    denied(text) {
-      const b = $('#bubble');
-      if (b) b.textContent = String(text || 'Kyle refused that.');
-    },
-    destroy() {
-      clearTimeout(animEnd);
-      clearInterval(anim);
-      if (ac) ac.close();
-    }
-  };
+  renderPiano(); renderTxt();
+  return { update() {}, denied() {}, destroy() { clearInterval(anim); clearTimeout(animEnd); if (ac) ac.close(); } };
 }
 
-export function summarize(s) {
-  return null;
-}
+export function summarize() { return null; }
