@@ -35,6 +35,32 @@ pass() { PASS=$((PASS + 1)); echo "PASS: $1"; }
 fail() { FAIL=$((FAIL + 1)); echo "FAIL: $1"; }
 skip() { SKIPPED=$((SKIPPED + 1)); echo "SKIP: $1"; }
 
+# A browser suite, with the same loud-failure / --skip-browser rules as every
+# other step. Used by the suites added after these were first hand-written.
+browser_step() {
+  local name="$1" script="$2"
+  step "$name — tests/$script"
+  if [ "$BROWSER_OK" = "1" ]; then
+    if python3 "tests/$script"; then
+      pass "$script"
+    else
+      fail "$script"
+      echo "Stopped at first failure." >&2
+      printf '\nResult: %d passed, %d failed, %d skipped\n' "$PASS" "$FAIL" "$SKIPPED"
+      exit 1
+    fi
+  else
+    if [ "$SKIP_BROWSER" = "1" ]; then
+      skip "$script ($BROWSER_WHY)"
+    else
+      fail "$script (no browser: $BROWSER_WHY)"
+      echo "Tip: re-run with --skip-browser for syntax-only checks." >&2
+      printf '\nResult: %d passed, %d failed, %d skipped\n' "$PASS" "$FAIL" "$SKIPPED"
+      exit 1
+    fi
+  fi
+}
+
 # ---- 1. preflight ----
 step "preflight"
 if ! command -v python3 >/dev/null 2>&1; then
@@ -163,6 +189,14 @@ else
   fi
 fi
 
+# ---- 6b. record durability + dedupe (browser) ----
+# The two ways a line used to be lost or duplicated: deduping on the sentence
+# (which drops a real repeat and duplicates the sheet) and writing with no retry.
+browser_step "record durability" record_durability_test.py
+
+# ---- 6c. solo is a room of one, and it has a host (browser) ----
+browser_step "solo host" solo_host_test.py
+
 # ---- 7. module registry (browser) ----
 step "module registry — tests/module_registry_test.py"
 if [ "$BROWSER_OK" = "1" ]; then
@@ -272,6 +306,11 @@ else
     exit 1
   fi
 fi
+
+# ---- 11b. a Focus round always reaches `over` (browser) ----
+# If the round never ends, summarize() returns null and the score is never
+# written. Covers the denied-finish latch and the hidden-tab clock.
+browser_step "dot return round ending" dotreturn_finish_test.py
 
 # ---- 12. hook rules (browser) ----
 step "hook rules — tests/hook_test.py"

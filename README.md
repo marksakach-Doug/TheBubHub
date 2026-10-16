@@ -159,6 +159,26 @@ Return an object with:
 `mount()` is wrapped in a try/catch — a throw shows an error card instead of a
 blank frame.
 
+### `roundId(state) → string` (optional)
+
+Called by the hub alongside `summarize()`. Returns a stable id for the round
+`state` is currently in — the epoch, a deal number, anything that changes when
+a new round starts and holds still until the next one.
+
+This is what the record dedupes on. `summarize()` keeps returning the same
+sentence for the rest of a round (the hub calls it after every `reduce()`), so
+without a round id the hub can only dedupe on the text — which needs a rate
+limit, and a rate limit cannot tell "the same round reported again" from "a
+second game that happened to score the same". The limit dropped the second and
+let the first through in sheets.
+
+```js
+export function roundId(state) { return 'e' + state.epoch; }
+```
+
+Legacy games send the same thing as `inst` in their `result` payload. A game
+with neither still works — it just falls back to a 30-second text limit.
+
 ### `summarize(state, nameOf) → string | null`
 
 Called by the hub after every `reduce()` on the host. Return one sentence to
@@ -173,10 +193,14 @@ export function summarize(state, nameOf) {
 }
 ```
 
-The hub rate-limits identical lines (30s) and de-duplicates by
-`date|game|text`, so a chatty `reduce()` cannot spam the sheet. Return `null`
-until the game is genuinely decided — returning a "still playing" line every
-move defeats the point of recording results.
+The hub de-duplicates by `roundId()` if you export one, and otherwise by
+`date|game|text` under a 30-second limit. Return `null` until the game is
+genuinely decided — returning a "still playing" line every move defeats the
+point of recording results.
+
+Writes go through a `localStorage` outbox and retry, so a line survives being
+offline and a reload. Nothing is lost to a failed `fetch` any more; the status
+line under the record card says when something is still queued.
 
 ---
 

@@ -65,6 +65,17 @@ export function createStore() {
       s.hostId = isHost ? s.me.id : '';
       emit();
     },
+    // Solo is a room of one: not in a room, but still the host. This has to be
+    // said out loud rather than left to `!inRoom` checks scattered around,
+    // because api.isHost is what legacy iframes are told they are
+    // (see compat.js legacyRoster) — and chess and Word Bridge decide their
+    // whole solo table from it. Without this, a solo player opened a game with
+    // isHost:false and the bot never moved, the rematch button never appeared,
+    // and reportResult() returned early: nothing was recorded.
+    openSolo() {
+      s.roomId = ''; s.inRoom = false; s.isHost = true; s.hostId = s.me.id;
+      emit();
+    },
     closeRoom() {
       s.roomId = ''; s.inRoom = false; s.isHost = false; s.hostId = '';
       s.roster = []; s.seats = {}; s.openGame = null;

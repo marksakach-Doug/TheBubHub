@@ -181,6 +181,13 @@ export function mount(root, api) {
   };
 }
 
+// A stable id for the round `s` is in. summarize() re-succeeds on every reduce()
+// for the rest of the round once lastWin is set, so the hub dedupes on this
+// rather than on the sentence.
+export function roundId(s) {
+  return 'r' + ((s && s.round) || 0);
+}
+
 export function summarize(s, nameOf) {
   const win = (s && s.lastWin) || [];
   if (!win.length) return null;

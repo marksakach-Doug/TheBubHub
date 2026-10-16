@@ -33,7 +33,8 @@ export async function loadRegistry() {
           file: g.file, players: g.players, compat: 'iframe', desc: g.desc || '',
           solo: !!g.solo, soloable: !!g.soloable, lobby: !!g.lobby,
           fill: !!g.fill, grow: !!g.grow, height: g.height || 0,
-          noRecord: !!g.noRecord, menuLabel: g.menuLabel || null
+          noRecord: !!g.noRecord, activityRecord: !!g.activityRecord,
+          menuLabel: g.menuLabel || null
         },
         entry: g
       };

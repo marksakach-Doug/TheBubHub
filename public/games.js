@@ -17,7 +17,13 @@ window.BUB_GAMES = [
   // `lobby: true`, which is a different flag from `soloable` and put a whole
   // building sandbox in the "play something while you wait" list. It still
   // promotes itself to a local table when opened without a room.
+  // `activityRecord: true` = a sandbox with no result to post, so the hub
+  // records it from play instead (see main.js onTouched). Goldberg builds a
+  // machine and presses play; there is no round and therefore nothing to send
+  // at the end. compat fires onTouched for EVERY intent from EVERY iframe
+  // game, so this flag is what stops chess moves leaving lines behind.
   { id: 'goldberg', file: 'goldberg.html', title: 'Goldberg', players: '2-6', color: '#e6c280', fill: true,
+    activityRecord: true,
     icon: '🔔', desc: 'Build a chain-reaction machine together out of parts, then press play and watch it go.' },
   { id: 'daltadka', file: 'daltadka.html', title: 'Dal Tadka', players: 'solo', color: '#d9b26f', solo: true, lobby: true, fill: true,
     icon: '🍲', desc: 'Cook dal from scratch for hungry judges, who score how well you timed each step.' },

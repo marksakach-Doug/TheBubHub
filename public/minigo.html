@@ -43,7 +43,7 @@ var $=function(i){return document.getElementById(i)};
 
 // ---------- hub bridge (same protocol as the other games) ----------
 var Hub={me:null,roster:[],up:function(k,p){try{window.parent.postMessage({t:'gu',game:GID,k:k,p:p},'*')}catch(e){}}};
-var S=null,local=false,note='',noteT=0,hov=-1,resArm=0;
+var S=null,local=false,note='',noteT=0,hov=-1,resArm=0,goInst=0,reported=false;
 function myId(){return Hub.me&&Hub.me.id}
 function isHost(){return !!(Hub.me&&Hub.me.isHost)}
 function send(d){if(isHost())onIntent(d,{id:myId()});else Hub.up('intent',d)}
@@ -98,8 +98,9 @@ function fresh(){var z=[];for(var i=0;i<N*N;i++)z.push(0);return z}
 function newGame(keepSeats,swap){
   var pl=S?S.players:{1:null,2:null},nm=S?S.names:{};
   if(swap){pl={1:pl[2],2:pl[1]}}
-  S={b:fresh(),turn:1,cap:[0,0,0],hist:[fresh().join('')],passes:0,phase:'play',dead:fresh(),acc:[0,0],
-     last:null,result:'',players:pl,names:nm};
+  S={b:fresh(),turn:1,cap:[0,0],hist:[fresh().join('')],passes:0,phase:'play',dead:fresh(),acc:[0,0],
+     last:null,result:'',won:0,players:pl,names:nm};
+  reported=false;
 }
 function onRoster(){
   if(!isHost()){Hub.up('intent',{a:'hello'});return}
@@ -117,7 +118,18 @@ function actor(id){return local?S.turn:(S.players[1]===id?1:S.players[2]===id?2:
 function finish(){
   var sc=score(S),w=sc[2]+KOMI,d=sc[1]-w;
   S.result=(d>0?'Black':'White')+' wins by '+Math.abs(d)+'  (Black '+sc[1]+', White '+sc[2]+' + '+KOMI+' komi)';
+  S.won=d>0?2:1;
   S.phase='over';
+  reportResult();
+}
+// MiniGo used to end without ever telling the hub, so it left no record line
+// at all. Both endings (scored and resignation) set S.won to the winning
+// colour — 1 is White, 2 is Black — and come through here.
+function reportResult(){
+  if(reported||!S||!S.won||!isHost())return;
+  reported=true;
+  var w=S.names[S.players[S.won]]||'Someone',l=S.names[S.players[3-S.won]]||'the other player';
+  Hub.up('result',{inst:'go-'+(++goInst),text:w+' beat '+l+' at MiniGo'});
 }
 function onIntent(d,from){
   if(!S||!d||!from)return;
@@ -131,7 +143,7 @@ function onIntent(d,from){
     S.passes++;S.last={c:c,i:-1};S.turn=3-c;
     if(S.passes>=2){S.phase='score';S.dead=fresh();S.acc=[0,0]}
   }else if(a==='resign'&&(S.phase==='play'||S.phase==='score')){
-    S.result=(c===1?'White':'Black')+' wins by resignation';S.phase='over';
+    S.result=(c===1?'White':'Black')+' wins by resignation';S.won=c;S.phase='over';reportResult();
   }else if(a==='mark'&&S.phase==='score'){
     var i=d.i|0;if(!S.b[i])return;
     var g=group(S.b,i),v=S.dead[i]?0:1;g.st.forEach(function(k){S.dead[k]=v});S.acc=[0,0];

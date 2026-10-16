@@ -44,6 +44,7 @@ const CENTER_RELEASE = R * 0.35;
 const REROLL_CD = 300;      // host-side floor between two rerolls for one dot
 const REROLL_RETRY = 400;  // client-side re-ask, must exceed REROLL_CD
 const FINISH_GRACE = 1000; // clock skew allowance when ending the round
+const FINISH_RETRY = 1500; // client-side re-ask floor between two `finish` intents
 const SHOW_CIRCLE = 0;     // 1 reveals the hidden circle while tuning
 const REVEAL_TIME = 3000;  // 3s reveal before clock starts
 
@@ -272,7 +273,16 @@ export function project(state, playerId) {
   });
 }
 
-// ------------------------------------------------------------ summarize ----
+// ---------------------------------------------------------------- summarize ----
+
+// A stable id for the round `state` is currently in. The hub uses this as the
+// record's dedupe key instead of the sentence: summarize() re-succeeds on every
+// reduce() once the phase is `over`, so keying on the text either needs a
+// throttle that throws away genuinely distinct identical rounds, or writes the
+// same round to the sheet over and over.
+export function roundId(state) {
+  return 'e' + ((state && state.epoch) || 0);
+}
 
 export function summarize(state, nameOf) {
   if (state.phase !== 'over' || !state.over) return null;
@@ -451,7 +461,8 @@ export function mount(root, api) {
   const sim = { epoch: -1, last: 0, acc: 0, dots: {}, windA: 0, windAt: 0 };
   let rafId = null;
   let running = false;
-  let askedFinish = false;
+  let lastFinishReq = 0;
+  let endTimer = null;
   let askedRevealEnd = false;
   let pendingReroll = false;
   let lastRerollReq = 0;
@@ -515,7 +526,7 @@ export function mount(root, api) {
       if (d.benched) return;
       sim.dots[id] = { x: 0, y: 0, a: d.a || 0 };
     });
-    askedFinish = false;
+    lastFinishReq = 0;
     askedRevealEnd = false;
     pendingReroll = false;
     latched = false;
@@ -534,6 +545,50 @@ export function mount(root, api) {
     if (rafId === null) return;
     api.cancelRaf(rafId);
     rafId = null;
+  }
+
+  // ---- ending the round ----
+  //
+  // This used to be a one-shot latch: the first frame past the clock set
+  // askedFinish and sent `finish` exactly once. reduce() rejects that intent
+  // with 'The clock is still running.' when this client's clock is more than
+  // FINISH_GRACE ahead of the host's, and nothing ever asked again — so the
+  // round sat in `play` forever and summarize() returned null, meaning the
+  // score was never recorded. Ask on a floor instead, and let a refusal reset
+  // it (see denied() below), so a denial costs a retry and not the round.
+
+  function askFinish() {
+    if (dead || !view || view.phase !== 'play') return;
+    if (Date.now() < (view.endsAt || 0)) return;
+    const now = Date.now();
+    if (now - lastFinishReq < FINISH_RETRY) return;
+    lastFinishReq = now;
+    api.send({ a: 'finish' });
+  }
+
+  // A second safety net under askFinish(): the host's own deadline, armed on
+  // the clock rather than on a frame. A hidden tab stops painting, so its
+  // requestAnimationFrame loop stops asking entirely — a backgrounded tab is
+  // throttled far harder than a timeout, but a timeout still fires. This is
+  // what lets a solo round (or one whose only player looked away) still reach
+  // `over` and get written down.
+  //
+  // api.setTimeout is what the hub's stage injects so it can cancel the timer
+  // on teardown; fall back to the global for harnesses and dev.html, which
+  // only supply raf/cancelRaf. clearTimeout cancels either one.
+  const setT = api.setTimeout || setTimeout;
+
+  function armEndTimer() {
+    if (endTimer !== null) { clearTimeout(endTimer); endTimer = null; }
+    if (dead || !view || view.phase !== 'play' || !iAmHost()) return;
+    const ms = Math.max(0, (view.endsAt || 0) - Date.now()) + FINISH_GRACE;
+    endTimer = setT(function () {
+      endTimer = null;
+      // askFinish()'s floor would swallow this, since the loop probably already
+      // sent one: rearm straight to 0 so the timer is a real second chance.
+      lastFinishReq = 0;
+      askFinish();
+    }, ms);
   }
 
   function showToast(text) {
@@ -661,10 +716,7 @@ export function mount(root, api) {
     } else if (view.phase === 'play') {
       left = Math.max(0, (view.endsAt - Date.now()) / 1000);
       hudTime.textContent = Math.ceil(left) + 's';
-      if (left <= 0 && !askedFinish) {
-        askedFinish = true;
-        api.send({ a: 'finish' });
-      }
+      askFinish();
     } else {
       left = Math.max(0, (view.endsAt - Date.now()) / 1000);
       hudTime.textContent = Math.ceil(left) + 's';
@@ -926,6 +978,14 @@ export function mount(root, api) {
     if (document.hidden && view && view.phase === 'play' && myDot() && !localOut) {
       localOut = true;
       api.send({ a: 'exit' });
+      return;
+    }
+    // Coming back: the first frame is enough to notice an expired clock, but a
+    // tab restored from a discard sometimes resumes without painting for a
+    // moment. Ask here as well, so a round nobody was watching still closes.
+    if (!document.hidden && view && view.phase === 'play') {
+      lastFinishReq = 0;
+      askFinish();
     }
   }
   document.addEventListener('visibilitychange', onVis);
@@ -968,6 +1028,7 @@ export function mount(root, api) {
         stopLoop();
       }
       if (next.phase === 'reveal') hudTime.textContent = Math.ceil(next.duration) + 's';
+      armEndTimer();
       updateRings();
       renderChrome();
       render();
@@ -988,7 +1049,13 @@ export function mount(root, api) {
     // Same-text repeats are throttled: a refusal that fires every frame would
     // otherwise pin the toast on screen.
     denied: function (text) {
-      if (dead) return;      const msg = String(text || 'The host refused that.');
+      if (dead) return;
+      const msg = String(text || 'The host refused that.');
+      // A refused `finish` means our clock ran ahead of the host's. Drop the
+      // retry floor so the next frame asks again immediately rather than
+      // waiting out FINISH_RETRY — and, more importantly, so the ask is never
+      // left as a single latched attempt that a denial can kill for good.
+      if (/clock is still running/i.test(msg)) lastFinishReq = 0;
       const now = Date.now();
       if (msg === lastDenied && now - lastDeniedAt < 1500) return;
       lastDenied = msg;
@@ -1002,6 +1069,7 @@ export function mount(root, api) {
         if (view && view.phase === 'play' && myDot() && !localOut) api.send({ a: 'exit' });
       } catch (e) {}
       dead = true;
+      if (endTimer !== null) { clearTimeout(endTimer); endTimer = null; }
       document.removeEventListener('visibilitychange', onVis);
       stopLoop();
       if (ro) ro.disconnect();

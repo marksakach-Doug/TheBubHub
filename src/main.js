@@ -377,6 +377,9 @@ export async function boot() {
         setStatus('host-status', 'Join or host a room to play ' + g.meta.title + '.');
         return;
       }
+      // A room of one still has a host. Without this the flag stays false and
+      // every legacy iframe is told it is a guest in its own solo table.
+      store.openSolo();
       store.setOpenGame(id);
       // hub seats you immediately in solo (room of one)
       if (store.mySeat() === null) store.claimSeat(0, s.me.id);
@@ -806,7 +809,21 @@ export async function boot() {
   let pendingGame = null;
 
   function wireCompat() {
-    compat.hooks.onTouched = function () {};
+    compat.hooks.onTouched = function (game) {
+      // compat fires onTouched for every intent from every iframe game, so this
+      // has to be opt-in per game. Goldberg is the only one: a machine is built
+      // part by part and then simply runs, with no round to report a result
+      // from. Every other game posts a real result.
+      const g = byId.get(game);
+      if (!g || !g.meta.activityRecord) return;
+      const me = store.state.me.name || 'Someone';
+      const title = g.meta.title || game;
+      // Time-bucketed: one line per half hour of building, not one per part.
+      try {
+        record.recordLine(game, me + ' had a go at ' + title,
+          'touch-' + Math.floor(Date.now() / 1800000));
+      } catch (e) {}
+    };
     compat.hooks.onResult = function (game, p) {
       const s = store.state;
       const g = byId.get(game);

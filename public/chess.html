@@ -455,7 +455,7 @@ let localSolo = false;
 function onDown(e){
   const m = e.data;
   if (!m || m.t !== 'gd' || m.game !== GAME_ID) return;
-  if (m.k === 'roster'){ Hub.me = m.p.you; Hub.roster = m.p.roster || []; Hub.room = m.p.room || ''; onRoster(); return; }
+  if (m.k === 'roster'){ Hub.me = m.p.you; Hub.roster = m.p.roster || []; Hub.room = m.p.room || ''; localSolo = !Hub.room; onRoster(); return; }
   if (m.k === 'state'){ onState(m.p); return; }
   if (m.k === 'intent'){ onIntent(m.p, m.from); return; }
   if (m.k === 'denied'){ flash('Not allowed: ' + ((m.p && m.p.text) || '')); return; }
@@ -482,6 +482,7 @@ let offer = null;        // {by}
 let botT = null;
 let flashT = null;
 let reported = false;    // one 'result' per game, ever
+let chessInst = 0;       // result instance id, so the hub can tell two games apart
 
 // Which side YOU are, or null if you are only watching.
 //
@@ -515,6 +516,7 @@ function reportResult(){
   const wId = S.seats && S.seats.w;
   const bId = S.seats && S.seats.b;
   Hub.up('result', {
+    inst: 'chess-' + (++chessInst),
     players: [wId, bId].filter(Boolean),
     bot: !bId,
     won: over.result === 'draw' ? 'draw' : over.result

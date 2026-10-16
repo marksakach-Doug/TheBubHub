@@ -103,6 +103,16 @@ export function createStage(rootEl) {
           console.error('game update() threw:', e);
         }
       },
+      // The hub routes a refused intent here so the game can recover. This was
+      // never forwarded: the handle below returned only update/destroy, so
+      // main.js's `typeof moduleHandle.denied === 'function'` check was always
+      // false and a denial from reduce() vanished instead of unblocking the
+      // client that asked.
+      denied: function (text) {
+        try { if (rec.handle && typeof rec.handle.denied === 'function') rec.handle.denied(text); } catch (e) {
+          console.error('game denied() threw:', e);
+        }
+      },
       destroy: clear
     };
   }

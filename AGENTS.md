@@ -20,8 +20,8 @@ Two kinds of game:
 
 `games/dotreturn/` is the one real module game, with its own harness and
 tests — copy it to start a new one. The six exports every module game needs
-(`meta`, `init`, `reduce`, `project`, `mount`, `summarize`) are listed in the
-contract table above.
+(`meta`, `init`, `reduce`, `project`, `mount`, `summarize`, plus an optional
+`roundId`) are listed in the contract table above.
 
 ## The loop
 
