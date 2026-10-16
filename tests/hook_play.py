@@ -85,12 +85,12 @@ HARNESS = r"""
   ok('the game is called Hook', hk.meta.id === 'hook');
   ok('the bubble and clock render', !!q('#bubble') && !!q('#clock'));
   ok('first update asks to join', intents.some((a) => a.a === 'join'));
-  ok('keys render one per scale degree', qa('#keys button').length === hk.SIZE);
+  ok('grid renders slots x scale degrees', qa('#grid button').length === hk.fillCount(state.pair) * hk.SIZE);
 
-  // ---- compose a hook: tap the first key until the draft is full, then lock
-  const n = hk.fillCount(state.intro);
+  // ---- compose a hook: tap one cell per column, then lock
+  const n = hk.fillCount(state.pair);
   ok('the bridge needs notes', n > 0);
-  for (let i = 0; i < n; i++) qa('#keys button')[0].click();
+  for (let c = 0; c < n; c++) q('#grid [data-col="' + c + '"][data-row="0"]').click();
   ok('lock reaches the host', (() => {
     q('[data-a="lock"]').click();
     return intents.some((a) => a.a === 'lock') && state.locked[ME];
@@ -129,7 +129,7 @@ HARNESS = r"""
   watchHandle.update(hk.project(state, 'ghost'));
   ok('a spectator is told they are watching',
     watchShadow.textContent.indexOf('watching') >= 0);
-  ok('a spectator gets no keys', !watchShadow.querySelector('#keys'));
+  ok('a spectator gets no grid', !watchShadow.querySelector('#grid'));
   ok('a spectator never asks to join', sent.every((a) => a.a !== 'join'));
 
   // ---- teardown stops the clock

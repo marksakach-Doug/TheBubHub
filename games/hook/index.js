@@ -1,16 +1,16 @@
-// games/hook/index.js: What's the Hook? (fill the gap between a random intro and outro; the table votes on the best hook)
-import { SCALES, SIZE, label, pick, fillCount, bridgeSteps, fmt, schedule } from './library.js';
+// games/hook/index.js: What's the Hook? (fill the gap in a dealt intro-outro pair; the table votes on the best hook)
+import { SCALES, SIZE, label, pickPair, fillCount, fillDurations, bridgeSteps, fmt, schedule } from './library.js';
 
 const PLAY_MS = 60000, VOTE_MS = 30000, KEYS = Object.keys(SCALES);
 
 export const meta = { id: 'hook', title: "What's the Hook?", players: { min: 1, max: 8 }, color: '#ff00ff',
-  icon: '🌉', desc: 'Fill the gap between a random intro and outro. The table votes.', soloable: true };
+  icon: '🌉', desc: 'Fill the gap in a matched intro-outro pair. The table votes.', soloable: true };
 
-// A fresh round: new intro and outro, a scale ('any' phrases get a random one), a new clock.
+// A fresh round: one matched pair (never a random intro + random outro), a scale ('any' pairs get a random one), a new clock.
 function deal(s, rng, now) {
-  const intro = pick('intro', rng);
-  return { ...s, round: s.round + 1, phase: 'play', intro, outro: pick('outro', rng),
-    scale: intro.scale === 'any' ? KEYS[Math.floor(rng() * KEYS.length)] : intro.scale || 'major',
+  const pair = pickPair(rng);
+  return { ...s, round: s.round + 1, phase: 'play', pair,
+    scale: pair.scale === 'any' ? KEYS[Math.floor(rng() * KEYS.length)] : pair.scale || 'major',
     deadline: now + PLAY_MS, locked: {}, subs: {}, votes: {} };
 }
 
@@ -53,8 +53,8 @@ export function reduce(s, a, ctx) {
   if (a.a === 'lock') {
     if (s.phase !== 'play') return { error: 'Not taking hooks right now.' };
     if (s.locked[id]) return { error: 'Already locked in.' };
-    if (!Array.isArray(a.b) || a.b.length !== fillCount(s.intro) || a.b.some((n) => !Number.isInteger(n) || n < 0 || n >= SIZE))
-      return { error: `Choose exactly ${fillCount(s.intro)} notes.` };
+    if (!Array.isArray(a.b) || a.b.length !== fillCount(s.pair) || a.b.some((n) => !Number.isInteger(n) || n < 0 || n >= SIZE))
+      return { error: `Choose exactly ${fillCount(s.pair)} notes.` };
     const n = { ...s, locked: { ...s.locked, [id]: true }, subs: { ...s.subs, [id]: a.b } };
     return s.order.every((p) => n.locked[p]) ? toVote(n, rng, now) : n;
   }
@@ -78,7 +78,7 @@ export function mount(root, api) {
   const $ = (q) => root.querySelector(q);
   const esc = (x) => String(x).replace(/[&<>"]/g, (c) => `&#${c.charCodeAt(0)};`);
   const talk = (t) => { const b = $('#bubble'); if (b) b.textContent = t; };
-  const o = (p) => ({ ...p, scale: view.scale });
+  const o = () => ({ ...view.pair, scale: view.scale });
   const left = () => Math.max(0, Math.ceil((view.deadline - Date.now()) / 1000));
   const seatedNow = () => !!view && !api.isSpectator && view.order.includes(view.you);
   const showClock = () => { const el = $('#clock'); if (el) el.textContent = `⏱ ${left()}s`; };
@@ -90,13 +90,13 @@ export function mount(root, api) {
     return ac;
   };
 
-  // Intro, then the bridge, then the outro, each at its own phrase's tempo and sound, all in the round's scale.
+  // Intro, then the bridge, then the outro, each at the pair's tempo and sound, all in the round's scale.
   const play = (bridge) => {
-    const { intro, outro } = view;
+    const { pair } = view;
     let t = ac.currentTime + 0.02;
-    t = schedule(ac, intro.steps, o(intro), t);
-    t = schedule(ac, bridgeSteps(intro, bridge), o(intro), t);
-    schedule(ac, outro.steps, o(outro), t);
+    t = schedule(ac, pair.intro.steps, o(), t);
+    t = schedule(ac, bridgeSteps(pair, bridge), o(), t);
+    schedule(ac, pair.outro.steps, o(), t);
   };
 
   root.innerHTML = `<style>
@@ -105,42 +105,60 @@ export function mount(root, api) {
     pre{font:16px/1.4 'Courier New',monospace;color:#0f0;margin:6px 0;white-space:pre-wrap}
     #bubble{background:#fff;color:#000;border:3px solid #000;padding:8px;font:bold 15px Arial}
     button{font:bold 16px Arial;min-width:44px;min-height:44px;margin:3px}
-    #keys button{background:#fff;color:#000;min-width:40px;min-height:90px}
     .box{border:2px solid #0f0;padding:6px;margin:6px 0}
+    #grid{display:grid;gap:4px;margin:6px 0}
+    #grid button{background:#fff;color:#000;min-width:48px;min-height:48px;margin:0;padding:4px}
+    #grid button.on{background:#ff0;color:#000;outline:3px solid #0ff}
+    #grid .ghead{color:#0ff;font:bold 12px Arial;text-align:center}
   </style>
   <div class="k"><h1>What's the Hook?</h1><div id="bubble"></div><div id="game"></div></div>`;
 
+  const gridHtml = (n) => {
+    let h = `<div id="grid" style="grid-template-columns:repeat(${n},minmax(48px,1fr))">`;
+    for (let r = SIZE - 1; r >= 0; r--) {
+      for (let c = 0; c < n; c++) {
+        h += `<button data-col="${c}" data-row="${r}" class="${draft[c] === r ? 'on' : ''}" aria-label="slot ${c + 1} ${label(view.scale, r)}">${draft[c] === r ? label(view.scale, r) : '·'}</button>`;
+      }
+    }
+    return h + '</div>';
+  };
+
   const render = () => {
-    const v = view, n = fillCount(v.intro), seated = seatedNow(), cands = Object.keys(v.subs);
-    talk(`Round ${v.round} · ${SCALES[v.scale][0]}${seated ? '' : ' · 👁 watching'}`);
-    const ends = `intro  ${fmt(v.intro.steps, v.scale)}\noutro  ${fmt(v.outro.steps, v.scale)}`;
+    const v = view, n = fillCount(v.pair), seated = seatedNow(), cands = Object.keys(v.subs);
+    if (!Array.isArray(draft) || draft.length !== n) draft = Array(n).fill(null);
+    talk(`Round ${v.round} · ${v.pair.name} · ${SCALES[v.scale][0]}${seated ? '' : ' · 👁 watching'}`);
+    const ends = `intro  ${fmt(v.pair.intro.steps, v.scale)}\noutro  ${fmt(v.pair.outro.steps, v.scale)}`;
+    const filled = draft.filter((x) => Number.isInteger(x)).length;
     const head = `<p>${v.last ? `Last round: ${esc(v.last)}<br>` : ''}Score: ${v.order.map((p) => `${esc(v.names[p])} ${v.scores[p] || 0}`).join(' · ')} · <b id="clock"></b></p>`
       + (!api.isSpectator && !v.order.includes(v.you) ? '<button data-a="join">Rejoin the table</button>' : '');
     $('#game').innerHTML = head + (v.phase === 'play'
-      ? `<div class="box"><pre>intro  ${fmt(v.intro.steps, v.scale)}\nbridge ${fmt(bridgeSteps(v.intro, draft), v.scale)}\noutro  ${fmt(v.outro.steps, v.scale)}</pre>
-          <p>${draft.length}/${n} notes chosen (· is a rest). Your last ${n} notes are your bridge.</p><button data-p="${draft}">▶ Hear it</button></div>
-        ${seated && !v.locked[v.you] ? `<div id="keys">${Array.from({ length: SIZE }, (_, i) => `<button data-k="${i}">${label(v.scale, i)}</button>`).join('')}</div>
+      ? `<div class="box"><pre>intro  ${fmt(v.pair.intro.steps, v.scale)}\nbridge ${fmt(bridgeSteps(v.pair, draft), v.scale)}\noutro  ${fmt(v.pair.outro.steps, v.scale)}</pre>
+          <p>${filled}/${n} slots filled — tap a column to set its note, tap again to clear it.</p><button data-p="${draft.map((x) => (Number.isInteger(x) ? x : -1)).join(',')}">▶ Hear it</button></div>
+        ${seated && !v.locked[v.you] ? `${gridHtml(n)}
           <button data-a="clear">Clear</button> <button data-a="lock">Lock in</button>` : ''}
         <p>${Object.keys(v.locked).length}/${v.order.length} locked in${v.locked[v.you] ? ' (including you)' : ''}</p>`
       : `<div class="box"><pre>${ends}</pre></div><p>Vote for the best hook${cands.length > 1 ? ' (not your own)' : ''}. ${Object.keys(v.votes).length}/${v.order.length} voted.</p>`
-        + cands.map((p) => `<p>${esc(v.names[p])}: <tt>${fmt(bridgeSteps(v.intro, v.subs[p]), v.scale)}</tt> <button data-p="${v.subs[p]}">▶</button> `
+        + cands.map((p) => `<p>${esc(v.names[p])}: <tt>${fmt(bridgeSteps(v.pair, v.subs[p]), v.scale)}</tt> <button data-p="${v.subs[p]}">▶</button> `
           + (seated && (p !== v.you || cands.length === 1) ? `<button data-a="vote" data-id="${esc(p)}">${v.votes[v.you] === p ? 'Voted ✓' : 'Vote'}</button>` : '') + '</p>').join(''));
     showClock();
   };
 
   root.addEventListener('click', (e) => {
-    const t = e.target.closest('[data-p],[data-k],[data-a]');
+    const t = e.target.closest('[data-p],[data-col],[data-a]');
     if (!t || !view) return;
     if (!audio()) return;
-    const d = t.dataset, n = fillCount(view.intro);
+    const d = t.dataset, n = fillCount(view.pair);
     if (d.p !== undefined) return play(d.p ? d.p.split(',').map(Number) : []);
-    if (d.k !== undefined) {
-      draft = [...draft, +d.k].slice(-n);
-      schedule(ac, [[+d.k, 12]], o(view.intro), ac.currentTime + 0.02);
+    if (d.col !== undefined) {
+      const c = +d.col, r = +d.row;
+      draft = draft.slice();
+      while (draft.length < n) draft.push(null);
+      draft[c] = draft[c] === r ? null : r;
+      schedule(ac, [[draft[c] === null ? -1 : draft[c], (fillDurations(view.pair)[c] || 12)]], o(), ac.currentTime + 0.02);
       return render();
     }
-    if (d.a === 'clear') { draft = []; return render(); }
-    if (d.a === 'lock' && draft.length < n) return talk(`Choose ${n} notes first.`);
+    if (d.a === 'clear') { draft = Array(n).fill(null); return render(); }
+    if (d.a === 'lock' && draft.some((x) => !Number.isInteger(x))) return talk(`Choose ${n} notes first.`);
     api.send({ a: d.a, b: draft, id: d.id });
   });
 
@@ -152,7 +170,7 @@ export function mount(root, api) {
   return {
     update(v) {
       if (!v) return;
-      view = v; if (v.round !== round) { round = v.round; draft = []; } render();
+      view = v; if (v.round !== round) { round = v.round; draft = Array(fillCount(v.pair)).fill(null); } render();
       // Seating is hub-owned, but the table roster lives in state: a player who
       // opened a live table asks to join from the first update (never from
       // mount — the hub has not assigned the handle yet). Spectators stay out.

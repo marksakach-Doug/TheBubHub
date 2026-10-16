@@ -3,12 +3,12 @@
 <head>
 <meta charset="utf-8">
 <meta name="viewport" content="width=device-width, initial-scale=1">
-<title>Phrase Builder</title>
+<title>Phrase Builder — intro/outro pairs</title>
 <style>
   :root { --bg:#f3efe6; --ink:#1d2b36; --line:#c9c2b2; --accent:#2d5b83; --tail:#8fb0cc; }
   * { box-sizing: border-box; }
   body { margin:0; padding:16px; background:var(--bg); color:var(--ink); font:15px/1.4 Georgia, serif; max-width:960px; }
-  h1 { font-size:22px; margin:0 0 12px; }
+  h1 { font-size:22px; margin:0 0 4px; }
   h2 { font-size:16px; margin:20px 0 8px; }
   .bar { display:flex; flex-wrap:wrap; gap:10px; align-items:center; margin-bottom:10px; }
   .bar label { display:flex; gap:5px; align-items:center; }
@@ -32,15 +32,17 @@
   .item .t { flex:1; }
   small { color:#5b6670; }
   textarea { width:100%; height:160px; font:13px/1.4 "Courier New", monospace; }
+  #sample { display:flex; flex-wrap:wrap; gap:6px; align-items:center; }
+  #sample label { display:flex; gap:4px; align-items:center; font-size:13px; }
   :focus-visible { outline:3px solid #d4a017; outline-offset:2px; }
 </style>
 </head>
 <body>
-<h1>Phrase Builder</h1>
+<h1>Phrase Builder — intro/outro pairs</h1>
+<p><small>An intro and an outro always ship as one pair. The game deals a whole pair, never a random intro + random outro. Tempo, swing, scale and timbre are shared so the two sides go together.</small></p>
 
 <div class="bar">
-  <input id="name" placeholder="phrase name" value="untitled">
-  <label>Use as <select id="kind"><option>intro</option><option>outro</option><option>both</option></select></label>
+  <input id="name" placeholder="pair name" value="untitled">
   <label>Tempo <input id="bpm" type="number" min="40" max="240" value="110"> bpm</label>
   <label>Swing <input id="swing" type="range" min="0" max="100" value="0"></label>
   <label>Scale <select id="scale"></select></label>
@@ -49,7 +51,8 @@
 </div>
 
 <div class="bar">
-  <button class="tab on" id="tabMain">Intro / phrase</button>
+  <button class="tab on" id="tabIntro">Intro</button>
+  <button class="tab" id="tabOutro">Outro</button>
   <button class="tab" id="tabBridge" disabled>Bridge rhythm</button>
   <label><input type="checkbox" id="own"> Bridge has its own rhythm</label>
 </div>
@@ -61,17 +64,21 @@
 </div>
 
 <div class="bar">
-  <button class="go" id="play">▶ Play this</button>
-  <button class="go" id="playAll">▶ Intro + bridge</button>
+  <button class="go" id="play">▶ Play this tab</button>
+  <button class="go" id="playFull">▶ Intro + sample bridge + outro</button>
   <button id="clear">Clear</button>
-  <button id="save">Save to library</button>
+  <button id="save">Save pair to library</button>
   <span id="info"></span>
 </div>
 
 <div id="wrap"><div id="grid"></div></div>
 <p><small>Click a cell to place a note, click a lit cell to remove it, shift-click to accent it. Gaps are rests. On the bridge tab, pitches are placeholders: the player chooses them in the game, and only the rhythm is saved.</small></p>
 
-<h2>Library</h2>
+<h2>Sample bridge (for testing the full chain)</h2>
+<div class="bar"><span><small>Pick test pitches, one per bridge slot, then hit “Intro + sample bridge + outro”. This is never saved — it stands in for what a player will choose in the game.</small></span></div>
+<div id="sample"></div>
+
+<h2>Library (pairs)</h2>
 <div id="list"></div>
 
 <h2>Export / import</h2>
@@ -92,14 +99,14 @@ const semi = (k, i) => { const s = (SCALES[k] || SCALES.major)[1]; return 12 * M
 const hz = (k, i) => 261.63 * 2 ** (semi(k, i) / 12);
 const NAMES = ['C', 'C♯', 'D', 'E♭', 'E', 'F', 'F♯', 'G', 'A♭', 'A', 'B♭', 'B'];
 const label = (k, i) => NAMES[semi(k, i) % 12] + (semi(k, i) >= 12 ? "'" : '');
-const S = 8, TK = 12, KEY = 'phraseLib2';
-const T = { main: { len: 48, notes: [] }, bridge: { len: 48, notes: [] } };
-let cur = 'main', lib = [], ac = null;
+const S = 8, TK = 12, KEY = 'pairLib1';
+const T = { intro: { len: 48, notes: [] }, outro: { len: 48, notes: [] }, bridge: { len: 48, notes: [] } };
+let cur = 'intro', lib = [], ac = null, sample = [];
 const $ = id => document.getElementById(id);
 
 try { lib = JSON.parse(localStorage.getItem(KEY) || '[]'); } catch (e) { lib = []; }
 const persist = () => { try { localStorage.setItem(KEY, JSON.stringify(lib)); } catch (e) {} };
-const opts = () => ({ bpm: +$('bpm').value || 100, swing: +$('swing').value, wave: $('wave').value, gate: +$('gate').value / 100, scale: $('scale').value });
+const opts = () => ({ bpm: +$('bpm').value || 100, swing: +$('swing').value, wave: $('wave').value, gate: +$('gate').value / 100, scale: $('scale').value === 'any' ? 'major' : $('scale').value });
 
 function audio() {
   const C = window.AudioContext || window.webkitAudioContext;
@@ -146,11 +153,38 @@ function fromSteps(steps) {
   return out;
 }
 
-// Older exports used eighth-note units and no tempo; convert them.
-function norm(p) {
-  if (p.bpm) return p;
-  const f = x => ({ ...x, len: x.len * 6, steps: x.steps.map(s => [s[0], s[1] * 6]) });
-  return { ...f(p), bpm: 100, swing: 0, wave: 'triangle', gate: 0.9 };
+// Template rhythm for the bridge: own bridge rhythm if enabled, else the intro.
+function templateSteps() {
+  const useOwn = $('own').checked && T.bridge.notes.length;
+  return useOwn ? toSteps(T.bridge.notes, T.bridge.len) : toSteps(T.intro.notes, T.intro.len);
+}
+function fillSlots() { return templateSteps().filter(s => s[0] >= 0).length; }
+function bridgeWithSample() {
+  let k = 0;
+  return templateSteps().map(([n, d, a]) => {
+    if (n < 0) return [-1, d];
+    const v = sample[k++];
+    return [Number.isInteger(v) ? v : -1, d, a];
+  });
+}
+
+// Older single-phrase exports (kind intro/outro/both, eighth-note units, no tempo): wrap each as a pair so nothing is lost.
+function normPair(p) {
+  if (p && p.intro && p.outro) {
+    const f = x => ({ len: x.len, steps: x.steps });
+    const q = { ...p };
+    if (!q.bpm) { const g = x => ({ ...x, len: x.len * 6, steps: x.steps.map(s => [s[0], s[1] * 6]) }); Object.assign(q, { ...g({ len: 0, steps: [] }), bpm: 100, swing: 0, wave: 'triangle', gate: 0.9 }); q.intro = f(g(p.intro)); q.outro = f(g(p.outro)); if (p.bridge) q.bridge = f(g(p.bridge)); }
+    return q;
+  }
+  if (p && Array.isArray(p.steps)) {
+    const f = x => ({ ...x, len: x.len * (p.bpm ? 1 : 6), steps: x.steps.map(s => [s[0], s[1] * (p.bpm ? 1 : 6)]) });
+    const base = { len: 0, steps: [] };
+    const intro = f(p), outro = f(p);
+    const q = { name: p.name || 'untitled', bpm: p.bpm || 100, swing: p.swing || 0, wave: p.wave || 'triangle', gate: p.gate || 0.9, scale: p.scale || 'major', intro, outro };
+    if (p.bridge) q.bridge = f(p.bridge);
+    return q;
+  }
+  return null;
 }
 
 function render() {
@@ -159,7 +193,7 @@ function render() {
   g.style.gridTemplateColumns = `40px repeat(${cols}, 30px)`;
   let h = '';
   for (let r = S - 1; r >= 0; r--) {
-    h += `<div class="lab">${label($('scale').value, r)}</div>`;
+    h += `<div class="lab">${label($('scale').value === 'any' ? 'major' : $('scale').value, r)}</div>`;
     for (let c = 0; c < cols; c++) {
       const x = tr.notes.find(k => k.n === r && k.s < (c + 1) * snap && k.s + k.d > c * snap);
       let cls = 'c';
@@ -170,8 +204,24 @@ function render() {
   }
   g.innerHTML = h;
   const n = tr.notes.length;
-  $('info').textContent = cur === 'bridge' ? `${n} choice${n === 1 ? '' : 's'} for the player` : `${n} note${n === 1 ? '' : 's'}`;
+  const who = cur === 'bridge' ? `${n} placeholder${n === 1 ? '' : 's'} for the player` : `${n} note${n === 1 ? '' : 's'} in ${cur}`;
+  $('info').textContent = who;
+  renderSample();
 }
+
+function renderSample() {
+  const n = fillSlots(), box = $('sample');
+  while (sample.length < n) sample.push(0);
+  sample = sample.slice(0, n);
+  const k = $('scale').value === 'any' ? 'major' : $('scale').value;
+  box.innerHTML = n ? sample.map((v, i) => `<label>slot ${i + 1} <select data-i="${i}">${Array.from({ length: S }, (_, r) => `<option value="${r}"${r === v ? ' selected' : ''}>${label(k, r)}</option>`).join('')}</select></label>`).join('') : '<small><i>Place intro notes first — the bridge slots come from the intro (or own bridge rhythm).</i></small>';
+}
+
+$('sample').addEventListener('change', e => {
+  const s = e.target.closest('select');
+  if (!s) return;
+  sample[+s.dataset.i] = +s.value;
+});
 
 $('grid').addEventListener('click', e => {
   const cell = e.target.closest('.c');
@@ -193,21 +243,21 @@ $('grid').addEventListener('click', e => {
 
 function setTab(t) {
   cur = t;
-  $('tabMain').classList.toggle('on', t === 'main');
-  $('tabBridge').classList.toggle('on', t === 'bridge');
+  ['Intro', 'Outro', 'Bridge'].forEach(x => $('tab' + x).classList.toggle('on', x.toLowerCase() === t));
   $('len').value = String(T[t].len);
   render();
 }
-$('tabMain').onclick = () => setTab('main');
+$('tabIntro').onclick = () => setTab('intro');
+$('tabOutro').onclick = () => setTab('outro');
 $('tabBridge').onclick = () => setTab('bridge');
 
 $('own').onchange = () => {
   const on = $('own').checked;
   $('tabBridge').disabled = !on;
   if (on && !T.bridge.notes.length) {
-    T.bridge = { len: T.main.len, notes: T.main.notes.map(x => ({ ...x })) };
+    T.bridge = { len: T.intro.len, notes: T.intro.notes.map(x => ({ ...x })) };
   }
-  if (!on) setTab('main');
+  if (!on) setTab(cur === 'bridge' ? 'intro' : cur); else renderSample();
 };
 
 $('len').onchange = () => {
@@ -226,16 +276,19 @@ function playList(lists) {
   lists.forEach(l => { t = schedule(l, o, t); });
 }
 $('play').onclick = () => playList([toSteps(T[cur].notes, T[cur].len)]);
-$('playAll').onclick = () => {
-  const m = toSteps(T.main.notes, T.main.len);
-  playList([m, $('own').checked ? toSteps(T.bridge.notes, T.bridge.len) : m]);
+$('playFull').onclick = () => {
+  if (!T.intro.notes.length || !T.outro.notes.length) { $('info').textContent = 'Place intro and outro notes first.'; return; }
+  playList([toSteps(T.intro.notes, T.intro.len), bridgeWithSample(), toSteps(T.outro.notes, T.outro.len)]);
 };
 $('clear').onclick = () => { T[cur].notes = []; render(); };
 
 $('save').onclick = () => {
-  if (!T.main.notes.length) { $('info').textContent = 'Place at least one note first.'; return; }
+  if (!T.intro.notes.length || !T.outro.notes.length) { $('info').textContent = 'A pair needs both an intro and an outro.'; return; }
   const o = opts();
-  const p = { name: $('name').value.trim() || 'untitled', kind: $('kind').value, ...o, len: T.main.len, steps: toSteps(T.main.notes, T.main.len) };
+  const p = { name: $('name').value.trim() || 'untitled', scale: $('scale').value,
+    bpm: o.bpm, swing: o.swing, wave: o.wave, gate: o.gate,
+    intro: { len: T.intro.len, steps: toSteps(T.intro.notes, T.intro.len) },
+    outro: { len: T.outro.len, steps: toSteps(T.outro.notes, T.outro.len) } };
   if ($('own').checked && T.bridge.notes.length) p.bridge = { len: T.bridge.len, steps: toSteps(T.bridge.notes, T.bridge.len) };
   const i = lib.findIndex(x => x.name === p.name);
   if (i >= 0) lib[i] = p; else lib.push(p);
@@ -245,8 +298,8 @@ $('save').onclick = () => {
 function renderList() {
   $('list').innerHTML = lib.length ? lib.map((p, i) => `
     <div class="item">
-      <div class="t"><b>${p.name}</b> <small>${p.kind}, ${p.scale || 'major'}, ${p.bpm} bpm, ${p.steps.filter(s => s[0] >= 0).length} notes${p.bridge ? ', own bridge rhythm' : ''}</small></div>
-      <button data-a="play" data-i="${i}">▶</button>
+      <div class="t"><b>${p.name}</b> <small>${p.scale || 'major'}, ${p.bpm} bpm, intro ${p.intro.steps.filter(s => s[0] >= 0).length} notes / outro ${p.outro.steps.filter(s => s[0] >= 0).length} notes${p.bridge ? ', own bridge rhythm' : ''}</small></div>
+      <button data-a="play" data-i="${i}">▶ full</button>
       <button data-a="load" data-i="${i}">Edit</button>
       <button data-a="del" data-i="${i}">Delete</button>
     </div>`).join('') : '<p><small>Nothing saved yet.</small></p>';
@@ -258,23 +311,33 @@ $('list').addEventListener('click', e => {
   const i = +b.dataset.i, p = lib[i];
   if (b.dataset.a === 'play') {
     audio();
+    const o = { bpm: p.bpm, swing: p.swing, wave: p.wave, gate: p.gate, scale: (p.scale === 'any' ? 'major' : p.scale) || 'major' };
     let t = ac.currentTime + 0.05;
-    t = schedule(p.steps, p, t);
-    if (p.bridge) schedule(p.bridge.steps, p, t);
+    const tmpl = (p.bridge || p.intro).steps;
+    let k = 0;
+    const bridge = tmpl.map(([n, d, a]) => {
+      if (n < 0) return [-1, d];
+      const v = sample[k++];
+      return [Number.isInteger(v) && k - 1 < sample.length ? v : 0, d, a];
+    });
+    t = schedule(p.intro.steps, o, t);
+    t = schedule(bridge, o, t);
+    schedule(p.outro.steps, o, t);
   }
   if (b.dataset.a === 'load') {
-    $('name').value = p.name; $('kind').value = p.kind; $('bpm').value = p.bpm;
+    $('name').value = p.name; $('bpm').value = p.bpm;
     $('swing').value = p.swing; $('scale').value = p.scale || 'major'; $('wave').value = p.wave; $('gate').value = Math.round(p.gate * 100);
-    T.main = { len: p.len, notes: fromSteps(p.steps) };
-    T.bridge = p.bridge ? { len: p.bridge.len, notes: fromSteps(p.bridge.steps) } : { len: p.len, notes: [] };
+    T.intro = { len: p.intro.len, notes: fromSteps(p.intro.steps) };
+    T.outro = { len: p.outro.len, notes: fromSteps(p.outro.steps) };
+    T.bridge = p.bridge ? { len: p.bridge.len, notes: fromSteps(p.bridge.steps) } : { len: p.intro.len, notes: [] };
     $('own').checked = !!p.bridge; $('tabBridge').disabled = !p.bridge;
-    setTab('main');
+    setTab('intro');
   }
   if (b.dataset.a === 'del') { lib.splice(i, 1); persist(); renderList(); refreshExport(); }
 });
 
 function refreshExport() {
-  $('out').value = 'export const PHRASES = [\n' + lib.map(p => '  ' + JSON.stringify(p)).join(',\n') + '\n];\n';
+  $('out').value = 'export const PAIRS = [\n' + lib.map(p => '  ' + JSON.stringify(p)).join(',\n') + '\n];\n';
 }
 $('export').onclick = refreshExport;
 $('copy').onclick = () => { $('out').select(); try { document.execCommand('copy'); } catch (e) {} };
@@ -282,13 +345,13 @@ $('import').onclick = () => {
   const txt = $('out').value;
   try {
     const arr = JSON.parse(txt.slice(txt.indexOf('['), txt.lastIndexOf(']') + 1));
-    lib = arr.filter(p => p && Array.isArray(p.steps)).map(norm);
+    lib = arr.map(normPair).filter(Boolean);
     persist(); renderList(); refreshExport();
   } catch (e) { $('info').textContent = 'Could not read that text. Paste the exported array.'; }
 };
 
 $('scale').innerHTML = Object.entries(SCALES).map(([k, [n]]) => `<option value="${k}">${n}</option>`).join('') + '<option value="any">Any (random each round)</option>';
-lib = lib.map(norm);
+lib = lib.map(normPair).filter(Boolean);
 render(); renderList(); refreshExport();
 </script>
 </body>

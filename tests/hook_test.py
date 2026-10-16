@@ -32,8 +32,8 @@ JS_CASES = r"""
   const ctx = (id, rng) => ({ from: { id: id, name: id }, rng: rng || Math.random });
   const nameOf = (id) => ({ dev: 'Dev', w1: 'Sam' }[id] || id || 'Someone');
   const table = (ids) => ids.map((id) => ({ id: id, name: id }));
-  const tmpl = (intro) => (intro.bridge || intro).steps;
-  const nOf = (s) => tmpl(s.intro).filter((x) => x[0] >= 0).length;
+  const tmpl = (pair) => ((pair.bridge || pair.intro) || pair).steps;
+  const nOf = (s) => tmpl(s.pair).filter((x) => x[0] >= 0).length;
   const goodBridge = (s) => Array.from({ length: nOf(s) }, (_, i) => i % 8);
 
   out.push(['meta id is hook', meta.id === 'hook']);
@@ -53,7 +53,8 @@ JS_CASES = r"""
   out.push(['init seats the table', s0.order.join(',') === 'dev,w1']);
   out.push(['init ignores people at other tables', s0.order.indexOf('x1') < 0]);
   out.push(['init never seats a spectator', s0.order.indexOf('w9') < 0]);
-  out.push(['intro and outro deal steps', Array.isArray(s0.intro.steps) && Array.isArray(s0.outro.steps)]);
+  out.push(['paired intro and outro deal steps', Array.isArray(s0.pair.intro.steps) && Array.isArray(s0.pair.outro.steps)]);
+  out.push(['the pair ships together', PAIRS.some((p) => p.name === s0.pair.name && p.intro.steps === s0.pair.intro.steps && p.outro.steps === s0.pair.outro.steps)]);
   out.push(['scale is a real scale', !!s0.scale]);
   out.push(['nothing is recorded mid-play', summarize(s0, nameOf) === null]);
   out.push(['nothing recorded with no winner', summarize({ ...s0, lastWin: [] }, nameOf) === null]);
@@ -160,7 +161,7 @@ def main():
     src = src.replace("export const", "const").replace("export function", "function")
     # The module split needs Vite; the classic-script injector gets one file.
     src = re.sub(r"import\s+\{[^}]*\}\s+from\s+['\"]\./library\.js['\"];?", "", src)
-    combined = lib + "\n" + src + "\nwindow.__hook = { meta, init, reduce, project, summarize };\n"
+    combined = lib + "\n" + src + "\nwindow.__hook = { meta, init, reduce, project, summarize, PAIRS, fillCount };\n"
 
     with sync_playwright() as p:
         br = p.chromium.launch()
