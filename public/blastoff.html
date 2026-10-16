@@ -598,13 +598,15 @@ function onIntent(d, from){
 }
 
 /* ---------- bot pilots (solo only) ----------
-   These are deliberately as dumb as a 1999 autoplayer: no scoring, no
-   planning, no lookahead. Each turn the bot simply tries one of the actions
-   the phase allows and hands the move to the real handle(), which is the
-   single source of truth for legality. If handle() rejects the move (no ship
-   to launch, nobody to ask for help, game over) the bot simply does nothing
-   and waits — it never retries, never blocks, and never sends anything over
-   the hub. A bot can therefore do nothing at all, which is fine and funny. */
+   1999 autopilot with a little coaching: no scoring, no planning, no
+   lookahead beyond this turn. handle() stays the single source of truth
+   for legality, and the bot only ever offers legal moves — if the first
+   choice is rejected it falls back to a safe one instead of idling, so a
+   bot can never freeze the table on its own turn. Bots never exist in a
+   real room. Conservative on purpose with a little noise, so they stay
+   beatable: win alone -> Normal, win-only-with-help -> Share, burner only
+   behind the same afterburnerFeasible() gate humans see, helpers mostly
+   say yes only when the flight actually wins. */
 let botT = null;
 // Bots belong to a SOLO-ORIGINATED table (S.soloOrigin), not to "am I
 // pre-room right now". Once a room appears under the player's feet the bots
@@ -618,27 +620,71 @@ function scheduleBot(){
 function botTurn(){
     botT = null;
     if (!botTableActive() || !isHost() || !S || S.over) return;
-    const pick = (arr) => arr[(Math.random() * arr.length) | 0];
+    const roll = (p) => Math.random() < p;
     let pid = null, move = null;
     const actor = cur();
     if (S.phase === 'decide' && S.pend){
         // someone asked for help: the responder answers, not the pilot on turn
         const responder = S.pl.find(x => x.id === S.pend.who);
-        if (isBot(responder)){ pid = responder.id; move = { action: 'decide', i: Math.random() < 0.6 ? 'yes' : 'no' }; }
+        if (isBot(responder)){
+            pid = responder.id;
+            // A little self-preservation: say yes when the flight wins,
+            // mostly no into a loss or a black hole (20% noise either way).
+            let win = false, hole = false;
+            try {
+                const rv = responder.ship ? val(responder.ship) : 0;
+                const qv = (S.pend_p && S.pend_p.ship) ? val(S.pend_p.ship) : 0;
+                const dv = S.currentDest ? val(S.currentDest) : 99;
+                win = (rv + qv) >= dv;
+                hole = !!(S.currentDest && BLACK_HOLES.includes(val(S.currentDest)));
+            } catch (e) {}
+            move = { action: 'decide', i: roll((win && !hole) ? 0.8 : 0.2) ? 'yes' : 'no' };
+        }
     } else if (isBot(actor)){
         pid = actor.id;
         if (S.phase === 'choose'){
-            // nothing to launch without a ship, so 'newship' is the only option then
-            move = { action: pick(actor.ship ? ['newship', 'blastoff'] : ['newship']) };
+            // Weak starting ships (fresh() deals <=4) are worth redrawing.
+            if (!actor.ship) move = { action: 'newship' };
+            else {
+                const sv = val(actor.ship);
+                const launchP = sv <= 5 ? 0.3 : (sv <= 9 ? 0.8 : 0.9);
+                move = { action: roll(launchP) ? 'blastoff' : 'newship' };
+            }
         } else if (S.phase === 'fight'){
-            move = { action: pick(['pathA', 'pathB', 'pathC']) };
+            const shipVal = actor.ship ? val(actor.ship) : 0;
+            const destVal = S.currentDest ? val(S.currentDest) : 0;
+            const hole = !!(S.currentDest && BLACK_HOLES.includes(val(S.currentDest)));
+            const bestHelp = S.pl.filter(x => x.id !== actor.id && x.ship)
+                .reduce((m, x) => Math.max(m, val(x.ship)), 0);
+            const canWinAlone = shipVal >= destVal;
+            const canWinWithHelp = bestHelp > 0 && (shipVal + bestHelp) >= destVal;
+            let abOk = false;
+            try { abOk = afterburnerFeasible(); } catch (e) { abOk = false; }
+            let primary;
+            if (hole) primary = 'pathA';                       // never drag help or double into a hole
+            else if (canWinAlone) primary = (abOk && roll(0.1)) ? 'pathC' : 'pathA';
+            else if (canWinWithHelp) primary = 'pathB';        // only case share turns loss into +1
+            else if (abOk) primary = 'pathC';
+            else primary = 'pathA';                           // fail cheap alone
+            if (primary === 'pathB' && !(bestHelp > 0)) primary = 'pathA';
+            if (primary === 'pathC' && !abOk) primary = 'pathA';
+            move = { action: primary };
         }
     }
     if (!move) return;                                  // it's your move
+    // Freeze fix: never idle on a bot's own turn. The first choice above is
+    // already the legal-and-sensible one, but if handle() still rejects it
+    // (no helper, phase raced), fall back instead of stranding the turn.
+    const tries = [move];
+    if (move.action === 'pathB' || move.action === 'pathC') tries.push({ action: 'pathA' });
+    if (move.action === 'blastoff') tries.push({ action: 'newship' });
     const who = S.pl.find(x => x.id === pid);
-    const err = handle(Object.assign({ pid, name: who && who.name }, move));
-    if (err) return;                                    // no legal move: idle
-    broadcast();
+    let err = 'no move';
+    for (let t = 0; t < tries.length; t++){
+        err = handle(Object.assign({ pid, name: who && who.name }, tries[t]));
+        if (!err) { broadcast(); return; }
+    }
+    if (err && !S.turnEnding && !S.over) scheduleBot();
 }
 
 function card(c, attr){
