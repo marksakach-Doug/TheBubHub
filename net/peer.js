@@ -109,6 +109,17 @@ export function createNet(onEvent) {
     // called by host when a hello arrives to bind id -> conn
     bindGuest(id, conn) { guests.set(id, conn); },
 
+    isOpen(id) { const c = guests.get(id); return !!(c && c.open); },
+
+    // Drop one guest's connection (host kick, heartbeat timeout). The
+    // conn 'close' handler may fire guest-left afterwards — main.js treats
+    // that as idempotent, so closing here is always safe.
+    closeConn(id) {
+      const c = guests.get(id);
+      if (c) { try { c.close(); } catch (e) {} }
+      guests.delete(id);
+    },
+
     join(roomId) {
       closed = false;
       destroyPeer();

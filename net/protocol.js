@@ -12,7 +12,8 @@ export const T = {
   INTENT: 'intent',     // guest -> host: { game, action, from }
   STATE: 'state',       // host -> guests: { game, view, from? }
   RESULT: 'result',     // host -> all: { entry }
-  PING: 'ping'
+  KICK: 'kick',         // host -> one guest: booted, leave the room
+  PING: 'ping'          // host -> all heartbeat; guests reply with { id }
 };
 
 export function msg(type, p) {

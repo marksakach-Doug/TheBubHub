@@ -3,6 +3,7 @@
 // implement their own seating.
 import { createStore, randomAnimalName } from '../room/store.js';
 import { createGrace, GRACE_MS } from '../room/grace.js';
+import { findReclaimId, prunePlayerState, HEARTBEAT_MS, DEAD_MS } from '../room/presence.js';
 import { createNet } from '../net/peer.js';
 import { T, msg } from '../net/protocol.js';
 import { createStage } from './stage.js';
@@ -99,6 +100,7 @@ export async function boot() {
 
   function teardownNet() {
     grace.stop();
+    stopHeartbeat();
     hideBanner();
     if (redialTimer) { clearTimeout(redialTimer); redialTimer = null; }
     redialDelay = 1500;
@@ -192,8 +194,20 @@ export async function boot() {
 
   function memberItem(m) {
     const li = document.createElement('li');
-    li.className = 'text-slate-200 text-sm pl-2';
-    li.textContent = memberLabel(m);
+    li.className = 'text-slate-200 text-sm pl-2 flex items-center gap-2';
+    const span = document.createElement('span');
+    span.textContent = memberLabel(m);
+    li.appendChild(span);
+    // Host moderation: boot anyone except yourself. Guests never see this.
+    const s = store.state;
+    if (s.inRoom && s.isHost && m.id !== s.me.id) {
+      const b = document.createElement('button');
+      b.className = 'ml-auto text-xs bg-red-900/70 border border-red-500 rounded px-2 py-0.5 font-bold shrink-0';
+      b.textContent = '⛔ boot';
+      b.title = 'Remove ' + m.name + ' from the room';
+      b.addEventListener('click', function () { doKick(m.id); });
+      li.appendChild(b);
+    }
     return li;
   }
 
@@ -513,6 +527,8 @@ export async function boot() {
       // we are host now
       store.openRoom(p.room, true);
       store.upsertMember({ id: s.me.id, name: s.me.name, host: true, game: s.openGame });
+      noteSeen(s.me.id);
+      startHeartbeat();
       showRoom();
       renderRoster();
       pushRosterToGames();
@@ -524,11 +540,7 @@ export async function boot() {
     } else if (kind === 'message') {
       onMessage(p.fromConn, p.msg);
     } else if (kind === 'guest-left') {
-      if (p.id) {
-        store.removeMember(p.id);
-        broadcastRoster();
-        renderRoster();
-      }
+      if (p.id) dropGuest(p.id);
     } else if (kind === 'host-conn') {
       if (p.state === 'closed' && s.inRoom && !s.isHost) onHostLost();
     } else if (kind === 'peer-error') {
@@ -538,22 +550,29 @@ export async function boot() {
 
   function onMessage(fromConn, m) {
     const s = store.state;
+    if (s.isHost) noteSeen(senderOf(m));
     if (m.type === T.HELLO) {
       if (!s.isHost) return;
       const want = String(m.p.name || 'Player').slice(0, 24);
-      const id = String(m.p.id || 'p-unknown');
-      const name = store.claimName(want, id);
-      ensureNet().bindGuest(id, fromConn);
-      store.upsertMember({ id: id, name: name, host: false, game: null });
+      const helloId = String(m.p.id || 'p-unknown');
+      // Refresh rejoin: same name, new id, old conn dead — hand back the old
+      // slot instead of seating a numbered duplicate next to the ghost.
+      const slotId = findReclaimId(store.state.roster, function (rid) {
+        return !!(net && net.isOpen(rid));
+      }, { id: helloId, name: want }) || helloId;
+      const name = store.claimName(want, slotId);
+      ensureNet().bindGuest(slotId, fromConn);
+      noteSeen(slotId);
+      store.upsertMember({ id: slotId, name: name, host: false, game: null });
       // tell newcomer + everyone
-      ensureNet().sendTo(id, msg(T.WELCOME, {
-        you: { id: id, name: name, isHost: false },
+      ensureNet().sendTo(slotId, msg(T.WELCOME, {
+        you: { id: slotId, name: name, isHost: false },
         room: s.roomId,
         roster: store.rosterList(),
         seats: Object.assign({}, s.seats),
         states: s.lastState
       }));
-      if (name !== want) ensureNet().sendTo(id, msg(T.RENAME, { id: id, name: name }));
+      if (name !== want) ensureNet().sendTo(slotId, msg(T.RENAME, { id: slotId, name: name }));
       broadcastRoster();
       renderRoster();
       pushRosterToGames();
@@ -626,7 +645,128 @@ export async function boot() {
       else compat.down(m.p.game, 'state', m.p.view);
     } else if (m.type === 'result' || m.type === T.RESULT) {
       if (m.p && m.p.entry) record.addLocal(m.p.entry);
+    } else if (m.type === T.PING) {
+      // Heartbeat: the host's sweep in startHeartbeat() drops guests that go
+      // silent (refresh killed the socket but 'close' never fired). Guests
+      // answer with their id so the host can stamp them alive.
+      if (s.isHost) {
+        if (senderOf(m)) noteSeen(senderOf(m));
+      } else {
+        ensureNet().sendToHost(msg(T.PING, { id: store.state.me.id }));
+      }
+    } else if (m.type === T.KICK) {
+      if (s.isHost) return; // hosts never take kick orders
+      const keepName = store.state.me.name;
+      const keepId = store.state.me.id;
+      // closeRoom FIRST: teardownNet severs the host conn, whose 'close'
+      // event would otherwise look like host loss and start the grace
+      // countdown + redial back into the room we were just removed from.
+      closeStageOnly();
+      store.closeRoom();
+      store.setMe(keepId, keepName);
+      teardownNet();
+      showLobby();
+      setStatus('join-status', 'Removed by the host.');
+      histReplace({ room: '', game: '' });
     }
+  }
+
+  // ---------- ghost cleanup + host kick ----------
+  // A refresh leaves the old id in the roster while the player rejoins with a
+  // new one, and conn 'close' often never fires. So: guests heartbeat, the
+  // host sweeps the silent ones, and every removal prunes game state too
+  // (the roster alone was never enough — modState kept the ghost seated).
+  const lastSeen = new Map();
+  let hbTimer = null;
+
+  function senderOf(m) {
+    const p = (m && m.p) || {};
+    if (p.from && p.from.id) return String(p.from.id);
+    if (p.id) return String(p.id);
+    return '';
+  }
+
+  function noteSeen(id) { if (id) lastSeen.set(id, Date.now()); }
+
+  function startHeartbeat() {
+    stopHeartbeat();
+    hbTimer = setInterval(function () {
+      const s = store.state;
+      if (!s.inRoom || !s.isHost || !net) return;
+      try { net.broadcast(msg(T.PING, {})); } catch (e) {}
+      const now = Date.now();
+      Array.from(net.guests.keys()).forEach(function (id) {
+        const c = net.guests.get(id);
+        if (!(c && c.open) || now - (lastSeen.get(id) || 0) > DEAD_MS) dropGuest(id);
+      });
+    }, HEARTBEAT_MS);
+  }
+
+  function stopHeartbeat() {
+    if (hbTimer) { clearInterval(hbTimer); hbTimer = null; }
+  }
+
+  // Re-project one module game and push it to everyone still here.
+  function rebroadcastGame(gameId) {
+    const entry = modState.get(gameId);
+    if (!entry) return;
+    const s = store.state;
+    const hostView = safeProject(entry.mod, entry.state, s.me.id);
+    store.cacheState(gameId, hostView);
+    stageUpdate(gameId, hostView);
+    if (s.inRoom && s.isHost && net) {
+      s.roster.forEach(function (m) {
+        if (m.id === s.me.id) return;
+        try {
+          net.sendTo(m.id, msg(T.STATE, { game: gameId, view: safeProject(entry.mod, entry.state, m.id) }));
+        } catch (e) {}
+      });
+    }
+  }
+
+  // Remove one player from every live game table (module) and refresh legacy
+  // frames with the corrected roster + snapshots. Finished-round history is
+  // kept — only live membership is pruned.
+  function pruneGames(goneId) {
+    let changed = false;
+    modState.forEach(function (st, gameId) {
+      if (!st || !st.state) return;
+      const next = prunePlayerState(st.state, goneId);
+      if (next !== st.state) {
+        st.state = next;
+        changed = true;
+        rebroadcastGame(gameId);
+      }
+    });
+    pushRosterToGames();
+    const s = store.state;
+    if (changed && s.inRoom && s.isHost && net) {
+      Object.keys(s.lastState).forEach(function (gid) {
+        if (modState.has(gid)) return; // already pushed above
+        try { net.broadcast(msg(T.STATE, { game: gid, view: s.lastState[gid] })); } catch (e) {}
+      });
+    }
+  }
+
+  // Shared removal path: clean conn close, heartbeat timeout, and host kick.
+  function dropGuest(id) {
+    if (!id || !store.state.isHost) return;
+    if (net) { try { net.closeConn(id); } catch (e) {} }
+    lastSeen.delete(id);
+    store.removeMember(id);
+    pruneGames(id);
+    broadcastRoster();
+    renderRoster();
+  }
+
+  function doKick(id) {
+    const s = store.state;
+    if (!s.inRoom || !s.isHost || id === s.me.id) return;
+    const m = s.roster.find(function (x) { return x.id === id; });
+    const name = (m && m.name) || 'this player';
+    if (!window.confirm('Remove ' + name + ' from the room?')) return;
+    if (net) { try { net.sendTo(id, msg(T.KICK, { text: 'Removed by the host.' })); } catch (e) {} }
+    dropGuest(id);
   }
 
   function broadcastRoster() {

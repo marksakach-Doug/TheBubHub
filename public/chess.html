@@ -256,10 +256,7 @@ function pseudo(st, c){
       if (nr >= 0 && nr <= 7){
         const one = nr * 8 + f;
         if (st.b[one] === '.'){
-          // En passant lands on the square DIRECTLY ahead (the one the double
-          // push skipped over); the captured pawn is the diagonal neighbour.
-          if (one === st.ep) out.push({ from:i, to:one, promo:null, ep:true });
-          else if (nr === lastRow) promo(i, one);
+          if (nr === lastRow) promo(i, one);
           else out.push({ from:i, to:one, promo:null });
           if (r === startRow){
             const two = (r + 2 * fwd) * 8 + f;
@@ -273,7 +270,12 @@ function pseudo(st, c){
         const tc = nr;
         if (tc < 0 || tc > 7) continue;
         const ts = tc * 8 + nf, tp = st.b[ts];
-        if (tp !== '.' && colourOf(tp) === opponent(c)){
+        // En passant is a DIAGONAL capture onto the empty ep square (the
+        // square the enemy double push skipped over). The victim sits one
+        // rank behind the destination, on the mover's own rank.
+        if (ts === st.ep && tp === '.'){
+          out.push({ from:i, to:ts, promo:null, ep:true });
+        } else if (tp !== '.' && colourOf(tp) === opponent(c)){
           // Promotion is ONLY legal on the back rank. This branch used to be a
           // bare `promo(i, ts)` with no guard AND no plain-capture else — so
           // every pawn capture anywhere on the board was generated as four
@@ -289,16 +291,18 @@ function pseudo(st, c){
       for (const [df, dr] of [[-2,-1],[-2,1],[-1,-2],[-1,2],[1,-2],[1,2],[2,-1],[2,1]]){
         const nf = f + df, nr = r + dr;
         if (nf < 0 || nf > 7 || nr < 0 || nr > 7) continue;
-        const ts = nr * 8 + nf;
-        if (st.b[ts] === '.') out.push({ from:i, to:ts, promo:null });
+        const ts = nr * 8 + nf, tp = st.b[ts];
+        if (tp === '.') out.push({ from:i, to:ts, promo:null });
+        else if (colourOf(tp) === opponent(c)) out.push({ from:i, to:ts, promo:null });
       }
     } else if (t === 'K'){
       for (let df = -1; df <= 1; df++) for (let dr = -1; dr <= 1; dr++){
         if (!df && !dr) continue;
         const nf = f + df, nr = r + dr;
         if (nf < 0 || nf > 7 || nr < 0 || nr > 7) continue;
-        const ts = nr * 8 + nf;
-        if (st.b[ts] === '.') out.push({ from:i, to:ts, promo:null });
+        const ts = nr * 8 + nf, tp = st.b[ts];
+        if (tp === '.') out.push({ from:i, to:ts, promo:null });
+        else if (colourOf(tp) === opponent(c)) out.push({ from:i, to:ts, promo:null });
       }
     } else {
       const rays = t === 'R' ? [[1,0],[-1,0],[0,1],[0,-1]]
@@ -333,6 +337,8 @@ function pseudo(st, c){
 function applyMove(st, m){
   const p = st.b[m.from], c = colourOf(p), t = typeOf(p);
   const k = c === WHITE ? 'K' : 'k', rk = c === WHITE ? 'R' : 'r';
+  // Capture (for the fifty-move clock) must be read BEFORE overwriting squares.
+  const captured = !m.castle && (m.ep || st.b[m.to] !== '.');
   if (m.castle === 'K'){
     st.b[m.from] = '.'; st.b[m.to] = k;
     st.b[m.to + 1] = '.'; st.b[m.to - 1] = rk;
@@ -341,9 +347,9 @@ function applyMove(st, m){
     st.b[m.to - 2] = '.'; st.b[m.to + 1] = rk;
   } else {
     // En passant: the captured pawn is NOT on the destination — it sits one
-    // rank behind the capturing pawn's path. With rank 8 at index 0, both
-    // colours' captured pawns land two rows before the destination.
-    if (m.ep) st.b[m.to - 16] = '.';
+    // rank behind the destination, on the mover's own rank: +8 for White
+    // (moving up the board), -8 for Black.
+    if (m.ep) st.b[m.to + (c === WHITE ? 8 : -8)] = '.';
     st.b[m.to] = m.promo ? (c === WHITE ? m.promo : m.promo.toLowerCase()) : p;
     st.b[m.from] = '.';
   }
@@ -356,7 +362,7 @@ function applyMove(st, m){
   if (m.to === ob + 7) st.cw[opponent(c)][0] = false;
 
   st.ep = (t === 'P' && Math.abs(m.to - m.from) === 16) ? (m.from + m.to) / 2 : -1;
-  st.half = (t === 'P' || m.ep) ? 0 : st.half + 1;
+  st.half = (t === 'P' || captured) ? 0 : st.half + 1;
   if (c === BLACK) st.full++;
   st.turn = opponent(c);
 }
@@ -408,18 +414,20 @@ function botMove(st, c){
     const ns = copy(st);
     applyMove(ns, m);
     let sc = Math.random() * 0.8;
-    const tookWhite = (st.b[m.to] !== '.' && colourOf(st.b[m.to]) === WHITE) || (m.ep && colourOf(st.b[m.to + 8]) === WHITE);
-    const lostOwn = (st.b[m.to] !== '.' && colourOf(st.b[m.to]) === c) || (m.ep && colourOf(st.b[m.to + 8]) === c);
-    if (tookWhite) sc += VAL[typeOf(st.b[m.to])] || 0;
-    if (lostOwn) sc -= (VAL[typeOf(st.b[m.to])] || 0) * 1.1;
+    // Captured piece sits ON the destination, except en passant where it is
+    // one rank behind the destination on the mover's own rank.
+    const capSq = m.ep ? m.to + (c === WHITE ? 8 : -8) : m.to;
+    const capP = st.b[capSq];
+    const took = capP !== '.' && colourOf(capP) === opponent(c) && !m.castle;
+    if (took) sc += VAL[typeOf(capP)] || 0;
     if (m.castle) sc += 1.5;
     if (m.promo === 'Q') sc += 2;
-    if (inCheck(ns, c)) sc += 2.5;
+    if (inCheck(ns, opponent(c))) sc += 2.5;
     // would the opponent just take this piece for free?
     let hangs = false;
     for (const om of legal(ns, opponent(c))){
-      if (om.to === m.from) { hangs = true; break; }
-      if (om.ep && om.to + (opponent(c) === WHITE ? 8 : -8) === m.from) { hangs = true; break; }
+      if (om.to === m.to) { hangs = true; break; }
+      if (om.ep && om.to + (opponent(c) === WHITE ? 8 : -8) === m.to) { hangs = true; break; }
     }
     if (hangs) sc -= (VAL[typeOf(st.b[m.from])] || 0);
     if (sc > bestSc){ bestSc = sc; best = m; }
@@ -675,7 +683,7 @@ function render(){
   const myTurnNow = !over && S.turn === side;
   const moves = (sel >= 0 && myTurnNow) ? legal(S, side) : [];
   const destSet = new Map();
-  for (const m of moves) if (m.from === sel) destSet.set(m.to, S.b[m.to] === '.' ? 'dot' : 'ring');
+  for (const m of moves) if (m.from === sel) destSet.set(m.to, (S.b[m.to] === '.' && !m.ep) ? 'dot' : 'ring');
   const chkSq = (!over && inCheck(S, S.turn)) ? kingSq(S, S.turn) : -1;
 
   for (let vr = 0; vr < 8; vr++){

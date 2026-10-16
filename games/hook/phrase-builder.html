@@ -1,0 +1,295 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Phrase Builder</title>
+<style>
+  :root { --bg:#f3efe6; --ink:#1d2b36; --line:#c9c2b2; --accent:#2d5b83; --tail:#8fb0cc; }
+  * { box-sizing: border-box; }
+  body { margin:0; padding:16px; background:var(--bg); color:var(--ink); font:15px/1.4 Georgia, serif; max-width:960px; }
+  h1 { font-size:22px; margin:0 0 12px; }
+  h2 { font-size:16px; margin:20px 0 8px; }
+  .bar { display:flex; flex-wrap:wrap; gap:10px; align-items:center; margin-bottom:10px; }
+  .bar label { display:flex; gap:5px; align-items:center; }
+  input, select, button, textarea { font:inherit; color:var(--ink); background:#fff; border:2px solid var(--ink); padding:4px 8px; }
+  input[type=range] { padding:0; width:90px; }
+  input[type=number] { width:70px; }
+  input[type=checkbox] { width:auto; }
+  button { cursor:pointer; font-weight:bold; }
+  button:hover:not(:disabled) { background:var(--ink); color:#fff; }
+  button:disabled { opacity:.4; cursor:default; }
+  button.go, button.tab.on { background:var(--accent); color:#fff; border-color:var(--accent); }
+  #wrap { overflow-x:auto; padding-bottom:6px; }
+  #grid { display:grid; gap:2px; width:max-content; }
+  .lab { text-align:right; padding-right:4px; font-size:13px; line-height:30px; }
+  .c { width:30px; height:30px; background:#fff; border:1px solid var(--line); cursor:pointer; }
+  .c.beat { border-left:2px solid var(--ink); }
+  .c.on { background:var(--accent); }
+  .c.tail { background:var(--tail); }
+  .c.acc { box-shadow: inset 0 0 0 3px #d4a017; }
+  .item { display:flex; gap:8px; align-items:center; padding:6px 0; border-bottom:1px solid var(--line); }
+  .item .t { flex:1; }
+  small { color:#5b6670; }
+  textarea { width:100%; height:160px; font:13px/1.4 "Courier New", monospace; }
+  :focus-visible { outline:3px solid #d4a017; outline-offset:2px; }
+</style>
+</head>
+<body>
+<h1>Phrase Builder</h1>
+
+<div class="bar">
+  <input id="name" placeholder="phrase name" value="untitled">
+  <label>Use as <select id="kind"><option>intro</option><option>outro</option><option>both</option></select></label>
+  <label>Tempo <input id="bpm" type="number" min="40" max="240" value="110"> bpm</label>
+  <label>Swing <input id="swing" type="range" min="0" max="100" value="0"></label>
+  <label>Scale <select id="scale"></select></label>
+  <label>Timbre <select id="wave"><option>triangle</option><option>sine</option><option>square</option><option>sawtooth</option></select></label>
+  <label>Articulation <input id="gate" type="range" min="20" max="120" value="90"></label>
+</div>
+
+<div class="bar">
+  <button class="tab on" id="tabMain">Intro / phrase</button>
+  <button class="tab" id="tabBridge" disabled>Bridge rhythm</button>
+  <label><input type="checkbox" id="own"> Bridge has its own rhythm</label>
+</div>
+
+<div class="bar">
+  <label>Length <select id="len"><option value="24">2 beats</option><option value="36">3 beats</option><option value="48" selected>4 beats</option><option value="60">5 beats</option><option value="72">6 beats</option><option value="96">8 beats</option></select></label>
+  <label>Grid <select id="snap"><option value="12">quarter</option><option value="6" selected>eighth</option><option value="4">triplet eighth</option><option value="3">sixteenth</option></select></label>
+  <label>Note <select id="dur"><option value="3">sixteenth</option><option value="4">triplet eighth</option><option value="6">eighth</option><option value="8">triplet quarter</option><option value="12" selected>quarter</option><option value="18">dotted quarter</option><option value="24">half</option></select></label>
+</div>
+
+<div class="bar">
+  <button class="go" id="play">▶ Play this</button>
+  <button class="go" id="playAll">▶ Intro + bridge</button>
+  <button id="clear">Clear</button>
+  <button id="save">Save to library</button>
+  <span id="info"></span>
+</div>
+
+<div id="wrap"><div id="grid"></div></div>
+<p><small>Click a cell to place a note, click a lit cell to remove it, shift-click to accent it. Gaps are rests. On the bridge tab, pitches are placeholders: the player chooses them in the game, and only the rhythm is saved.</small></p>
+
+<h2>Library</h2>
+<div id="list"></div>
+
+<h2>Export / import</h2>
+<div class="bar"><button id="export">Refresh export</button><button id="import">Import pasted text</button><button id="copy">Copy</button></div>
+<textarea id="out" spellcheck="false"></textarea>
+
+<script>
+const SCALES = {
+  major: ['Major', [0, 2, 4, 5, 7, 9, 11]], minor: ['Natural minor', [0, 2, 3, 5, 7, 8, 10]],
+  harmonic: ['Harmonic minor', [0, 2, 3, 5, 7, 8, 11]], melodic: ['Melodic minor', [0, 2, 3, 5, 7, 9, 11]],
+  dorian: ['Dorian', [0, 2, 3, 5, 7, 9, 10]], phrygian: ['Phrygian', [0, 1, 3, 5, 7, 8, 10]],
+  lydian: ['Lydian', [0, 2, 4, 6, 7, 9, 11]], mixolydian: ['Mixolydian', [0, 2, 4, 5, 7, 9, 10]],
+  locrian: ['Locrian', [0, 1, 3, 5, 6, 8, 10]], majpent: ['Major pentatonic', [0, 2, 4, 7, 9]],
+  minpent: ['Minor pentatonic', [0, 3, 5, 7, 10]], blues: ['Blues', [0, 3, 5, 6, 7, 10]], whole: ['Whole tone', [0, 2, 4, 6, 8, 10]]
+};
+// Notes are scale degrees 0-7 from C, wrapping into the next octave (so every scale has 8 keys).
+const semi = (k, i) => { const s = (SCALES[k] || SCALES.major)[1]; return 12 * Math.floor(i / s.length) + s[i % s.length]; };
+const hz = (k, i) => 261.63 * 2 ** (semi(k, i) / 12);
+const NAMES = ['C', 'C♯', 'D', 'E♭', 'E', 'F', 'F♯', 'G', 'A♭', 'A', 'B♭', 'B'];
+const label = (k, i) => NAMES[semi(k, i) % 12] + (semi(k, i) >= 12 ? "'" : '');
+const S = 8, TK = 12, KEY = 'phraseLib2';
+const T = { main: { len: 48, notes: [] }, bridge: { len: 48, notes: [] } };
+let cur = 'main', lib = [], ac = null;
+const $ = id => document.getElementById(id);
+
+try { lib = JSON.parse(localStorage.getItem(KEY) || '[]'); } catch (e) { lib = []; }
+const persist = () => { try { localStorage.setItem(KEY, JSON.stringify(lib)); } catch (e) {} };
+const opts = () => ({ bpm: +$('bpm').value || 100, swing: +$('swing').value, wave: $('wave').value, gate: +$('gate').value / 100, scale: $('scale').value });
+
+function audio() {
+  const C = window.AudioContext || window.webkitAudioContext;
+  ac = ac || new C();
+  if (ac.state === 'suspended') ac.resume();
+  return ac;
+}
+
+// Same scheduler the game uses (library.js). Durations are ticks: 12 per quarter note.
+function schedule(steps, o, t) {
+  const tick = 60 / o.bpm / TK, sw = o.swing / 100 * 2;
+  let pos = 0;
+  steps.forEach(([n, d, a]) => {
+    if (n >= 0) {
+      const st = t + (pos + (pos % TK === TK / 2 ? sw : 0)) * tick;
+      const dur = Math.max(0.03, d * tick * o.gate);
+      const os = ac.createOscillator(), g = ac.createGain();
+      os.type = o.wave;
+      os.frequency.value = hz(o.scale, n);
+      g.gain.setValueAtTime(a ? 0.5 : 0.3, st);
+      g.gain.exponentialRampToValueAtTime(0.001, st + dur);
+      os.connect(g).connect(ac.destination);
+      os.start(st); os.stop(st + dur + 0.02);
+    }
+    pos += d;
+  });
+  return t + pos * tick;
+}
+
+function toSteps(list, len) {
+  const out = []; let cur = 0;
+  [...list].sort((a, b) => a.s - b.s).forEach(x => {
+    if (x.s > cur) out.push([-1, x.s - cur]);
+    out.push(x.a ? [x.n, x.d, 1] : [x.n, x.d]);
+    cur = x.s + x.d;
+  });
+  if (cur < len) out.push([-1, len - cur]);
+  return out;
+}
+
+function fromSteps(steps) {
+  const out = []; let cur = 0;
+  steps.forEach(([n, d, a]) => { if (n >= 0) out.push({ s: cur, n, d, a: a ? 1 : 0 }); cur += d; });
+  return out;
+}
+
+// Older exports used eighth-note units and no tempo; convert them.
+function norm(p) {
+  if (p.bpm) return p;
+  const f = x => ({ ...x, len: x.len * 6, steps: x.steps.map(s => [s[0], s[1] * 6]) });
+  return { ...f(p), bpm: 100, swing: 0, wave: 'triangle', gate: 0.9 };
+}
+
+function render() {
+  const tr = T[cur], snap = +$('snap').value, cols = Math.floor(tr.len / snap);
+  const g = $('grid');
+  g.style.gridTemplateColumns = `40px repeat(${cols}, 30px)`;
+  let h = '';
+  for (let r = S - 1; r >= 0; r--) {
+    h += `<div class="lab">${label($('scale').value, r)}</div>`;
+    for (let c = 0; c < cols; c++) {
+      const x = tr.notes.find(k => k.n === r && k.s < (c + 1) * snap && k.s + k.d > c * snap);
+      let cls = 'c';
+      if ((c * snap) % TK === 0) cls += ' beat';
+      if (x) cls += (x.s >= c * snap ? ' on' : ' tail') + (x.a ? ' acc' : '');
+      h += `<div class="${cls}" data-c="${c}" data-r="${r}"></div>`;
+    }
+  }
+  g.innerHTML = h;
+  const n = tr.notes.length;
+  $('info').textContent = cur === 'bridge' ? `${n} choice${n === 1 ? '' : 's'} for the player` : `${n} note${n === 1 ? '' : 's'}`;
+}
+
+$('grid').addEventListener('click', e => {
+  const cell = e.target.closest('.c');
+  if (!cell) return;
+  const tr = T[cur], snap = +$('snap').value;
+  const c = +cell.dataset.c, r = +cell.dataset.r;
+  const hit = tr.notes.find(k => k.n === r && k.s < (c + 1) * snap && k.s + k.d > c * snap);
+  if (hit) {
+    if (e.shiftKey) hit.a = hit.a ? 0 : 1;
+    else tr.notes = tr.notes.filter(k => k !== hit);
+  } else {
+    const s = c * snap, d = Math.min(+$('dur').value, tr.len - s);
+    tr.notes = tr.notes.filter(k => k.s + k.d <= s || k.s >= s + d);
+    tr.notes.push({ s, n: r, d, a: e.shiftKey ? 1 : 0 });
+    audio(); schedule([[r, d]], opts(), ac.currentTime + 0.02);
+  }
+  render();
+});
+
+function setTab(t) {
+  cur = t;
+  $('tabMain').classList.toggle('on', t === 'main');
+  $('tabBridge').classList.toggle('on', t === 'bridge');
+  $('len').value = String(T[t].len);
+  render();
+}
+$('tabMain').onclick = () => setTab('main');
+$('tabBridge').onclick = () => setTab('bridge');
+
+$('own').onchange = () => {
+  const on = $('own').checked;
+  $('tabBridge').disabled = !on;
+  if (on && !T.bridge.notes.length) {
+    T.bridge = { len: T.main.len, notes: T.main.notes.map(x => ({ ...x })) };
+  }
+  if (!on) setTab('main');
+};
+
+$('len').onchange = () => {
+  const tr = T[cur];
+  tr.len = +$('len').value;
+  tr.notes = tr.notes.filter(x => x.s + x.d <= tr.len);
+  render();
+};
+$('snap').onchange = render;
+$('scale').onchange = render;
+
+function playList(lists) {
+  audio();
+  const o = opts();
+  let t = ac.currentTime + 0.05;
+  lists.forEach(l => { t = schedule(l, o, t); });
+}
+$('play').onclick = () => playList([toSteps(T[cur].notes, T[cur].len)]);
+$('playAll').onclick = () => {
+  const m = toSteps(T.main.notes, T.main.len);
+  playList([m, $('own').checked ? toSteps(T.bridge.notes, T.bridge.len) : m]);
+};
+$('clear').onclick = () => { T[cur].notes = []; render(); };
+
+$('save').onclick = () => {
+  if (!T.main.notes.length) { $('info').textContent = 'Place at least one note first.'; return; }
+  const o = opts();
+  const p = { name: $('name').value.trim() || 'untitled', kind: $('kind').value, ...o, len: T.main.len, steps: toSteps(T.main.notes, T.main.len) };
+  if ($('own').checked && T.bridge.notes.length) p.bridge = { len: T.bridge.len, steps: toSteps(T.bridge.notes, T.bridge.len) };
+  const i = lib.findIndex(x => x.name === p.name);
+  if (i >= 0) lib[i] = p; else lib.push(p);
+  persist(); renderList(); refreshExport();
+};
+
+function renderList() {
+  $('list').innerHTML = lib.length ? lib.map((p, i) => `
+    <div class="item">
+      <div class="t"><b>${p.name}</b> <small>${p.kind}, ${p.scale || 'major'}, ${p.bpm} bpm, ${p.steps.filter(s => s[0] >= 0).length} notes${p.bridge ? ', own bridge rhythm' : ''}</small></div>
+      <button data-a="play" data-i="${i}">▶</button>
+      <button data-a="load" data-i="${i}">Edit</button>
+      <button data-a="del" data-i="${i}">Delete</button>
+    </div>`).join('') : '<p><small>Nothing saved yet.</small></p>';
+}
+
+$('list').addEventListener('click', e => {
+  const b = e.target.closest('button');
+  if (!b) return;
+  const i = +b.dataset.i, p = lib[i];
+  if (b.dataset.a === 'play') {
+    audio();
+    let t = ac.currentTime + 0.05;
+    t = schedule(p.steps, p, t);
+    if (p.bridge) schedule(p.bridge.steps, p, t);
+  }
+  if (b.dataset.a === 'load') {
+    $('name').value = p.name; $('kind').value = p.kind; $('bpm').value = p.bpm;
+    $('swing').value = p.swing; $('scale').value = p.scale || 'major'; $('wave').value = p.wave; $('gate').value = Math.round(p.gate * 100);
+    T.main = { len: p.len, notes: fromSteps(p.steps) };
+    T.bridge = p.bridge ? { len: p.bridge.len, notes: fromSteps(p.bridge.steps) } : { len: p.len, notes: [] };
+    $('own').checked = !!p.bridge; $('tabBridge').disabled = !p.bridge;
+    setTab('main');
+  }
+  if (b.dataset.a === 'del') { lib.splice(i, 1); persist(); renderList(); refreshExport(); }
+});
+
+function refreshExport() {
+  $('out').value = 'export const PHRASES = [\n' + lib.map(p => '  ' + JSON.stringify(p)).join(',\n') + '\n];\n';
+}
+$('export').onclick = refreshExport;
+$('copy').onclick = () => { $('out').select(); try { document.execCommand('copy'); } catch (e) {} };
+$('import').onclick = () => {
+  const txt = $('out').value;
+  try {
+    const arr = JSON.parse(txt.slice(txt.indexOf('['), txt.lastIndexOf(']') + 1));
+    lib = arr.filter(p => p && Array.isArray(p.steps)).map(norm);
+    persist(); renderList(); refreshExport();
+  } catch (e) { $('info').textContent = 'Could not read that text. Paste the exported array.'; }
+};
+
+$('scale').innerHTML = Object.entries(SCALES).map(([k, [n]]) => `<option value="${k}">${n}</option>`).join('') + '<option value="any">Any (random each round)</option>';
+lib = lib.map(norm);
+render(); renderList(); refreshExport();
+</script>
+</body>
+</html>

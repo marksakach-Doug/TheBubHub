@@ -108,6 +108,17 @@ else
   exit 1
 fi
 
+# ---- 4b. kick + ghost cleanup (no browser needed) ----
+step "kick/ghost — tests/kick_ghost_test.py"
+if python3 tests/kick_ghost_test.py; then
+  pass "kick_ghost_test"
+else
+  fail "kick_ghost_test"
+  echo "Stopped at first failure." >&2
+  printf '\nResult: %d passed, %d failed, %d skipped\n' "$PASS" "$FAIL" "$SKIPPED"
+  exit 1
+fi
+
 # ---- 5. record sentences (browser) ----
 step "record sentences — tests/record_test.py"
 if [ "$BROWSER_OK" = "1" ]; then
@@ -262,22 +273,44 @@ else
   fi
 fi
 
-# ---- 12. music bridge rules (browser) ----
-step "music bridge rules — tests/musicbridge_test.py"
+# ---- 12. hook rules (browser) ----
+step "hook rules — tests/hook_test.py"
 if [ "$BROWSER_OK" = "1" ]; then
-  if python3 tests/musicbridge_test.py; then
-    pass "musicbridge_test"
+  if python3 tests/hook_test.py; then
+    pass "hook_test"
   else
-    fail "musicbridge_test"
+    fail "hook_test"
     echo "Stopped at first failure." >&2
     printf '\nResult: %d passed, %d failed, %d skipped\n' "$PASS" "$FAIL" "$SKIPPED"
     exit 1
   fi
 else
   if [ "$SKIP_BROWSER" = "1" ]; then
-    skip "musicbridge_test ($BROWSER_WHY)"
+    skip "hook_test ($BROWSER_WHY)"
   else
-    fail "musicbridge_test (no browser: $BROWSER_WHY)"
+    fail "hook_test (no browser: $BROWSER_WHY)"
+    echo "Tip: re-run with --skip-browser for syntax-only checks." >&2
+    printf '\nResult: %d passed, %d failed, %d skipped\n' "$PASS" "$FAIL" "$SKIPPED"
+    exit 1
+  fi
+fi
+
+# ---- 12b. hook play test (browser) ----
+step "hook play test — tests/hook_play.py"
+if [ "$BROWSER_OK" = "1" ]; then
+  if python3 tests/hook_play.py; then
+    pass "hook_play"
+  else
+    fail "hook_play"
+    echo "Stopped at first failure." >&2
+    printf '\nResult: %d passed, %d failed, %d skipped\n' "$PASS" "$FAIL" "$SKIPPED"
+    exit 1
+  fi
+else
+  if [ "$SKIP_BROWSER" = "1" ]; then
+    skip "hook_play ($BROWSER_WHY)"
+  else
+    fail "hook_play (no browser: $BROWSER_WHY)"
     echo "Tip: re-run with --skip-browser for syntax-only checks." >&2
     printf '\nResult: %d passed, %d failed, %d skipped\n' "$PASS" "$FAIL" "$SKIPPED"
     exit 1
@@ -306,7 +339,51 @@ else
   fi
 fi
 
-# ---- 14. the 96 game play test (browser) ----
+# ---- 14. chess captures (browser) ----
+step "chess captures — tests/chess_captures.py"
+if [ "$BROWSER_OK" = "1" ]; then
+  if python3 tests/chess_captures.py; then
+    pass "chess_captures"
+  else
+    fail "chess_captures"
+    echo "Stopped at first failure." >&2
+    printf '\nResult: %d passed, %d failed, %d skipped\n' "$PASS" "$FAIL" "$SKIPPED"
+    exit 1
+  fi
+else
+  if [ "$SKIP_BROWSER" = "1" ]; then
+    skip "chess_captures ($BROWSER_WHY)"
+  else
+    fail "chess_captures (no browser: $BROWSER_WHY)"
+    echo "Tip: re-run with --skip-browser for syntax-only checks." >&2
+    printf '\nResult: %d passed, %d failed, %d skipped\n' "$PASS" "$FAIL" "$SKIPPED"
+    exit 1
+  fi
+fi
+
+# ---- 15. chess capture play test (browser) ----
+step "chess capture play test — tests/chess_capture_play.py"
+if [ "$BROWSER_OK" = "1" ]; then
+  if python3 tests/chess_capture_play.py; then
+    pass "chess_capture_play"
+  else
+    fail "chess_capture_play"
+    echo "Stopped at first failure." >&2
+    printf '\nResult: %d passed, %d failed, %d skipped\n' "$PASS" "$FAIL" "$SKIPPED"
+    exit 1
+  fi
+else
+  if [ "$SKIP_BROWSER" = "1" ]; then
+    skip "chess_capture_play ($BROWSER_WHY)"
+  else
+    fail "chess_capture_play (no browser: $BROWSER_WHY)"
+    echo "Tip: re-run with --skip-browser for syntax-only checks." >&2
+    printf '\nResult: %d passed, %d failed, %d skipped\n' "$PASS" "$FAIL" "$SKIPPED"
+    exit 1
+  fi
+fi
+
+# ---- 16. the 96 game play test (browser) ----
 step "the 96 game play test — tests/t96_play.py"
 if [ "$BROWSER_OK" = "1" ]; then
   if python3 tests/t96_play.py; then

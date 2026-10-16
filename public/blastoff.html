@@ -15,42 +15,27 @@ body{margin:0;background:var(--space);color:var(--ink);font:15px/1.45 'Segoe UI'
 .bo-b.k{background:#c08a4a}
 .bo-b[disabled]{opacity:.4;cursor:not-allowed}
 #bo-err{font:11px monospace;color:#ff8888}
-/* Result card: the last resolved flight, pinned until the next one. It stays
-   put (no auto-dismiss) because the whole point is that you can read the score
-   change after the fact instead of having to remember it. */
-#bo-result{background:rgba(0,0,0,.55);border:2px solid #334155;border-radius:14px;padding:10px 14px;display:flex;flex-direction:column;gap:6px}
-#bo-result.win{border-color:#4caf50}
-#bo-result.lose{border-color:#f44336}
-#bo-result.hole{border-color:#888}
-#bo-result.none{display:none}
-.bo-res-head{display:flex;align-items:baseline;justify-content:space-between;gap:10px;flex-wrap:wrap}
-.bo-res-who{font:800 13px system-ui;color:var(--neon)}
-.bo-res-verdict{font:900 15px system-ui;letter-spacing:.08em}
-#bo-result.win .bo-res-verdict{color:#8fe08f}
-#bo-result.lose .bo-res-verdict{color:#ff9c8f}
-#bo-result.hole .bo-res-verdict{color:#fff}
-.bo-res-math{font:15px system-ui;color:#f2faff}
-.bo-res-math b{font-size:19px}
-.bo-res-where{font:12px system-ui;color:var(--dim)}
-.bo-res-delta{font:700 12px system-ui;color:var(--dim);display:flex;align-items:center;gap:6px;flex-wrap:wrap}
-.bo-res-delta .ar{color:var(--dim)}
-.bo-res-delta .to{color:var(--gold);font-size:15px;font-weight:900}
-.bo-res-delta.up .to{color:#8fe08f}
-.bo-res-delta.down .to{color:#ff9c8f}
-@keyframes boResIn{from{opacity:0;transform:translateY(-8px)}to{opacity:1;transform:none}}
-#bo-result.fresh{animation:boResIn .35s ease}
-/* Destinations left: the one number that decides how a run ends. */
-.bo-left{display:flex;align-items:center;justify-content:center;gap:10px;background:rgba(0,0,0,.4);border:1px solid #334155;border-radius:12px;padding:8px 14px}
-.bo-left .n{font:900 28px system-ui;line-height:1;color:var(--neon)}
-.bo-left .cap{font:700 11px system-ui;letter-spacing:.12em;color:var(--dim)}
-.bo-left.low{border-color:#f44336}
-.bo-left.low .n{color:#ff8888}
+#bo-confetti{position:absolute;inset:0;pointer-events:none;overflow:hidden;z-index:20;border-radius:14px}
+.cf{position:absolute;top:-14px;width:10px;height:14px;opacity:0;animation-name:cfFall;animation-timing-function:ease-in;animation-fill-mode:forwards}
+@keyframes cfFall{0%{opacity:1;transform:translateY(0) rotate(0)}100%{opacity:0;transform:translateY(420px) rotate(var(--r,720deg))}}
+/* Destinations-left mini badge docked in the VS row (LOTR monster-badge
+   pattern): the one number that decides how a run ends, no separate box. */
+.deck.mini{padding:4px 8px;gap:8px;min-width:0;border-radius:8px;flex:none;align-self:center;display:flex;align-items:center;background:rgba(0,0,0,.4);border:1px solid #334155}
+.deck.mini .stack{width:22px;height:32px;border-radius:5px;box-shadow:1px 1px 0 #111,2px 2px 0 #0a0a0a;border:1px solid #ff8888;background:linear-gradient(135deg,#ff6b6b,#c0392b)}
+.deck.mini .n{font-size:15px;line-height:1;font-weight:900;color:#fff}
+.deck.mini .cap{font-size:9px;letter-spacing:.08em;font-weight:700;color:var(--dim)}
+.deck.mini.low{border-color:#f44336}
+.deck.mini.low .n{color:#ff8888}
+/* Tiny destination chips beside the VS number (LOTR monMini pattern). */
+.dest-minis{display:flex;gap:4px;flex-wrap:wrap;justify-content:center;margin-top:2px}
+.dest-mini{font:700 11px system-ui;background:rgba(0,0,0,.45);border:1px solid #ff8888;border-radius:7px;padding:1px 6px;color:#ffd0d0;white-space:nowrap}
+.dest-mini.hole{border-style:dashed;color:#fff;border-color:#888}
 #bo-score{background:rgba(0,0,0,.5);border:2px solid var(--neon);border-radius:14px;padding:10px 12px;display:flex;flex-direction:column;gap:8px}
 .sc-vsrow{display:flex;align-items:center;justify-content:center;gap:14px}
 .sc-side{flex:1;text-align:center;min-width:0}
 .sc-cap{font:700 11px system-ui;letter-spacing:.15em;color:var(--dim)}
 .sc-side.you .sc-cap{color:var(--neon)}
-.sc-n{font-size:52px;font-weight:900;line-height:1.05;color:#f2faff;text-shadow:0 0 10px var(--neon)}
+.sc-n{font-size:36px;font-weight:900;line-height:1.05;color:#f2faff;text-shadow:0 0 10px var(--neon);min-height:38px}
 .sc-side.dest .sc-n{color:#ff8888}
 .sc-side.win .sc-n{color:var(--gold);text-shadow:0 0 18px var(--gold)}
 .sc-sub{font-size:11px;color:var(--dim);min-height:14px;overflow:hidden;text-overflow:ellipsis;white-space:nowrap}
@@ -73,8 +58,8 @@ body{margin:0;background:var(--space);color:var(--ink);font:15px/1.45 'Segoe UI'
 .sc-chip.winner{border-color:var(--gold);background:rgba(255,224,130,.2);color:var(--gold)}
 #bo-tablewrap{position:relative;background:rgba(0,0,0,.28);border:1px solid #334155;border-radius:14px;padding:12px;display:flex;flex-direction:column;gap:12px;overflow:hidden}
 .bo-lbl{font:11px monospace;color:var(--dim);letter-spacing:.05em}
-/* Draw piles are shown as a plain face-down stack, never with a count: the
-   only number worth watching is destinations remaining (see .bo-left).
+/* Draw piles are shown as a mini DEST badge in the VS row, never with a full
+   box: the only number worth watching is destinations remaining.
    One column now: the FLEET panel is gone and every pilot's ship power
    lives in the score chips instead (see .sc-chip .si). */
 .bo-midrow{display:grid;grid-template-columns:1fr;gap:12px;align-items:start}
@@ -92,14 +77,16 @@ body{margin:0;background:var(--space);color:var(--ink);font:15px/1.45 'Segoe UI'
 .bo-c[data-a]:hover{transform:translateY(-3px)}
 .bo-c.flip{animation:flipIn .45s ease}
 @keyframes flipIn{0%{transform:rotateY(90deg) scale(.9);opacity:0}100%{transform:none;opacity:1}}
-.bo-act{display:flex;gap:12px;align-items:center;width:100%;text-align:left;background:#1a202c;border:2px solid var(--neon);color:#f0f4ff;border-radius:14px;padding:14px 16px;cursor:pointer;min-height:64px}
+.bo-act{display:flex;gap:8px;align-items:center;flex:1 1 140px;text-align:left;background:#1a202c;border:2px solid var(--neon);color:#f0f4ff;border-radius:10px;padding:8px 10px;cursor:pointer;min-height:40px}
 .bo-act:hover:not([disabled]){transform:translateY(-2px);box-shadow:0 6px 16px rgba(0,242,255,0.2)}
 .bo-act:active:not([disabled]){transform:scale(.99)}
 .bo-act[disabled]{opacity:.45;cursor:not-allowed}
 .bo-act.k{background:#2d3748;border-color:var(--gold)}
-.bo-act .ic{font-size:30px;flex:none}
-.bo-act .tt{font-size:17px;font-weight:800}
-.bo-act .ss{font-size:12px;color:var(--dim);font-weight:400}
+.bo-act .ic{font-size:18px;flex:none}
+.bo-act .tt{font-size:13px;font-weight:800}
+.bo-act .ss{display:none}
+/* Compact single-word buttons: explanation lives in title tooltip (LOTR
+   pattern). The hint reason stays visible — it is the recommendation. */
 /* Which button to press: bounce the one the numbers favour, flash After Burner
    when the ship is strong enough that the double draw is worth the gamble. */
 @keyframes boBounce{0%,100%{transform:translateY(0)}50%{transform:translateY(-7px)}}
@@ -118,14 +105,25 @@ body{margin:0;background:var(--space);color:var(--ink);font:15px/1.45 'Segoe UI'
    softened everything you needed to read to find out what happened on someone
    else's turn — which is the opposite of helpful. No background, no blur: the
    ribbon docks at the top of the table and the cards stay at full strength. */
-#bo-veil{position:absolute;inset:0;display:flex;align-items:flex-start;justify-content:center;padding-top:6px;pointer-events:none;border-radius:14px;z-index:5;transition:opacity .5s ease, visibility .5s ease}
+#bo-veil{position:absolute;inset:0;display:flex;align-items:center;justify-content:center;padding:70px 0 0;pointer-events:none;border-radius:14px;z-index:6;transition:opacity .5s ease, visibility .5s ease}
 #bo-veil.hidden{opacity:0;visibility:hidden}
 #bo-veil .ribbon{background:rgba(26,28,58,.92);border:2px solid var(--neon);border-radius:14px;padding:7px 16px;font-size:15px;font-weight:800;text-align:center;box-shadow:0 6px 20px rgba(0,242,255,0.3);max-width:92%}
 #bo-veil .ribbon small{display:block;font-size:12px;font-weight:400;color:var(--dim);margin-top:4px}
-/* Action buttons live inside the midrow (same box as YOUR SHIP). All buttons
-   are always present; the ones that don't apply are dimmed via [disabled]. */
-.bo-actrow{display:flex;flex-wrap:wrap;gap:10px;padding:8px 0}
-.bo-actrow .bo-act{width:calc(50% - 5px);flex:1 1 230px}
+/* Action buttons live in their own row below YOUR SHIP (LOTR #lr-actions
+   pattern). All buttons are always present; the ones that don't apply are
+   dimmed via [disabled]. Fixed floors so text changes don't move buttons. */
+.bo-actrow{display:flex;flex-wrap:wrap;gap:8px;padding:6px 0;min-height:40px;justify-content:center}
+.sc-sub{height:14px}
+@media (max-width:640px){
+  #bo-panel{padding:8px;gap:8px}
+  #bo-tablewrap{gap:8px}
+  #bo-veil{padding:90px 0 0}
+  .bo-zone{min-height:140px;padding:8px}
+  .bo-cards{min-height:100px}
+  .bo-act{min-height:40px;padding:8px 10px;flex:1 1 100%}
+  .bo-act .tt{font-size:13px}
+  .bo-act .ic{font-size:18px}
+}
 .bo-errline{font:12px system-ui;color:#ff9c8f;text-align:center;padding:2px 0}
 .bo-act[disabled].hint-bounce,.bo-act[disabled].hint-flash{animation:none;border-color:#334155}
 .hidden{display:none!important}
@@ -152,10 +150,10 @@ body{margin:0;background:var(--space);color:var(--ink);font:15px/1.45 'Segoe UI'
     <div id="bo-game" class="hidden" style="flex-direction:column;gap:12px">
         <div id="bo-tablewrap">
             <div id="bo-veil" class="hidden"><div class="ribbon" id="bo-veil-text">Waiting…</div></div>
-            <div id="bo-topdeck"></div>
-            <div id="bo-result" class="none"></div>
+            <div id="bo-confetti"></div>
             <div id="bo-score"></div>
             <div class="bo-midrow" id="bo-midrow"></div>
+            <div id="bo-actions"></div>
         </div>
     </div>
 </div>
@@ -224,7 +222,7 @@ function onDown(e){
     if (m.k === 'hostmove'){ if (!isHost()) act('hello'); else if (S) broadcast(); render(); return; }
     if (m.k === 'state'){ if (m.p) { S = m.p; localErr = null; render(); } return; }
     if (m.k === 'intent'){ onIntent(m.p, m.from); return; }
-    if (m.k === 'reset'){ S = null; lastResKey = null; render(); return; }
+    if (m.k === 'reset'){ S = null; lastWinShown = null; render(); return; }
 }
 const myId = () => Hub.me && Hub.me.id;
 const myName = () => (Hub.names && Hub.names[myId()]) || (Hub.me && cleanName(Hub.me.name)) || 'Player';
@@ -282,7 +280,7 @@ const DEST = {
     13: ['Cygnus X-1','🕳️'], 14: ['Sagittarius A*','🌌']
 };
 const BLACK_HOLES = [13, 14];
-let S = null, lastResKey = null, localErr = null;
+let S = null, lastWinShown = null, localErr = null;
 
 const val = (c) => V[c.r] || +c.r;
 function shuffle(a){ for (let i = a.length - 1; i > 0; i--){ const j = Math.random() * (i + 1) | 0; [a[i], a[j]] = [a[j], a[i]]; } return a; }
@@ -651,46 +649,37 @@ function card(c, attr){
     const hole = isRed && BLACK_HOLES.includes(val(c)) ? ' hole' : '';
     return `<div class="bo-c ${isRed ? 'red' : 'black'}${hole}" ${attr || ''}><b>${val(c)}</b><i>${icon}</i><u>${name}</u></div>`;
 }
-/* Destinations left. This is the number that decides how a run ends, so it
-   gets a dedicated readout that turns red as the pile empties. */
-function destinationsLeft(){
+/* Destinations-left mini badge for the VS row (LOTR deck-mini pattern).
+   Same number, no separate box; turns red as the pile empties. */
+function destBadge(){
     const n = S.redDeck.length;
-    const cls = n <= 3 ? ' low' : '';
-    const tail = n === 0 ? ' — none left, this is the last flight'
-        : n === 1 ? ' — one flight left'
-        : n <= 3 ? ' — the run is nearly over' : '';
-    return `<div class="bo-left${cls}"><span class="cap">DESTINATIONS LEFT</span><span class="n">${n}</span></div>` +
-           (tail ? `<div class="bo-lbl" style="text-align:center">${tail}</div>` : '');
+    const tip = n === 0 ? 'no destinations left — this is the last flight'
+        : n === 1 ? 'one flight left'
+        : n + ' destinations left';
+    return `<div class="deck mini${n <= 3 ? ' low' : ''}" title="${esc(tip)}"><div class="stack"></div><div><div class="n">${n}</div><div class="cap">DEST</div></div></div>`;
 }
-
-/* The pinned result card. Stays put until the next fight resolves so the
-   score change is readable rather than something you have to remember. */
-function resultCard(){
-    const L = S.last;
-    if (!L) return '';
-    const verdict = L.hole ? 'BLACK HOLE' : L.win ? 'SUCCESS' : 'FAILURE';
-    const powerTxt = L.parts.map(x => `${esc(x.name)} <b>${x.power}</b>`).join(' + ');
-    const destTxt = L.dests.map(d => `${esc(d.n)} <b>${d.v}</b>`).join(' + ');
-    const arrow = L.path === 'afterburner' ? ' 🔥 After Burner'
-        : L.path === 'share' ? ' 🤝 Share Ships' : ' 🛡️ Normal Flight';
-    const deltaCls = L.after > L.before ? ' up' : L.after < L.before ? ' down' : '';
-    const gained = L.after - L.before;
-    const deltaTxt = gained > 0 ? `+${gained}` : gained < 0 ? `${gained}` : 'no change';
-    const extra = [];
-    if (L.lostShip) extra.push(L.helper ? 'both ships lost' : 'ship lost');
-    if (L.dests.some(d => BLACK_HOLES.includes(d.v))) extra.push('black hole');
-    return `<div class="bo-res-head">
-              <span class="bo-res-who">${esc(L.who)}${L.helper ? ' + ' + esc(L.helper) : ''}</span>
-              <span class="bo-res-verdict">${verdict}</span>
-            </div>
-            <div class="bo-res-math">Power ${powerTxt} &nbsp;vs&nbsp; Destination ${destTxt} = ${L.destSum}</div>
-            <div class="bo-res-where">${arrow}${extra.length ? ' — ' + extra.join(', ') : ''}</div>
-            <div class="bo-res-delta${deltaCls}">Red cards
-              <span class="from">${L.before}</span>
-              <span class="ar">→</span>
-              <span class="to">${L.after}</span>
-              <span>(${deltaTxt})</span>
-            </div>`;
+/* Tiny destination chips beside the VS number (LOTR monMini pattern). */
+function destMini(c){
+    const v = val(c), d = DEST[v];
+    const hole = BLACK_HOLES.includes(v) ? ' hole' : '';
+    return `<span class="dest-mini${hole}" title="${esc(d[0])} (${v})">${d[1]}${v}</span>`;
+}
+function confettiBurst(){
+    const box = $('bo-confetti');
+    if (!box) return;
+    const cols = ['#00f2ff','#ffe082','#4caf50','#ff6b6b','#c86ab0','#f2faff','#7ad97a'];
+    let html = '';
+    for (let i = 0; i < 70; i++){
+        const x = (Math.random() * 100).toFixed(1);
+        const d = (Math.random() * 0.9).toFixed(2);
+        const t = (2.2 + Math.random() * 1.4).toFixed(2);
+        const r = (360 + Math.random() * 720 | 0);
+        const col = cols[i % cols.length];
+        const w = (6 + Math.random() * 6 | 0);
+        html += `<i class="cf" style="left:${x}%;background:${col};width:${w}px;height:${w + 4}px;animation-delay:${d}s;animation-duration:${t}s;--r:${r}deg"></i>`;
+    }
+    box.innerHTML = html;
+    setTimeout(() => { if (box && lastWinShown) box.innerHTML = ''; }, 4600);
 }
 
 /* After Burner draws a face-down second destination, so "can I beat it?" can
@@ -731,52 +720,48 @@ function render(){
     const p = me(), c = cur();
     const paused = !isHost() && !hostPresent();
 
-    $('bo-topdeck').innerHTML =
-        `<div class="bo-deckrow" style="display:flex;gap:12px;align-items:center;justify-content:center;flex-wrap:wrap">` +
-        destinationsLeft() +
-        (S.currentDest ? `<div class="bo-cards">${card(S.currentDest)} ${S.extraDest ? card(S.extraDest) : ''}</div>` : '') +
-        `</div>`;
-
-    // The pinned result card. `fresh` marks it so it animates in once per
-    // resolved flight rather than pulsing on every re-render.
-    const res = $('bo-result');
-    if (res){
-        const L = S.last;
-        res.className = L ? '' : 'none';
-        if (L){
-            res.classList.add(L.hole ? 'hole' : L.win ? 'win' : 'lose');
-            if (L.key !== lastResKey){
-                lastResKey = L.key;
-                res.classList.add('fresh');
-            }
-            res.innerHTML = resultCard();
-        } else {
-            res.innerHTML = '';
-            lastResKey = null;
-        }
-    }
+    // Winner confetti (LOTR pattern): fires once when the mission ends.
+    if (S.over){
+        if (!lastWinShown){ lastWinShown = S.inst || 'over'; confettiBurst(); }
+    } else if (lastWinShown){ lastWinShown = null; const cb = $('bo-confetti'); if (cb) cb.innerHTML = ''; }
 
     const sc = $('bo-score');
     let L_cap = 'SHIP POWER', L_n = '—', L_sub = '—', L_you = false, L_win = false;
-    let R_cap = 'DESTINATION', R_n = '—', R_sub = '—', R_dest = true, R_win = false;
+    let R_cap = 'DESTINATION', R_n = '—', R_sub = '—', R_minis = '', R_win = false;
     let verdict = 'READY', vcls = '';
 
-    if (S.currentDest){
+    if (S.over){
+        const winner = S.pl.reduce((a, b) => (a.score > b.score) ? a : b);
+        L_cap = '🏆 WINNER'; L_n = '🔴' + winner.score; L_sub = pn(winner); L_you = winner.id === myId(); L_win = true;
+        R_cap = 'RED CARDS'; R_n = winner.score; R_sub = 'most red cards wins';
+        verdict = pn(winner).toUpperCase() + ' WINS'; vcls = 'win';
+    } else if (S.currentDest){
         const shipVal = c && c.ship ? val(c.ship) : 0;
         const destVal = val(S.currentDest) + (S.extraDest ? val(S.extraDest) : 0);
         L_n = shipVal; L_sub = c && c.ship ? 'Pilot: ' + pn(c) : 'No Ship!'; L_you = (p && p.id === c.id); L_win = shipVal >= destVal;
         R_n = destVal; R_sub = DEST[val(S.currentDest)][0] + (S.extraDest ? ' + ' + DEST[val(S.extraDest)][0] : '');
+        R_minis = `<div class="dest-minis">${destMini(S.currentDest)}${S.extraDest ? destMini(S.extraDest) : ''}</div>`;
         verdict = L_win ? 'SUCCESS' : 'DANGER'; vcls = L_win ? 'win' : 'lose';
         if (BLACK_HOLES.includes(val(S.currentDest)) || (S.extraDest && BLACK_HOLES.includes(val(S.extraDest)))) {
             verdict = 'BLACK HOLE!'; vcls = 'hole';
         }
+    } else if (S.last){
+        // No separate result box anymore: the last flight stays readable in
+        // the verdict line until the next destination is drawn.
+        const R = S.last;
+        L_cap = 'LAST FLIGHT'; L_n = R.power; L_sub = R.parts.map(x => x.name).join(' + '); L_you = false; L_win = R.win && !R.hole;
+        R_cap = 'DESTINATION'; R_n = R.destSum; R_sub = R.dests.map(d => d.n).join(' + ');
+        R_minis = `<div class="dest-minis">${R.dests.map(d => `<span class="dest-mini${BLACK_HOLES.includes(d.v) ? ' hole' : ''}" title="${esc(d.n)} (${d.v})">${esc(d.n)}${d.v}</span>`).join('')}</div>`;
+        verdict = R.hole ? 'BLACK HOLE' : R.win ? 'SUCCESS' : 'FAILURE';
+        vcls = R.hole ? 'hole' : R.win ? 'win' : 'lose';
     }
 
-    const leftSide = `<div class="sc-side ${L_you ? 'you' : ''} ${L_win ? 'win' : ''}"><div class="sc-cap">${L_cap}</div><div class="sc-n">${L_n}</div><div class="sc-sub">${L_sub}</div></div>`;
-    const rightSide = `<div class="sc-side dest ${R_win ? 'win' : ''}"><div class="sc-cap">${R_cap}</div><div class="sc-n">${R_n}</div><div class="sc-sub">${R_sub}</div></div>`;
-    const center = `<div class="sc-vs"><div class="x">🚀</div><div class="sc-verdict ${vcls}">${verdict}</div></div>`;
+    const side = (cap, n, sub, you, win, dest, minis) => `<div class="sc-side${you ? ' you' : ''}${dest ? ' dest' : ''}${win ? ' win' : ''}">` +
+        `<div class="sc-cap">${esc(cap)}</div><div class="sc-n">${esc(String(n))}</div>${minis || ''}` +
+        `<div class="sc-sub" title="${esc(sub)}">${esc(sub)}</div></div>`;
+    const center = `<div class="sc-vs"><div class="x">🚀</div><div class="sc-verdict ${vcls}">${esc(verdict)}</div></div>`;
     
-    sc.innerHTML = `<div class="sc-vsrow">${leftSide}${center}${rightSide}</div>` +
+    sc.innerHTML = `<div class="sc-vsrow">${destBadge()}${side(L_cap, L_n, L_sub, L_you, L_win, false, '')}${center}${side(R_cap, R_n, R_sub, false, R_win, true, R_minis)}</div>` +
         // Each chip carries BOTH numbers now: red cards collected, and the
         // power of the ship that pilot is carrying. The ship value used to be
         // only in the FLEET panel, which showed every pilot's ship as a full
@@ -807,9 +792,9 @@ function render(){
         mid += `<div class="bo-zone"><span class="bo-lbl">Join the game to see your ship.</span></div>`;
     }
 
-    // Static button layout: all 7 action buttons are always present inside the
-    // same midrow box as YOUR SHIP. Buttons that don't apply right now are
-    // dimmed via [disabled] instead of being added/removed.
+    // Static button layout (LOTR #lr-actions pattern): all 7 action buttons
+    // live in their own row below YOUR SHIP. Buttons that don't apply right
+    // now are dimmed via [disabled] instead of being added/removed.
     const turnBlocked = !!(S.turnEnding || paused || S.over);
     const myChoose = !turnBlocked && S.phase === 'choose' && myId() === (cur() ? cur().id : null);
     const myFight = !turnBlocked && S.phase === 'fight' && myId() === (cur() ? cur().id : null);
@@ -824,31 +809,29 @@ function render(){
     const abHint = !canReachWithHelp && bestHelp > 0
         ? `Strongest help available: ${bestHelp} (${shipVal} + ${bestHelp} = ${shipVal + bestHelp})`
         : (bestHelp ? `Strongest help available: ${bestHelp}` : 'No other pilot has a ship');
-    // `why` is the one-line reason the button is recommended, so the hint is
-    // never just an unexplained bounce. Everything interpolated here is escaped:
-    // `why` is built from player names, which are user input. Hints only render
-    // on enabled buttons — a dimmed button shows no bounce/flash and no why.
+    // Compact single-word buttons (LOTR pattern): explanation in the title
+    // tooltip; the hint reason stays visible — it is the recommendation.
     const bigBtn = (a, ic, t, s, o = '', attr = '', why = '', disabled = false) => {
         const cls = disabled ? '' : (o || '');
         const hint = disabled ? '' : (why || '');
-        return `<button class="bo-act ${cls}" data-a="${a}" ${attr}${disabled ? ' disabled' : ''}><span class="ic">${esc(ic)}</span><span><span class="tt">${esc(t)}</span><br><span class="ss">${esc(s)}</span>${hint ? `<span class="why">${esc(hint)}</span>` : ''}</span></button>`;
+        return `<button class="bo-act${cls ? ' ' + cls : ''}" data-a="${a}" title="${esc(t + ' — ' + s)}" ${attr}${disabled ? ' disabled' : ''}><span class="ic">${ic}</span><span class="tt">${t}</span>${hint ? `<span class="why">${esc(hint)}</span>` : ''}</button>`;
     };
-    mid += (localErr ? `<div class="bo-errline">${esc(localErr)}</div>` : '') + `<div class="bo-actrow">` +
-        bigBtn('blastoff', '🚀', 'Blast Off!', 'Draw a destination and try to reach it.', '', '', '', !(myChoose && p && p.ship)) +
-        bigBtn('newship', '🛠️', 'Find New Ship', 'Draw a new ship to replace your current one.', 'k', '', '', !myChoose) +
-        bigBtn('pathA', '🛡️', 'Normal Flight', 'Ship vs destination. One red card, keep your ship.',
+    $('bo-midrow').innerHTML = mid + (localErr ? `<div class="bo-errline">${esc(localErr)}</div>` : '');
+    $('bo-actions').innerHTML = `<div class="bo-actrow">` +
+        bigBtn('blastoff', '🚀', 'Launch', 'Draw a destination and try to reach it.', '', '', '', !(myChoose && p && p.ship)) +
+        bigBtn('newship', '🛠️', 'Ship', 'Draw a new ship to replace your current one.', 'k', '', '', !myChoose) +
+        bigBtn('pathA', '🛡️', 'Normal', 'Ship vs destination. One red card, keep your ship.',
             enough ? 'hint-bounce' : '', '',
             enough ? `Your ship ${shipVal} reaches ${destVal} — this one is safe` : '', !myFight) +
-        bigBtn('pathB', '🤝', 'Share Ships', 'Ask another pilot to combine ships. They may lose theirs too.',
+        bigBtn('pathB', '🤝', 'Share', 'Ask another pilot to combine ships. They may lose theirs too.',
             !enough && canReachWithHelp ? 'hint-bounce' : '', '',
-            !enough && canReachWithHelp ? `You cannot reach ${destVal} alone, but help would` : (myFight && others.length ? abHint : ''), !(myFight && others.length)) +
-        bigBtn('pathC', '🔥', 'After Burner', 'Draw a second destination. Double the cards — and the risk.',
+            !enough && canReachWithHelp ? `You cannot reach ${destVal} alone, but help would` : abHint, !(myFight && others.length)) +
+        bigBtn('pathC', '🔥', 'Burner', 'Draw a second destination. Double the cards — and the risk.',
             abOk ? 'hint-flash' : '', '',
             abOk ? `Ship ${shipVal} — likely strong enough for two` : '', !(myFight && abOk)) +
-        bigBtn('decide', '✅', 'YES', 'Help the other pilot.', '', 'data-i="yes"', '', !myDecide) +
-        bigBtn('decide', '❌', 'NO', 'Stay in orbit.', 'k', 'data-i="no"', '', !myDecide) +
+        bigBtn('decide', '✅', 'Yes', 'Help the other pilot.', '', 'data-i="yes"', '', !myDecide) +
+        bigBtn('decide', '❌', 'No', 'Stay in orbit.', 'k', 'data-i="no"', '', !myDecide) +
         `</div>`;
-    $('bo-midrow').innerHTML = mid;
 
     const veil = $('bo-veil');
     if (!S.over && paused){
@@ -859,7 +842,7 @@ function render(){
     } else if (!S.over && !myAction() && !S.pend){
         $('bo-veil-text').innerHTML = `Waiting for ${pn(cur())}...`;
         veil.classList.remove('hidden');
-    } else if (S.pend){
+    } else if (S.pend && !S.over){
         $('bo-veil-text').innerHTML = `Awaiting Response...<small>${S.pend.why}</small>`;
         veil.classList.remove('hidden');
     } else {
@@ -892,7 +875,7 @@ $('btn-bo-menu').addEventListener('click', () => toSetup());
 // player can also do it themselves.
 function toSetup(){
     if (!isHost()) return;
-    S = null; lastResKey = null;
+    S = null; lastWinShown = null;
     render();
     reportHeight();
 }

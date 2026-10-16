@@ -116,10 +116,22 @@ body{margin:0;background:var(--felt);color:var(--ink);font:15px/1.45 Georgia,ser
    No background, no blur — the ribbon docks at the top and the cards stay
    legible. The ribbon text is kept: "Waiting for Zoe to choose" and
    "Mark is fighting" are the clearest statement of what the game wants. */
-#lr-veil{position:absolute;inset:0;display:flex;align-items:flex-start;justify-content:center;padding-top:6px;pointer-events:none;border-radius:14px;z-index:5;transition:opacity .5s ease, visibility .5s ease}
+#lr-veil{position:absolute;inset:0;display:flex;align-items:center;justify-content:center;padding:70px 0 0;pointer-events:none;border-radius:14px;z-index:6;transition:opacity .5s ease, visibility .5s ease}
 #lr-veil.hidden{opacity:0;visibility:hidden}
 #lr-veil .ribbon{background:rgba(20,26,18,.92);border:2px solid var(--gold);border-radius:14px;padding:7px 16px;font-size:15px;font-weight:800;text-align:center;box-shadow:0 6px 20px rgba(0,0,0,.6);max-width:92%}
 #lr-veil .ribbon small{display:block;font-size:12px;font-weight:400;color:var(--dim);margin-top:4px}
+/* Stable floors: score numbers, zone boxes and the action row keep their
+   size so card/text changes don't shove the buttons around. */
+.sc-n{min-height:38px}
+.sc-sub{height:14px;min-height:14px}
+.lr-zone{min-height:158px}
+.lr-cards{min-height:100px}
+#lr-actions .lr-btnrow{min-height:40px}
+/* Floating pick/decide prompt: overlays the middle of the table instead of
+   pushing the buttons down. Narrow on purpose so equipped + spare stay
+   visible around the edges while you decide. */
+#lr-arena.overlay{position:absolute;top:50%;left:50%;transform:translate(-50%,-50%);z-index:10;width:min(92%,540px);background:rgba(20,26,18,.96);border:2px solid var(--gold);border-radius:14px;padding:10px;box-shadow:0 12px 32px rgba(0,0,0,.6);display:flex;flex-direction:column;gap:8px;align-items:center;text-align:center}
+#lr-arena.overlay .lr-cards{justify-content:center}
 .shake{animation:shakeA .4s}
 @keyframes shakeA{0%,100%{transform:none}25%{transform:translateX(-6px)}50%{transform:translateX(6px)}75%{transform:translateX(-3px)}}
 .pulse{animation:pulseA .8s}
@@ -135,8 +147,9 @@ body{margin:0;background:var(--felt);color:var(--ink);font:15px/1.45 Georgia,ser
 @media (max-width:640px){
   #lotr-panel{padding:8px;gap:8px}
   #lr-tablewrap{gap:8px}
-  .lr-zone{min-height:0;padding:8px}
-  .lr-cards{min-height:0}
+  #lr-veil{padding:90px 0 0}
+  .lr-zone{min-height:140px;padding:8px}
+  .lr-cards{min-height:100px}
   .lr-midrow{gap:8px}
   .lr-act{min-height:40px;padding:8px 10px;flex:1 1 100%}
   .lr-act .tt{font-size:13px}
@@ -296,6 +309,28 @@ const val = (c, dr) => (c.r === 'A' && c.c === 'B') ? (dr ? 20 : 14) : (V[c.r] |
 const isNum = (c) => !V[c.r];
 const isDragon = (c) => c.c === 'R' && c.r === 'A';
 const wname = (c) => (c.c === 'R' ? MON : WEP)[c.r][0];
+// Special-power tooltips for the four named blades (loot face cards J/Q/K/A).
+// Text mirrors the actual rules: Orcrist's win-triggered bonus (resolve/next),
+// Narsil's stashCands protection, Andúril's Dragon-only 20 (val's dr flag is
+// only passed on Dragon paths), Glamdring's plain-14. undefined otherwise.
+const wtip = (c) => {
+    if (!c || c.c !== 'B') return undefined;
+    if (c.r === 'J') return 'Orcrist — Power 12. Win a fight with it equipped and you draw 2 Loot, keep 1. Needs Level 5+.';
+    if (c.r === 'Q') return 'Glamdring — Power 14, no extra rule, just a big sword. Needs Level 5+.';
+    if (c.r === 'K') return 'Narsil — Power 16. Protected: never offered as the discard/move-to-spare while you hold another weapon. Needs Level 5+.';
+    if (c.r === 'A') return 'Andúril — Power 14, or 20 in Dragon fights. Needs Level 5+.';
+    return undefined;
+};
+// Short rule clause for fit-option text (wtip is the hover title; this avoids
+// repeating the name/power that the option line already shows).
+const wrule = (c) => {
+    if (!c || c.c !== 'B') return undefined;
+    if (c.r === 'J') return 'Win a fight with it equipped: draw 2 Loot, keep 1 bonus.';
+    if (c.r === 'Q') return 'No extra rule — just a big sword.';
+    if (c.r === 'K') return 'Protected from discard/move-to-spare while you hold another weapon.';
+    if (c.r === 'A') return 'Counts 20 in Dragon fights (14 otherwise).';
+    return undefined;
+};
 function shuffle(a){ for (let i = a.length - 1; i > 0; i--){ const j = Math.random() * (i + 1) | 0; [a[i], a[j]] = [a[j], a[i]]; } return a; }
 function deck(col){ const d = []; ['2','3','4','5','6','7','8','9','10','J','Q','K','A'].forEach(r => d.push({ r, c: col }, { r, c: col })); return shuffle(d); }
 function draw(k){
@@ -325,6 +360,10 @@ const spareVal = (p, c) => canEq(p, c) ? val(c) : val(c) - 100;
 // normLevel, so a player who equipped a King at Level 5 and then dropped back
 // below Level 5 is left holding a weapon that looks real and swings at nothing.
 const canFightNow = (p) => !!p && p.eq.some(x => canEq(p, x) && val(x) > 0);
+// Is there anyone who could answer a call for help? Mirrors the `help`
+// requirement (an equipped weapon) so Ask is not offered when every
+// teammate's gear is empty.
+const helpAvailable = () => !!S && S.pl.some(q => q.id !== cur().id && !q.gone && q.eq.length > 0);
 function dread(p){
     if (!S.cfg.dread) return 0;
     return Math.max(0, p.lvl - Math.min(...S.pl.filter(x => !x.gone).map(x => x.lvl)));
@@ -388,6 +427,7 @@ function pumpIll(){
 // call next(); the choice handler finishes the flow.
 function fitOptions(p, c){
     const opts = [], can = canEq(p, c), cn = wname(c), cv = val(c);
+    const rule = wrule(c), ruleSuffix = rule ? ' · ' + rule : '';
     // If we would have to throw away a spare to make room, say whether that
     // is actually a good deal. A usable 9 beats an unusable 14 for a Lv 1-4
     // player, so "Stow as spare" must not read as a neutral choice when it
@@ -399,11 +439,11 @@ function fitOptions(p, c){
                    : ' — a fair swap';
     };
     if (can && p.eq.length < cap(p))
-        opts.push({ t: 'Equip ' + cn, d: 'Power ' + cv + ' — gear ' + p.eq.length + '/' + cap(p), go: 'eq' });
+        opts.push({ t: 'Equip ' + cn, d: 'Power ' + cv + ' — gear ' + p.eq.length + '/' + cap(p) + ruleSuffix, go: 'eq' });
     else if (can && p.eq.length && !p.hand.length)
-        opts.push({ t: 'Equip ' + cn, d: 'gear is full — you choose a weapon to move to the spare', go: 'place', dropSpare: false });
+        opts.push({ t: 'Equip ' + cn, d: 'gear is full — you choose a weapon to move to the spare' + ruleSuffix, go: 'place', dropSpare: false });
     else if (can && p.eq.length && p.hand.length)
-        opts.push({ t: 'Equip ' + cn, d: 'gear AND spare full — your spare ' + wname(p.hand[0]) + ' is discarded, and you choose what leaves the gear' + swapNote(p.hand[0], c), go: 'place', dropSpare: true });
+        opts.push({ t: 'Equip ' + cn, d: 'gear AND spare full — your spare ' + wname(p.hand[0]) + ' is discarded, and you choose what leaves the gear' + swapNote(p.hand[0], c) + ruleSuffix, go: 'place', dropSpare: true });
     if (!can || !p.eq.length || p.eq.length >= cap(p)){
         if (!p.hand.length) opts.push({ t: 'Stow as spare', d: 'your one spare slot — kept, not equipped', go: 'spare' });
         else opts.push({ t: 'Stow as spare', d: 'spare is full — your ' + wname(p.hand[0]) + ' is discarded' + swapNote(p.hand[0], c), go: 'sparedrop' });
@@ -440,6 +480,7 @@ function resolveChoice(i){
     else if (o.go === 'place'){
         S.pend = { who: p.id, kind: 'place', cards: stashCands(p), incoming: c,
                    dropSpare: !!o.dropSpare, then: 'chain',
+                   prevOpts: pd.opts, prevWhy: pd.why, prevKind: pd.kind,
                    why: 'Gear is full — choose a weapon to move to the spare' +
                         (o.dropSpare && p.hand[0] ? ' (your spare ' + wname(p.hand[0]) + ' is discarded).' : '.') };
         S.msg = S.pend.why;
@@ -480,6 +521,46 @@ function resolvePlace(i){
     if (then === 'chain') return chainNext();
     S.phase = back;
     return null;
+}
+// Back out of a gear-full placement: choosing Equip is not a commitment.
+// Restores the fit/illegal options so the player can stow or discard instead
+// of sacrificing a saved weapon.
+function resolvePlaceBack(){
+    const pd = S.pend;
+    const p = pd && S.pl.find(x => x.id === pd.who);
+    if (!pd || !p) return null;
+    S.pend = { who: p.id, kind: pd.prevKind || 'fit', cards: [pd.incoming],
+               incoming: pd.incoming, opts: pd.prevOpts || fitOptions(p, pd.incoming),
+               why: pd.prevWhy || ('New card: ' + wname(pd.incoming) + ' — where does it go?') };
+    S.msg = S.pend.why;
+    return null;
+}
+// Discard the incoming card from inside the gear-full prompt, keeping both
+// the equipped gear and the spare exactly as they were.
+function resolvePlaceDrop(){
+    const pd = S.pend;
+    const p = pd && S.pl.find(x => x.id === pd.who);
+    if (!pd || !p) return null;
+    const c = pd.incoming;
+    S.lootD.push(c);
+    say(`${pn(p)} discards ${wname(c)} (gear unchanged).`);
+    S.pend = null;
+    normSort(p);
+    if ((pd.then || 'chain') === 'chain') return chainNext();
+    S.phase = pd.back || 'choose';
+    return null;
+}
+// Discard-both for draw-2-keep-1 (Explore + Orcrist): neither card is worth
+// it, so both go to the loot pile and the turn continues with no fit prompt.
+function resolveDropBoth(){
+    const pk = S.pick;
+    const p = pk && S.pl.find(x => x.id === pk.who);
+    if (!pk || !p) return null;
+    S.lootD.push(...pk.cards);
+    say(`${pn(p)} discards both (${pk.cards.map(wname).join(' + ')}).`);
+    S.pick = null;
+    S.pend = null;
+    return chainNext();
 }
 // Narsil (K) cannot be discarded or stashed while another weapon is equipped
 // (house rule) — so it only appears as a choice when it is the lone option.
@@ -762,6 +843,8 @@ function handle(d){
         }
         if (S.pend && S.pend.kind === 'place'){
             if (S.pend.who !== d.pid) return 'Waiting for ' + (S.pl.find(x => x.id === S.pend.who) ? pn(S.pl.find(x => x.id === S.pend.who)) : 'someone') + ' to choose.';
+            if (a === 'placeback') return resolvePlaceBack();
+            if (a === 'placedrop') return resolvePlaceDrop();
             if (a !== 'decide' || d.i == null || !S.pend.cards[d.i]) return 'Tap one of the weapon buttons below.';
             return resolvePlace(d.i);
         }
@@ -791,7 +874,9 @@ function handle(d){
         return continueBossAfterAck();
     }
     if (S.phase === 'pick'){
-        if (a !== 'keep' || S.pick.who !== d.pid) return 'Waiting for ' + S.pl.find(x => x.id === S.pick.who).name + ' to pick.';
+        if (S.pick.who !== d.pid) return 'Waiting for ' + S.pl.find(x => x.id === S.pick.who).name + ' to pick.';
+        if (a === 'dropboth') return resolveDropBoth();
+        if (a !== 'keep') return 'Waiting for ' + S.pl.find(x => x.id === S.pick.who).name + ' to pick.';
         const k = S.pick.cards[d.i]; if (!k) return null;
         const other = S.pick.cards[1 - d.i];
         S.lootD.push(other);
@@ -840,7 +925,7 @@ function handle(d){
         return 'Choose Explore or Fight.';
     }
     if (S.phase === 'fight'){
-        if (a === 'ask'){ f.ask = true; say(`${pn(c)} asks for help!`); return null; }
+        if (a === 'ask'){ if (!helpAvailable()) return 'No one has an equipped weapon to help.'; f.ask = true; say(`${pn(c)} asks for help!`); return null; }
         if (a === 'push'){
             if (f.pushed) return 'Already pushed.';
             if (f.ask) return 'You cannot push your luck if you asked for help.';
@@ -927,7 +1012,8 @@ function card(c, attr, big){
     const leg = 'JQKA'.includes(c.r) || (!m && c.r === '10');
     const v = (!m && c.r === 'A') ? '14·20' : val(c, true);
     const flip = isNewCard(c) ? ' flip' : '';
-    return `<div class="lr-c ${m ? 'm' : 'w'}${leg ? ' leg' : ''}${big ? ' big' : ''}${flip}" ${attr || ''}><b>${v}</b><i>${n[1]}</i><u>${n[0]}</u></div>`;
+    const tip = wtip(c) || `${n[0]} (${v})`;
+    return `<div class="lr-c ${m ? 'm' : 'w'}${leg ? ' leg' : ''}${big ? ' big' : ''}${flip}" title="${esc(tip)}" ${attr || ''}><b>${v}</b><i>${n[1]}</i><u>${n[0]}</u></div>`;
 }
 function deckBox(kind, count, disc, label){
     // mini badge (docked in VS row): count + label only, no discard line.
@@ -1086,15 +1172,20 @@ function render(){
     $('lr-midrow').innerHTML = mid;
 
     let ar = '';
+    let arFloat = false;
     if (ph === 'pick'){
         const who = S.pl.find(x => x.id === S.pick.who);
         const picking = S.pick.who === myId() && !paused;
-        ar = `<span class="lr-lbl">LOOT — ${esc(who.name)} keeps one (${picking ? 'click a card' : 'waiting for them'})</span><div class="lr-cards"${picking ? '' : ' style="opacity:.55"'}>${S.pick.cards.map((x, i) => card(x, picking ? `data-a="keep" data-i="${i}"` : '')).join('')}</div>`;
+        arFloat = true;
+        ar = `<span class="lr-lbl">LOOT — ${esc(who.name)} keeps one (${picking ? 'click a card' : 'waiting for them'})</span><div class="lr-cards"${picking ? '' : ' style="opacity:.55"'}>${S.pick.cards.map((x, i) => card(x, picking ? `data-a="keep" data-i="${i}"` : '')).join('')}</div>` +
+            (picking ? `<div class="lr-cards lr-btnrow" style="justify-content:center"><button class="lr-act" data-a="dropboth"><span><span class="tt">Discard both</span><br><span class="ss">neither card — nothing changes</span></span></button></div>`
+                     : `<span class="lr-lbl">waiting for them to choose</span>`);
     } else if (ph === 'hreward'){
         ar = `<span class="lr-lbl">HELPER REWARD — ${esc(S.pl.find(x => x.id === f.helper).name)} chooses below.</span>`;
     } else if (ph === 'decide' && S.pend){
         const pd = S.pend, who = S.pl.find(x => x.id === pd.who);
         const minePd = pd.who === myId() && !paused;
+        arFloat = true;
         if (pd.kind === 'fit' || pd.kind === 'illegal'){
             // a new card with explicit options: each button names its cost.
             // Another player's card renders dimmed + owner-labeled so it
@@ -1118,7 +1209,7 @@ function render(){
             ar = `<span class="lr-lbl">${ownerP}GEAR FULL — choose which weapon leaves the gear to make room for <b>${esc(inName)}</b>${pd.dropSpare ? ' · your spare is also discarded' : ''}</span>` +
                 `<div class="lr-cards"${minePd ? '' : ' style="opacity:.55"'}>${card(pd.incoming, '', true)}</div>` +
                 (minePd
-                    ? `<div class="lr-cards lr-btnrow">${pd.cards.map((x, i) => `<button class="lr-act" data-a="decide" data-i="${i}"><span><span class="tt">Move ${esc(wname(x))} to the spare</span><br><span class="ss">and equip ${esc(inName)}${pd.dropSpare && S.pl.find(v => v.id === pd.who) && S.pl.find(v => v.id === pd.who).hand[0] ? ' · your ' + esc(wname(S.pl.find(v => v.id === pd.who).hand[0])) + ' is discarded' : ''}</span></span></button>`).join('')}</div>`
+                    ? `<div class="lr-cards lr-btnrow">${pd.cards.map((x, i) => `<button class="lr-act" data-a="decide" data-i="${i}"><span><span class="tt">Move ${esc(wname(x))} to the spare</span><br><span class="ss">and equip ${esc(inName)}${pd.dropSpare && S.pl.find(v => v.id === pd.who) && S.pl.find(v => v.id === pd.who).hand[0] ? ' · your ' + esc(wname(S.pl.find(v => v.id === pd.who).hand[0])) + ' is discarded' : ''}</span></span></button>`).join('')}<button class="lr-act" data-a="placeback"><span><span class="tt">↩ Keep gear as-is</span><br><span class="ss">back to stow / discard options</span></span></button><button class="lr-act" data-a="placedrop"><span><span class="tt">Discard ${esc(inName)}</span><br><span class="ss">gear + spare unchanged</span></span></button></div>`
                     : `<span class="lr-lbl">waiting for ${esc(who ? pn(who) : 'them')} to choose</span>`);
         } else {
         const tag = pd.kind === 'lose' ? 'DISCARD ONE' : (pd.kind === 'stash' ? `GEAR FULL — new card: ${wname(pd.incoming)}` : 'SPARE FULL — keep 1');
@@ -1142,9 +1233,12 @@ function render(){
     }
     // #lr-arena is always a flex item in the table column, so an empty one
     // still cost a 12px gap above and below. Hide it when there is nothing to
-    // show, which is every phase except the decide prompts.
-    $('lr-arena').innerHTML = ar;
-    $('lr-arena').style.display = ar ? '' : 'none';
+    // show. Pick + fit/place prompts float as an overlay so they never push
+    // the buttons down; everything else stays in-flow.
+    const arenaEl = $('lr-arena');
+    arenaEl.innerHTML = ar;
+    arenaEl.classList.toggle('overlay', arFloat && !!ar);
+    arenaEl.style.display = ar ? '' : 'none';
 
     const veil = $('lr-veil');
     if (!isOver() && !myAction() && !paused && !S.turnEnding){
@@ -1163,15 +1257,18 @@ function render(){
     const turnBlocked = !!(paused || isOver() || S.turnEnding);
     const canExplore = !turnBlocked && ph === 'choose' && mine;
     const canFightBtn = canExplore && canFightNow(c);
-    const canAsk = !turnBlocked && ph === 'fight' && mine && f && !f.ask;
+    const canAsk = !turnBlocked && ph === 'fight' && mine && f && !f.ask && helpAvailable();
     const canPush = !turnBlocked && ph === 'fight' && mine && f && !f.pushed && !f.ask && (power(c) + (f.helper ? power(S.pl.find(x => x.id === f.helper)) : 0) >= total());
     const canResolve = !turnBlocked && ph === 'fight' && mine && f;
     const canHelp = !turnBlocked && ph === 'fight' && p && !p.gone && f && f.ask && !f.helper && p.eq.length > 0;
     const canHr = !turnBlocked && ph === 'hreward' && f && f.helper === myId();
+    const askTip = (ph === 'fight' && mine && f && !f.ask && !helpAvailable())
+        ? 'No one has an equipped weapon to help.'
+        : 'A teammate adds their weapon Power. They share the spoils.';
     let ac = `<div class="lr-cards lr-btnrow" style="justify-content:center">` +
         bigBtn('explore', '🔍', 'Explore', 'Safe · keep 1 of 2 Loot cards · no Levels either way.', 'k', '', !canExplore) +
         bigBtn('fight', '⚔️', 'Fight', 'Win 1 Level (2 if you push your luck) · lose = discard a weapon · ' + (c ? fightOdds(c) : '') + '.', '', '', !canFightBtn) +
-        bigBtn('ask', '📯', 'Ask', 'A teammate adds their weapon Power. They share the spoils.', 'k', '', !canAsk) +
+        bigBtn('ask', '📯', 'Ask', askTip, 'k', '', !canAsk) +
         bigBtn('push', '🎲', 'Push', 'Flip one more Monster beyond the requirement. Win counts double.', 'k', '', !canPush) +
         bigBtn('resolve', '⚖️', 'Resolve', (f && (ph === 'fight' || ph === 'hreward')) ? `Power ${power(c) + (f.helper ? power(S.pl.find(x => x.id === f.helper)) : 0)} vs Monsters ${total()}. Exact ties win.` : 'Resolve the current fight. Exact ties win.', '', '', !canResolve) +
         bigBtn('help', '🤝', 'Help', `Add +${p ? power(p) : 0} Power to ${c ? pn(c) : 'pilot'}. Win: draw 1 Loot or gain 1 Level. Lose: you discard too.`, '', '', !canHelp) +

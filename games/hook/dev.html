@@ -3,20 +3,21 @@
 <head>
 <meta charset="UTF-8">
 <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
-<title>Music Bridge: dev</title>
+<title>What's the Hook? — dev</title>
 <!--
-  Dev harness for games/musicbridge/index.js. Not part of the hub and not
+  Dev harness for games/hook/index.js. Not part of the hub and not
   registered anywhere: the hub finds module games through Vite's
   import.meta.glob, which needs `npm run dev`, and nothing here needs that.
 
-  It imports the *shipped* game file and stands in for the hub itself: the
+  It imports the *shipped* game file and stands in for the hub itself — the
   send -> reduce -> project -> update loop is exactly what src/main.js runs.
-  So what you play here is the real mount(), the real rules.
+  So what you play here is the real mount(), the real rules, the real sound.
 
   Serve it over HTTP (ES modules are blocked on file://):
 
       cd /home/mark/Documents/BubHub && python3 -m http.server 5173
-      # http://localhost:5173/games/musicbridge/dev.html
+      # http://localhost:5173/games/hook/dev.html
+      # http://<your-lan-ip>:5173/games/hook/dev.html  for the phone
 
   Edit a constant in index.js and hit F5.
 -->
@@ -83,11 +84,12 @@
 <div id="stage"></div>
 
 <div id="readout">
-    <span>phase <b id="r-phase">-</b></span>
-    <span>round <b id="r-round">-</b></span>
-    <span>locked <b id="r-locked">-</b></span>
-    <span>found <b id="r-found">-</b></span>
-    <span>intent <b id="r-intent">-</b></span>
+    <span>phase <b id="r-phase">–</b></span>
+    <span>round <b id="r-round">–</b></span>
+    <span>scale <b id="r-scale">–</b></span>
+    <span>locked <b id="r-locked">–</b></span>
+    <span>subs <b id="r-subs">–</b></span>
+    <span>intent <b id="r-intent">–</b></span>
 </div>
 
 <div id="fatal"></div>
@@ -115,10 +117,10 @@
                 '<p>ES modules cannot be imported over <code>file://</code>, so the game file ' +
                 'never loads. From the repo root:</p>' +
                 '<code>python3 -m http.server 5173</code>' +
-                '<p>then open <code>http://localhost:5173/games/musicbridge/dev.html</code></p>');
+                '<p>then open <code>http://localhost:5173/games/hook/dev.html</code></p>');
         } else {
             die('Could not load ./index.js',
-                '<p>Serve the <em>repo root</em>, not this folder: the game sits under /games/musicbridge/.</p>' +
+                '<p>Serve the <em>repo root</em>, not this folder — the game sits under /games/hook/.</p>' +
                 '<code>' + String(e) + '</code>');
         }
         throw e;
@@ -127,14 +129,16 @@
     const me = { id: ME, name: NAME };
     // Solo corner: a room of one. `atTable` is what the hub now hands a game so
     // it seats the people actually at the table; `isInRoom`/`isHost` are what
-    // the lobby branches on.
+    // the lobby branches on. Toggle ROOM below to exercise the host paths.
     const ROOM = new URLSearchParams(location.search).get('room') === '1';
-    const table = [{ id: ME, name: NAME, host: true, game: 'musicbridge' }];
+    const table = [{ id: ME, name: NAME, host: true, game: 'hook' }];
     let state = game.init({ seats: table, atTable: table, options: {} });
 
     // ---- the readout -------------------------------------------------------
+    // Declared before mount(): the game's first update() sends a `join`
+    // intent, which lands right back here through api.send.
     const out = {};
-    ['phase', 'round', 'locked', 'found', 'intent'].forEach((k) => {
+    ['phase', 'round', 'scale', 'locked', 'subs', 'intent'].forEach((k) => {
         out[k] = document.getElementById('r-' + k);
     });
 
@@ -148,8 +152,9 @@
     function paint() {
         set('phase', state.phase);
         set('round', String(state.round));
-        set('locked', String(Object.keys(state.locked || {}).length) + '/' + String((state.order || []).length));
-        set('found', String(state.found || 0));
+        set('scale', state.scale || '–');
+        set('locked', Object.keys(state.locked || {}).length + '/' + state.order.length);
+        set('subs', Object.keys(state.subs || {}).length);
     }
 
     const api = {
@@ -165,7 +170,7 @@
             const kind = (action && action.a) || '?';
             if (next && next.error) {
                 set('intent', kind + ' → denied: ' + next.error, true);
-                if (handle && typeof handle.denied === 'function') handle.denied(next.error);
+                if (handle && handle.denied) handle.denied(next.error);
                 return;
             }
             state = next;

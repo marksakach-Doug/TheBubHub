@@ -133,14 +133,30 @@ let c2 = fromRows(castleBoard, WHITE, [[true,true],[true,true]]);
 c2.b[SQ('f8')] = 'r';                       // transit square f1 attacked
 eq('castle_blocked_through_check', !!legal(c2, WHITE).find(x => x.castle === 'K'), false);
 
-// ---- en passant (black pawn e4 just double-pushed; ep target e3) ----
-const e = fromRows([P('.'), P('.'), P('.'), '....P...', '....p...', P('.'), P('.'), '....K...'],
-                   BLACK, [[false,false],[false,false]], SQ('e3'));
-const ep = legal(e, BLACK).find(x => x.from === SQ('e4') && x.to === SQ('e3'));
+// ---- en passant, both colours, diagonal onto the empty ep square ----
+// White: white pawn e5, black just pushed d7-d5, ep target d6.
+const e = fromRows([P('.'), P('.'), P('.'), '...pP...', P('.'), P('.'), P('.'), '....K...'],
+                   WHITE, [[false,false],[false,false]], SQ('d6'));
+const ep = legal(e, WHITE).find(x => x.from === SQ('e5') && x.to === SQ('d6'));
 eq('en_passant_offered', !!ep, true);
+eq('en_passant_is_flagged', ep && ep.ep, true);
 if (ep) applyMove(e, ep);
-eq('en_passant_pawn_lands_on_e3', e.b[SQ('e3')], 'p');
-eq('en_passant_removes_captured_pawn', e.b[SQ('e5')], '.');
+eq('en_passant_pawn_lands_on_d6', e.b[SQ('d6')], 'P');
+eq('en_passant_removes_captured_pawn', e.b[SQ('d5')], '.');
+eq('en_passant_origin_is_empty', e.b[SQ('e5')], '.');
+// Black: black pawn e4, white just pushed d2-d4, ep target d3.
+const eb = fromRows(['....K...', P('.'), P('.'), P('.'), '...Pp...', '........', P('.'), P('.')],
+                    BLACK, [[false,false],[false,false]], SQ('d3'));
+const epb = legal(eb, BLACK).find(x => x.from === SQ('e4') && x.to === SQ('d3'));
+eq('en_passant_black_offered', !!epb, true);
+if (epb) applyMove(eb, epb);
+eq('en_passant_black_lands_on_d3', eb.b[SQ('d3')], 'p');
+eq('en_passant_black_removes_captured_pawn', eb.b[SQ('d4')], '.');
+// A straight push onto the ep square is never en passant.
+const ef = fromRows([P('.'), P('.'), P('.'), '....P...', '....p...', P('.'), P('.'), '....K...'],
+                    BLACK, [[false,false],[false,false]], SQ('e3'));
+eq('en_passant_straight_push_is_not_flagged',
+   legal(ef, BLACK).filter(x => x.from === SQ('e4') && x.to === SQ('e3') && x.ep).length, 0);
 
 // ---- promotion ----
 const pr = fromRows([P('.'), '....P....', P('.'), P('.'), P('.'), P('.'), P('.'), '....K...'],
