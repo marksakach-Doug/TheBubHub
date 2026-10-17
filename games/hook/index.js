@@ -1,7 +1,11 @@
 // games/hook/index.js: What's the Hook? (fill the gap in a dealt intro-outro pair; the table votes on the best hook)
 import { SCALES, SIZE, label, dealPair, fillCount, fillDurations, bridgeSteps, fmt, schedule } from './library.js';
 
-const PLAY_MS = 60000, VOTE_MS = 30000, KEYS = Object.keys(SCALES);
+const PLAY_MS = 90000, VOTE_MS = 30000, KEYS = Object.keys(SCALES);
+
+// The rule, in the player's words. Solo has no table to vote in, so it gets its own line.
+const RULES_TABLE = 'You make the best hook to fit between the intro and outro. We will vote on who found the best hook.';
+const RULES_SOLO = 'You make the best hook to fit between the intro and outro. No table, no vote — just build the hook that fits.';
 
 export const meta = { id: 'hook', title: "What's the Hook?", players: { min: 1, max: 8 }, color: '#ff00ff',
   icon: '🌉', desc: 'Fill the gap in a matched intro-outro pair. The table votes.', soloable: true };
@@ -139,6 +143,7 @@ export function mount(root, api) {
   root.innerHTML = `<style>
     .k{background:#000080;color:#ff0;font:16px 'Times New Roman',serif;padding:10px;height:100%;max-width:100%;overflow-y:auto;overflow-x:hidden;-webkit-overflow-scrolling:touch;touch-action:pan-y;box-sizing:border-box;word-wrap:break-word}
     h1{color:#0ff;font:bold 22px Georgia;text-shadow:3px 3px #f0f}
+    #rules{color:#9cf;font:italic 14px Georgia;margin:2px 0 8px}
     pre{font:16px/1.4 'Courier New',monospace;color:#0f0;margin:6px 0;white-space:pre-wrap;overflow-wrap:anywhere}
     #bubble{background:#fff;color:#000;border:3px solid #000;padding:8px;font:bold 15px Arial}
     button{font:bold 16px Arial;min-width:44px;min-height:44px;margin:3px}
@@ -149,13 +154,14 @@ export function mount(root, api) {
     #grid button.on{background:#ff0;color:#000;outline:3px solid #0ff}
     #pager{display:flex;align-items:center;justify-content:space-between;color:#0ff;font:bold 13px Arial;margin:4px 0}
   </style>
-  <div class="k"><h1>What's the Hook?</h1><div id="bubble"></div><div id="game"></div></div>`;
+  <div class="k"><h1>What's the Hook?</h1><p id="rules"></p><div id="bubble"></div><div id="game"></div></div>`;
 
   const csv = (notes) => (Array.isArray(notes) ? notes : []).map((x) => (Number.isInteger(x) ? x : -1)).join(',');
 
+  // The parts in the order the game goes: the intro, then the hook you built, then the outro.
   const playsHtml = (notes) => `<div class="plays">
-    <button data-part="hook" data-b="${csv(notes)}">▶ Hook</button>
     <button data-part="intro">▶ Intro</button>
+    <button data-part="hook" data-b="${csv(notes)}">▶ Hook</button>
     <button data-part="outro">▶ Outro</button>
     <button data-part="all" data-b="${csv(notes)}">▶ All</button></div>`;
 
@@ -179,6 +185,9 @@ export function mount(root, api) {
     const pp = perPage(n);
     page = Math.max(0, Math.min(page, Math.ceil(n / pp) - 1));
     talk(`Round ${v.round} · ${v.pair.name} · ${SCALES[v.scale][0]}${seated ? '' : ' · 👁 watching'}`);
+    // The rule under the title, worded for whoever is at the table right now.
+    const rules = $('#rules');
+    if (rules) rules.textContent = soloish(v) ? RULES_SOLO : RULES_TABLE;
     const ends = `intro  ${fmt(v.pair.intro.steps, v.scale)}\noutro  ${fmt(v.pair.outro.steps, v.scale)}`;
     const filled = draft.filter((x) => Number.isInteger(x)).length;
     const head = `<p>${v.last ? `Last round: ${esc(v.last)}<br>` : ''}Score: ${v.order.map((p) => `${esc(v.names[p])} ${v.scores[p] || 0}`).join(' · ')} · <b id="clock"></b></p>`

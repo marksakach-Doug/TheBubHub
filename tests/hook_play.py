@@ -4,8 +4,8 @@
 tests/hook_test.py proves the rules. This one proves the game *plays* —
 mount() builds, the keys fill a draft, lock reaches the host, the solo reveal
 offers a hook you can hear on its own and a Next button, a wide pair paginates
-instead of running off the screen, spectators stay read-only, and teardown stops
-the clock.
+instead of running off the screen, a table of two can vote and skip the vote,
+spectators stay read-only, and teardown stops the clock.
 
 It stands in for the hub the way src/main.js drives a game: `api.send(action)`
 goes to `reduce()`, and the result is projected and handed back to
@@ -86,6 +86,11 @@ HARNESS = r"""
   ok('the game is called Hook', hk.meta.id === 'hook');
   ok('the bubble and clock render', !!q('#bubble') && !!q('#clock'));
   ok('first update asks to join', intents.some((a) => a.a === 'join'));
+  ok('the rule is on screen under the title',
+    /You make the best hook to fit between the intro and outro\./.test(q('#rules').textContent));
+  ok('a table of one is not promised a vote', /No table, no vote/.test(q('#rules').textContent));
+  ok('the compose clock is 90 seconds',
+    Math.round((state.deadline - Date.now()) / 1000) >= 88 && Math.round((state.deadline - Date.now()) / 1000) <= 90);
 
   // The grid draws one screenful of columns, and never more than that: a 16-slot pair
   // paginates rather than running off the side of a phone.
@@ -98,6 +103,10 @@ HARNESS = r"""
     q('#grid').scrollWidth <= q('#grid').clientWidth + 1 && q('.k').scrollWidth <= q('.k').clientWidth + 1);
   ok('the compose panel can play each part on its own',
     !!q('[data-part="hook"]') && !!q('[data-part="intro"]') && !!q('[data-part="outro"]') && !!q('[data-part="all"]'));
+  ok('the parts play in order: intro, hook, outro, all', (() => {
+    const parts = qa('.plays button').map((b) => b.dataset.part);
+    return parts.join(',') === 'intro,hook,outro,all';
+  })());
 
   // ---- compose a hook: one cell per column (paging as needed), then lock
   const n = hk.fillCount(state.pair), firstPair = state.pair.name;
@@ -153,6 +162,43 @@ HARNESS = r"""
   q('[data-pg="1"]').click();
   ok('the pager moves to the next columns', !!q('#grid [data-col="' + wpp + '"]'));
 
+  // ---- a table of two: the vote panel, and a way out of it once someone has voted
+  const duoHost = document.createElement('div');
+  document.body.appendChild(duoHost);
+  const duoShadow = duoHost.attachShadow({ mode: 'open' });
+  const duo = [{ id: ME, name: 'Sam' }, { id: 'zed', name: 'Zoe' }];
+  let duoState = hk.init({ seats: duo, atTable: duo });
+  const hooks = Array(hk.fillCount(duoState.pair));
+  duoState = hk.reduce(duoState, { a: 'lock', b: hooks.map((_, i) => i % 8) },
+    { from: { id: ME, name: 'Sam' }, rng: Math.random });
+  duoState = hk.reduce(duoState, { a: 'lock', b: hooks.map((_, i) => (i + 3) % 8) },
+    { from: { id: 'zed', name: 'Zoe' }, rng: Math.random });
+  const duoApi = Object.assign({}, api, {
+    isHost: false, isInRoom: true,
+    send: (a) => {
+      const next = hk.reduce(duoState, a, { from: { id: ME, name: 'Sam' }, rng: Math.random });
+      if (!next || next.error) return;
+      duoState = next;
+      duoHandle.update(hk.project(duoState, ME));
+    },
+    setInterval: (fn, ms) => window.setInterval(fn, ms)
+  });
+  const duoHandle = hk.mount(duoShadow, duoApi);
+  const dq = (sel) => duoShadow.querySelector(sel);
+  const dqa = (sel) => Array.from(duoShadow.querySelectorAll(sel));
+  duoHandle.update(hk.project(duoState, ME));
+  ok('a table of two is promised the vote',
+    /We will vote on who found the best hook\./.test(dq('#rules').textContent));
+  ok('both hooks lock and the vote opens', duoState.phase === 'vote' && dqa('[data-a="vote"]').length === 1);
+  ok('your own hook offers no vote button', !dq('[data-a="vote"][data-id="' + ME + '"]'));
+  ok('there is no way out of a vote nobody has cast', !dq('[data-a="skip"]'));
+  dq('[data-a="vote"]').click();
+  ok('the vote records your pick', duoState.votes[ME] === 'zed');
+  ok('a Next round button appears once a vote lands', !!dq('[data-a="skip"]'));
+  dq('[data-a="skip"]').click();
+  ok('Next round ends the vote and deals again',
+    duoState.phase === 'play' && duoState.round === 2 && duoState.scores.zed === 1);
+
   // ---- a spectator watches read-only and never joins
   const watchHost = document.createElement('div');
   document.body.appendChild(watchHost);
@@ -174,6 +220,7 @@ HARNESS = r"""
   // ---- teardown stops the clock
   handle.destroy();
   watchHandle.destroy();
+  duoHandle.destroy();
   ok('destroy stops the clock', intervals.size === 0);
 
   return out;
