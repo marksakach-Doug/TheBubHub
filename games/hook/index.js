@@ -1,5 +1,5 @@
 // games/hook/index.js: What's the Hook? (fill the gap in a dealt intro-outro pair; the table votes on the best hook)
-import { SCALES, SIZE, label, dealPair, fillCount, fillDurations, bridgeSteps, fmt, schedule } from './library.js';
+import { SCALES, SIZE, label, dealPair, fillCount, fillDurations, hookSteps, fmt, schedule } from './library.js';
 
 // The clock, currently off. 0 means untimed: a round waits for everyone at the table to
 // lock in, nobody is timed out and no one misses a round. Put a number back here to turn it
@@ -19,7 +19,7 @@ export const meta = { id: 'hook', title: "What's the Hook?", players: { min: 1, 
 function deal(s, rng, now) {
   const d = dealPair(rng, s.bag);
   const pair = d.pair;
-  return { ...s, bag: d.bag, round: s.round + 1, phase: 'play', pair,
+  return { ...s, bag: d.bag, round: s.round + 1, phase: 'play', pair, note: '',
     scale: pair.scale === 'any' ? KEYS[Math.floor(rng() * KEYS.length)] : pair.scale || 'major',
     deadline: deadline(now, PLAY_MS), locked: {}, subs: {}, votes: {} };
 }
@@ -27,12 +27,20 @@ function deal(s, rng, now) {
 // Nobody to out-vote: a table of one has a reveal and a Next button instead of a vote.
 const soloish = (s) => s.order.length < 2;
 
+// Ids are strings everywhere here. A numeric 0 would be falsy in a filter and would fail the
+// strict order.includes() checks below, which is how a real player ends up "watching".
+const sid = (id) => (id === undefined || id === null ? '' : String(id));
+
+// The table as this client sees it. An empty table is empty: inventing a seat here produced a
+// "Player 0" nobody could ever lock in, which — with the clock off — froze the round forever.
+// People arrive through `join`, which seats them whether or not init saw them.
 export function init(ctx) {
-  const list = (ctx && (ctx.atTable || ctx.seats)) || [{ id: 'solo', name: 'Player' }];
-  const at = list.filter((m) => m && m.id && !m.spectator);
-  const seated = at.length ? at : [{ id: 'solo', name: 'Player' }];
-  return deal({ round: 0, order: seated.map((m) => m.id), names: Object.fromEntries(seated.map((m) => [m.id, m.name])),
-    scores: {}, miss: {}, last: '', lastWin: [], lastTop: 0, lastSolo: false, bag: { left: [], last: -1 } }, (ctx && ctx.rng) || Math.random, Date.now());
+  const list = ctx && (Array.isArray(ctx.atTable) ? ctx.atTable : Array.isArray(ctx.seats) ? ctx.seats : []);
+  const seated = list.filter((m) => m && sid(m.id) && !m.spectator);
+  return deal({ round: 0, order: seated.map((m) => sid(m.id)),
+    names: Object.fromEntries(seated.map((m) => [sid(m.id), m.name || sid(m.id)])),
+    scores: {}, miss: {}, last: '', note: '', lastWin: [], lastTop: 0, lastSolo: false,
+    bag: { left: [], last: -1 } }, (ctx && ctx.rng) || Math.random, Date.now());
 }
 
 // Composing is over (all locked in, or time ran out). Whoever locked in competes; a player who misses two clocks in a row is dropped.
@@ -65,10 +73,11 @@ function finish(s, rng, now) {
 }
 
 export function reduce(s, a, ctx) {
-  const rng = (ctx && ctx.rng) || Math.random, now = (ctx && ctx.now) || Date.now(), id = (ctx && ctx.from && ctx.from.id) || '';
+  const rng = (ctx && ctx.rng) || Math.random, now = (ctx && ctx.now) || Date.now();
+  const id = sid(ctx && ctx.from && ctx.from.id), isHost = !!(ctx && ctx.from && ctx.from.host);
   // Clients send 'tick' when their clock hits zero; it only counts once the shared deadline has really passed.
-// An untimed round has no deadline, so a tick from an old tab cannot move it on.
-if (a.a === 'tick') {
+  // An untimed round has no deadline, so a tick from an old tab cannot move it on.
+  if (a.a === 'tick') {
     if (!s.deadline || now < s.deadline) return s;
     return s.phase === 'play' ? toVote(s, rng, now) : s.phase === 'reveal' ? finish(s, rng, now) : tally(s, rng, now);
   }
@@ -76,6 +85,12 @@ if (a.a === 'tick') {
     if (!id || s.order.includes(id)) return s;
     if (s.order.length >= 8) return { error: 'The table is full.' };
     return { ...s, order: [...s.order, id], names: { ...s.names, [id]: (ctx.from && ctx.from.name) || id } };
+  }
+  // The host wants a different pair to play: throw this round away, keep the scores.
+  if (a.a === 'newpair') {
+    if (!isHost) return { error: 'Only the host deals a new pair.' };
+    if (s.phase !== 'play') return { error: 'Not taking hooks right now.' };
+    return { ...deal(s, rng, now), note: 'New pair dealt.' };
   }
   if (!s.order.includes(id)) return { error: 'You are watching, not seated.' };
   if (a.a === 'lock') {
@@ -112,6 +127,17 @@ export function project(s, you) {
     votes: Object.fromEntries(Object.keys(s.votes).map((p) => [p, p === you ? s.votes[p] : true])) };
 }
 
+// Optional export: the host calls this when someone leaves, times out or is kicked, so a
+// departed player stops holding a seat (and a seat nobody can fill cannot freeze the round).
+// Returns the same object when there was nothing to remove.
+export function prune(s, goneId) {
+  const id = sid(goneId);
+  if (!s || !id || s.order.indexOf(id) < 0) return s;
+  const drop = (o) => { const n = { ...(o || {}) }; delete n[id]; return n; };
+  return { ...s, order: s.order.filter((p) => p !== id), names: drop(s.names), scores: drop(s.scores),
+    miss: drop(s.miss), locked: drop(s.locked), subs: drop(s.subs), votes: drop(s.votes) };
+}
+
 export function mount(root, api) {
   let view = null, draft = [], round = 0, ac, timer, ro, joined = false, page = 0;
   const CELL = 44, GAP = 4;                       // a note cell has to stay big enough to tap
@@ -131,15 +157,18 @@ export function mount(root, api) {
     return ac;
   };
 
-  // Any one part on its own, or the whole thing, each at the pair's tempo and sound, in the round's scale.
-  const play = (part, bridge) => {
-    const { pair } = view, t0 = ac.currentTime + 0.02, hook = bridgeSteps(pair, bridge);
-    if (part === 'intro') return schedule(ac, pair.intro.steps, o(), t0);
-    if (part === 'outro') return schedule(ac, pair.outro.steps, o(), t0);
-    if (part === 'hook') return schedule(ac, hook, o(), t0);
-    const t = schedule(ac, pair.intro.steps, o(), t0);      // all: intro, then the bridge, then the outro
-    schedule(ac, hook, o(), schedule(ac, pair.outro.steps, o(), t));
-  };
+// Any one part on its own, or the whole thing, each at the pair's tempo and sound, in the round's scale.
+// The three parts are scheduled one after another from explicit start times. Nesting them —
+// schedule(hook, schedule(outro, t)) — queues the inner part first, which plays intro, outro, hook.
+const play = (part, notes) => {
+  const { pair } = view, t0 = ac.currentTime + 0.02, hook = hookSteps(pair, notes);
+  if (part === 'intro') return schedule(ac, pair.intro.steps, o(), t0);
+  if (part === 'outro') return schedule(ac, pair.outro.steps, o(), t0);
+  if (part === 'hook') return schedule(ac, hook, o(), t0);
+  const afterIntro = schedule(ac, pair.intro.steps, o(), t0);
+  const afterHook = schedule(ac, hook, o(), afterIntro);
+  return schedule(ac, pair.outro.steps, o(), afterHook);
+};
 
   // How many note columns fit the screen: a ShadowRoot has no width of its own, so the host element's is used.
   const avail = () => {
@@ -192,7 +221,8 @@ export function mount(root, api) {
     if (!Array.isArray(draft) || draft.length !== n) draft = Array(n).fill(null);
     const pp = perPage(n);
     page = Math.max(0, Math.min(page, Math.ceil(n / pp) - 1));
-    talk(`Round ${v.round} · ${v.pair.name} · ${SCALES[v.scale][0]}${seated ? '' : ' · 👁 watching'}`);
+    // A note from the rules ("New pair dealt.") replaces the round line for one round only.
+    talk(v.note || `Round ${v.round} · ${v.pair.name} · ${SCALES[v.scale][0]}${seated ? '' : ' · 👁 watching'}`);
     // The rule under the title, worded for whoever is at the table right now.
     const rules = $('#rules');
     if (rules) rules.textContent = soloish(v) ? RULES_SOLO : RULES_TABLE;
@@ -201,18 +231,20 @@ export function mount(root, api) {
     const head = `<p>${v.last ? `Last round: ${esc(v.last)}<br>` : ''}Score: ${v.order.map((p) => `${esc(v.names[p])} ${v.scores[p] || 0}`).join(' · ')}${v.deadline ? ' · <b id="clock"></b>' : ''}</p>`
       + (!api.isSpectator && !v.order.includes(v.you) ? '<button data-a="join">Rejoin the table</button>' : '');
     const voted = Object.keys(v.votes).length;
+    // Only the host may re-deal: one player should not pull the pair out from under a table.
+    const newGame = seated && api.isHost ? ' <button data-a="newpair">New game</button>' : '';
     $('#game').innerHTML = head + (v.phase === 'play'
-      ? `<div class="box"><pre>intro  ${fmt(v.pair.intro.steps, v.scale)}\nbridge ${fmt(bridgeSteps(v.pair, draft), v.scale)}\noutro  ${fmt(v.pair.outro.steps, v.scale)}</pre>
-          <p>${filled}/${n} slots filled — tap a column to set its note, tap again to clear it.</p>${playsHtml(draft)}</div>
+      ? `<div class="box"><pre>intro  ${fmt(v.pair.intro.steps, v.scale)}\nhook   ${fmt(hookSteps(v.pair, draft), v.scale)}\noutro  ${fmt(v.pair.outro.steps, v.scale)}</pre>
+          <p>${filled}/${n} slots filled — tap a column to set its note, tap again to clear it.${newGame}</p>${playsHtml(draft)}</div>
         ${seated && !v.locked[v.you] ? `${gridHtml(n, pp)}
           <button data-a="clear">Clear</button> <button data-a="lock">Lock in</button>` : ''}
         <p>${Object.keys(v.locked).length}/${v.order.length} locked in${v.locked[v.you] ? ' (including you)' : ''}</p>`
       : v.phase === 'reveal'
-      ? `<div class="box"><pre>intro  ${fmt(v.pair.intro.steps, v.scale)}\nbridge ${fmt(bridgeSteps(v.pair, v.subs[v.you] || []), v.scale)}\noutro  ${fmt(v.pair.outro.steps, v.scale)}</pre>
+      ? `<div class="box"><pre>intro  ${fmt(v.pair.intro.steps, v.scale)}\nhook   ${fmt(hookSteps(v.pair, v.subs[v.you] || []), v.scale)}\noutro  ${fmt(v.pair.outro.steps, v.scale)}</pre>
           ${playsHtml(v.subs[v.you])}</div><p>Your hook${seated ? '' : ' (watching)'}. `
         + (seated ? '<button data-a="next">Next round</button>' : '') + `</p>`
       : `<div class="box"><pre>${ends}</pre></div><p>Vote for the best hook${cands.length > 1 ? ' (not your own)' : ''}. ${voted}/${v.order.length} voted.</p>`
-        + cands.map((p) => `<p>${esc(v.names[p])}: <tt>${fmt(bridgeSteps(v.pair, v.subs[p]), v.scale)}</tt> <button data-part="hook" data-b="${csv(v.subs[p])}">▶</button> `
+        + cands.map((p) => `<p>${esc(v.names[p])}: <tt>${fmt(hookSteps(v.pair, v.subs[p]), v.scale)}</tt> <button data-part="hook" data-b="${csv(v.subs[p])}">▶</button> `
           + (seated && (p !== v.you || cands.length === 1) ? `<button data-a="vote" data-id="${esc(p)}">${v.votes[v.you] === p ? 'Voted ✓' : 'Vote'}</button>` : '') + '</p>').join('')
         // A table that is done voting should not have to sit out the clock.
         + (seated && voted ? '<button data-a="skip">Next round</button>' : ''));

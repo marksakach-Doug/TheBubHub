@@ -30,7 +30,7 @@ JS_CASES = r"""
 () => {
   const out = [];
   const rng0 = () => 0;
-  const ctx = (id, rng) => ({ from: { id: id, name: id }, rng: rng || Math.random });
+  const ctx = (id, rng, host) => ({ from: { id: id, name: id, host: !!host }, rng: rng || Math.random });
   const nameOf = (id) => ({ dev: 'Dev', w1: 'Sam' }[id] || id || 'Someone');
   const table = (ids) => ids.map((id) => ({ id: id, name: id }));
   const tmpl = (pair) => ((pair.bridge || pair.intro) || pair).steps;
@@ -64,6 +64,23 @@ JS_CASES = r"""
   out.push(['init falls back to seats', legacy.order.join(',') === 'dev']);
   const soloInit = init({ seats: table(['dev']), atTable: table(['dev']), rng: rng0 });
   out.push(['solo table of one seats itself', soloInit.order.join(',') === 'dev']);
+
+  // ---- an empty table is empty: inventing a seat here made a "Player 0" nobody
+  // could ever lock in, which froze the round for good once the clock was off
+  const bare = init({ seats: [], atTable: [], rng: rng0 });
+  out.push(['an empty table seats nobody', bare.order.length === 0]);
+  out.push(['no invented Player is on the table',
+    Object.keys(bare.names).length === 0 && !/Player/.test(JSON.stringify(bare.names))]);
+  out.push(['a real player can still join an empty table',
+    reduce(bare, { a: 'join' }, ctx('dev')).order.join(',') === 'dev']);
+  const joinedBare = reduce(bare, { a: 'join' }, ctx('dev'));
+  out.push(['and can play on it', reduce(joinedBare, { a: 'lock', b: goodBridge(joinedBare) }, ctx('dev')).locked.dev === true]);
+  const seatsMap = init({ seats: { '0': 'dev' }, atTable: { '0': 'dev' }, rng: rng0 });
+  out.push(['a seat map instead of a list is not a table', seatsMap.order.length === 0]);
+  const numeric = init({ seats: [{ id: 0, name: 'Zed' }], atTable: [{ id: 0, name: 'Zed' }], rng: rng0 });
+  out.push(['a numeric id is seated as a string', numeric.order.join(',') === '0']);
+  out.push(['and can act with it',
+    reduce(numeric, { a: 'lock', b: goodBridge(numeric) }, { from: { id: 0 }, rng: rng0 }).locked['0'] === true]);
 
   // ---- lock validation
   const good = goodBridge(s0);
@@ -197,6 +214,42 @@ JS_CASES = r"""
     reduce({ ...s0, deadline: Date.now() - 10 }, { a: 'tick' },
       { from: { id: 'dev' }, rng: rng0, now: Date.now() + 1000 }).round === 2]);
 
+  // ---- new game: the host throws the round away and deals a different pair
+  out.push(['a guest cannot deal a new pair',
+    !!reduce(s0, { a: 'newpair' }, ctx('w1', null, false)).error]);
+  out.push(['the host is the one who may', !reduce(s0, { a: 'newpair' }, ctx('dev', null, true)).error]);
+  const swapped = reduce(s0, { a: 'newpair' }, ctx('dev', null, true));
+  out.push(['a new pair is a different pair', swapped.pair.name !== s0.pair.name]);
+  out.push(['new game counts as the next round', swapped.round === s0.round + 1]);
+  out.push(['new game keeps the scores', JSON.stringify(swapped.scores) === JSON.stringify(s0.scores)]);
+  out.push(['new game clears the lock-ins', Object.keys(swapped.locked).length === 0 && Object.keys(swapped.subs).length === 0]);
+  out.push(['new game says so', swapped.note === 'New pair dealt.']);
+  out.push(['the note lasts one round only', !!deal(swapped, rng0, Date.now()).note === false]);
+  out.push(['a new pair outside composing is refused',
+    !!reduce(oneVote, { a: 'newpair' }, ctx('dev', null, true)).error &&
+    !!reduce(soloLock, { a: 'newpair' }, ctx('dev', null, true)).error]);
+  const reDeal = reduce(swapped, { a: 'newpair' }, ctx('dev', null, true));
+  out.push(['two new pairs running never repeat', reDeal.pair.name !== swapped.pair.name]);
+  out.push(['new game records nothing', summarize(swapped, nameOf) === null]);
+
+  // ---- prune: a player who leaves stops holding a seat
+  const busy = reduce(oneVote, { a: 'join' }, ctx('w2'));
+  const gone = prune(busy, 'w2');
+  out.push(['prune empties a seat that leaves', gone.order.join(',') === 'dev,w1']);
+  out.push(['prune forgets their name and score',
+    gone.names.w2 === undefined && gone.scores.w2 === undefined]);
+  out.push(['prune forgets their hook and vote',
+    gone.subs.w2 === undefined && gone.votes.w2 === undefined && gone.locked.w2 === undefined]);
+  out.push(['prune leaves everyone else alone',
+    gone.order.indexOf('dev') >= 0 && gone.order.indexOf('w1') >= 0]);
+  out.push(['pruning a stranger changes nothing', prune(busy, 'ghost') === busy]);
+  out.push(['pruning nobody changes nothing', prune(busy, '') === busy]);
+  // One of two walks out mid-round. The one left still has to be able to finish it:
+  // a seat nobody can ever fill would otherwise hold the round open forever.
+  const afterLeave = prune(s0, 'w1');
+  const soloLeft = reduce(afterLeave, { a: 'lock', b: Array(fillCount(afterLeave.pair)).fill(0) }, ctx('dev'));
+  out.push(['a table can still finish after someone leaves', soloLeft.phase === 'reveal']);
+
   // ---- tick: with a deadline, the shared clock and not the sender's decide
   const early = reduce({ ...s0, deadline: Date.now() + 20000 }, { a: 'tick' },
     { from: { id: 'dev' }, rng: rng0, now: Date.now() + 1000 });
@@ -238,7 +291,7 @@ def main():
     src = src.replace("export const", "const").replace("export function", "function")
     # The module split needs Vite; the classic-script injector gets one file.
     src = re.sub(r"import\s+\{[^}]*\}\s+from\s+['\"]\./library\.js['\"];?", "", src)
-    combined = lib + "\n" + src + "\nwindow.__hook = { meta, init, reduce, project, summarize, PAIRS, fillCount };\n"
+    combined = lib + "\n" + src + "\nwindow.__hook = { meta, init, reduce, project, summarize, prune, PAIRS, fillCount };\n"
 
     with sync_playwright() as p:
         br = p.chromium.launch()

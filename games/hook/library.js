@@ -89,8 +89,10 @@ export function dealPair(rng, bag) {
   return { pair: list[index], index, bag: { left, last: index } };
 }
 
-// The rhythm template the bridge uses: the pair's own bridge rhythm if it has one, else the intro itself.
-// Accepts a pair ({ intro, bridge }) or a legacy intro phrase ({ steps, bridge }) so old saves keep working.
+// The rhythm template the hook uses: the pair's own hook rhythm if it has one, else the intro itself.
+// `bridge` is the data key inside a pair — the wording on screen is "hook", the key is what the
+// phrase-builder exports and what every pasted pair carries, so it stays. Accepts a pair
+// ({ intro, bridge }) or a legacy intro phrase ({ steps, bridge }) so old saves keep working.
 const stepsOf = (x) => (x && x.intro ? (x.bridge || x.intro).steps : (x.bridge || x).steps);
 const template = (pairOrIntro) => ({ steps: stepsOf(pairOrIntro) });
 
@@ -98,7 +100,7 @@ const template = (pairOrIntro) => ({ steps: stepsOf(pairOrIntro) });
 export const fillCount = (pairOrIntro) => stepsOf(pairOrIntro).filter(s => s[0] >= 0).length;
 
 // Template rhythm with the player's notes dropped into its note slots (unfilled slots become rests).
-export function bridgeSteps(pairOrIntro, notes) {
+export function hookSteps(pairOrIntro, notes) {
   let k = 0;
   return stepsOf(pairOrIntro).map(([n, d, a]) => {
     if (n < 0) return [-1, d];
@@ -107,7 +109,7 @@ export function bridgeSteps(pairOrIntro, notes) {
   });
 }
 
-// Column durations for the bridge grid, one per player choice.
+// Column durations for the hook grid, one per player choice.
 export const fillDurations = (pairOrIntro) => stepsOf(pairOrIntro).filter(s => s[0] >= 0).map(s => s[1]);
 
 export const fmt = (steps, k) => steps.map(([n, d]) =>

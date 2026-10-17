@@ -53,8 +53,8 @@
 <div class="bar">
   <button class="tab on" id="tabIntro">Intro</button>
   <button class="tab" id="tabOutro">Outro</button>
-  <button class="tab" id="tabBridge" disabled>Bridge rhythm</button>
-  <label><input type="checkbox" id="own"> Bridge has its own rhythm</label>
+  <button class="tab" id="tabBridge" disabled>Hook rhythm</button>
+  <label><input type="checkbox" id="own"> Hook has its own rhythm</label>
 </div>
 
 <div class="bar">
@@ -65,17 +65,17 @@
 
 <div class="bar">
   <button class="go" id="play">▶ Play this tab</button>
-  <button class="go" id="playFull">▶ Intro + sample bridge + outro</button>
+  <button class="go" id="playFull">▶ Intro + sample hook + outro</button>
   <button id="clear">Clear</button>
   <button id="save">Save pair to library</button>
   <span id="info"></span>
 </div>
 
 <div id="wrap"><div id="grid"></div></div>
-<p><small>Click a cell to place a note, click a lit cell to remove it, shift-click to accent it. Gaps are rests. On the bridge tab, pitches are placeholders: the player chooses them in the game, and only the rhythm is saved.</small></p>
+<p><small>Click a cell to place a note, click a lit cell to remove it, shift-click to accent it. Gaps are rests. On the hook tab, pitches are placeholders: the player chooses them in the game, and only the rhythm is saved.</small></p>
 
-<h2>Sample bridge (for testing the full chain)</h2>
-<div class="bar"><span><small>Pick test pitches, one per bridge slot, then hit “Intro + sample bridge + outro”. This is never saved — it stands in for what a player will choose in the game.</small></span></div>
+<h2>Sample hook (for testing the full chain)</h2>
+<div class="bar"><span><small>Pick test pitches, one per hook slot, then hit “Intro + sample bridge + outro”. This is never saved — it stands in for what a player will choose in the game.</small></span></div>
 <div id="sample"></div>
 
 <h2>Library (pairs)</h2>
@@ -243,7 +243,7 @@ $('grid').addEventListener('click', e => {
 
 function setTab(t) {
   cur = t;
-  ['Intro', 'Outro', 'Bridge'].forEach(x => $('tab' + x).classList.toggle('on', x.toLowerCase() === t));
+  ['Intro', 'Outro', 'Hook'].forEach(x => $('tab' + x).classList.toggle('on', x.toLowerCase() === t));
   $('len').value = String(T[t].len);
   render();
 }

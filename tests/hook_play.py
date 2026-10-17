@@ -32,13 +32,35 @@ HARNESS = r"""
   mod = mod.replace(/export (const|function)/g, '$1')
            .replace(/import\s+\{[^}]*\}\s+from\s+['"]\.\/library\.js['"];?/, '');
   const factory = new Function(lib + '\n' + mod + `
-    window.__hook = { meta, init, reduce, project, summarize, mount, fillCount, SIZE, PAIRS };
+    window.__hook = { meta, init, reduce, project, summarize, mount, prune, fillCount, SIZE, PAIRS };
   `);
   factory();
 
   const hk = window.__hook;
   const out = [];
   const ok = (name, cond) => out.push([name, !!cond]);
+
+  // A stand-in for Web Audio that records what was scheduled and when. The order the three
+  // parts are queued in is invisible in the DOM, and getting it wrong (nested calls) plays
+  // intro, outro, hook — so the DOM test watches the audio schedule instead of the pixels.
+  const played = [];
+  const FakeParam = function (v) { this.value = v; };
+  FakeParam.prototype.setValueAtTime = function () {};
+  FakeParam.prototype.exponentialRampToValueAtTime = function () {};
+  window.AudioContext = function () {
+    this.state = 'running';
+    this.currentTime = 0;
+    this.destination = {};
+    this.resume = function () {};
+    this.close = function () {};
+    this.createGain = function () { return { gain: new FakeParam(1), connect: function () { return this; } }; };
+    this.createOscillator = function () {
+      const os = { type: 'sine', frequency: new FakeParam(440), connect: function () { return this; },
+        start: function (t) { played.push({ at: Number(t), hz: Math.round(this.frequency.value) }); },
+        stop: function () {} };
+      return os;
+    };
+  };
 
   const ME = 'me';
   const table = [{ id: ME, name: 'Sam', host: true, game: 'hook' }];
@@ -56,7 +78,7 @@ HARNESS = r"""
     isInRoom: false,
     send: (action) => {
       intents.push(action);
-      const next = hk.reduce(state, action, { from: { id: ME, name: 'Sam' }, rng: Math.random });
+      const next = hk.reduce(state, action, { from: { id: ME, name: 'Sam', host: true }, rng: Math.random });
       if (!next || next.error) {
         denied.push(next && next.error);
         handle.denied(next && next.error);
@@ -113,19 +135,61 @@ HARNESS = r"""
   })());
 
   // ---- compose a hook: one cell per column (paging as needed), then lock
-  const n = hk.fillCount(state.pair), firstPair = state.pair.name;
+  const firstPair = state.pair.name;
   const cell = (c, r) => q('#grid [data-col="' + c + '"][data-row="' + r + '"]');
-  let filledSlots = 0, paged = 0;
-  for (let c = 0; c < n; c++) {
-    let b = cell(c, 0);
-    while (!b && paged < n) {
-      const next = q('[data-pg="1"]');
-      if (!next) break;
-      next.click(); paged++; b = cell(c, 0);
+  // One note per column, paging to reach the columns that do not fit.
+  const fillDraft = () => {
+    const n = hk.fillCount(state.pair);
+    let filled = 0, paged = 0;
+    for (let c = 0; c < n; c++) {
+      let b = cell(c, 0);
+      while (!b && paged < n) {
+        const next = q('[data-pg="1"]');
+        if (!next) break;
+        next.click(); paged++; b = cell(c, 0);
+      }
+      if (b) { b.click(); filled++; }
     }
-    if (b) { b.click(); filledSlots++; }
-  }
-  ok('every slot of the hook can be filled', filledSlots === n);
+    return filled;
+  };
+  const n = hk.fillCount(state.pair);
+  ok('every slot of the hook can be filled', fillDraft() === n);
+
+  // ---- the three parts play in the order the game goes: intro, hook, outro.
+  // Only "All" plays more than one part, so it is the one that can get the order wrong.
+  const heard = (name) => {
+    played.length = 0;
+    q('.plays [data-part="' + name + '"]').click();
+    return played.slice().sort((a, b) => a.at - b.at);
+  };
+  const introNotes = heard('intro'), hookNotes = heard('hook'), outroNotes = heard('outro');
+  ok('each part plays on its own', introNotes.length > 0 && hookNotes.length > 0 && outroNotes.length > 0);
+  const allNotes = heard('all');
+  const seq = (notes) => notes.map((x) => x.hz).join(',');
+  ok('All plays every part once', allNotes.length === introNotes.length + hookNotes.length + outroNotes.length);
+  // The order inside All is the whole point: nested schedule() calls queue the inner part
+  // first, which is how this ever played intro, outro, hook.
+  ok('All plays the parts in order: intro, hook, outro',
+    seq(allNotes) === seq(introNotes) + ',' + seq(hookNotes) + ',' + seq(outroNotes));
+  const iLast = allNotes[introNotes.length - 1], hFirst = allNotes[introNotes.length];
+  const hLast = allNotes[introNotes.length + hookNotes.length - 1];
+  const oFirst = allNotes[introNotes.length + hookNotes.length];
+  ok('the hook starts after the intro has finished', hFirst.at >= iLast.at);
+  ok('the outro starts after the hook has finished', oFirst.at >= hLast.at);
+  ok('nothing overlaps the part before it', allNotes.every((x, i) => i === 0 || x.at >= allNotes[i - 1].at));
+
+  // ---- New game: the host throws the round away for a different pair, keeping scores
+  ok('the host is offered a new game', !!q('[data-a="newpair"]'));
+  const pairBeforeSwap = state.pair.name, scoresBeforeSwap = JSON.stringify(state.scores);
+  q('[data-a="newpair"]').click();
+  ok('new game deals a different pair', state.phase === 'play' && state.pair.name !== pairBeforeSwap);
+  ok('new game keeps the scores', JSON.stringify(state.scores) === scoresBeforeSwap);
+  ok('new game says so in the bubble', /New pair dealt/.test(q('#bubble').textContent));
+  ok('new game clears the draft', /0\/[0-9]+ slots filled/.test(q('#game').textContent));
+  q('[data-a="newpair"]').click();
+  ok('two new games never hand back the same pair', state.pair.name !== pairBeforeSwap);
+  ok('the fresh round can be filled and locked', fillDraft() === hk.fillCount(state.pair));
+
   ok('lock reaches the host', (() => {
     q('[data-a="lock"]').click();
     return intents.some((a) => a.a === 'lock') && state.locked[ME];
@@ -136,8 +200,10 @@ HARNESS = r"""
   ok('solo is never asked to vote for itself', !q('[data-a="vote"]'));
   ok('the reveal shows the hook it just took', /Your hook/.test(q('#game').textContent));
   ok('the reveal can play the hook alone', !!q('[data-part="hook"]'));
+  const roundBeforeNext = state.round, pairBeforeNext = state.pair.name;
   q('[data-a="next"]').click();
-  ok('next deals a fresh pair', state.phase === 'play' && state.round === 2 && state.pair.name !== firstPair);
+  ok('next deals a fresh pair',
+    state.phase === 'play' && state.round === roundBeforeNext + 1 && state.pair.name !== pairBeforeNext);
   ok('holding the hook scores a point', state.scores[ME] === 1);
   ok('the win is named', /held the hook/.test(q('#game').textContent));
   const line = hk.summarize(state, (id) => id === ME ? 'Sam' : id);
@@ -180,7 +246,7 @@ HARNESS = r"""
   const duoApi = Object.assign({}, api, {
     isHost: false, isInRoom: true,
     send: (a) => {
-      const next = hk.reduce(duoState, a, { from: { id: ME, name: 'Sam' }, rng: Math.random });
+      const next = hk.reduce(duoState, a, { from: { id: ME, name: 'Sam', host: false }, rng: Math.random });
       if (!next || next.error) return;
       duoState = next;
       duoHandle.update(hk.project(duoState, ME));
@@ -194,8 +260,11 @@ HARNESS = r"""
   ok('a table of two is promised the vote',
     /We will vote on who found the best hook\./.test(dq('#rules').textContent));
   ok('both hooks lock and the vote opens', duoState.phase === 'vote' && dqa('[data-a="vote"]').length === 1);
+  ok('a guest is not offered a new game', !dq('[data-a="newpair"]'));
   ok('your own hook offers no vote button', !dq('[data-a="vote"][data-id="' + ME + '"]'));
   ok('there is no way out of a vote nobody has cast', !dq('[data-a="skip"]'));
+  ok('a guest cannot smuggle a new pair through the rules',
+    !!(hk.reduce(duoState, { a: 'newpair' }, { from: { id: ME, name: 'Sam', host: false }, rng: Math.random }) || {}).error);
   dq('[data-a="vote"]').click();
   ok('the vote records your pick', duoState.votes[ME] === 'zed');
   ok('a Next round button appears once a vote lands', !!dq('[data-a="skip"]'));
