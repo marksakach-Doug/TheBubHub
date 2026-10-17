@@ -445,6 +445,9 @@ For anything interactive, drive the page with Playwright and assert on the
 
 ## Run, build, deploy
 
+The live site is **<https://bubhub.us>**. (There is no thebubhub.com; `thebubhub`
+in `wrangler.jsonc` is the Cloudflare Worker's *name*, not a domain.)
+
 ```bash
 npm install
 npm run dev       # Vite dev server on http://localhost:5173 (LAN-exposed)
@@ -452,7 +455,7 @@ npm run build     # → dist/
 npm run preview   # serve the production build
 ```
 
-Deployment targets **Cloudflare Workers** with static assets, via
+Deployment also targets **Cloudflare Workers** with static assets, via
 `@cloudflare/vite-plugin`:
 
 ```bash
@@ -464,13 +467,9 @@ npm run deploy    # bun run build && wrangler deploy
 
 ### Deploying (and keeping the credential out of git)
 
-**The `thebubhub` Worker has Workers Builds connected: pushing to `main` builds
-and deploys automatically.** (There is no Pages project in the account — a
-"Cloning repository… `bun install --frozen-lockfile`" log is a Workers build.)
-A failed build leaves the live site on the last good deployment, so check the log
-before assuming the site is broken.
-
-To publish without pushing:
+**Pushing to `main` deploys <https://bubhub.us>.** A failed build leaves the live
+site on the last good deployment, so check the log before assuming the site is
+broken. To publish without pushing (this path goes out through `wrangler deploy`):
 
 ```bash
 bun install
@@ -508,7 +507,8 @@ bun (1.2.15 is the default `bun` on this machine, 1.4.3 is aliased
 `tests/lockfile_test.py` — which also runs the real frozen install — catch any
 drift.
 
-- `wrangler.jsonc` names the worker `thebubhub` and serves `dist/`.
+- `wrangler.jsonc` names the worker `thebubhub` — a worker name, not a domain —
+  and serves `dist/`.
 - `cloudflare()` must stay in the `plugins` array of `vite.config.js` — wrangler
   refuses to auto-configure a config without a plugin.
 

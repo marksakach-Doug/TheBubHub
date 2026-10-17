@@ -23,6 +23,13 @@ tests — copy it to start a new one. The six exports every module game needs
 (`meta`, `init`, `reduce`, `project`, `mount`, `summarize`, plus an optional
 `roundId`) are listed in the contract table above.
 
+**`games/hook/library.js` is a growing library, on purpose.** Its `PAIRS` array
+is hand-curated: new pairs are pasted in from `games/hook/phrase-builder.html` as
+they come up, and they ship straight to production. So nothing may depend on how
+many there are — `dealPair()` shuffles whatever is in the list and the hook tests
+read `PAIRS.length` instead of a number. Adding a batch of pairs is a content
+change, not a code change: commit and push them, and do not touch the tests.
+
 ## The loop
 
 ```bash
@@ -50,11 +57,12 @@ first `update()`), and never let an intent sent mid-frame start a second
 
 ## Deploying
 
-**`thebubhub` has Workers Builds connected: pushing to `main` builds and
-deploys by itself.** There is no Pages project in the account — that build log
-("Cloning repository… Installing project dependencies: bun install
---frozen-lockfile") is a Workers build. So a push is a release, and a failed
-build means the live site keeps serving the last good deployment.
+**The live site is <https://bubhub.us>. There is no thebubhub.com — if you ever
+see that domain, it is a typo, not a deploy target.** Pushing to `main` is a
+release: the Pages workflow publishes on every push, and a failed build means
+the live site keeps serving the last good deployment. `wrangler.jsonc` holds the
+Cloudflare Worker used by the manual path below; `thebubhub` there is the
+*worker's name*, not a domain.
 
 To publish without pushing:
 
