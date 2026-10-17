@@ -534,47 +534,20 @@ drift.
 - `cloudflare()` must stay in the `plugins` array of `vite.config.js` — wrangler
   refuses to auto-configure a config without a plugin.
 
-### Trying a module game without npm
+### Testing a module game
 
-`npm run dev` is the real hub and the only way to test invites, multiplayer and
-the record sheet — but it needs node. On a machine with no node, **a module game
-is still playable**, because it is just an ES module with no dependency on Vite:
-the `import.meta.glob` in `src/registry.js` is the only part that needs it.
-
-Dot Return ships such a harness at `games/dotreturn/dev.html`. It imports the
-**real** `index.js` and stands in for the hub, running the same
-`send → reduce → project → update` loop:
-
-```bash
-cd /path/to/BubHub
-python3 -m http.server 5173
-# http://localhost:5173/games/dotreturn/dev.html
-# http://<your-lan-ip>:5173/games/dotreturn/dev.html   ← the phone, over the LAN
-```
-
-Edit a constant in `games/dotreturn/index.js`, hit F5, play. `python3 -m
-http.server` is enough for this page even though it does not work for the hub,
-because the harness never asks the registry for anything. Double-clicking it
-prints the command above instead of showing a blank screen — ES modules cannot be
-imported over `file://`.
-
-It is not a copy of the game and not a mock: same `mount()`, same physics, same
-rules, with a readout of `phase` / `epoch` / the shared tally / your dot's
-authoritative heading, and arrow keys (or WASD) to steer without dragging a
-mouse. What it cannot cover is the hub itself — other players, invites, BubHub
-Record. `python3 tests/dotreturn_play.py` covers the game with 32 DOM assertions
-and needs no server at all. A new module game gets the same harness by copying
-that file next to its own `index.js`.
+`npm run test:syntax` (`./test.sh --skip-browser`) parses every script and game
+module offline — no browser, no node. `npm run test` adds the browser suites,
+which need Playwright + Chromium. A new module game belongs in `test.sh` in the
+same commit as its code; an unwired test is a test nobody runs.
 
 **Requirements and limits worth knowing before you start:**
 
 - **ES modules need HTTP.** There is no `file://` support. Opening
-  `index.html` from disk shows an empty arcade — the same is true of a
-  per-game dev harness, which is why they print the server command instead of
-  failing silently.
-- **`npm run serve` (`python3 -m http.server`) does not work** for the hub: it
-  does not serve `public/` at the root and cannot resolve `import.meta.glob`,
-  so the registry comes up empty. Use `npm run dev`.
+  `index.html` from disk shows an empty arcade.
+- **`python3 -m http.server` does not work** for the hub: it does not serve
+  `public/` at the root and cannot resolve `import.meta.glob`, so the registry
+  comes up empty. Use `npm run dev`.
 - PeerJS and Tailwind load from CDNs, so the whole arcade **degrades offline**
   and **multiplayer does not work offline**. Prefer inline data and CSS-drawn
   assets in a game over anything fetched at runtime.
@@ -588,7 +561,6 @@ that file next to its own `index.js`.
 | File | Touch? | Purpose |
 |---|---|---|
 | `games/<id>/index.js` | ✅ to add a game | A module game. Auto-registered; the only file you create. |
-| `games/<id>/dev.html` | – | A per-game browser harness that mounts the game behind a fake hub, so you can play it with `python3 -m http.server` and no node. Inert to the registry. |
 | `public/games.js` | ✅ for legacy games | The legacy registry — one line per iframe game. |
 | `public/*.html` | ✅ for legacy games | The legacy games. Copied verbatim to the site root. |
 | `index.html` | Rarely | Hub shell markup + the few CSS rules that own the stage frame. |
@@ -606,7 +578,6 @@ that file next to its own `index.js`.
 | `AGENTS.md` | ✅ | The short operating manual for coding agents: the loop, the deploy path, the credential rules, and the gotchas that have already bitten. |
 | `test.sh` | – | One command for the checks above. |
 | `bub-record.js` | Rarely | Legacy sentence composer. **Only `tests/record_test.py` uses it now**; the running hub goes through `summarize()`. |
-| `indexOLD.html` | – | The pre-v10 shell, kept for reference. Nothing loads it. |
 
 ---
 
@@ -633,7 +604,7 @@ bottom.
 - The bot is intentionally 1-ply (material swing, a "will this hang?" check, a
   check bonus, jitter). It can only ever pick from `legal()`, so it cannot cheat.
 
-### eggs (`public/eggs.html`)
+### Eggs (`games/eggs/index.js`)
 
 Damage-% knockback plus a Mario-style mushroom: the `bean` grows you
 BIG → HUGE → TITAN with **no timer** — the size is *spent* by taking a hit
@@ -743,8 +714,6 @@ on a phone would be worse).
 
 - `tests/chess_play.py` still targets the pre-v10 shell and fails; it is
   excluded from `test.sh`.
-- `npm run serve` (`python3 -m http.server`) does not work for the hub — see
-  [Run, build, deploy](#run-build-deploy).
 - **Goldberg does not record at all.** It never posts a `result` — the old hub
   inferred "someone played it" from activity, and that hook
   (`compat.hooks.onTouched`) is now an empty stub. It needs a debounce so it
@@ -753,4 +722,3 @@ on a phone would be worse).
 - `bub-record.js` at the repo root is dead weight for the running hub. Only
   `tests/record_test.py` loads it, as a regression guard on the ported rules.
 - `npm run deploy` assumes `bun` is installed.
-- `public/horse.html` is not in `public/games.js`, so it is unreachable.

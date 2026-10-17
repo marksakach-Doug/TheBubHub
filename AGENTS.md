@@ -16,10 +16,10 @@ Two kinds of game:
 | Lives in | `games/<id>/index.js` | `public/<name>.html` |
 | Registered by | dropping it in `games/` | one line in `public/games.js` |
 | Reaches the hub via | `api.send()` → `reduce()` → `project()` | a `postMessage` bridge |
-| Test it with | a `dev.html` harness | open the file |
+| Test it with | a suite in `test.sh` | open the file |
 
-`games/dotreturn/` is the one real module game, with its own harness and
-tests — copy it to start a new one. The six exports every module game needs
+`games/dotreturn/` is the reference module game, with its own test suite — copy
+it to start a new one. The six exports every module game needs
 (`meta`, `init`, `reduce`, `project`, `mount`, `summarize`, plus the optional
 `roundId` and `prune`) are listed in the contract table above.
 
@@ -43,22 +43,15 @@ bun run test          # everything: syntax, secrets, record sentences, rules, pl
 bun run test:syntax   # offline, no browser needed
 ```
 
-**Always run `bun run test` before you say you are done.** Eight suites; the
-browser ones need Playwright + Chromium (`pip install playwright &&
-playwright install chromium`). A new test belongs in `test.sh` in the same
-commit as the code it covers — an unwired test is a test nobody runs.
+**Always run `bun run test` before you say you are done.** The offline suites
+run anywhere; the browser ones need Playwright + Chromium (`pip install
+playwright && playwright install chromium`). A new test belongs in one of
+`test.sh`'s two suite tables in the same commit as the code it covers — an
+unwired test is a test nobody runs.
 
-To actually *play* a module game you are changing, use its harness:
-
-```bash
-bun run serve   # or: python3 -m http.server 5173
-# http://localhost:5173/games/dotreturn/dev.html
-```
-
-That imports the real `index.js` behind a fake hub. Edit, hit F5, play. Copy
-`games/dotreturn/dev.html` when you add a game. Two rules: never send anything
-from inside `mount()` (the hub has not assigned the handle yet — send from the
-first `update()`), and never let an intent sent mid-frame start a second
+Two rules that bite every module game: never send anything from inside
+`mount()` (the hub has not assigned the handle yet — send from the first
+`update()`), and never let an intent sent mid-frame start a second
 `requestAnimationFrame` loop.
 
 ## Deploying
