@@ -560,6 +560,11 @@ function resolveDropBoth(){
     say(`${pn(p)} discards both (${pk.cards.map(wname).join(' + ')}).`);
     S.pick = null;
     S.pend = null;
+    // Neutralize the phase BEFORE chaining: chainNext() can reach endTurn(),
+    // which leaves phase untouched for its 500ms grace window. Without this,
+    // the immediate broadcast()->render() saw phase 'pick' with S.pick null
+    // and crashed on `S.pick.who`. next() re-sets the phase if it queues work.
+    S.phase = 'choose';
     return chainNext();
 }
 // Narsil (K) cannot be discarded or stashed while another weapon is equipped
@@ -660,6 +665,11 @@ const rematch = () => { if (isHost() && S) startGame(S.cfg.dread); };
 function endTurn(){
     if (S.turnEnding) return;
     S.turnEnding = true;
+    // The only object cleared before the grace timeout is S.pick, so a stale
+    // 'pick' phase would render with S.pick null. Neutralize just that phase;
+    // 'fight' is left alone so the scoreboard keeps showing the resolved
+    // fight's Power-vs-Monsters result through the grace window.
+    if (S.phase === 'pick') S.phase = 'choose';
     setTimeout(() => {
         if (!S || !S.turnEnding) return;
         S.fight = null; S.pick = null; S.boss = null; S.q = [];
@@ -874,6 +884,7 @@ function handle(d){
         return continueBossAfterAck();
     }
     if (S.phase === 'pick'){
+        if (!S.pick) return null;
         if (S.pick.who !== d.pid) return 'Waiting for ' + S.pl.find(x => x.id === S.pick.who).name + ' to pick.';
         if (a === 'dropboth') return resolveDropBoth();
         if (a !== 'keep') return 'Waiting for ' + S.pl.find(x => x.id === S.pick.who).name + ' to pick.';
@@ -1028,7 +1039,7 @@ function myAction(){
     if (ph === 'choose' || ph === 'fight') return cur().id === myId() || (ph === 'fight' && f.ask && !f.helper && p.eq.length > 0);
     if (ph === 'boss') return !S.boss.ch[myId()];
     if (ph === 'bossresult') return bossAckId() === myId();
-    if (ph === 'pick') return S.pick.who === myId();
+    if (ph === 'pick') return !!S.pick && S.pick.who === myId();
     if (ph === 'hreward') return f.helper === myId();
     if (ph === 'decide') return !!(S.pend && S.pend.who === myId());
     return false;
@@ -1047,7 +1058,11 @@ function waitingText(){
         const w = S.pl.find(x => x.id === bossAckId());
         return [`${w ? pn(w) : 'Someone'} is confirming the Dragon result`, 'Team vs Dragon breakdown above.'];
     }
-    if (S.phase === 'pick') return [`Waiting for ${S.pl.find(x => x.id === S.pick.who).name} to keep a card (${S.pick.why || 'Explore'})`, 'Draw 2 Loot, keep 1.'];
+    if (S.phase === 'pick'){
+        if (!S.pick) return ['Please wait', 'The draw is resolving.'];
+        const w = S.pl.find(x => x.id === S.pick.who);
+        return [`Waiting for ${w ? pn(w) : 'someone'} to keep a card (${S.pick.why || 'Explore'})`, 'Draw 2 Loot, keep 1.'];
+    }
     if (S.phase === 'hreward') return [`Waiting for the helper to choose`, 'Draw 1 Loot or gain 1 Level.'];
     if (S.phase === 'fight'){
         const f = S.fight;
@@ -1173,7 +1188,7 @@ function render(){
 
     let ar = '';
     let arFloat = false;
-    if (ph === 'pick'){
+    if (ph === 'pick' && S.pick){
         const who = S.pl.find(x => x.id === S.pick.who);
         const picking = S.pick.who === myId() && !paused;
         arFloat = true;
@@ -1260,18 +1275,21 @@ function render(){
     const canAsk = !turnBlocked && ph === 'fight' && mine && f && !f.ask && helpAvailable();
     const canPush = !turnBlocked && ph === 'fight' && mine && f && !f.pushed && !f.ask && (power(c) + (f.helper ? power(S.pl.find(x => x.id === f.helper)) : 0) >= total());
     const canResolve = !turnBlocked && ph === 'fight' && mine && f;
-    const canHelp = !turnBlocked && ph === 'fight' && p && !p.gone && f && f.ask && !f.helper && p.eq.length > 0;
+    const canHelp = !turnBlocked && ph === 'fight' && p && !p.gone && !mine && f && f.ask && !f.helper && p.eq.length > 0;
     const canHr = !turnBlocked && ph === 'hreward' && f && f.helper === myId();
     const askTip = (ph === 'fight' && mine && f && !f.ask && !helpAvailable())
         ? 'No one has an equipped weapon to help.'
         : 'A teammate adds their weapon Power. They share the spoils.';
+    const helpTip = (ph === 'fight' && mine)
+        ? 'You cannot help yourself.'
+        : `Add +${p ? power(p) : 0} Power to ${c ? pn(c) : 'pilot'}. Win: draw 1 Loot or gain 1 Level. Lose: you discard too.`;
     let ac = `<div class="lr-cards lr-btnrow" style="justify-content:center">` +
         bigBtn('explore', '🔍', 'Explore', 'Safe · keep 1 of 2 Loot cards · no Levels either way.', 'k', '', !canExplore) +
         bigBtn('fight', '⚔️', 'Fight', 'Win 1 Level (2 if you push your luck) · lose = discard a weapon · ' + (c ? fightOdds(c) : '') + '.', '', '', !canFightBtn) +
         bigBtn('ask', '📯', 'Ask', askTip, 'k', '', !canAsk) +
         bigBtn('push', '🎲', 'Push', 'Flip one more Monster beyond the requirement. Win counts double.', 'k', '', !canPush) +
         bigBtn('resolve', '⚖️', 'Resolve', (f && (ph === 'fight' || ph === 'hreward')) ? `Power ${power(c) + (f.helper ? power(S.pl.find(x => x.id === f.helper)) : 0)} vs Monsters ${total()}. Exact ties win.` : 'Resolve the current fight. Exact ties win.', '', '', !canResolve) +
-        bigBtn('help', '🤝', 'Help', `Add +${p ? power(p) : 0} Power to ${c ? pn(c) : 'pilot'}. Win: draw 1 Loot or gain 1 Level. Lose: you discard too.`, '', '', !canHelp) +
+        bigBtn('help', '🤝', 'Help', helpTip, '', '', !canHelp) +
         bigBtn('hr', '🃏', 'Loot', 'Take a card from the black deck into your gear.', '', 'data-j="loot"', !canHr) +
         bigBtn('hr', '⬆️', '+Level', 'Closer to 15, right now.', 'k', 'data-j="lvl"', !canHr);
     if (ph === 'boss' && S.boss){
