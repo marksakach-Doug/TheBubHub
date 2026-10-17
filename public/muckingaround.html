@@ -33,7 +33,7 @@ input{flex:1 1 auto;min-width:0;padding:8px 12px;background:#1e293b;color:#fff;b
     <button id="bs">Say</button>
   </div>
   <p class="hint" id="hint"></p>
-  <details class="hint"><summary>Keys</summary>Q frown · W flip · E wider · R thinner · T bounce · Y jut forward · U grow legs · I A440 beep · O everyone piggybacks on you · P cockeyed top hat · A jump · S big mouth · D plant seed · H cycle colour · J burst and respawn · K horse look · L arpeggio · Z spider · X rabbit ears · C mini and speedy · V roll · B measuring tape (press to set, again to measure) · N xylophone (tap bars, anyone can play) · M grow. Space pick up, F use, G sit.</details>
+  <details class="hint"><summary>Keys</summary>Q frown · W flip · E wider · R thinner · T bounce · Y jut forward · U grow legs · I A440 beep · O everyone piggybacks on you · P cockeyed top hat · A jump · S big mouth · D plant seed · H cycle colour · J burst and respawn · K horse look · L arpeggio · Z spider · X rabbit ears · C mini and speedy · V roll · B measuring tape (press to set, again to measure) · N xylophone (tap bars, anyone can play) · M axe (F chops grown trees into logs). Space pick up, F use, G sit.</details>
 </div>
 <script>
 (function(){
@@ -41,7 +41,7 @@ input{flex:1 1 auto;min-width:0;padding:8px 12px;background:#1e293b;color:#fff;b
 var GID='mucking',W=400,H=640;
 var POND={x:150,y:430,rx:120,ry:90},TREE={x:310,y:130},TREEB={x:310,y:204},BENCH={x:65,y:200};
 var ICON={note:'📝',apple:'🍎',ball:'🏐',flower:'🌼',lantern:'🏮',stick:'🪵',boot:'🥾',fish:'🐟'};
-var ACT={eat:'😋',sniff:'💛',fish:'🎣',ripple:'〰️',poke:'…',glow:'✨',throw:'💨',wave:'👋',show:'✨',flop:'💦',hop:'🤗',fall:'💫',flip:'🔄',wide:'↔️',thin:'↕️',jump:'⬆️',legs:'🦵',beep:'🎵',piggy:'🐷',hat:'🎩',mouth:'😮',plant:'🌱',color:'🎨',burst:'💥',respawn:'✨',horse:'🐴',arp:'🎶',spider:'🕷️',ears:'🐰',sneeze:'🤧',ufo:'🛸',jelly:'🍮',pancake:'🥞',confetti:'🎉',mini:'🔍',roll:'🌀',tape:'📏',xylo:'🎹',grow:'📈'};
+var ACT={eat:'😋',sniff:'💛',fish:'🎣',ripple:'〰️',poke:'…',glow:'✨',throw:'💨',wave:'👋',show:'✨',flop:'💦',hop:'🤗',fall:'💫',flip:'🔄',wide:'↔️',thin:'↕️',jump:'⬆️',legs:'🦵',beep:'🎵',piggy:'🐷',hat:'🎩',mouth:'😮',plant:'🌱',color:'🎨',burst:'💥',respawn:'✨',horse:'🐴',arp:'🎶',spider:'🕷️',ears:'🐰',sneeze:'🤧',ufo:'🛸',jelly:'🍮',pancake:'🥞',confetti:'🎉',mini:'🔍',roll:'🌀',tape:'📏',xylo:'🎹',grow:'📈',axe:'🪓',chop:'🪓',fire:'🔥',feed:'🔥',burn:'🔥'};
 var $=function(i){return document.getElementById(i)};
 
 var F='english-vietnamese.txt',SIZE=0,WHOLE=null,A=64,dec=new TextDecoder('utf-8');
@@ -193,7 +193,23 @@ function collapse(root){
 }
 function useItem(id,p){
   var it=heldBy(id);
-  if(!it){act(p,'wave');return}
+  if(!it){if(p.ax)chop(id,p);else act(p,'wave');return}
+  if(it.k==='stick'){
+    // a log still fishes in the pond; anywhere else it starts or feeds a fire
+    if(inPond(p.x,p.y)||inPond(p.x+p.f*45,p.y)){
+      if(Math.random()<.5&&S.it.length<18){addItem(Math.random()<.5?'fish':'boot',p.x+p.f*30,p.y+8);act(p,'fish')}
+      else act(p,'ripple');
+      return;
+    }
+    S.it.splice(S.it.indexOf(it),1);
+    var f=nearFire(p,72);
+    if(f){f.fuel=(f.fuel||0)+50;act(p,'feed')}
+    else{addItem('fire',p.x+p.f*18,p.y+8);var nf=S.it[S.it.length-1];nf.fuel=70;nf.l=1;act(p,'fire')}
+    return;
+  }
+  // anything else you hold can be thrown on the fire and burned away
+  var fr=nearFire(p,72);
+  if(fr){S.it.splice(S.it.indexOf(it),1);act(p,'burn');return}
   if(it.k==='apple'){
     S.it.splice(S.it.indexOf(it),1);act(p,'eat');
     setTimeout(function(){if(S&&isHost()&&S.it.length<18)addItem('apple',rnd(270,350),rnd(212,245))},20000);
@@ -201,12 +217,7 @@ function useItem(id,p){
     it.b=null;it.x=cl(p.x+p.f*90,20,W-20);it.y=cl(p.y+rnd(-20,20),40,H-20);act(p,'throw');
   }else if(it.k==='flower'){act(p,'sniff')}
   else if(it.k==='lantern'){it.l=it.l?0:1;act(p,'glow')}
-  else if(it.k==='stick'){
-    if(inPond(p.x,p.y)||inPond(p.x+p.f*45,p.y)){
-      if(Math.random()<.5&&S.it.length<18){addItem(Math.random()<.5?'fish':'boot',p.x+p.f*30,p.y+8);act(p,'fish')}
-      else act(p,'ripple');
-    }else act(p,'poke');
-  }else act(p,it.k==='fish'?'flop':'show');
+  else act(p,it.k==='fish'?'flop':'show');
 }
 function onIntent(d,from){
   if(!S||!d||!from||!S.p[from.id])return;
@@ -219,12 +230,12 @@ function onIntent(d,from){
   else if(d.a==='say'){var t=String(d.t||'').slice(0,90);if(t){p.say=t;p.sq=(p.sq||0)+1}}
   else if(d.a==='take'){
     if(heldBy(id))return;
-    S.it.forEach(function(it){if(it.i===d.i&&!it.b&&!it.pl&&Math.hypot(it.x-p.x,it.y-p.y)<90)it.b=id});
+    S.it.forEach(function(it){if(it.i===d.i&&!it.b&&!it.pl&&it.k!=='fire'&&Math.hypot(it.x-p.x,it.y-p.y)<90)it.b=id});
   }else if(d.a==='drop'){
     var h=heldBy(id);if(h){h.b=null;h.x=cl(p.x+p.f*24,20,W-20);h.y=cl(p.y+14,40,H-20)}
   }else if(d.a==='use'){useItem(id,p)}
   else if(d.a==='fx'){doFx(id,p,d.k)}
-  else if(d.a==='xn'){p.xi=cl(d.i|0,0,4);act(p,'xy')}
+  else if(d.a==='xn'){p.xi=cl(d.i|0,0,XN-1);act(p,'xy')}
   else if(d.a==='ride'){
     var t2=S.p[d.to];
     if(p.r||p.tr||!t2||d.to===id||t2.tr)return;
@@ -256,7 +267,7 @@ setInterval(function(){
 
 // ---------- tricks (Q to M) ----------
 var GROW=['🌰','🌱','🌿','🌳'];
-var FXKEY={q:'frown',w:'flip',e:'wide',r:'thin',t:'bounce',y:'jut',u:'legs',i:'beep',o:'piggy',p:'hat',a:'jump',s:'mouth',d:'seed',h:'color',j:'burst',k:'horse',l:'arp',z:'spider',x:'ears',c:'mini',v:'roll',b:'tape',n:'xylo',m:'grow'};
+var FXKEY={q:'frown',w:'flip',e:'wide',r:'thin',t:'bounce',y:'jut',u:'legs',i:'beep',o:'piggy',p:'hat',a:'jump',s:'mouth',d:'seed',h:'color',j:'burst',k:'horse',l:'arp',z:'spider',x:'ears',c:'mini',v:'roll',b:'tape',n:'xylo',m:'axe'};
 var FXD={frown:900,flip:2000,bounce:900,jut:400,jump:600,jelly:700,pancake:1200,sneeze:600,confetti:1000,fall:900,respawn:500};
 var ARPS=[[0,4,7,12],[0,3,7,10,12],[0,5,9,12,17],[12,7,4,0],[0,7,4,9,5,12]];
 var AC=null;
@@ -272,7 +283,8 @@ function tone(f,t0,dur,vol,f1){
   }catch(e){}
 }
 // Sound plays on every client that sees the press, so others hear it too.
-var XF=[523.25,587.33,659.25,783.99,880];
+// A complete C major scale, one note per bar (do re mi fa sol la ti do).
+var XF=[523.25,587.33,659.25,698.46,783.99,880,987.77,1046.50];
 // Xylophone-style note for jump and bounce, the same timbre as the xylophone bars.
 function playSfx(k,n,xi){
   switch(k){
@@ -301,6 +313,11 @@ function playSfx(k,n,xi){
     case 'ears':tone(400,0,0.2,0.15,800);break;
     case 'grow':tone(200,0,0.8,0.15,500);break;
     case 'piggy':tone(300,0,0.25,0.15,200);break;
+    case 'axe':tone(700,0,0.08,0.15,1000);tone(1000,0.09,0.08,0.12,1400);break;
+    case 'chop':tone(180,0,0.18,0.3,90);break;
+    case 'fire':tone(140,0,0.5,0.2,60);break;
+    case 'feed':tone(120,0,0.3,0.2,70);break;
+    case 'burn':tone(500,0,0.4,0.15,120);break;
   }
 }
 // Big players are louder, small players quieter.
@@ -316,6 +333,23 @@ function piggy(id,p){
 function plant(p){
   addItem('seed',p.x+p.f*22,p.y+12);
   var it=S.it[S.it.length-1];it.pl=1;it.d=0;
+}
+// nearest burning campfire within r, or null
+function nearFire(p,r){
+  var best=null,bd=r;
+  S.it.forEach(function(f){if(f.k!=='fire'||(f.fuel|0)<=0)return;var d=Math.hypot(f.x-p.x,f.y-p.y);if(d<bd){bd=d;best=f}});
+  return best;
+}
+// swing the axe at the nearest fully-grown planted tree, felling it into logs
+function chop(id,p){
+  var best=null,bd=70;
+  S.it.forEach(function(it){if(it.b||!it.pl||(it.d|0)<3)return;var d=Math.hypot(it.x-p.x,it.y-p.y);if(d<bd){bd=d;best=it}});
+  if(best){
+    S.it.splice(S.it.indexOf(best),1);
+    addItem('stick',best.x,best.y);
+    addItem('stick',cl(best.x+rnd(-14,14),20,W-20),cl(best.y+10,40,H-20));
+    act(p,'chop');
+  }else act(p,'axe');
 }
 function burst(id,p){
   p.pop=1;
@@ -348,6 +382,7 @@ function doFx(id,p,k){
     case 'mini':p.mi=p.mi?0:1;act(p,k);break;
     case 'roll':p.rl=p.rl?0:1;act(p,k);break;
     case 'grow':p.gr=(p.gr||1)*1.3;act(p,k);break;
+    case 'axe':p.ax=p.ax?0:1;act(p,k);break;
     case 'xylo':S.xy=!S.xy;act(p,k);break;
     case 'tape':
       if(p.ta0){var L=Math.round(Math.hypot(p.x-p.ta0.x,p.y-p.ta0.y)*2.5);p.ta0=null;p.say=L+' cm';p.sq=(p.sq||0)+1}
@@ -360,6 +395,24 @@ setInterval(function(){
   if(!S||!isHost())return;
   S.it.forEach(function(it){if(it.pl&&it.d<3)it.d++});
 },15000);
+// campfires burn down, light the dark, and singe anyone standing too close
+var FIRE_R=46,FIRE_STEP=250;
+setInterval(function(){
+  if(!S||!isHost())return;
+  S.it=S.it.filter(function(f){
+    if(f.k!=='fire')return true;
+    f.fuel=(f.fuel||0)-1;
+    return f.fuel>0;
+  });
+  Object.keys(S.p).forEach(function(id){var p=S.p[id];if(p.br>0)p.br=Math.max(0,p.br-FIRE_STEP)});
+  S.it.forEach(function(f){
+    if(f.k!=='fire')return;
+    Object.keys(S.p).forEach(function(id){
+      var p=S.p[id];
+      if(Math.hypot(f.x-p.x,f.y-p.y)<FIRE_R){p.br=1000;p.bx=f.x;p.by=f.y}
+    });
+  });
+},FIRE_STEP);
 // spiders wander, then fade out and vanish
 setInterval(function(){
   if(!S||!isHost()||!S.sp||!S.sp.length)return;
@@ -378,13 +431,14 @@ function drawSpider(sp,now){
   ctx.globalAlpha=1;
 }
 
-var XH=[0,0,0,0,0],XYB=[100,150,200,250,300],XY_Y=582,XY_W=44,XY_H=48;
-function xyHit(x,y){for(var i=0;i<5;i++){if(x>=XYB[i]&&x<=XYB[i]+XY_W&&y>=XY_Y&&y<=XY_Y+XY_H)return i}return -1}
+var XN=8,XH=[0,0,0,0,0,0,0,0],XYB=[],XY_Y=582,XY_W=34,XY_H=48;
+(function(){for(var i=0;i<XN;i++)XYB[i]=46+i*39})();
+function xyHit(x,y){for(var i=0;i<XN;i++){if(x>=XYB[i]&&x<=XYB[i]+XY_W&&y>=XY_Y&&y<=XY_Y+XY_H)return i}return -1}
 function drawXylo(now){
-  ctx.fillStyle='#8b5a2b';ctx.fillRect(90,XY_Y-8,264,XY_H+16);
-  for(var i=0;i<5;i++){
+  ctx.fillStyle='#8b5a2b';ctx.fillRect(30,XY_Y-8,340,XY_H+16);
+  for(var i=0;i<XN;i++){
     var hit=now-XH[i]<200;
-    ctx.fillStyle=hit?'#fde68a':['#f59e0b','#fbbf24','#f59e0b','#fbbf24','#f59e0b'][i];
+    ctx.fillStyle=hit?'#fde68a':(i%2?'#fbbf24':'#f59e0b');
     ctx.fillRect(XYB[i],XY_Y,XY_W,XY_H);
   }
 }
@@ -454,12 +508,20 @@ function drawItem(it,now){
   var inP=inPond(it.x,it.y),yy=it.y+(inP?Math.sin(now/500+it.i)*2.5:0);
   if(!inP&&!it.pl){ctx.fillStyle='rgba(0,0,0,.15)';ctx.beginPath();ctx.ellipse(it.x,it.y+10,9,3.5,0,0,7);ctx.fill()}
   if(it.k==='seed'){var g=Math.min(3,it.d|0);emoji(GROW[g],it.x,yy,[24,36,70,140][g]);return}
+  if(it.k==='fire'){
+    var fl=Math.min(1,(it.fuel||0)/70),fs=30+8*fl+Math.sin(now/90+it.i)*3;
+    ctx.fillStyle='rgba(255,150,40,'+(.12+.14*fl)+')';ctx.beginPath();ctx.arc(it.x,yy,fs+12,0,7);ctx.fill();
+    emoji('🪵',it.x-9,yy+7,20);emoji('🪵',it.x+9,yy+7,20);
+    emoji('🔥',it.x,yy-6,fs);
+    return;
+  }
   emoji(ICON[it.k],it.x,yy,24);
 }
 function drawP(id,p,x,y,a,f,mv,lev,z,now){
   var s=seen[id],fx=null;
   if(s&&s.k&&FXD[s.k]&&now-s.at<FXD[s.k])fx={k:s.k,t:now-s.at,d:FXD[s.k]};
   if(p.pop){emoji('✨',x,y-14,18);return}
+  var burning=(p.br||0)>0;
   var fe=fx?fx.t/fx.d:0,ox=0,ang=0,sx=p.wd||1,sy=1,sc=(p.gr||1)*(p.mi?.55:1);
   var sw=lev===0&&a<2&&inPond(x,y),bob=sw?Math.sin(now/350)*1.5:(mv&&!p.rl&&!z&&!lev&&a<2?Math.abs(Math.sin(now/110))*3:0);
   if(lev===0&&!sw){ctx.fillStyle='rgba(0,0,0,'+(a>2?.1:.18)+')';ctx.beginPath();ctx.ellipse(x,y+14,12,4.5,0,0,7);ctx.fill()}
@@ -506,10 +568,17 @@ function drawP(id,p,x,y,a,f,mv,lev,z,now){
       ctx.beginPath();ctx.arc(x,by,14,0,7);ctx.fill();
       ctx.fillStyle='#223';ctx.beginPath();ctx.arc(x+f*5-3,by-3,2,0,7);ctx.arc(x+f*5+4,by-3,2,0,7);ctx.fill();
       ctx.beginPath();
-      if(p.mo){ctx.ellipse(x+f*5,by+7,3.5,5,0,0,7);ctx.fill()}
+      if(p.mo||burning){ctx.ellipse(x+f*5,by+7,3.5,5,0,0,7);ctx.fill()}
       else if(fx&&fx.k==='frown'){ctx.arc(x+f*5,by+9,4,Math.PI+.6,2*Math.PI-.6);ctx.stroke()}
       else{ctx.arc(x+f*5,by+1,4,.2,2.9);ctx.stroke()}
+      if(burning){
+        var ba=Math.atan2((p.by||by)-by,(p.bx||x)-x);
+        ctx.fillStyle='#e11d48';ctx.strokeStyle='#7f1d1d';ctx.lineWidth=1;
+        ctx.beginPath();ctx.arc(x+Math.cos(ba)*13,by+Math.sin(ba)*13,3.5,0,7);ctx.fill();ctx.stroke();
+        ctx.fillStyle='hsl('+((hue(id)+(p.hu||0))%360)+',60%,68%)';
+      }
     }
+    if(p.ax){ctx.save();ctx.translate(x+f*17,by-24);ctx.rotate(f*.5);emoji('🪓',0,0,24);ctx.restore()}
     if(p.th){ctx.save();ctx.translate(x+f*2,by-22);ctx.rotate(-.35*f);emoji('🎩',0,0,26);ctx.restore()}
   }
   ctx.restore();
@@ -581,7 +650,7 @@ function pick(){
   if(!S)return;
   if(heldBy(myId())){send({a:'drop'});return}
   var best=null,bd=70;
-  S.it.forEach(function(it){if(it.b||it.pl)return;var d=Math.hypot(it.x-me.x,it.y-me.y);if(d<bd){bd=d;best=it}});
+  S.it.forEach(function(it){if(it.b||it.pl||it.k==='fire')return;var d=Math.hypot(it.x-me.x,it.y-me.y);if(d<bd){bd=d;best=it}});
   if(best)send({a:'take',i:best.i});
 }
 function useIt(){
