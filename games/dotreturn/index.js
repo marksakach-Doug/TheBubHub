@@ -574,8 +574,8 @@ export function mount(root, api) {
   // `over` and get written down.
   //
   // api.setTimeout is what the hub's stage injects so it can cancel the timer
-  // on teardown; fall back to the global for harnesses and dev.html, which
-  // only supply raf/cancelRaf. clearTimeout cancels either one.
+  // on teardown; fall back to the global for a host page that only supplies
+  // raf/cancelRaf. clearTimeout cancels either one.
   const setT = api.setTimeout || setTimeout;
 
   function armEndTimer() {

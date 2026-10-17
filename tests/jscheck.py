@@ -82,8 +82,8 @@ def main(argv):
         # Legacy iframe games live in public/ and carry their rules in inline
         # <script> blocks — they moved out of the repo root when v10 adopted
         # Vite, so we need recursing here too or they stop being checked.
-        # games/**/*.html is the per-game dev harnesses (dotreturn/dev.html),
-        # which are the only other place game-adjacent JS is written inline.
+        # games/**/*.html is for inline-JS tooling that lives beside a game,
+        # e.g. games/hook/phrase-builder.html.
         targets += sorted((root / "public").rglob("*.html"))
         targets += sorted((root / "games").rglob("*.html"))
     # inline <script> blocks come from .html; bare .js files parse as modules
