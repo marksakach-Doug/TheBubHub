@@ -96,9 +96,12 @@ State is cached and restored, so it survives a reload and a late joiner.
 The heart of the game. **Host-side only, and the only place state changes.**
 
 - `action` is whatever object you passed to `api.send()`.
-- `ctx` is `{ from: { id, name }, rng }`.
+- `ctx` is `{ from: { id, name, host }, rng }`.
   - `from.id` is the sender. **Key everything on `id`, never on `name`** — names
     change and get deduplicated mid-session.
+  - `from.host` is true when the sender is the room's host (a solo room has a
+    host too). Gate anything the table shares on it — dealing a new round,
+    skipping a phase, resetting — so one player cannot move everyone.
   - `rng` is a `Math.random` reference handed to you by the hub. Use it instead
     of calling `Math.random()` directly so rolls stay deterministic under a
     seeded replay, and so a bug is reproducible.
@@ -178,6 +181,25 @@ export function roundId(state) { return 'e' + state.epoch; }
 
 Legacy games send the same thing as `inst` in their `result` payload. A game
 with neither still works — it just falls back to a 30-second text limit.
+
+### `prune(state, goneId) → state` (optional)
+
+Called by the host when a player leaves the room, times out, is kicked, or
+moves to a different table. Return the state with that player's seat removed.
+
+Export it when your state has its own membership that the shared pruner cannot
+see. `room/presence.js` only knows Dot Return's `players` / `table` / `dots`;
+Hook keeps an `order` of seats plus `names`, `scores`, `locked`, `subs` and
+`votes`, and without a `prune` a departed player holds a seat forever — which
+matters most in a game with no clock, because a round that waits for everyone
+can then never end. Return the *same object* when there was nothing to remove.
+
+```js
+export function prune(state, goneId) {
+  if (state.order.indexOf(goneId) < 0) return state;
+  return { ...state, order: state.order.filter((id) => id !== goneId) };
+}
+```
 
 ### `summarize(state, nameOf) → string | null`
 

@@ -395,7 +395,26 @@ export async function boot() {
     if (store.mySeat() === null) store.claimFreeSeat(s.me.id);
     store.setPresence(s.me.id, id);
     broadcastRoster();
+    // A guest's roster entry only leaves their own machine, so the host would otherwise hand
+    // the game an empty table and never learn anyone was playing. PRESENCE is how a guest says
+    // "I am at this table" — without it, games see nobody and seat nobody.
+    if (!s.isHost && net) { try { ensureNet().sendToHost(msg(T.PRESENCE, { id: s.me.id, game: id })); } catch (e) {} }
     mountGame(g);
+    saveSession(store.state);
+  }
+
+  // Leaving the game you have open. Presence has to go too: setOpenGame(null) only clears
+  // the local pointer, so the roster kept saying "at What's the Hook?" forever, and the host
+  // never learned the seat was empty.
+  function leaveOpenGame() {
+    const s = store.state;
+    closeStageOnly();
+    store.setOpenGame(null);
+    if (s.inRoom) {
+      store.setPresence(s.me.id, null);
+      if (s.isHost) broadcastRoster();
+      else if (net) { try { ensureNet().sendToHost(msg(T.PRESENCE, { id: s.me.id, game: null })); } catch (e) {} }
+    }
     saveSession(store.state);
   }
 
@@ -454,9 +473,9 @@ export async function boot() {
     const g = byId.get(gameId);
     if (g && g.kind === 'module' && g.module) {
       if (s.isHost || !s.inRoom) {
-        hostReduce(gameId, action, { id: s.me.id, name: s.me.name });
+        hostReduce(gameId, action, { id: s.me.id, name: s.me.name, host: !!s.isHost });
       } else {
-        ensureNet().sendToHost(msg(T.INTENT, { game: gameId, action: action, from: { id: s.me.id, name: s.me.name } }));
+        ensureNet().sendToHost(msg(T.INTENT, { game: gameId, action: action, from: { id: s.me.id, name: s.me.name, host: !!s.isHost } }));
       }
     } else {
       // compat: guest intents go to host iframe; host applies + broadcasts
@@ -464,7 +483,7 @@ export async function boot() {
         compat.down(gameId, 'intent', action);
         // solo: nothing to broadcast
       } else {
-        ensureNet().sendToHost(msg(T.INTENT, { game: gameId, action: action, from: { id: s.me.id, name: s.me.name } }));
+        ensureNet().sendToHost(msg(T.INTENT, { game: gameId, action: action, from: { id: s.me.id, name: s.me.name, host: !!s.isHost } }));
       }
     }
   }
@@ -617,7 +636,12 @@ export async function boot() {
       saveName();
     } else if (m.type === T.PRESENCE) {
       if (s.isHost) {
-        store.setPresence(m.p.id, m.p.game || null);
+        // Someone who was at one table and is now at another (or at none) must stop
+        // holding a seat there, or the table they left waits on them forever.
+        const was = (s.roster.find(function (r) { return r.id === m.p.id; }) || {}).game || null;
+        const now = m.p.game || null;
+        store.setPresence(m.p.id, now);
+        if (was && was !== now && pruneOneGame(was, m.p.id)) pushRosterToGames();
         broadcastRoster();
         renderRoster();
       }
@@ -727,6 +751,21 @@ export async function boot() {
     }
   }
 
+  // Take one player out of one module game's state. A game may know its own shape better than
+  // the shared helper does (Hook keeps an order/names/scores table, which prunePlayerState
+  // cannot see), so a game's own prune wins. Returns whether anything moved.
+  function pruneOneGame(gameId, goneId) {
+    const st = modState.get(gameId);
+    if (!st || !st.state) return false;
+    const own = (st.mod && typeof st.mod.prune === 'function') ? st.mod.prune : null;
+    let next = own ? own(st.state, goneId) : prunePlayerState(st.state, goneId);
+    if (!next || next.error) return false;        // a game that does not know leave: ignore it
+    if (next === st.state) return false;
+    st.state = next;
+    rebroadcastGame(gameId);
+    return true;
+  }
+
   // Remove one player from every live game table (module) and refresh legacy
   // frames with the corrected roster + snapshots. Finished-round history is
   // kept — only live membership is pruned.
@@ -734,12 +773,7 @@ export async function boot() {
     let changed = false;
     modState.forEach(function (st, gameId) {
       if (!st || !st.state) return;
-      const next = prunePlayerState(st.state, goneId);
-      if (next !== st.state) {
-        st.state = next;
-        changed = true;
-        rebroadcastGame(gameId);
-      }
+      if (pruneOneGame(gameId, goneId)) changed = true;
     });
     pushRosterToGames();
     const s = store.state;
@@ -843,13 +877,13 @@ export async function boot() {
         },
         routeIntent: function (game, action) {
           const s = store.state;
-          const from = { id: s.me.id, name: s.me.name };
+          const from = { id: s.me.id, name: s.me.name, host: !!s.isHost };
           if (s.isHost || !s.inRoom) {
             // host (or solo local host): feed to own frame with sender attached
             compat.down(game, 'intent', action, from);
           } else {
             ensureNet().sendToHost(msg(T.INTENT, {
-              game: game, action: action, from: { id: s.me.id, name: s.me.name }
+              game: game, action: action, from: { id: s.me.id, name: s.me.name, host: !!s.isHost }
             }));
           }
         },
@@ -1006,9 +1040,7 @@ export async function boot() {
     record.wire();
 
     document.getElementById('btn-focus-exit').addEventListener('click', function () {
-      closeStageOnly();
-      store.setOpenGame(null);
-      saveSession(store.state);
+      leaveOpenGame();
     });
     document.getElementById('drawer-close').addEventListener('click', function () {
       document.body.classList.remove('drawer-open');
@@ -1018,8 +1050,7 @@ export async function boot() {
       if (e.key === 'Escape') {
         if (document.body.classList.contains('drawer-open')) document.body.classList.remove('drawer-open');
         else if (stageRoot && !stageRoot.classList.contains('stage-idle')) {
-          closeStageOnly();
-          store.setOpenGame(null);
+          leaveOpenGame();
         }
       }
     });

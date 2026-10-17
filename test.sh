@@ -356,6 +356,28 @@ else
   fi
 fi
 
+# ---- 12c. presence reaches the host (browser) ----
+step "presence — tests/presence_test.py"
+if [ "$BROWSER_OK" = "1" ]; then
+  if python3 tests/presence_test.py; then
+    pass "presence_test"
+  else
+    fail "presence_test"
+    echo "Stopped at first failure." >&2
+    printf '\nResult: %d passed, %d failed, %d skipped\n' "$PASS" "$FAIL" "$SKIPPED"
+    exit 1
+  fi
+else
+  if [ "$SKIP_BROWSER" = "1" ]; then
+    skip "presence_test ($BROWSER_WHY)"
+  else
+    fail "presence_test (no browser: $BROWSER_WHY)"
+    echo "Tip: re-run with --skip-browser for syntax-only checks." >&2
+    printf '\nResult: %d passed, %d failed, %d skipped\n' "$PASS" "$FAIL" "$SKIPPED"
+    exit 1
+  fi
+fi
+
 # ---- 13. chess rules (browser) ----
 step "chess rules — tests/chess_rules.py"
 if [ "$BROWSER_OK" = "1" ]; then

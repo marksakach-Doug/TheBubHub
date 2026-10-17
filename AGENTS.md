@@ -20,8 +20,14 @@ Two kinds of game:
 
 `games/dotreturn/` is the one real module game, with its own harness and
 tests — copy it to start a new one. The six exports every module game needs
-(`meta`, `init`, `reduce`, `project`, `mount`, `summarize`, plus an optional
-`roundId`) are listed in the contract table above.
+(`meta`, `init`, `reduce`, `project`, `mount`, `summarize`, plus the optional
+`roundId` and `prune`) are listed in the contract table above.
+
+Two contract details worth knowing before you write rules: `ctx.from.host`
+tells a reduce whether the sender hosts the table (a solo room has a host), so
+gate anything the whole table shares on it; and export `prune(state, goneId)`
+if your state keeps its own membership, or a player who leaves still holds a
+seat — which deadlocks any round that waits for everyone.
 
 **`games/hook/library.js` is a growing library, on purpose.** Its `PAIRS` array
 is hand-curated: new pairs are pasted in from `games/hook/phrase-builder.html` as
