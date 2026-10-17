@@ -89,27 +89,6 @@ export function dealPair(rng, bag) {
   return { pair: list[index], index, bag: { left, last: index } };
 }
 
-// Progression. A game is a short climb: the early rounds deal the pairs with the fewest notes to choose
-// (the gentlest), the last rounds the longest. Pairs are ranked by how many notes the player chooses
-// (fillCount), the ranking is cut into `rounds` even tiers, and round r deals from tier r. Inside a tier
-// the deal is random, never the pair just played, and it still draws from the shuffled bag first so
-// every pair gets a turn before any repeats. Adding pairs to PAIRS needs no change here.
-export function dealPairFor(rng, bag, round) {
-  const n = PAIRS.length;
-  if (!n) return dealPair(rng, bag);
-  const byEase = PAIRS.map((_, i) => i).sort((a, b) => fillCount(PAIRS[a]) - fillCount(PAIRS[b]) || a - b);
-  const r = round;
-  const lo = 0, hi = n;
-  const tier = byEase, last = bag && bag.last;
-  let left = bag && bag.left && bag.left.length ? bag.left.slice() : shuffle(PAIRS, rng);
-  let pool = tier.filter((i) => i !== last);
-  if (!pool.length) { left = shuffle(PAIRS, rng); pool = tier;
-  // No need to reassign pool if it's already populated
-  const index = pool[Math.floor(rng() * pool.length)];
-  return { pair: PAIRS[index], index, bag: { left: left, last: index } };
-}
-}
-
 // The rhythm template the hook uses: the pair's own hook rhythm if it has one, else the intro itself.
 // `bridge` is the data key inside a pair — the wording on screen is "hook", the key is what the
 // phrase-builder exports and what every pasted pair carries, so it stays. Accepts a pair

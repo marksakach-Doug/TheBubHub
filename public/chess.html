@@ -667,12 +667,12 @@ function driveBot(){
 function renderSetup(){
   const o = others();
   $('setup-sub').textContent = inRoom()
-    ? 'You are White. Start a game and share the room with a friend.'
-    : 'Full rules — castling, en passant, checkmate, stalemate. You are White.';
+    ? 'Play the bot or a friend.'
+    : 'Full rules: castling, en passant, checkmate, stalemate. You are White.';
   $('btn-solo').disabled = false;
   $('btn-two').disabled = !(inRoom() && isHost() && o.length > 0);
   note(inRoom()
-    ? (o.length ? (isHost() ? 'Ready — press Play a friend.' : 'Waiting for the host to start.')
+    ? (o.length ? (isHost() ? 'Ready. Press Play a friend.' : 'Waiting for the host to start.')
                 : 'Waiting for someone to join the room.')
     : 'No room — the bot is Black.');
 }
