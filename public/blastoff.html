@@ -410,7 +410,8 @@ function resolveFight(p, helperId, path){
 
     // Snapshot the score before anything moves so the result card can show the
     // change. Without this you have to remember what you were on last turn.
-    const before = p.score;
+    const scorer = (win && h) ? h : p;
+    const before = scorer.score;
     // Which pilots this flight involved, and what power each contributed.
     const parts = [{ name: pn(p), power: shipVal }];
     if (h) parts.push({ name: pn(h), power: helperVal });
@@ -418,12 +419,18 @@ function resolveFight(p, helperId, path){
     say(`${pn(p)}${h ? ' + ' + pn(h) : ''}: Power ${totalPower} vs Destination ${destSum} — ${win ? 'Success!' : 'Failure!'}`);
 
     if (win){
-        p.score += dests.length;
-        say(`${pn(p)} collects ${dests.length} red card(s)!`);
+        scorer.score += dests.length;
+        say(`${pn(scorer)} collects ${dests.length} red card(s)!`);
         if (h) {
             const ns = drawShip();
-            h.ship = ns;
-            say(`${pn(h)} draws a new ship: ${val(ns)}.`);
+            if (!p.ship || val(ns) > val(p.ship)) {
+                if (p.ship) S.blackDisco.push(p.ship);
+                p.ship = ns;
+                say(`${pn(p)} is rescued and upgrades to a new ship: ${val(ns)}!`);
+            } else {
+                S.blackDisco.push(ns);
+                say(`${pn(p)} is rescued and keeps their current ship (${val(p.ship)} vs drawn ${val(ns)}).`);
+            }
         }
     } else {
         p.ship = null;
@@ -460,7 +467,7 @@ function resolveFight(p, helperId, path){
         lostShip: !win || isBlackHole,
         path,
         before,
-        after: p.score,
+        after: scorer.score,
         key: (S.feedN || 0) + ':' + p.id + ':' + shipVal + ':' + totalPower + ':' + destSum
     };
 
@@ -869,13 +876,13 @@ function render(){
         bigBtn('pathA', '🛡️', 'Normal', 'Ship vs destination. One red card, keep your ship.',
             enough ? 'hint-bounce' : '', '',
             enough ? `Your ship ${shipVal} reaches ${destVal} — this one is safe` : '', !myFight) +
-        bigBtn('pathB', '🤝', 'Share', 'Ask another pilot to combine ships. They may lose theirs too.',
+        bigBtn('pathB', '🤝', 'Share', 'Ask another pilot for a tow. If you win, they get the red card and your ship is saved!',
             !enough && canReachWithHelp ? 'hint-bounce' : '', '',
             !enough && canReachWithHelp ? `You cannot reach ${destVal} alone, but help would` : abHint, !(myFight && others.length)) +
         bigBtn('pathC', '🔥', 'Burner', 'Draw a second destination. Double the cards — and the risk.',
             abOk ? 'hint-flash' : '', '',
             abOk ? `Ship ${shipVal} — likely strong enough for two` : '', !(myFight && abOk)) +
-        bigBtn('decide', '✅', 'Yes', 'Help the other pilot.', '', 'data-i="yes"', '', !myDecide) +
+        bigBtn('decide', '✅', 'Yes', 'Help the other pilot and claim the red card if you win.', '', 'data-i="yes"', '', !myDecide) +
         bigBtn('decide', '❌', 'No', 'Stay in orbit.', 'k', 'data-i="no"', '', !myDecide) +
         `</div>`;
 

@@ -94,19 +94,20 @@ export function dealPair(rng, bag) {
 // (fillCount), the ranking is cut into `rounds` even tiers, and round r deals from tier r. Inside a tier
 // the deal is random, never the pair just played, and it still draws from the shuffled bag first so
 // every pair gets a turn before any repeats. Adding pairs to PAIRS needs no change here.
-export function dealPairFor(rng, bag, round, rounds) {
+export function dealPairFor(rng, bag, round) {
   const n = PAIRS.length;
   if (!n) return dealPair(rng, bag);
   const byEase = PAIRS.map((_, i) => i).sort((a, b) => fillCount(PAIRS[a]) - fillCount(PAIRS[b]) || a - b);
-  const r = Math.min(Math.max(round || 1, 1), rounds) - 1;
-  const lo = Math.floor(r * n / rounds), hi = Math.max(lo + 1, Math.floor((r + 1) * n / rounds));
-  const tier = byEase.slice(lo, hi), last = bag && bag.last;
+  const r = round;
+  const lo = 0, hi = n;
+  const tier = byEase, last = bag && bag.last;
   let left = bag && bag.left && bag.left.length ? bag.left.slice() : shuffle(PAIRS, rng);
-  let pool = tier.filter((i) => left.includes(i) && i !== last);
-  if (!pool.length) { left = shuffle(PAIRS, rng); pool = tier.filter((i) => i !== last); }
-  if (!pool.length) pool = tier;
+  let pool = tier.filter((i) => i !== last);
+  if (!pool.length) { left = shuffle(PAIRS, rng); pool = tier;
+  // No need to reassign pool if it's already populated
   const index = pool[Math.floor(rng() * pool.length)];
-  return { pair: PAIRS[index], index, bag: { left: left.filter((i) => i !== index), last: index } };
+  return { pair: PAIRS[index], index, bag: { left: left, last: index } };
+}
 }
 
 // The rhythm template the hook uses: the pair's own hook rhythm if it has one, else the intro itself.

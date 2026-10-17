@@ -136,6 +136,7 @@ BROWSER_SUITES=(
   "chess captures|chess_captures.py"
   "chess capture play test|chess_capture_play.py"
   "the 96 game play test|t96_play.py"
+  "minigo_test.mjs"
 )
 
 for entry in "${OFFLINE_SUITES[@]}"; do

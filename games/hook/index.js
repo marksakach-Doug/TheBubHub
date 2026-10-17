@@ -26,8 +26,8 @@ export const meta = { id: 'hook', title: "What's the Hook?", players: { min: 1, 
 
 // A fresh round: one matched pair from the shuffled bag (never a random intro + random outro, never the same pair twice running), a scale ('any' pairs get a random one), a new clock.
 // `advance` false deals another pair for the round already under way (a host swap, or a round nobody played).
-function deal(s, rng, now, advance = true) {
-  const round = advance ? s.round + 1 : Math.max(1, s.round);
+function deal(s, rng, now) {
+  const round = s.round + 1;
   const d = dealPairFor(rng, s.bag, round, ROUNDS);
   const pair = d.pair;
   // `dealt` counts every deal, so clients know to clear their draft even when the round number stayed put.
@@ -61,7 +61,7 @@ function toVote(s, rng, now) {
   const miss = {};
   s.order.forEach((p) => { miss[p] = s.locked[p] ? 0 : (s.miss[p] || 0) + 1; });
   const kept = s.order.filter((p) => miss[p] < MISS_OUT), base = { ...s, miss, order: kept.length ? kept : s.order };
-  if (!Object.keys(s.subs).length) return deal({ ...base, last: 'Nobody locked in.', lastWin: [], lastTop: 0, lastSolo: false }, rng, now, false);
+  if (!Object.keys(s.subs).length)     return deal({ ...base, last: 'Nobody locked in.', lastWin: [], lastTop: 0, lastSolo: false }, rng, now);
   return soloish(base) ? { ...base, phase: 'reveal', deadline: deadline(now, VOTE_MS) }
                        : { ...base, phase: 'vote', deadline: deadline(now, VOTE_MS) };
 }
@@ -110,7 +110,7 @@ export function reduce(s, a, ctx) {
   if (a.a === 'newpair') {
     if (!isHost) return { error: 'Only the host deals a new pair.' };
     if (s.phase !== 'play') return { error: 'Not taking hooks right now.' };
-    return { ...deal(s, rng, now, false), note: 'New pair dealt.' };
+    return { ...deal(s, rng, now), note: 'New pair dealt.' };
   }
   if (!s.order.includes(id)) return { error: 'You are watching, not seated.' };
   if (a.a === 'lock') {

@@ -68,5 +68,4 @@ window.BUB_GAMES = [
   // fixed 3:2 canvas, not a document that scrolls.
   { id: 'the96game', file: 'the96game.html', title: 'The 96 Game', players: '3-8', color: '#b5541f', fill: true,
     icon: '🖍️', desc: 'Telephone for the table — one writes, the next draws, the next describes it blind.' },
-    { id:'minigo', title:'MiniGo', file:'minigo.html', icon:'⚫', color:'#c98f55', players:'2', soloable:false, desc:'Go on a tiny 7x7 board.' },
-];
+]
