@@ -1,28 +1,30 @@
 export const meta = {
   id: 'eggs',
   title: 'Eggs',
-  players: '2-8',
+  players: { min: 2, max: 8 },
   color: '#d6a05c',
+  fill: true,
   icon: '🥚',
-  desc: 'Coop brawl',
+  desc: 'Bounce and splat around a chicken coop, growing bigger with beans while you knock rivals off the edge.',
   soloable: true
 };
 
 export function init(ctx) {
-  let players = ctx.atTable.map(p => ({ id: p.id, name: p.name, bot: false }));
-  // Automatically inject a CPU bot if someone opens the game in a solo room
-  if (players.length < 2) {
-    players.push({ id: 'cpu1', name: 'CPU', bot: true });
-  }
   return {
     inputs: {},
     hostState: null,
-    players: players,
+    players: ctx.atTable.map(p => ({ id: p.id, name: p.name, bot: false })),
     matchId: Math.random().toString(36).slice(2)
   };
 }
 
 export function reduce(state, action, ctx) {
+  if (action.type === 'JOIN') {
+    if (!state.players.find(p => p.id === action.player.id)) {
+      return { ...state, players: [...state.players, { ...action.player, bot: false }] };
+    }
+    return state;
+  }
   if (action.type === 'INPUT') {
     return {
       ...state,
@@ -49,6 +51,21 @@ export function roundId(state) {
 export function summarize(state, nameOf) {
   if (!state.hostState || !state.hostState.matchOver || !state.hostState.roundWinner) return null;
   return `${nameOf(state.hostState.roundWinner.id)} won a match of Eggs!`;
+}
+
+// `players` holds objects, not ids, so the hub's prunePlayerState() (which does
+// players.indexOf(goneId)) can never find a leaver. Without this, a departed
+// player keeps a seat in the lobby and leaks their input forever.
+export function prune(state, goneId) {
+  if (!state || !Array.isArray(state.players)) return state;
+  if (!state.players.some(function (p) { return p && p.id === goneId; })) return state;
+  const next = { ...state, players: state.players.filter(function (p) { return p && p.id !== goneId; }) };
+  if (next.inputs && next.inputs[goneId] !== undefined) {
+    const inputs = { ...next.inputs };
+    delete inputs[goneId];
+    next.inputs = inputs;
+  }
+  return next;
 }
 
 export function mount(root, api) {
@@ -85,17 +102,20 @@ export function mount(root, api) {
    {id:'moon',name:'MOON COOP',desc:'Low gravity. Everybody floats.'},
    {id:'ice',name:'ICE RINK',desc:'The perches are slippery.'},
    {id:'turbo',name:'TURBO',desc:'The whole coop runs 25% faster.'},
-   {id:'glass',name:'GLASS EGGS',desc:'Knockback is doubled. Walls hurt.'},
+   {id:'glass',name:'GLASS EGGS',desc:'Damage causes extreme fragility.'},
    {id:'flood',name:'POWER FLOOD',desc:'Power-ups keep dropping in.'},
    {id:'giant',name:'SUPERSIZE',desc:'Everyone starts BIG.'}
   ];
 
   let plats=[], eggs=[], decals=[], parts=[], bombs=[], pus=[];
-  let levelName='world', scene='countdown', mode='stocks', roundT=0, puCD=5, puIdx=0, nest=null, mut=null;
+  let levelName='world', scene='lobby', mode='stocks', roundT=0, puCD=5, puIdx=0, nest=null, mut=null;
   let mover={x:100,y:H-170,w:150,h:16,dx:0,dy:0,sp:45,by:''}, moverD=0, moverSpeed=45, mdriver='';
   let board=null, peg=null;
   let matchOver=false, roundWinner=null, overtime=false, hurryShown=false, lastCount=0;
   let ban=null, lastMutId='', COUNT=2.6, roundNo=0, roundsNeed=3, sceneT=0;
+  
+  let cfg = { rounds: 1, chaos: 1, cpu: 0 };
+  const ROWS = ['match', 'chaos', 'cpu', 'start'];
   
   const NOINP = {ax:0, jump:false, brake:false, up:false, dash:false, item:false};
 
@@ -105,7 +125,7 @@ export function mount(root, api) {
    if(m.id==='moon'){GRAV=GRAV0*0.55;JV=0.78;}
    else if(m.id==='ice'){GFRIC=0.987;ACC_G=520;ACC_A=420;FRIC=0.05;}
    else if(m.id==='turbo'){timeScale=1.25;}
-   else if(m.id==='glass'){DMG_KB=28;}
+   else if(m.id==='glass'){DMG_KB=28;} // Kept for reference but knockback scaling is disabled
    else if(m.id==='flood'){PU_GAP=5;PU_MAX=3;}
    else if(m.id==='giant'){SPAWN_TIER=1;}
   }
@@ -179,7 +199,9 @@ export function mount(root, api) {
    var vn=g.vx*h.nx+g.vy*h.ny;
    if(vn<0){
     var tier=g.bigTier||0;
-    var lethal=950-180*tier, side=800-150*tier;
+    // FRAGILITY OVERHAUL: Damage lowers threshold exponentially instead of knockback multiplier
+    var lethal=950-180*tier - (g.dmg * 3.5);
+    var side=800-150*tier - (g.dmg * 3.5);
     if(g.thrownT>0){lethal-=400;side-=300;}
     var attackerId=(g.thrownT>0&&g.thrownById)?g.thrownById:null;
     var kill=!attackerId&&(g.inv>0||g.starT>0)?false:true;
@@ -187,7 +209,8 @@ export function mount(root, api) {
      g.ground=true;g.jumps=0;
      if(vn<-lethal&&kill){hurt(g,attackerId||undefined,'SPLAT!',26);return true;}
      else if(vn<-650){g.cracks++;g.sq=1;addDmg(g,5);burst(g.x,g.y,6,40,160,.4,2,['#fff'],0);}
-     g.vy*=-0.35*knockMul(g);g.vx*=GFRIC;
+     g.vy*=-0.35; // REMOVED knockMul multiplier so they don't bounce out of bounds arbitrarily
+     g.vx*=GFRIC;
      if(g.jumpBuf>0){g.jumpBuf=0;g.vy=-660*JV*(1-0.12*tier);g.vx+=inp.ax*120;g.ground=false;g.jumps=1;}
     }else{
      g.vx-=1.7*vn*h.nx;g.vy-=1.7*vn*h.ny;
@@ -401,19 +424,19 @@ export function mount(root, api) {
     if(d>R||e.starT>0)return;
     releaseHold(e);dismount(e);
     var f=0.5+0.5*(1-d/R),nx=d>1?dx/d:0,ny=d>1?dy/d:-1;
-    var km=knockMul(e)/(1+0.5*(e.bigTier||0));
+    var heavy=1/(1+0.5*(e.bigTier||0));
     addDmg(e,14);
-    e.vx=e.vx*0.3+nx*520*km*f;e.vy=Math.min(e.vy,0)+ny*520*km*f-200;
+    e.vx=e.vx*0.3+nx*520*heavy*f;e.vy=Math.min(e.vy,0)+ny*520*heavy*f-200; // No knockMul multiplier
     e.thrownT=1.0;e.thrownById=(e.id===b.byId)?null:b.byId;e.shoveT=0;e.jumps=1;e.ground=false;e.inv=0;
    });
   }
 
   function shove(a,b){
    var dir=Math.abs(a.vx)>60?(a.vx>0?1:-1):(a.face||1);
-   var km=knockMul(b),heavy=1/(1+0.5*(b.bigTier||0));
+   var heavy=1/(1+0.5*(b.bigTier||0));
    releaseHold(b);dismount(b);
    addDmg(b,12);
-   b.vx=dir*380*km*heavy+a.vx*0.3;b.vy=-(240*km*heavy)-60;
+   b.vx=dir*380*heavy+a.vx*0.3;b.vy=-(240*heavy)-60; // No knockMul multiplier
    b.thrownT=0.9;b.thrownById=a.id;b.shoveT=0.3;b.sq=-0.4;b.jumps=Math.min(b.jumps,1);b.inv=0;b.ground=false;
    a.vx*=-0.2;a.dashT=0;
    popText(b.x,b.y-30,'BONK!');
@@ -454,9 +477,11 @@ export function mount(root, api) {
    if(b.thrownT>0&&bSpd>350&&!(b.thrownById===a.id&&b.shoveT>0)){hurt(a,b.thrownById||b.id,'THROWN!',30);b.thrownT=0;b.thrownById=null;return;}
    if(a.thrownT>0&&b.thrownT>0){burst((a.x+b.x)/2,(a.y+b.y)/2,16,100,300,.6,3,['#fff','#fca5a5'],0);a.thrownT=0;b.thrownT=0;return;}
    if(rel>700){
-    var av=Math.hypot(a.vx,a.vy)*(aBig?1+0.6*(a.bigTier||0):1),bv=Math.hypot(b.vx,b.vy)*(bBig?1+0.6*(b.bigTier||0):1);
-    if(Math.abs(av-bv)<120){hurt(a,null,'MID-AIR SPLAT!',22);hurt(b,null,'MID-AIR SPLAT!',22);}
-    else if(av>bv)hurt(b,a.thrownById||a.id,'CRUNCHED!',24);else hurt(a,b.thrownById||b.id,'CRUNCHED!',24);
+    // Calculate vulnerability offset based on damage
+    var aVuln = Math.hypot(a.vx,a.vy)*(aBig?1+0.6*(a.bigTier||0):1) - (a.dmg * 3);
+    var bVuln = Math.hypot(b.vx,b.vy)*(bBig?1+0.6*(b.bigTier||0):1) - (b.dmg * 3);
+    if(Math.abs(aVuln-bVuln)<120){hurt(a,null,'MID-AIR SPLAT!',22);hurt(b,null,'MID-AIR SPLAT!',22);}
+    else if(aVuln>bVuln)hurt(b,a.thrownById||a.id,'CRUNCHED!',24);else hurt(a,b.thrownById||b.id,'CRUNCHED!',24);
    }else{
     var rv=(a.vx-b.vx)*dx+(a.vy-b.vy)*dy;
     if(rv>0){a.vx-=dx*rv*0.6;a.vy-=dy*rv*0.6;b.vx+=dx*rv*0.6;b.vy+=dy*rv*0.6;}
@@ -634,9 +659,9 @@ export function mount(root, api) {
     v.x=h.x;v.y=h.y-h.r-26;v.vx=h.vx;v.vy=h.vy;
     if(h.holdT>0.9){
      var dir=h.vx>60?1:(h.vx<-60?-1:(h.face||1));
-     var km=knockMul(v);
+     var heavy=1/(1+0.5*(v.bigTier||0));
      v.heldBy=-1;h.holding=-1;h.holdT=0;h.throwCD=1.2;
-     v.vx=h.vx+dir*620*km;v.vy=-560*km;v.inv=0;v.thrownT=1.4;v.thrownById=h.id;v.jumps=1;
+     v.vx=h.vx+dir*620*heavy;v.vy=-560*heavy;v.inv=0;v.thrownT=1.4;v.thrownById=h.id;v.jumps=1;
      popText(v.x,v.y-26,'THROW!');
      burst(v.x,v.y,10,80,260,.5,3,['#fff','#fca5a5'],0);
     }
@@ -654,7 +679,7 @@ export function mount(root, api) {
   function startRound(){
    roundNo++;
    mut=null;
-   if(Math.random()<0.8)mut=pickMut();
+   if(cfg.chaos && Math.random()<0.8)mut=pickMut();
    lastMutId=mut?mut.id:'';
    applyMut(mut);
    newWorld();
@@ -664,18 +689,10 @@ export function mount(root, api) {
     g.inv=COUNT+1.5;
    });
    feed=[];scene='countdown';sceneT=0;roundT=0;overtime=false;hurryShown=false;lastCount=0;matchOver=false;roundWinner=null;
-   var sub=(mut?mut.name+' — '+mut.desc:MODES[0].desc);
-   ban={text:(roundsNeed>1?'ROUND '+roundNo:MODES[0].name),sub:sub,t:0,dur:COUNT,col:'#ffd23f'};
+   var sub=(mut?mut.name+' — '+mut.desc:'STOCKS - Three lives each.');
+   ban={text:(roundsNeed>1?'ROUND '+roundNo:'STOCKS'),sub:sub,t:0,dur:COUNT,col:'#ffd23f'};
   }
 
-  function leader(key){
-   var best=null,tie=false;
-   eggs.forEach(function(e){
-    if(!best||e[key]>best[key]){best=e;tie=false;}
-    else if(e[key]===best[key])tie=true;
-   });
-   return tie?null:best;
-  }
   function endRound(w){
    scene='roundEnd';sceneT=0;
    roundWinner = w ? { id: w.id, name: w.name } : null;
@@ -768,7 +785,7 @@ export function mount(root, api) {
    return{x:MOVER_PTS[0][0],y:MOVER_PTS[0][1]};
   }
 
-  let toastMsg={t:0,text:''}, feed=[];
+  let feed=[];
   function addFeed(s){feed.push({t:0,text:s});if(feed.length>5)feed.shift();}
 
   var coopCv=null;
@@ -867,10 +884,56 @@ export function mount(root, api) {
    ctx.restore();
   }
 
+  function drawBomb(x,y,s,t){
+   ctx.save();ctx.translate(x,y);ctx.scale(s,s);
+   ctx.fillStyle='#2b2b2b';ctx.beginPath();ctx.arc(0,2,10,0,7);ctx.fill();
+   ctx.strokeStyle='rgba(255,255,255,.25)';ctx.lineWidth=2;ctx.beginPath();ctx.arc(0,2,10,0,7);ctx.stroke();
+   ctx.fillStyle='rgba(255,255,255,.5)';ctx.beginPath();ctx.ellipse(-4,-1,2.2,3.5,-0.5,0,7);ctx.fill();
+   ctx.strokeStyle='#a8895a';ctx.lineWidth=2.5;ctx.beginPath();ctx.moveTo(3,-7);ctx.quadraticCurveTo(8,-14,12,-12);ctx.stroke();
+   var fl=0.6+0.4*Math.sin(t*30);
+   ctx.fillStyle='rgba(255,'+((150+fl*80)|0)+',40,1)';ctx.beginPath();ctx.arc(12,-12,3+fl*2,0,7);ctx.fill();
+   ctx.restore();
+  }
+
+  function drawNest(){
+   if(!nest)return;
+   var t=performance.now()/1000;
+   var col=nest.contested?'#f87171':(nest.holder>=0?colorOf(nest.holder).shell:'#ffd23f');
+   ctx.save();ctx.translate(nest.x,nest.y);
+   var gr=ctx.createRadialGradient(0,0,10,0,0,nest.r);
+   gr.addColorStop(0,'rgba(255,210,63,.30)');gr.addColorStop(1,'rgba(255,210,63,0)');
+   ctx.fillStyle=gr;ctx.beginPath();ctx.arc(0,0,nest.r,0,7);ctx.fill();
+   ctx.strokeStyle=col;ctx.lineWidth=4;
+   ctx.setLineDash([14,10]);ctx.lineDashOffset=-t*30;
+   ctx.beginPath();ctx.arc(0,0,nest.r,0,7);ctx.stroke();
+   ctx.setLineDash([]);
+   txt('NEST',0,-nest.r-10,18,col,'center',900,{w:5,c:'rgba(10,7,4,.85)'});
+   ctx.restore();
+  }
+
   function drawWorld(){
    if(!coopCv)buildCoop();
    ctx.drawImage(coopCv,0,0);
    drawBulb();
+   
+   decals.forEach(function(d){
+    var a=Math.max(0,1-d.t/40);
+    var sc=Math.min(2.4,d.sc||1);
+    ctx.save();ctx.globalAlpha=Math.min(1,a+0.2);ctx.translate(d.x,d.y);
+    ctx.fillStyle='rgba(0,0,0,.35)';
+    ctx.beginPath();ctx.ellipse(0,1.5,22*sc,11*sc,0,0,7);ctx.fill();
+    ctx.fillStyle='rgba(248,250,252,.92)';
+    ctx.beginPath();ctx.ellipse(0,0,(20+((d.seed*37)%8))*sc,(9+((d.seed*53)%5))*sc,0,0,7);ctx.fill();
+    ctx.beginPath();ctx.ellipse(8*((d.seed*7)%1-0.5)*2,2,11*sc,6*sc,0.3,0,7);ctx.fill();
+    ctx.fillStyle='#fbbf24';
+    ctx.beginPath();ctx.ellipse(0,0,8*sc,5.4*sc,0,0,7);ctx.fill();
+    ctx.fillStyle='#f59e0b';
+    ctx.beginPath();ctx.ellipse(0,0,4.4*sc,3*sc,0,0,7);ctx.fill();
+    ctx.restore();
+   });
+   
+   drawNest();
+
    plats.forEach(function(p){
     if(p.w>=W-1)return;
     ctx.save();ctx.translate(p.x,p.y);ctx.rotate(p.a||0);
@@ -883,6 +946,90 @@ export function mount(root, api) {
     ctx.fillStyle='rgba(255,220,160,.35)';ctx.fillRect(-w/2+2,-h/2,w-4,3);
     ctx.restore();
    });
+
+   if(mover){
+    ctx.save();ctx.translate(mover.x,mover.y);
+    ctx.fillStyle='#155e63';ctx.fillRect(-mover.w/2-3,-mover.h/2-3,mover.w+6,mover.h+6);
+    ctx.fillStyle='#3cc3d4';ctx.strokeStyle='#0b3540';ctx.lineWidth=2;
+    ctx.beginPath();ctx.rect(-mover.w/2,-mover.h/2,mover.w,mover.h);ctx.fill();ctx.stroke();
+    ctx.fillStyle='#0b3540';
+    for(var mi=-mover.w/2+14;mi<mover.w/2-6;mi+=20){
+     ctx.beginPath();ctx.moveTo(mi,-mover.h/2+3);ctx.lineTo(mi+7,0);ctx.lineTo(mi,mover.h/2-3);ctx.fill();
+    }
+    var mlabel='ELEVATOR '+(mover.sp>=0?'+':'')+(mover.sp||0)+(mover.by?' · '+mover.by:'');
+    ctx.font='700 13px monospace';ctx.textAlign='center';ctx.textBaseline='alphabetic';
+    var mlw=ctx.measureText(mlabel).width;
+    ctx.fillStyle='rgba(10,7,4,.7)';
+    ctx.fillRect(-mlw/2-8,-mover.h/2-34,mlw+16,20);
+    ctx.fillStyle='#3cc3d4';
+    ctx.fillText(mlabel,0,-mover.h/2-19);
+    ctx.restore();
+   }
+
+   if(peg){
+    ctx.save();ctx.translate(peg.x,H-48);
+    ctx.fillStyle='#e0432f';ctx.beginPath();ctx.rect(-6,-34,12,34);ctx.fill();
+    ctx.fillStyle='#fff';
+    ctx.beginPath();ctx.rect(-6,-28,12,7);ctx.fill();
+    ctx.beginPath();ctx.rect(-6,-14,12,7);ctx.fill();
+    ctx.strokeStyle='rgba(0,0,0,.4)';ctx.lineWidth=2;
+    ctx.beginPath();ctx.rect(-6,-34,12,34);ctx.stroke();
+    ctx.restore();
+   }
+
+   if(board){
+    ctx.save();ctx.translate(board.x,board.y);
+    ctx.rotate((board.flip||0)+(board.stuck>0?Math.sin(performance.now()/60)*0.04:0));
+    ctx.fillStyle='#8a5a2b';
+    ctx.beginPath();ctx.rect(-board.w/2,-board.h/2,board.w,board.h);ctx.fill();
+    ctx.strokeStyle='#3e2a10';ctx.lineWidth=2;ctx.stroke();
+    ctx.fillStyle='#ffd23f';
+    ctx.fillRect(-board.w/2+8,-2,14,4);
+    ctx.fillRect(board.w/2-22,-2,14,4);
+    ctx.fillStyle='#1b1b1b';
+    ctx.beginPath();ctx.arc(-board.w/2+16,board.h/2+5,5,0,7);ctx.fill();
+    ctx.beginPath();ctx.arc(board.w/2-16,board.h/2+5,5,0,7);ctx.fill();
+    if(board.rider>=0)txt('RIDING',0,-16,11,'#3cc3d4','center',900);
+    ctx.restore();
+   }
+
+   pus.forEach(function(pu){
+    ctx.save();ctx.translate(pu.x,pu.y+Math.sin(pu.t*4)*3);
+    ctx.textAlign='center';ctx.textBaseline='middle';
+    if(pu.k==='star'){
+     ctx.shadowColor='#ffd23f';ctx.shadowBlur=18;
+     ctx.fillStyle='#ffd23f';ctx.font='30px sans-serif';
+     ctx.fillText('★',0,0);
+    }else if(pu.k==='bean'){
+     ctx.rotate(0.5+Math.sin(pu.t*2)*0.15);
+     ctx.shadowColor='#d6a05c';ctx.shadowBlur=16;
+     ctx.fillStyle='#a16207';
+     ctx.beginPath();ctx.ellipse(0,0,9,14,0,0,7);ctx.fill();
+     ctx.shadowBlur=0;
+     ctx.strokeStyle='#713f12';ctx.lineWidth=2.5;
+     ctx.beginPath();ctx.moveTo(0,-12);ctx.quadraticCurveTo(6,0,0,12);ctx.stroke();
+     ctx.fillStyle='rgba(255,255,255,.5)';
+     ctx.beginPath();ctx.ellipse(-3,-5,2,4.5,-0.3,0,7);ctx.fill();
+    }else if(pu.k==='bomb'){
+     ctx.shadowColor='#ff9a3c';ctx.shadowBlur=16;
+     drawBomb(0,0,1.5,pu.t);
+    }else{
+     ctx.shadowColor='#fca5a5';ctx.shadowBlur=16;
+     ctx.fillStyle='rgba(10,7,4,.8)';
+     ctx.beginPath();ctx.arc(0,0,17,0,7);ctx.fill();
+     ctx.shadowBlur=0;
+     var sw2=Math.sin(pu.t*6)*4;
+     ctx.strokeStyle='#fca5a5';ctx.lineWidth=4;ctx.lineCap='round';
+     ctx.beginPath();ctx.moveTo(-6,-4);ctx.lineTo(-6+sw2,12);ctx.moveTo(6,-4);ctx.lineTo(6-sw2,12);ctx.stroke();
+     ctx.fillStyle='#fca5a5';
+     ctx.beginPath();ctx.arc(-6+sw2,12,3,0,7);ctx.fill();
+     ctx.beginPath();ctx.arc(6-sw2,12,3,0,7);ctx.fill();
+    }
+    ctx.restore();
+   });
+
+   bombs.forEach(function(b){drawBomb(b.x,b.y,1,b.t);});
+
    eggs.forEach(function(g){if(!g.dead)drawEgg(g);});
    parts.forEach(function(p){
     if(p.k==='p'){ctx.globalAlpha=Math.max(0,p.l/p.m||p.l);ctx.fillStyle=p.c;ctx.beginPath();ctx.arc(p.x,p.y,p.s,0,7);ctx.fill();ctx.globalAlpha=1;}
@@ -982,13 +1129,74 @@ export function mount(root, api) {
     txt(String(g.wins),W/2+60,y,26,'#fff','right',900);
    });
   }
-  
+
+  function drawLobby() {
+   ctx.fillStyle='rgba(10,7,4,0.7)';ctx.fillRect(0,0,W,H);
+   var t=performance.now()/1000;
+   txt('EGGS',72,176,150,'#ffd23f','left',900,{w:14,c:'rgba(10,7,4,.95)'});
+   txt(api.isHost ? 'Waiting for guests to join...' : 'Waiting for host to start...',80,214,26,'#f0e6d2','left',700);
+   
+   var roster = viewState ? viewState.players : [];
+   var slots=Math.min(8,Math.max(4,roster.length));
+   var colX=[60,405], colW=330, rowH=118, startY=242;
+   for(let i=0;i<slots;i++){
+    var col=i%2, row=(i/2)|0;
+    var x=colX[col], y=startY+row*rowH, r=roster[i];
+    ctx.fillStyle='rgba(10,7,4,.74)';rrect(x,y,colW,108,16);ctx.fill();
+    ctx.strokeStyle=r?colorOf(i).shell:'#4a3a26';ctx.lineWidth=3;rrect(x,y,colW,108,16);ctx.stroke();
+    if(r){
+     drawEggIcon(x+46,y+54,1.7+Math.sin(t*3+i)*0.04,i,1);
+     fitTxt(r.name,x+92,y+48,colW-104,26,colorOf(i).shell,'left',900);
+     txt(r.bot?'CPU egg':'Player',x+92,y+78,16,'#d8c9a8','left',700);
+    }else{
+     ctx.globalAlpha=0.5+0.3*Math.sin(t*3);
+     txt('Waiting for player...',x+colW/2,y+64,20,'#8a7a5c','center',800);
+     ctx.globalAlpha=1;
+    }
+   }
+
+   var ROW_X=760, ROW_Y0=232, ROW_H=72, ROW_W=560;
+   var ROUND_NAMES = ['Single round','Best of 3','Best of 5'];
+
+   for(let i=0; i<ROWS.length; i++){
+    var rr=ROWS[i], ry=ROW_Y0+i*ROW_H;
+    ctx.fillStyle='rgba(10,7,4,.74)';rrect(ROW_X,ry,ROW_W,62,14);ctx.fill();
+    ctx.strokeStyle='#4a3a26';ctx.lineWidth=3;rrect(ROW_X,ry,ROW_W,62,14);ctx.stroke();
+    
+    var big=(rr==='start');
+    var label = rr==='match'?'MATCH':rr==='chaos'?'CHAOS RULES':rr==='cpu'?'CPU EGGS':'START MATCH';
+    txt(label, big?ROW_X+ROW_W/2:ROW_X+22,ry+40,big?28:22,api.isHost?'#ffd23f':'#8a7a5c',big?'center':'left',900);
+    
+    var v = '';
+    if(rr==='match') v = ROUND_NAMES[cfg.rounds];
+    if(rr==='chaos') v = cfg.chaos ? 'ON' : 'OFF';
+    if(rr==='cpu') v = cfg.cpu === 0 ? 'NONE' : String(cfg.cpu);
+    
+    if(v){
+     txt(v,ROW_X+ROW_W-52,ry+40,22,'#fff','right',900);
+     if(api.isHost){
+      txt('◀',ROW_X+ROW_W-250,ry+40,22,'#ffd23f','center',900);
+      txt('▶',ROW_X+ROW_W-26,ry+40,22,'#ffd23f','center',900);
+     }
+    }
+   }
+   if(!api.isHost) {
+    txt('Only the host can change settings and start the match.', ROW_X, ROW_Y0+ROWS.length*ROW_H+30, 18, '#fca5a5', 'left', 700);
+   }
+  }
+
   function render(){
    ctx.setTransform(1,0,0,1,0,0);
    ctx.globalAlpha=1;ctx.shadowBlur=0;
    ctx.clearRect(0,0,W,H);
-   drawWorld();drawMutTint();drawHud();drawBanner();drawCountdown();drawFeed();
-   if(scene==='matchEnd')drawMatchEnd();
+   if (scene === 'lobby') {
+    if(!coopCv)buildCoop();
+    ctx.drawImage(coopCv,0,0);
+    drawLobby();
+   } else {
+    drawWorld();drawMutTint();drawHud();drawBanner();drawCountdown();drawFeed();
+    if(scene==='matchEnd')drawMatchEnd();
+   }
   }
 
   // --- IO / Network loop ---
@@ -1021,21 +1229,46 @@ export function mount(root, api) {
   const onKeyUp = (e) => {
       keys[e.code] = false; updateInput();
   };
-  
-  // Tie document-level events exactly to when this game is mounted
+
+  cv.addEventListener('mousedown', function(e) {
+    var r = cv.getBoundingClientRect();
+    var p = { x: (e.clientX - r.left) * W / r.width, y: (e.clientY - r.top) * H / r.height };
+    if (scene === 'lobby' && api.isHost) {
+      var ROW_X = 760, ROW_Y0 = 232, ROW_H = 72, ROW_W = 560;
+      for(var i=0; i<ROWS.length; i++) {
+        var ry = ROW_Y0 + i*ROW_H;
+        if (p.x >= ROW_X && p.x <= ROW_X+ROW_W && p.y >= ry && p.y <= ry+62) {
+          var rr = ROWS[i];
+          if (rr === 'start') {
+            startMatch(viewState.players);
+          } else {
+            var d = (p.x < ROW_X + ROW_W/2) ? -1 : 1;
+            if (rr === 'match') cfg.rounds = (cfg.rounds + d + 3) % 3;
+            if (rr === 'chaos') cfg.chaos = cfg.chaos ? 0 : 1;
+            if (rr === 'cpu') cfg.cpu = (cfg.cpu + d + 4) % 4;
+          }
+        }
+      }
+    } else if (scene === 'matchEnd' && sceneT > 0.8 && api.isHost) {
+      scene = 'lobby';
+      sceneT = 0;
+    }
+  });
+
   document.addEventListener('keydown', onKeyDown);
   document.addEventListener('keyup', onKeyUp);
 
   let viewState = null;
   let hostEngineStarted = false;
   let lastSync = 0;
+  let joined = false;
   let lastT = performance.now();
 
   function serialize() {
       return {
           eggs, plats, bombs, pus, mover, board, peg, nest,
           parts, decals, scene, sceneT, roundT, ban, feed,
-          levelName, mode, roundNo, roundsNeed, matchOver, roundWinner, overtime, mut
+          levelName, mode, roundNo, roundsNeed, matchOver, roundWinner, overtime, mut, cfg
       };
   }
 
@@ -1047,7 +1280,7 @@ export function mount(root, api) {
       ban = hs.ban || null; feed = hs.feed || []; mut = hs.mut || null; 
       levelName = hs.levelName || 'coop'; roundNo = hs.roundNo || 1; 
       matchOver = hs.matchOver || false; roundWinner = hs.roundWinner || null;
-      overtime = hs.overtime || false;
+      overtime = hs.overtime || false; cfg = hs.cfg || cfg;
 
       if (!eggs || eggs.length === 0) {
           eggs = hs.eggs || [];
@@ -1067,9 +1300,14 @@ export function mount(root, api) {
 
   api.update = (view) => {
       viewState = view;
+      // Announce on the first update(), never in mount(): the hub has not
+      // finished wiring the handle while mount() runs (see AGENTS.md).
+      if (!joined) {
+          joined = true;
+          api.send({ type: 'JOIN', player: { id: api.me.id, name: api.me.name } });
+      }
       if (api.isHost && !hostEngineStarted && view.players) {
           hostEngineStarted = true;
-          startMatch(view.players);
       }
       if (!api.isHost && view.hostState) {
           syncFromHost(view.hostState);
@@ -1078,34 +1316,47 @@ export function mount(root, api) {
 
   function startMatch(playersList) {
       eggs = playersList.map((p, i) => spawnEgg(i, p));
+      for (let i = 0; i < cfg.cpu; i++) {
+          eggs.push(spawnEgg(eggs.length, { id: 'cpu' + i, name: 'CPU ' + (i + 1), bot: true }));
+      }
       mode = 'stocks';
-      roundsNeed = 3;
+      roundsNeed = [1, 3, 5][cfg.rounds];
       roundNo = 0; lastMutId = '';
       api.send({ type: 'MATCH_ID', matchId: Math.random().toString(36).slice(2) });
       startRound();
   }
 
-  api.raf(function loop(now) {
+api.setInterval(function loop() {
+      let now = performance.now();
       let rdt = (now - lastT) / 1000;
       lastT = now;
       if (!(rdt >= 0)) rdt = 0.016;
       rdt = Math.min(0.05, rdt);
 
       if (api.isHost && hostEngineStarted) {
-          // Sync inputs
           if (viewState && viewState.inputs) {
               eggs.forEach(g => {
                   if (g.bot) g.inp = botInput(g, rdt);
                   else if (viewState.inputs[g.id]) g.inp = viewState.inputs[g.id];
               });
           }
+          
+          // Let guests spawn seamlessly into match. Never in the lobby: eggs is
+          // rebuilt from scratch by startMatch() and would just churn here.
+          if (scene !== 'lobby') {
+              viewState.players.forEach((vp) => {
+                  if (!eggs.find(e => e.id === vp.id)) {
+                      var newEgg = spawnEgg(eggs.length, vp);
+                      if (scene === 'play' || scene === 'countdown') respawn(newEgg, true);
+                      eggs.push(newEgg);
+                  }
+              });
+          }
+
           if (scene === 'countdown' || scene === 'play' || scene === 'roundEnd') {
               sceneTick(rdt); step(rdt * timeScale, rdt); checkRound();
           } else {
               sceneT += rdt;
-          }
-          if (scene === 'matchEnd' && sceneT > 6.0) {
-              startMatch(viewState.players);
           }
           
           if (now - lastSync > 33) {
@@ -1127,9 +1378,8 @@ export function mount(root, api) {
           });
       }
       
-      render();
-      api.raf(loop);
-  });
+render();
+  }, 16); // 16ms interval targets ~60fps
 
   return {
     update: api.update,

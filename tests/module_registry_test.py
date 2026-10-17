@@ -29,9 +29,11 @@ REGISTRY = ROOT / "src" / "registry.js"
 GAMES = sorted((ROOT / "games").glob("*/index.js"))
 
 # Stand-ins for window.BUB_GAMES, so the legacy branch has something to find.
+# Keep these ids that have NO games/<id>/index.js — a module id here would be
+# filtered out as a duplicate, which is a different test.
 LEGACY = [
     {"id": "chess", "title": "Chess", "file": "chess.html", "players": "2"},
-    {"id": "eggs", "title": "eggs", "file": "eggs.html", "players": "2-4"},
+    {"id": "warp", "title": "Warp Front", "file": "warpfront.html", "players": "1-3"},
 ]
 
 

@@ -1,4 +1,4 @@
-// BubHub v10 — compat shim for legacy iframe games (chess.html, eggs.html…).
+// BubHub v10 — compat shim for legacy iframe games (chess.html, lotr.html…).
 // Old games speak postMessage { t:'gu', game, k, p }; the hub used to reply
 // { t:'gd', game, k, p }. This shim keeps that contract alive inside the new
 // hub: roster/state/intent/result/denied all translated to/from room/store.

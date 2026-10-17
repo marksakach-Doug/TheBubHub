@@ -56,8 +56,6 @@ window.BUB_GAMES = [
     icon: '✍️', desc: 'Write one honest line a day — editable until midnight, sealed after.' },
   //{ id: 'DrawDrive', file: 'DrawDrive.html', title: 'Draw and Drive', players: '1-4', color: '#3cc3d4', fill: true,
   //  icon: '✏️', desc: 'Draw a track, then drive a car along what you drew.' },
-  { id: 'eggs', file: 'eggs.html', title: 'eggs', players: '2-4', color: '#ffd23f', fill: true, soloable: true,
-    icon: '🥚', desc: 'Bounce and splat around a chicken coop, growing bigger with beans while you knock rivals off the edge.' },
    { id: 'mucking', file: 'muckingaround.html', title: 'Mucking Around', players: '2-6', color: '#ffd23f', fill: true, soloable: true,
     icon: '🍂', desc: 'You just kind of... muck around.' },
   { id: 'chess', file: 'chess.html', title: 'Chess', players: '2', color: '#c89b6d', fill: true, soloable: true,
