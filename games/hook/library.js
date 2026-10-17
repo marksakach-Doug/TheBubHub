@@ -4,6 +4,7 @@
 // Pair: { name, bpm, swing, wave, gate, scale, intro: { len, steps }, outro: { len, steps }, bridge?: { len, steps } }
 // scale: a key of SCALES (default 'major'), or 'any' for a random scale each round. Notes are scale degrees 0-7.
 // An intro and outro always ship as one pair: the game deals a whole pair, never a random intro + random outro.
+// Pairs are dealt from a shuffled bag (dealPair), so nothing repeats back to back.
 // Paste the exported array from phrase-builder.html over PAIRS.
 export const PAIRS = [
   {"name":"Tinguss","scale":"major","bpm":220,"swing":0,"wave":"sawtooth","gate":0.9,"intro":{"len":96,"steps":[[7,12],[6,12],[7,12],[6,12],[7,12],[6,12],[5,12],[4,12]]},"outro":{"len":48,"steps":[[3,12],[2,12],[1,12],[0,12]]},"bridge":{"len":48,"steps":[[0,12],[1,12],[2,12],[0,12]]}},
@@ -39,9 +40,33 @@ const NAMES = ['C', 'C♯', 'D', 'E♭', 'E', 'F', 'F♯', 'G', 'A♭', 'A', 'B�
 export const label = (k, i) => NAMES[semi(k, i) % 12] + (semi(k, i) >= 12 ? "'" : '');
 export const SIZE = 8;   // keys per scale
 
-export function pickPair(rng) {
+// Deals from a shuffled bag rather than picking at random, so every pair gets a turn
+// before any repeats. The pair just played is also pushed to the back of the next
+// shuffle: refilling a bag with the pair you were holding hands back the same pair twice
+// running about one time in fifteen.
+const shuffle = (list, rng) => {
+  const d = list.map((_, i) => i);
+  for (let i = d.length - 1; i > 0; i--) {
+    const j = Math.floor(rng() * (i + 1)), t = d[i];
+    d[i] = d[j]; d[j] = t;
+  }
+  return d;
+};
+
+const refill = (list, rng, last) => {
+  // pop() takes from the back, so the pair just played is parked at the front: it is
+  // dealt last next cycle, which is the only place it cannot follow itself.
+  const d = shuffle(list, rng), i = last === undefined || last === null ? -1 : d.indexOf(last);
+  if (i > 0) { const t = d[0]; d[0] = last; d[i] = t; }
+  return d;
+};
+
+export function dealPair(rng, bag) {
   const list = PAIRS.length ? PAIRS : [];
-  return list[Math.floor(rng() * list.length)];
+  if (!list.length) return { pair: list[0], index: -1, bag: { left: [], last: -1 } };
+  const left = bag && bag.left && bag.left.length ? bag.left.slice() : refill(list, rng, bag && bag.last);
+  const index = left.pop();
+  return { pair: list[index], index, bag: { left, last: index } };
 }
 
 // The rhythm template the bridge uses: the pair's own bridge rhythm if it has one, else the intro itself.

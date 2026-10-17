@@ -2,9 +2,10 @@
 """Play test for What's the Hook?: drive the mounted game and assert on the DOM.
 
 tests/hook_test.py proves the rules. This one proves the game *plays* —
-mount() builds, the keys fill a draft, lock reaches the host, the vote opens,
-a vote tallies a point, spectators stay read-only, and teardown stops the
-clock.
+mount() builds, the keys fill a draft, lock reaches the host, the solo reveal
+offers a hook you can hear on its own and a Next button, a wide pair paginates
+instead of running off the screen, spectators stay read-only, and teardown stops
+the clock.
 
 It stands in for the hub the way src/main.js drives a game: `api.send(action)`
 goes to `reduce()`, and the result is projected and handed back to
@@ -31,7 +32,7 @@ HARNESS = r"""
   mod = mod.replace(/export (const|function)/g, '$1')
            .replace(/import\s+\{[^}]*\}\s+from\s+['"]\.\/library\.js['"];?/, '');
   const factory = new Function(lib + '\n' + mod + `
-    window.__hook = { meta, init, reduce, project, summarize, mount, fillCount, SIZE };
+    window.__hook = { meta, init, reduce, project, summarize, mount, fillCount, SIZE, PAIRS };
   `);
   factory();
 
@@ -85,24 +86,47 @@ HARNESS = r"""
   ok('the game is called Hook', hk.meta.id === 'hook');
   ok('the bubble and clock render', !!q('#bubble') && !!q('#clock'));
   ok('first update asks to join', intents.some((a) => a.a === 'join'));
-  ok('grid renders slots x scale degrees', qa('#grid button').length === hk.fillCount(state.pair) * hk.SIZE);
 
-  // ---- compose a hook: tap one cell per column, then lock
-  const n = hk.fillCount(state.pair);
-  ok('the bridge needs notes', n > 0);
-  for (let c = 0; c < n; c++) q('#grid [data-col="' + c + '"][data-row="0"]').click();
+  // The grid draws one screenful of columns, and never more than that: a 16-slot pair
+  // paginates rather than running off the side of a phone.
+  const cellsPerPage = (w, n) => Math.max(1, Math.min(n, Math.floor((w - 26 + 4) / 48)));
+  ok('grid renders one page of note cells', (() => {
+    const n = hk.fillCount(state.pair);
+    return qa('#grid button').length === cellsPerPage(host.clientWidth, n) * hk.SIZE;
+  })());
+  ok('the grid fits the width it is given',
+    q('#grid').scrollWidth <= q('#grid').clientWidth + 1 && q('.k').scrollWidth <= q('.k').clientWidth + 1);
+  ok('the compose panel can play each part on its own',
+    !!q('[data-part="hook"]') && !!q('[data-part="intro"]') && !!q('[data-part="outro"]') && !!q('[data-part="all"]'));
+
+  // ---- compose a hook: one cell per column (paging as needed), then lock
+  const n = hk.fillCount(state.pair), firstPair = state.pair.name;
+  const cell = (c, r) => q('#grid [data-col="' + c + '"][data-row="' + r + '"]');
+  let filledSlots = 0, paged = 0;
+  for (let c = 0; c < n; c++) {
+    let b = cell(c, 0);
+    while (!b && paged < n) {
+      const next = q('[data-pg="1"]');
+      if (!next) break;
+      next.click(); paged++; b = cell(c, 0);
+    }
+    if (b) { b.click(); filledSlots++; }
+  }
+  ok('every slot of the hook can be filled', filledSlots === n);
   ok('lock reaches the host', (() => {
     q('[data-a="lock"]').click();
     return intents.some((a) => a.a === 'lock') && state.locked[ME];
   })());
-  ok('solo lock opens the vote', state.phase === 'vote');
-  ok('the vote lists your hook', shadow.textContent.indexOf('Vote') >= 0);
-  const voteBtn = q('[data-a="vote"]');
-  ok('a vote button is offered', !!voteBtn);
-  voteBtn.click();
-  ok('voting tallies a point and deals again',
-    state.phase === 'play' && state.round === 2 && state.scores[ME] === 1);
-  ok('the win is named', /won with/.test(q('#game').textContent));
+
+  // ---- solo: a reveal of your own hook and a Next button, never a vote for yourself
+  ok('solo lock reveals your hook', state.phase === 'reveal');
+  ok('solo is never asked to vote for itself', !q('[data-a="vote"]'));
+  ok('the reveal shows the hook it just took', /Your hook/.test(q('#game').textContent));
+  ok('the reveal can play the hook alone', !!q('[data-part="hook"]'));
+  q('[data-a="next"]').click();
+  ok('next deals a fresh pair', state.phase === 'play' && state.round === 2 && state.pair.name !== firstPair);
+  ok('holding the hook scores a point', state.scores[ME] === 1);
+  ok('the win is named', /held the hook/.test(q('#game').textContent));
   const line = hk.summarize(state, (id) => id === ME ? 'Sam' : id);
   ok('the record names the winner',
     typeof line === 'string' && line.indexOf("What's the Hook?:") === 0 && line.indexOf('Sam') >= 0);
@@ -113,6 +137,21 @@ HARNESS = r"""
   if (lockBtn) lockBtn.click();
   ok('an empty draft is stopped locally',
     intents.length === sentBefore && /Choose .* notes first/.test(q('#bubble').textContent));
+
+  // ---- a wide pair on a narrow screen: pager, no sideways scroll
+  const widest = hk.PAIRS.reduce((a, p) => (hk.fillCount(p) > hk.fillCount(a) ? p : a));
+  host.style.width = '320px';
+  const wide = hk.project({ ...state, pair: widest, round: 500 }, ME);
+  handle.update(wide);
+  const wn = hk.fillCount(wide.pair), wpp = cellsPerPage(320, wn);
+  ok('the widest pair is wider than a phone', wn > wpp);
+  ok('a pair that will not fit gets a pager', !!q('#pager') && /of /.test(q('#pager').textContent));
+  ok('only a page of columns is drawn', qa('#grid button').length === wpp * hk.SIZE);
+  ok('the pager shows the columns you are on', /slots 1[–-]\d+ of \d+/.test(q('#pager').textContent));
+  ok('nothing runs off the side',
+    q('#grid').scrollWidth <= q('#grid').clientWidth + 1 && q('.k').scrollWidth <= q('.k').clientWidth + 1);
+  q('[data-pg="1"]').click();
+  ok('the pager moves to the next columns', !!q('#grid [data-col="' + wpp + '"]'));
 
   // ---- a spectator watches read-only and never joins
   const watchHost = document.createElement('div');

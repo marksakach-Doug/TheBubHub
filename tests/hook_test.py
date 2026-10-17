@@ -9,7 +9,8 @@ about the logic changes.
 
 The parts worth guarding are the ones the table and the record sheet depend
 on: lock validation, the all-locked -> vote transition, vote validation, the
-tick clock, join, hidden hooks in project(), and the record sentence in
+tick clock, join, hidden hooks in project(), the no-repeat deal, the solo
+reveal-and-Next path, the skip-vote escape, and the record sentences in
 summarize().
 
     pip install playwright && playwright install chromium
@@ -112,14 +113,73 @@ JS_CASES = r"""
     typeof line === 'string' && line.indexOf("What's the Hook?:") === 0 &&
     line.indexOf('Dev') >= 0 && line.indexOf('Sam') >= 0]);
 
-  // ---- solo: one lock opens the vote, self-vote is allowed, then it tallies
+  // ---- solo: one lock reveals your hook and Next deals the next pair
   const soloLock = reduce(soloInit, { a: 'lock', b: goodBridge(soloInit) }, ctx('dev'));
-  out.push(['solo lock opens the vote', soloLock.phase === 'vote']);
-  const soloTally = reduce(soloLock, { a: 'vote', id: 'dev' }, ctx('dev'));
-  out.push(['solo self-vote tallies a point',
-    soloTally.phase === 'play' && soloTally.scores.dev === 1]);
-  out.push(['solo win is recorded',
-    (summarize(soloTally, nameOf) || '').indexOf('Dev') >= 0]);
+  out.push(['solo lock reveals your hook', soloLock.phase === 'reveal']);
+  out.push(['solo reveal shows your hook', JSON.stringify(project(soloLock, 'dev').subs.dev) === JSON.stringify(goodBridge(soloInit))]);
+  out.push(['there is nothing to vote for in solo',
+    !!reduce(soloLock, { a: 'vote', id: 'dev' }, ctx('dev')).error]);
+  out.push(['skip is not a solo move',
+    !!reduce(soloLock, { a: 'skip' }, ctx('dev')).error]);
+  const soloNext = reduce(soloLock, { a: 'next' }, ctx('dev'));
+  out.push(['next deals a new pair',
+    soloNext.phase === 'play' && soloNext.round === 2 && soloNext.pair.name !== soloInit.pair.name]);
+  out.push(['holding the hook scores a point', soloNext.scores.dev === 1]);
+  out.push(['a solo win is recorded', summarize(soloNext, nameOf) === "What's the Hook?: Dev held the hook."]);
+  out.push(['next outside the reveal is refused',
+    !!reduce(soloNext, { a: 'next' }, ctx('dev')).error]);
+  out.push(['a solo spectator cannot send next',
+    !!reduce(soloLock, { a: 'next' }, ctx('stranger')).error]);
+  const soloMiss = reduce({ ...soloInit, deadline: Date.now() - 10 }, { a: 'tick' },
+    { from: { id: 'dev' }, rng: rng0, now: Date.now() + 1000 });
+  out.push(['a solo clock that runs out deals again',
+    soloMiss.phase === 'play' && soloMiss.round === 2 && soloMiss.last === 'Nobody locked in.']);
+  out.push(['an empty solo clock records nothing', summarize(soloMiss, nameOf) === null]);
+  const soloRevealTick = reduce({ ...soloLock, deadline: Date.now() - 10 }, { a: 'tick' },
+    { from: { id: 'dev' }, rng: rng0, now: Date.now() + 1000 });
+  out.push(['the reveal clock moves on by itself',
+    soloRevealTick.phase === 'play' && soloRevealTick.round === 2 && soloRevealTick.scores.dev === 1]);
+
+  // ---- dealing: a shuffled bag, so no pair comes up twice running
+  let bagState = init({ seats: table(['dev']), atTable: table(['dev']) });
+  const seq = [], cycles = 3;
+  for (let i = 0; i < PAIRS.length * cycles; i++) {
+    seq.push(bagState.pair.name);
+    bagState = reduce({ ...bagState, deadline: Date.now() - 10 }, { a: 'tick' },
+      { from: { id: 'dev' }, rng: Math.random, now: Date.now() + 1000 });
+  }
+  out.push(['no pair is dealt twice in a row',
+    seq.every((name, i) => !i || name !== seq[i - 1])]);
+  const rounds = [0, 1, 2].map((c) => new Set(seq.slice(c * PAIRS.length, (c + 1) * PAIRS.length)).size);
+  out.push(['a full cycle deals every pair once', rounds.join(',') === PAIRS.length + ',' + PAIRS.length + ',' + PAIRS.length]);
+  out.push(['the bag is refilled, not re-picked',
+    rounds.every((n) => n === PAIRS.length)]);
+
+  // The same sequence on a fixed seed, which is the only way to prove the refill itself
+  // never hands back the pair just played: it is where a lazy bag repeats.
+  let det = init({ seats: table(['dev']), atTable: table(['dev']), rng: rng0 }), fixed = [];
+  for (let i = 0; i < PAIRS.length * 2; i++) {
+    fixed.push(det.pair.name);
+    det = reduce({ ...det, deadline: Date.now() - 10 }, { a: 'tick' },
+      { from: { id: 'dev' }, rng: rng0, now: Date.now() + 1000 });
+  }
+  out.push(['a fixed seed walks every pair without a repeat',
+    fixed.every((name, i) => !i || name !== fixed[i - 1]) &&
+    new Set(fixed).size === PAIRS.length]);
+
+  // ---- skip: a table that is done voting does not have to sit out the clock
+  out.push(['skipping a voteless round is refused',
+    !!reduce(bothIn, { a: 'skip' }, ctx('dev')).error]);
+  out.push(['a stranger cannot skip',
+    !!reduce(oneVote, { a: 'skip' }, ctx('stranger')).error]);
+  const skipped = reduce(oneVote, { a: 'skip' }, ctx('w1'));
+  out.push(['a seated player can end the vote early',
+    !skipped.error && skipped.phase === 'play' && skipped.round === 2]);
+  out.push(['skip tallies the votes cast', skipped.scores.dev === 1]);
+  out.push(['skip during play is refused',
+    !!reduce(s0, { a: 'skip' }, ctx('dev')).error]);
+  out.push(['skip after the tally is refused',
+    !!reduce(tied, { a: 'skip' }, ctx('dev')).error]);
 
   // ---- tick: the shared clock, not the sender's
   const early = reduce(s0, { a: 'tick' }, { from: { id: 'dev' }, rng: rng0, now: s0.deadline - 5000 });
