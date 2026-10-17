@@ -84,13 +84,17 @@ HARNESS = r"""
 
   ok('mount builds the Hook title', !!q('h1') && q('h1').textContent === "What's the Hook?");
   ok('the game is called Hook', hk.meta.id === 'hook');
-  ok('the bubble and clock render', !!q('#bubble') && !!q('#clock'));
+  ok('the bubble renders', !!q('#bubble'));
   ok('first update asks to join', intents.some((a) => a.a === 'join'));
   ok('the rule is on screen under the title',
     /You make the best hook to fit between the intro and outro\./.test(q('#rules').textContent));
   ok('a table of one is not promised a vote', /No table, no vote/.test(q('#rules').textContent));
-  ok('the compose clock is 90 seconds',
-    Math.round((state.deadline - Date.now()) / 1000) >= 88 && Math.round((state.deadline - Date.now()) / 1000) <= 90);
+  // The clock is switched off at the moment: no countdown on screen, and nothing times a
+  // round out. PLAY_MS is the one constant that brings it back.
+  ok('the round is untimed', state.deadline === 0);
+  ok('no countdown is drawn while untimed', !q('#clock') && shadow.textContent.indexOf('\u23f1') < 0);
+  ok('an untimed round never asks to tick',
+    !intents.some((a) => a.a === 'tick'));
 
   // The grid draws one screenful of columns, and never more than that: a 16-slot pair
   // paginates rather than running off the side of a phone.

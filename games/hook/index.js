@@ -1,7 +1,12 @@
 // games/hook/index.js: What's the Hook? (fill the gap in a dealt intro-outro pair; the table votes on the best hook)
 import { SCALES, SIZE, label, dealPair, fillCount, fillDurations, bridgeSteps, fmt, schedule } from './library.js';
 
-const PLAY_MS = 90000, VOTE_MS = 30000, KEYS = Object.keys(SCALES);
+// The clock, currently off. 0 means untimed: a round waits for everyone at the table to
+// lock in, nobody is timed out and no one misses a round. Put a number back here to turn it
+// on — 90000 is the 90 seconds it ran at before — and everything below comes back with it:
+// the deadline, the countdown, the tick, and the two-misses-and-you-are-out rule.
+const PLAY_MS = 0, VOTE_MS = 30000, KEYS = Object.keys(SCALES);
+const deadline = (now, ms) => (PLAY_MS && ms ? now + ms : 0);   // 0 everywhere means "no clock"
 
 // The rule, in the player's words. Solo has no table to vote in, so it gets its own line.
 const RULES_TABLE = 'You make the best hook to fit between the intro and outro. We will vote on who found the best hook.';
@@ -16,7 +21,7 @@ function deal(s, rng, now) {
   const pair = d.pair;
   return { ...s, bag: d.bag, round: s.round + 1, phase: 'play', pair,
     scale: pair.scale === 'any' ? KEYS[Math.floor(rng() * KEYS.length)] : pair.scale || 'major',
-    deadline: now + PLAY_MS, locked: {}, subs: {}, votes: {} };
+    deadline: deadline(now, PLAY_MS), locked: {}, subs: {}, votes: {} };
 }
 
 // Nobody to out-vote: a table of one has a reveal and a Next button instead of a vote.
@@ -37,7 +42,8 @@ function toVote(s, rng, now) {
   s.order.forEach((p) => { miss[p] = s.locked[p] ? 0 : (s.miss[p] || 0) + 1; });
   const kept = s.order.filter((p) => miss[p] < 2), base = { ...s, miss, order: kept.length ? kept : s.order };
   if (!Object.keys(s.subs).length) return deal({ ...base, last: 'Nobody locked in.', lastWin: [], lastTop: 0, lastSolo: false }, rng, now);
-  return soloish(base) ? { ...base, phase: 'reveal', deadline: now + VOTE_MS } : { ...base, phase: 'vote', deadline: now + VOTE_MS };
+  return soloish(base) ? { ...base, phase: 'reveal', deadline: deadline(now, VOTE_MS) }
+                       : { ...base, phase: 'vote', deadline: deadline(now, VOTE_MS) };
 }
 
 // Voting is over: most votes wins a point (ties share it), then the next round starts.
@@ -61,8 +67,9 @@ function finish(s, rng, now) {
 export function reduce(s, a, ctx) {
   const rng = (ctx && ctx.rng) || Math.random, now = (ctx && ctx.now) || Date.now(), id = (ctx && ctx.from && ctx.from.id) || '';
   // Clients send 'tick' when their clock hits zero; it only counts once the shared deadline has really passed.
-  if (a.a === 'tick') {
-    if (now < s.deadline) return s;
+// An untimed round has no deadline, so a tick from an old tab cannot move it on.
+if (a.a === 'tick') {
+    if (!s.deadline || now < s.deadline) return s;
     return s.phase === 'play' ? toVote(s, rng, now) : s.phase === 'reveal' ? finish(s, rng, now) : tally(s, rng, now);
   }
   if (a.a === 'join') {
@@ -112,7 +119,8 @@ export function mount(root, api) {
   const esc = (x) => String(x).replace(/[&<>"]/g, (c) => `&#${c.charCodeAt(0)};`);
   const talk = (t) => { const b = $('#bubble'); if (b) b.textContent = t; };
   const o = () => ({ ...view.pair, scale: view.scale });
-  const left = () => Math.max(0, Math.ceil((view.deadline - Date.now()) / 1000));
+  // null means untimed: no countdown, and nothing to send a tick about.
+  const left = () => (view.deadline ? Math.max(0, Math.ceil((view.deadline - Date.now()) / 1000)) : null);
   const seatedNow = () => !!view && !api.isSpectator && view.order.includes(view.you);
   const showClock = () => { const el = $('#clock'); if (el) el.textContent = `⏱ ${left()}s`; };
   const audio = () => {
@@ -190,7 +198,7 @@ export function mount(root, api) {
     if (rules) rules.textContent = soloish(v) ? RULES_SOLO : RULES_TABLE;
     const ends = `intro  ${fmt(v.pair.intro.steps, v.scale)}\noutro  ${fmt(v.pair.outro.steps, v.scale)}`;
     const filled = draft.filter((x) => Number.isInteger(x)).length;
-    const head = `<p>${v.last ? `Last round: ${esc(v.last)}<br>` : ''}Score: ${v.order.map((p) => `${esc(v.names[p])} ${v.scores[p] || 0}`).join(' · ')} · <b id="clock"></b></p>`
+    const head = `<p>${v.last ? `Last round: ${esc(v.last)}<br>` : ''}Score: ${v.order.map((p) => `${esc(v.names[p])} ${v.scores[p] || 0}`).join(' · ')}${v.deadline ? ' · <b id="clock"></b>' : ''}</p>`
       + (!api.isSpectator && !v.order.includes(v.you) ? '<button data-a="join">Rejoin the table</button>' : '');
     const voted = Object.keys(v.votes).length;
     $('#game').innerHTML = head + (v.phase === 'play'
@@ -231,9 +239,11 @@ export function mount(root, api) {
     api.send({ a: d.a, b: draft, id: d.id });
   });
 
-  // Every second: redraw the clock, and once it hits zero ask the game to move on (it checks the real deadline).
+  // Every second: redraw the clock, and once it hits zero ask the game to move on (it checks the real
+  // deadline). Untimed rounds have no #clock to draw and left() is null, so this sends nothing —
+  // put a number back in PLAY_MS and the whole clock comes back with it.
   // Tracked via api so the hub tears it down with the stage; destroy() clears it too.
-  const tickFn = () => { if (!view) return; showClock(); if (!left() && seatedNow()) api.send({ a: 'tick' }); };
+  const tickFn = () => { if (!view) return; showClock(); if (left() === 0 && seatedNow()) api.send({ a: 'tick' }); };
   timer = (api.setInterval || setInterval)(tickFn, 1000);
 
   // Turning the phone sideways, or resizing the window, changes how many columns fit.

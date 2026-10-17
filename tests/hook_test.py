@@ -181,8 +181,25 @@ JS_CASES = r"""
   out.push(['skip after the tally is refused',
     !!reduce(tied, { a: 'skip' }, ctx('dev')).error]);
 
-  // ---- tick: the shared clock, not the sender's
-  const early = reduce(s0, { a: 'tick' }, { from: { id: 'dev' }, rng: rng0, now: s0.deadline - 5000 });
+  // ---- the clock is off: an untimed round waits for the table, and nothing times anyone out
+  const untimed = init({ seats: table(['dev']), atTable: table(['dev']), rng: rng0 });
+  out.push(['a fresh round has no deadline', untimed.deadline === 0]);
+  out.push(['a tick on an untimed round changes nothing',
+    reduce(untimed, { a: 'tick' }, { from: { id: 'dev' }, rng: rng0 }).phase === 'play' &&
+    reduce(untimed, { a: 'tick' }, { from: { id: 'dev' }, rng: rng0 }).round === 1]);
+  out.push(['a tick long after any clock would have run does nothing',
+    reduce({ ...untimed, deadline: 1 }, { a: 'tick' }, { from: { id: 'dev' }, rng: rng0, now: Date.now() }).phase === 'play']);
+  out.push(['the vote and the reveal are untimed too',
+    reduce(soloLock, { a: 'next' }, ctx('dev')).deadline === 0 &&
+    reduce(oneVote, { a: 'vote', id: 'dev' }, ctx('w1')).deadline === 0]);
+  // The clock is one constant: a deadline put back by hand still works.
+  out.push(['a deadline put back by hand still runs',
+    reduce({ ...s0, deadline: Date.now() - 10 }, { a: 'tick' },
+      { from: { id: 'dev' }, rng: rng0, now: Date.now() + 1000 }).round === 2]);
+
+  // ---- tick: with a deadline, the shared clock and not the sender's decide
+  const early = reduce({ ...s0, deadline: Date.now() + 20000 }, { a: 'tick' },
+    { from: { id: 'dev' }, rng: rng0, now: Date.now() + 1000 });
   out.push(['tick before the deadline changes nothing',
     early.phase === 'play' && early.round === 1]);
   const latePlay = reduce({ ...s0, deadline: Date.now() - 10 }, { a: 'tick' },
