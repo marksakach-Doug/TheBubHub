@@ -73,7 +73,11 @@ button.go[disabled]{background:var(--paper);color:#8c8c8c}
 .alone > button{text-align:left;padding:5px 12px;min-height:0;border-width:1px;transition:background 0.2s}
 .alone > button small{color:inherit;opacity:.75}
 .miss{margin:10px 0 0;color:var(--ash);font-size:14px}
-.arbnote{color:#b00000;font-size:13px;text-align:right;margin:6px 0 0;}
+.arbnote{color:#b00000;font-size:13px;text-align:left;margin:8px 0 0;
+  background:#fff8f8;border:1px solid #e8c4c4;border-radius:10px;padding:8px 10px;}
+.arbnote b{color:#7a0000;}
+.arbnote .arb-do{display:flex;flex-direction:column;gap:3px;margin-top:6px;}
+.arbnote .arb-do span{color:#3a1010;}
 .whybox{margin-top:8px}
 /* 16px is the iOS Safari threshold: any focused field below it makes the page
    zoom in on a phone and never zoom back out. */
@@ -131,7 +135,22 @@ button.go[disabled]{background:var(--paper);color:#8c8c8c}
       <button id="b-home" class="small hidden">Home</button>
     </div>
   </header>
-  <div id="arbnote" class="arbnote hidden">You are the arbiter</div>
+  <!-- The arbiter is the one job in this game nobody has to be told twice, and
+       four words of instruction was not it: the buttons are labelled with verbs
+       but nothing said which words could be approved, or what "reveal now"
+       was for, or that the role moves on by itself. It also has to survive the
+       end of the setup screen — the real instructions lived in a <details>
+       that is hidden the moment a game exists. -->
+  <div id="arbnote" class="arbnote hidden">
+    <b>You are the arbiter this round.</b> The role passes around the table on
+    its own — you get it again next round.
+    <span class="arb-do">
+      <span><b>1.</b> When everyone's in, <b>Reveal now</b> to open the words early (or wait for the table).</span>
+      <span><b>2.</b> Tap each revealed word to approve it. Your word turns <b>black</b> when it is a bridge. Tap again to take it back.</span>
+      <span><b>3.</b> <b>Next word</b> when the words are all decided.</span>
+      <span><b>4.</b> <b>Skip word</b> abandons this one and deals a new word.</span>
+    </span>
+  </div>
 
   <section id="card" class="hidden">
     <h2 id="word" class="word fit" data-min="48" data-max="120"></h2>
@@ -999,7 +1018,11 @@ function renderReveal(){
     for (i = 0; i < beats.length; i++){
         renderBeat(box, beats[i], { wordShown: true, divShown: true });
     }
-    if (iAmArbiter()) box.appendChild(el('p', 'miss', soloOn ? 'Does it fit both meanings? Click the word to count it.' : 'Click to approve Word Bridge(s).'));
+    if (iAmArbiter()) {
+      box.appendChild(el('p', 'miss', soloOn
+        ? 'Does it fit both meanings? Tap the word to count it.'
+        : 'Your call: tap a word to approve it as a bridge (it turns black). Tap again to un-approve. When they are all decided, press Next word.'));
+    }
     if (S.missing && S.missing.length) box.appendChild(el('p', 'miss', 'No word from ' + listNames(S.missing) + '.'));
 }
 function renderPeople(){
@@ -1068,7 +1091,10 @@ function render(){
     $('menu').classList.toggle('hidden', !(soloOn || (hub && isHost())));
     $('b-new').classList.toggle('hidden', soloOn);
     $('b-home').classList.toggle('hidden', !soloOn);
-    $('arbnote').classList.toggle('hidden', !(hub && S && iAmArbiter() && !soloOn));
+    // Solo players are the arbiter too — they just tap their own words — so the
+    // instructions used to hide in exactly the one mode with no second player to
+    // ask. Now shown whenever there is an arbiter, solo included.
+    $('arbnote').classList.toggle('hidden', !((hub || soloOn) && S && iAmArbiter()));
     $('hub-ui').classList.toggle('hidden', !(hub || soloOn));
     $('local-ui').classList.toggle('hidden', !(local && !soloOn));
     $('homebtns').classList.toggle('hidden', !home);

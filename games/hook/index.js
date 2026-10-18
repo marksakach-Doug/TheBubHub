@@ -139,8 +139,12 @@ export function prune(s, goneId) {
 }
 
 export function mount(root, api) {
-  let view = null, draft = [], round = 0, ac, timer, ro, joined = false, page = 0;
-  const CELL = 44, GAP = 4;                       // a note cell has to stay big enough to tap
+  let view = null, draft = [], round = 0, ac, timer, ro, joined = false;
+  // One cell size for everything, chosen in CSS so it can shrink on a narrow
+  // phone but never depends on how many slots a pair happens to have. See
+  // phrase-builder.html, which this grid now matches.
+  const cellPx = () => Math.max(26, Math.min(44, Math.floor(
+    (((root.host && root.host.clientWidth) || (typeof window !== 'undefined' ? window.innerWidth : 360)) - 74) / 7)));
   const $ = (q) => root.querySelector(q);
   const esc = (x) => String(x).replace(/[&<>"]/g, (c) => `&#${c.charCodeAt(0)};`);
   const talk = (t) => { const b = $('#bubble'); if (b) b.textContent = t; };
@@ -170,13 +174,6 @@ const play = (part, notes) => {
   return schedule(ac, pair.outro.steps, o(), afterHook);
 };
 
-  // How many note columns fit the screen: a ShadowRoot has no width of its own, so the host element's is used.
-  const avail = () => {
-    const w = (root.host && root.host.clientWidth) || (typeof window !== 'undefined' ? window.innerWidth : 360);
-    return Math.max(CELL, w - 26);                          // .k pads 10px a side
-  };
-  const perPage = (n) => Math.max(1, Math.min(n, Math.floor((avail() + GAP) / (CELL + GAP))));
-
   root.innerHTML = `<style>
     .k{background:#000080;color:#ff0;font:16px 'Times New Roman',serif;padding:10px;height:100%;max-width:100%;overflow-y:auto;overflow-x:hidden;-webkit-overflow-scrolling:touch;touch-action:pan-y;box-sizing:border-box;word-wrap:break-word}
     h1{color:#0ff;font:bold 22px Georgia;text-shadow:3px 3px #f0f}
@@ -186,10 +183,19 @@ const play = (part, notes) => {
     button{font:bold 16px Arial;min-width:44px;min-height:44px;margin:3px}
     .box{border:2px solid #0f0;padding:6px;margin:6px 0;max-width:100%;box-sizing:border-box}
     .plays{display:flex;flex-wrap:wrap;margin:4px 0}
-    #grid{display:grid;gap:4px;margin:6px 0;justify-items:center}
-    #grid button{background:#fff;color:#000;font:bold 13px Arial;min-width:0;width:100%;max-width:64px;min-height:38px;aspect-ratio:1/1;margin:0;padding:2px}
-    #grid button.on{background:#ff0;color:#000;outline:3px solid #0ff}
-    #pager{display:flex;align-items:center;justify-content:space-between;color:#0ff;font:bold 13px Arial;margin:4px 0}
+    /* The grid is the same shape as phrase-builder.html: fixed square cells of
+       ONE size, one label gutter, and a horizontal scroller for the pairs with
+       many slots. It used to divide the width between however many columns a
+       pair had, so a 4-slot pair drew enormous keys, a 16-slot pair drew tiny
+       ones, and the last page of a paged pair was bigger than the first. */
+    #wrap{overflow-x:auto;overflow-y:hidden;padding-bottom:6px;-webkit-overflow-scrolling:touch}
+    #grid{display:grid;gap:3px;width:max-content;margin:6px 0}
+    #grid button{background:#fff;color:#000;font:bold 13px Arial;margin:0;padding:0;
+      width:var(--cell);height:var(--cell);min-width:0;min-height:0;border-radius:4px}
+    #grid button.on{background:#ff0;color:#000;outline:2px solid #0ff}
+    .lab{color:#0ff;text-align:right;padding-right:4px;font:bold 11px Arial;line-height:var(--cell)}
+    #gridhead{display:flex;gap:3px;color:#0ff;font:bold 11px Arial;margin-left:0}
+    #gridhead span{width:var(--cell);text-align:center}
   </style>
   <div class="k"><h1>What's the Hook?</h1><p id="rules"></p><div id="bubble"></div><div id="game"></div></div>`;
 
@@ -202,25 +208,24 @@ const play = (part, notes) => {
     <button data-part="outro">▶ Outro</button>
     <button data-part="all" data-b="${csv(notes)}">▶ All</button></div>`;
 
-  // Only the columns that fit; the rest wait behind the pager, so a 16-slot pair is still one screen wide.
-  const gridHtml = (n, pp) => {
-    const from = page * pp, to = Math.min(n, from + pp);
-    // The pager sits above the grid: eight rows of keys is a screenful on its own.
-    const head = pp >= n ? '' : `<div id="pager"><button data-pg="-1">‹ Prev</button><span>slots ${from + 1}–${to} of ${n}</span><button data-pg="1">Next ›</button></div>`;
-    let h = `${head}<div id="grid" style="grid-template-columns:repeat(${Math.max(1, to - from)},minmax(0,1fr))">`;
+  // Every slot of the pair, every row, one cell size. A 16-slot pair is wider
+  // than a phone and scrolls sideways instead of being split behind a pager, so
+  // there is no "page" whose cells could be a different size from the others.
+  const gridHtml = (n) => {
+    const cell = cellPx();
+    let h = `<div id="wrap"><div id="grid" style="--cell:${cell}px;grid-template-columns:40px repeat(${n},${cell}px)">`;
     for (let r = SIZE - 1; r >= 0; r--) {
-      for (let c = from; c < to; c++) {
+      h += `<span class="lab">${label(view.scale, r)}</span>`;
+      for (let c = 0; c < n; c++) {
         h += `<button data-col="${c}" data-row="${r}" class="${draft[c] === r ? 'on' : ''}" aria-label="slot ${c + 1} ${label(view.scale, r)}">${draft[c] === r ? label(view.scale, r) : '·'}</button>`;
       }
     }
-    return h + '</div>';
+    return h + '</div></div>';
   };
 
   const render = () => {
     const v = view, n = fillCount(v.pair), seated = seatedNow(), cands = Object.keys(v.subs);
     if (!Array.isArray(draft) || draft.length !== n) draft = Array(n).fill(null);
-    const pp = perPage(n);
-    page = Math.max(0, Math.min(page, Math.ceil(n / pp) - 1));
     // A note from the rules ("New pair dealt.") replaces the round line for one round only.
     talk(v.note || `Round ${v.round} · ${v.pair.name} · ${SCALES[v.scale][0]}${seated ? '' : ' · 👁 watching'}`);
     // The rule under the title, worded for whoever is at the table right now.
@@ -236,7 +241,7 @@ const play = (part, notes) => {
     $('#game').innerHTML = head + (v.phase === 'play'
       ? `<div class="box"><pre>intro  ${fmt(v.pair.intro.steps, v.scale)}\nhook   ${fmt(hookSteps(v.pair, draft), v.scale)}\noutro  ${fmt(v.pair.outro.steps, v.scale)}</pre>
           <p>${filled}/${n} slots filled. Tap a column to set its note.  ${newGame}</p>${playsHtml(draft)}</div>
-        ${seated && !v.locked[v.you] ? `${gridHtml(n, pp)}
+        ${seated && !v.locked[v.you] ? `${gridHtml(n)}
           <button data-a="clear">Clear</button> <button data-a="lock">Lock in</button>` : ''}
         <p>${Object.keys(v.locked).length}/${v.order.length} locked in${v.locked[v.you] ? ' (including you)' : ''}</p>`
       : v.phase === 'reveal'
@@ -252,10 +257,9 @@ const play = (part, notes) => {
   };
 
   root.addEventListener('click', (e) => {
-    const t = e.target.closest('[data-part],[data-pg],[data-col],[data-a]');
+    const t = e.target.closest('[data-part],[data-col],[data-a]');
     if (!t || !view) return;
     const d = t.dataset, n = fillCount(view.pair);
-    if (d.pg !== undefined) { page = Math.max(0, page + Number(d.pg)); return render(); }
     if (!audio()) return;
     if (d.part !== undefined) return play(d.part, d.b === undefined ? draft : (d.b ? d.b.split(',').map(Number) : []));
     if (d.col !== undefined) {
@@ -278,14 +282,14 @@ const play = (part, notes) => {
   const tickFn = () => { if (!view) return; showClock(); if (left() === 0 && seatedNow()) api.send({ a: 'tick' }); };
   timer = (api.setInterval || setInterval)(tickFn, 1000);
 
-  // Turning the phone sideways, or resizing the window, changes how many columns fit.
+  // Turning the phone sideways, or resizing the window, changes the cell size.
   if (typeof ResizeObserver === 'function' && root.host) {
     let last = -1;
     ro = new ResizeObserver(() => {
       if (!view) return;
-      const pp = perPage(fillCount(view.pair));
-      if (pp === last) return;
-      last = pp; render();
+      const px = cellPx();
+      if (px === last) return;
+      last = px; render();
     });
     ro.observe(root.host);
   }
@@ -293,7 +297,18 @@ const play = (part, notes) => {
   return {
     update(v) {
       if (!v) return;
-      view = v; if (v.round !== round) { round = v.round; page = 0; draft = Array(fillCount(v.pair)).fill(null); } render();
+      view = v; if (v.round !== round) { round = v.round; draft = Array(fillCount(v.pair)).fill(null); }
+      // render() walks the whole projected state into innerHTML. If any of it
+      // is not what we expect — a half-dealt pair from a snapshot mid-flight, a
+      // scale the library does not have — that used to throw out of update(),
+      // which the hub swallows, and the stage was left as a blank navy box with
+      // no grid and no explanation. Say what is wrong instead.
+      try { render(); } catch (err) {
+        root.querySelector('#game').innerHTML =
+          `<div class="box"><p>Round ${v.round} could not be drawn: ${esc(String((err && err.message) || err))}</p>`
+          + '<p>Press New game for a fresh pair.</p></div>';
+        talk('Something went wrong drawing this round.');
+      }
       // Seating is hub-owned, but the table roster lives in state: a player who
       // opened a live table asks to join from the first update (never from
       // mount — the hub has not assigned the handle yet). Spectators stay out.

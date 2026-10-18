@@ -119,15 +119,44 @@ HARNESS = r"""
   ok('an untimed round never asks to tick',
     !intents.some((a) => a.a === 'tick'));
 
-  // The grid draws one screenful of columns, and never more than that: a 16-slot pair
-  // paginates rather than running off the side of a phone.
-  const cellsPerPage = (w, n) => Math.max(1, Math.min(n, Math.floor((w - 26 + 4) / 48)));
-  ok('grid renders one page of note cells', (() => {
-    const n = hk.fillCount(state.pair);
-    return qa('#grid button').length === cellsPerPage(host.clientWidth, n) * hk.SIZE;
+  // The grid draws EVERY slot of the pair at one cell size, and scrolls sideways
+  // when that is wider than the screen. It used to divide the width between
+  // however many columns the pair happened to have and paginate the rest, so a
+  // 4-slot pair drew enormous keys, a 16-slot pair tiny ones, and the last page
+  // of a paged pair was visibly bigger than the first.
+  const gridCells = () => qa('#grid button').length;
+  const cellSize = () => {
+    const b = q('#grid button');
+    return b ? Math.round(b.getBoundingClientRect().width) : 0;
+  };
+  ok('every slot of the pair is drawn', gridCells() === hk.fillCount(state.pair) * hk.SIZE);
+  ok('every cell is the same size', (() => {
+    const sizes = qa('#grid button').map((b) => Math.round(b.getBoundingClientRect().width));
+    return sizes.length > 0 && sizes.every((s) => s === sizes[0]);
   })());
-  ok('the grid fits the width it is given',
-    q('#grid').scrollWidth <= q('#grid').clientWidth + 1 && q('.k').scrollWidth <= q('.k').clientWidth + 1);
+  ok('every cell is square', (() => {
+    const b = q('#grid button').getBoundingClientRect();
+    return Math.abs(Math.round(b.width) - Math.round(b.height)) <= 1;
+  })());
+  ok('each row is labelled', qa('#grid .lab').length === hk.SIZE);
+  // Measured off getBoundingClientRect, so the values are fractional and a
+  // 3px gap can read as 2.6 or 3.4. Compare with a 1px tolerance — what is
+  // being caught is a grid that stretches its cells to fill the row, which
+  // makes the gaps differ by many pixels, not by rounding.
+  // Compare cells within ONE row: with 4 slots a row, cell 7 belongs to the
+  // next row and the "gap" to it is the row pitch.
+  ok('the gaps between cells are even', (() => {
+    const row = qa('#grid button').slice(0, hk.fillCount(state.pair));
+    const gaps = [];
+    for (let i = 1; i < row.length; i++) {
+      gaps.push(row[i].getBoundingClientRect().left - row[i - 1].getBoundingClientRect().right);
+    }
+    if (gaps.length < 2) return false;
+    const lo = Math.min.apply(null, gaps), hi = Math.max.apply(null, gaps);
+    return (hi - lo) <= 1.5 && lo > 0 && hi <= 5;
+  })());
+  ok('the page itself never scrolls sideways',
+    q('.k').scrollWidth <= q('.k').clientWidth + 1);
   ok('the compose panel can play each part on its own',
     !!q('[data-part="hook"]') && !!q('[data-part="intro"]') && !!q('[data-part="outro"]') && !!q('[data-part="all"]'));
   ok('the parts play in order: intro, hook, outro, all', (() => {
@@ -138,17 +167,13 @@ HARNESS = r"""
   // ---- compose a hook: one cell per column (paging as needed), then lock
   const firstPair = state.pair.name;
   const cell = (c, r) => q('#grid [data-col="' + c + '"][data-row="' + r + '"]');
-  // One note per column, paging to reach the columns that do not fit.
+  // One note per column. Every column is on screen at once (the grid scrolls
+  // rather than paginating), so no paging is needed to reach one.
   const fillDraft = () => {
     const n = hk.fillCount(state.pair);
-    let filled = 0, paged = 0;
+    let filled = 0;
     for (let c = 0; c < n; c++) {
-      let b = cell(c, 0);
-      while (!b && paged < n) {
-        const next = q('[data-pg="1"]');
-        if (!next) break;
-        next.click(); paged++; b = cell(c, 0);
-      }
+      const b = cell(c, 0);
       if (b) { b.click(); filled++; }
     }
     return filled;
@@ -218,20 +243,35 @@ HARNESS = r"""
   ok('an empty draft is stopped locally',
     intents.length === sentBefore && /Choose .* notes first/.test(q('#bubble').textContent));
 
-  // ---- a wide pair on a narrow screen: pager, no sideways scroll
+  // ---- a wide pair on a narrow screen: every column present, one cell size,
+// sideways scroll inside the grid, and NO pager (there is no "next" to hunt for)
   const widest = hk.PAIRS.reduce((a, p) => (hk.fillCount(p) > hk.fillCount(a) ? p : a));
   host.style.width = '320px';
   const wide = hk.project({ ...state, pair: widest, round: 500 }, ME);
   handle.update(wide);
-  const wn = hk.fillCount(wide.pair), wpp = cellsPerPage(320, wn);
-  ok('the widest pair is wider than a phone', wn > wpp);
-  ok('a pair that will not fit gets a pager', !!q('#pager') && /of /.test(q('#pager').textContent));
-  ok('only a page of columns is drawn', qa('#grid button').length === wpp * hk.SIZE);
-  ok('the pager shows the columns you are on', /slots 1[–-]\d+ of \d+/.test(q('#pager').textContent));
-  ok('nothing runs off the side',
-    q('#grid').scrollWidth <= q('#grid').clientWidth + 1 && q('.k').scrollWidth <= q('.k').clientWidth + 1);
-  q('[data-pg="1"]').click();
-  ok('the pager moves to the next columns', !!q('#grid [data-col="' + wpp + '"]'));
+  const wn = hk.fillCount(wide.pair);
+  ok('the widest pair is wider than a phone', wn * cellSize() > 320);
+  ok('there is no pager to hunt for', !q('#pager') && !q('[data-pg]'));
+  ok('all of the widest pair is drawn at once', gridCells() === wn * hk.SIZE);
+  ok('the last column is reachable', !!q('#grid [data-col="' + (wn - 1) + '"]'));
+  const wideCell = cellSize();
+  ok('cells stay the same size on the widest pair', (() => {
+    const sizes = qa('#grid button').map((b) => Math.round(b.getBoundingClientRect().width));
+    return sizes.every((s) => s === sizes[0]);
+  })());
+  ok('the wide grid scrolls sideways inside its own box', (() => {
+    const wrap = q('#wrap'), g = q('#grid');
+    return wrap.scrollWidth > wrap.clientWidth + 1 && getComputedStyle(wrap).overflowX === 'auto';
+  })());
+  ok('the page still does not scroll sideways', q('.k').scrollWidth <= q('.k').clientWidth + 1);
+  // And a narrow pair on the same narrow screen must not be padded out into
+  // giant cells just because there are fewer of them.
+  const narrowest = hk.PAIRS.reduce((a, p) => (hk.fillCount(p) < hk.fillCount(a) ? p : a));
+  handle.update(hk.project({ ...state, pair: narrowest, round: 501 }, ME));
+  ok('a narrow pair uses the same cell size as a wide one', cellSize() === wideCell);
+  ok('a narrow pair fits without scrolling',
+    q('#wrap').scrollWidth <= q('#wrap').clientWidth + 1);
+  handle.update(hk.project(state, ME));
 
   // ---- a table of two: the vote panel, and a way out of it once someone has voted
   const duoHost = document.createElement('div');
