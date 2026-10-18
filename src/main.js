@@ -8,7 +8,7 @@ import { createNet } from '../net/peer.js';
 import { T, msg } from '../net/protocol.js';
 import { createStage } from './stage.js';
 import { createCompat, legacyRoster } from './compat.js';
-import { loadRegistry, soloCorner, roomLists } from './registry.js';
+import { loadRegistry, soloCorner, roomLists, multiplayerSections, playerLabel } from './registry.js';
 import { createChat } from '../plugins/chat.js';
 import { createInvite, parseInvite } from '../plugins/invite.js';
 import { createRecord } from '../plugins/record.js';
@@ -54,7 +54,24 @@ export async function boot() {
   };
 
   // module runtime state (host-side): gameId -> { mod, state }
+  //
+  // This map used to live for the whole page load, which meant init() ran at
+  // most once per game per tab: seat whoever was in the room the FIRST time
+  // anybody opened that game, forever. Leave a room and host a new one in the
+  // same tab and the new room inherited the old table — old ids, old round,
+  // nothing repairable without a reload. That is the "I have to make a new
+  // room (or reload)" bug. Room transitions now call resetTables().
   const modState = new Map();
+
+  // Drop every game table AND the cached host views that go with them. Called
+  // whenever the room underneath us changes: leaving, being kicked, host grace
+  // running out, hosting a new room, or being accepted into one as a guest.
+  function resetTables() {
+    modState.clear();
+    store.clearStates();
+    store.state.seatsByGame = {};
+    store.state.seats = {};
+  }
 
   const stageRoot = document.getElementById('game-stage');
   const stage = createStage(stageRoot);
@@ -83,8 +100,13 @@ export async function boot() {
       // grace expired: close the room, keep usernames for a fresh room
       const keepName = store.state.me.name;
       const keepId = store.state.me.id;
-      teardownNet();
+      // closeRoom BEFORE teardownNet: tearing down the host connection fires
+      // its 'close' event, which — while inRoom is still true — looks exactly
+      // like the host dropping us and starts the grace countdown again, from
+      // inside the thing that was supposed to stop it.
       store.closeRoom();
+      resetTables();
+      teardownNet();
       store.setMe(keepId, keepName);
       showLobby();
       setStatus('join-status', 'Host is gone — room closed. Start a new room below; your name was kept.');
@@ -104,7 +126,12 @@ export async function boot() {
     hideBanner();
     if (redialTimer) { clearTimeout(redialTimer); redialTimer = null; }
     redialDelay = 1500;
-    if (net) { try { net.close(); } catch (e) {} }
+    const old = net;
+    // Null it out. ensureNet used to hand back the closed object forever after
+    // a teardown, so anything reading net.peer or net.guests in between was
+    // looking at a destroyed Peer.
+    net = null;
+    if (old) { try { old.close(); } catch (e) {} }
   }
 
   function hideBanner() {
@@ -137,10 +164,17 @@ export async function boot() {
     return { groups: groups, lobby: lobby };
   }
 
+  // Seats are per table now, so the label asks each table separately — a flat
+  // map printed whichever game happened to be open when the roster rendered.
   function memberLabel(m) {
     const s = store.state;
     let seat = '';
-    Object.keys(s.seats).forEach(function (k) { if (s.seats[k] === m.id) seat = ' (seat ' + k + ')'; });
+    Object.keys(s.seatsByGame).forEach(function (gid) {
+      const map = s.seatsByGame[gid];
+      Object.keys(map).forEach(function (k) {
+        if (map[k] === m.id) seat = ' (seat ' + k + ' · ' + gameTitle(gid) + ')';
+      });
+    });
     return (m.host ? '👑 ' : '') + m.name + (m.id === s.me.id ? ' (you)' : '') + seat +
       (m.bot ? ' [bot]' : '') + (m.spectator ? ' [watching]' : '');
   }
@@ -234,7 +268,12 @@ export async function boot() {
       btn.className = 'btn-bouncy rounded px-2 py-1 text-xs font-bold ml-auto';
       btn.style.background = g.meta.color || '#334155';
       btn.textContent = 'Join table';
-      btn.addEventListener('click', function () { openGame(gid); });
+      // Leave the current table properly first. Calling openGame directly left
+      // the old seat held and the old table waiting on a player who had gone.
+      btn.addEventListener('click', function () {
+        leaveOpenGame();
+        openGame(gid);
+      });
       div.appendChild(span);
       div.appendChild(btn);
       box.appendChild(div);
@@ -307,11 +346,18 @@ export async function boot() {
       const lum = (0.299 * r + 0.587 * gg + 0.114 * bb) / 255;
       b.style.color = lum > 0.6 ? '#0f172a' : '#fff';
     } catch (e) {}
-    const count = g.meta.players && g.meta.players.min !== undefined
-      ? g.meta.players.min + '-' + g.meta.players.max + ' players'
-      : (g.meta.players || '');
+    const count = playerLabel(g.meta);
     b.title = [count, g.meta.desc, g.kind === 'module' ? 'New module.' : 'Classic.']
       .filter(Boolean).join(' ');
+    // The count is the thing people read first when choosing a table, and a
+    // phone never shows a tooltip, so it goes on the button in small type.
+    if (count) {
+      const tag = document.createElement('small');
+      tag.className = 'block text-[10px] font-normal opacity-80';
+      tag.textContent = count;
+      b.appendChild(document.createElement('br'));
+      b.appendChild(tag);
+    }
     b.addEventListener('click', function () { openGame(g.meta.id); });
     return b;
   }
@@ -322,16 +368,28 @@ export async function boot() {
       lobby.innerHTML = '';
       soloCorner(registry).forEach(function (g) { lobby.appendChild(gameButton(g, 'lobby')); });
     }
-    const lists = roomLists(registry);
+    // Multiplayer is grouped by how many people a table takes, so nobody has to
+    // open six games to find out which ones a third person can join.
     const mb = document.getElementById('game-buttons');
     if (mb) {
       mb.innerHTML = '';
-      lists.multi.forEach(function (g) { mb.appendChild(gameButton(g, 'room')); });
+      multiplayerSections(registry).forEach(function (sec) {
+        const wrap = document.createElement('div');
+        const h = document.createElement('h3');
+        h.className = 'text-teal-300 text-xs font-extrabold uppercase tracking-wide mb-1';
+        h.textContent = sec.title;
+        wrap.appendChild(h);
+        const row = document.createElement('div');
+        row.className = 'flex flex-wrap gap-2';
+        sec.games.forEach(function (g) { row.appendChild(gameButton(g, 'room')); });
+        wrap.appendChild(row);
+        mb.appendChild(wrap);
+      });
     }
     const sb = document.getElementById('solo-game-buttons');
     if (sb) {
       sb.innerHTML = '';
-      lists.solo.forEach(function (g) { sb.appendChild(gameButton(g, 'solo')); });
+      roomLists(registry).solo.forEach(function (g) { sb.appendChild(gameButton(g, 'solo')); });
     }
   }
 
@@ -388,17 +446,24 @@ export async function boot() {
       saveSession(store.state);
       return;
     }
+    // Switching tables in place. openGame used to set presence for the game
+    // being ENTERED and never for the one being left, so a host who moved to
+    // another table stayed seated in the first one's state and any round
+    // waiting on the whole table could never finish. Say where we were, prune
+    // it, then claim the new seat — in that order, so the seat index is free.
+    const was = (s.roster.find(function (r) { return r.id === s.me.id; }) || {}).game || null;
+    if (was && was !== id && pruneOneGame(was, s.me.id)) pushRosterToGames();
     store.setOpenGame(id);
     // hub-owned seating: whoever opens the game takes the lowest free seat.
     // A guest's claim stays local (broadcastRoster only sends for the host),
     // but that is all isSpectator() needs to stop lying.
-    if (store.mySeat() === null) store.claimFreeSeat(s.me.id);
+    if (store.mySeat(id) === null) store.claimFreeSeat(s.me.id, id);
     store.setPresence(s.me.id, id);
     broadcastRoster();
     // A guest's roster entry only leaves their own machine, so the host would otherwise hand
     // the game an empty table and never learn anyone was playing. PRESENCE is how a guest says
     // "I am at this table" — without it, games see nobody and seat nobody.
-    if (!s.isHost && net) { try { ensureNet().sendToHost(msg(T.PRESENCE, { id: s.me.id, game: id })); } catch (e) {} }
+    if (!s.isHost) { logWire('out', msg(T.PRESENCE, { id: s.me.id, game: id })); sendToHostOrExplain(msg(T.PRESENCE, { id: s.me.id, game: id }), id); }
     mountGame(g);
     saveSession(store.state);
   }
@@ -408,13 +473,22 @@ export async function boot() {
   // never learned the seat was empty.
   function leaveOpenGame() {
     const s = store.state;
+    const was = s.openGame;
     closeStageOnly();
     store.setOpenGame(null);
     if (s.inRoom) {
       store.setPresence(s.me.id, null);
+      // Give the seat back. store.freeSeat had no call sites anywhere, so seats
+      // were only ever reclaimed when a connection dropped: the map grew for
+      // the life of the room, seat numbers climbed across games, and
+      // isSpectator() went on calling leavers "seated" at a table they had left.
+      if (was) store.freePlayerSeats(s.me.id, was);
+      // Host: prune the table I was holding, or it waits on me forever.
+      if (s.isHost && was && pruneOneGame(was, s.me.id)) pushRosterToGames();
       if (s.isHost) broadcastRoster();
-      else if (net) { try { ensureNet().sendToHost(msg(T.PRESENCE, { id: s.me.id, game: null })); } catch (e) {} }
+      else { logWire('out', msg(T.PRESENCE, { id: s.me.id, game: null })); sendToHostOrExplain(msg(T.PRESENCE, { id: s.me.id, game: null }), was || ''); }
     }
+    renderRoster();
     saveSession(store.state);
   }
 
@@ -428,19 +502,33 @@ export async function boot() {
     renderHeaderRoom();
     if (g.kind === 'module' && g.module) {
       const mod = g.module;
-      let st = modState.get(g.meta.id);
-      if (!st) {
-        try {
-          st = { mod: mod, state: mod.init(initCtx(g.meta)) };
-        } catch (e) {
-          console.error(e);
-          st = { mod: mod, state: {} };
-        }
-        modState.set(g.meta.id, st);
-      }
-      // late joiners / re-opens get the cached state first
+      const s = store.state;
       const cached = store.getCached(g.meta.id);
-      const view = cached !== undefined ? cached : st.state;
+      let view = cached;
+      if (s.isHost || !s.inRoom) {
+        // Authoritative side (host, or a solo room of one): we own the table.
+        let st = modState.get(g.meta.id);
+        if (!st) {
+          try {
+            st = { mod: mod, state: mod.init(initCtx(g.meta)) };
+          } catch (e) {
+            console.error(e);
+            st = { mod: mod, state: {} };
+          }
+          modState.set(g.meta.id, st);
+        }
+        if (view === undefined) view = st.state;
+      }
+      // A guest used to run mod.init() here too, on its own local roster, and
+      // that fiction won over the host's real state because `cached` was
+      // usually empty. There was no way to ask: the host only sent T.STATE
+      // after somebody reduced, so a guest opening a game nobody was playing
+      // sat on a table made of its own imagination until the host happened to
+      // move. Ask instead, and render the waiting state until the answer lands.
+      if (view === undefined) {
+        view = waitingView(g);
+        requestSnapshot(g.meta.id);
+      }
       moduleHandle = stage.mount(g.meta, mod, apiFor(g.meta));
       if (moduleHandle) { try { moduleHandle.update(view); } catch (e) {} }
     } else {
@@ -454,6 +542,41 @@ export async function boot() {
       } catch (e) {}
     }
     histReplace({ game: store.state.openGame || '' });
+  }
+
+  // A guest's placeholder view, shaped like a fresh host table so a game's
+  // update() does not walk into undefined fields while the snapshot lands.
+  function waitingView(g) {
+    try { return g.module.project(g.module.init({ seats: [], atTable: [], options: {} }), store.state.me.id); }
+    catch (e) { return {}; }
+  }
+
+  // "I just opened this game — send me the table." Cheap, idempotent, and it
+  // means a guest never has to invent one.
+  function requestSnapshot(gameId) {
+    const s = store.state;
+    if (!s.inRoom || s.isHost || !net) return;
+    try { ensureNet().sendToHost(msg(T.SNAPSHOT, { game: gameId, id: s.me.id })); }
+    catch (e) { console.warn('snapshot request failed:', e); }
+  }
+
+  function sendSnapshotTo(gameId, toId) {
+    const g = byId.get(gameId);
+    if (!g || g.kind !== 'module') return false;
+    let st = modState.get(gameId);
+    if (!st) {
+      // Nobody has played here yet, so there is no table to describe. Create
+      // one from the live roster, then answer — an empty game the host has not
+      // opened is still a real table once a guest sits down.
+      try { st = { mod: g.module, state: g.module.init(initCtx(g.meta)) }; }
+      catch (e) { st = { mod: g.module, state: {} }; }
+      modState.set(gameId, st);
+    }
+    const view = safeProject(g.module, st.state, toId);
+    store.cacheState(gameId, safeProject(g.module, st.state, store.state.me.id));
+    try { ensureNet().sendTo(toId, msg(T.STATE, { game: gameId, view: view })); }
+    catch (e) { return false; }
+    return true;
   }
 
   function stageUpdate(gameId, view) {
@@ -471,21 +594,36 @@ export async function boot() {
   function sendAction(gameId, action) {
     const s = store.state;
     const g = byId.get(gameId);
+    const intent = msg(T.INTENT, { game: gameId, action: action, from: { id: s.me.id, name: s.me.name, host: !!s.isHost } });
+    const local = (s.isHost || !s.inRoom);
+    if (!local) logWire('out', intent);
     if (g && g.kind === 'module' && g.module) {
-      if (s.isHost || !s.inRoom) {
+      if (local) {
         hostReduce(gameId, action, { id: s.me.id, name: s.me.name, host: !!s.isHost });
-      } else {
-        ensureNet().sendToHost(msg(T.INTENT, { game: gameId, action: action, from: { id: s.me.id, name: s.me.name, host: !!s.isHost } }));
-      }
+      } else if (!sendToHostOrExplain(intent, gameId)) { /* already logged */ }
     } else {
       // compat: guest intents go to host iframe; host applies + broadcasts
-      if (s.isHost || !s.inRoom) {
+      if (local) {
         compat.down(gameId, 'intent', action);
         // solo: nothing to broadcast
-      } else {
-        ensureNet().sendToHost(msg(T.INTENT, { game: gameId, action: action, from: { id: s.me.id, name: s.me.name, host: !!s.isHost } }));
-      }
+      } else if (!sendToHostOrExplain(intent, gameId)) { /* already logged */ }
     }
+  }
+
+  // net.sendToHost returns false when the connection is not open. Every call
+  // site threw that boolean away, so an action taken during a wobble vanished
+  // with nothing on screen — a frozen game and no clue why.
+  function sendToHostOrExplain(m, gameId) {
+    let ok = false;
+    try { ok = ensureNet().sendToHost(m); } catch (e) {
+      logNote('send to host threw: ' + ((e && e.message) || e));
+      return false;
+    }
+    if (!ok) {
+      logNote('could not reach the host — "' + gameId + '" did not get your move. Reconnecting…');
+      onHostLost();
+    }
+    return ok;
   }
 
   function hostReduce(gameId, action, from) {
@@ -537,16 +675,33 @@ export async function boot() {
 
   function safeProject(mod, state, playerId) {
     try {
-      if (typeof mod.project === 'function') return mod.project(state, playerId);
+      // api is the third argument so a game can read the live hub (the roster
+      // is the only place player names live) when it projects.
+      if (typeof mod.project === 'function') return mod.project(state, playerId, apiFor(currentMeta(playerId)));
     } catch (e) { console.error('project() threw:', e); }
     return state;
+  }
+
+  // The meta of the game a given view belongs to — always the open one, since
+  // a view is only projected for a game somebody is looking at.
+  function currentMeta() {
+    const g = byId.get(store.state.openGame);
+    return g ? g.meta : { id: store.state.openGame || '' };
   }
 
   // ---------- net events ----------
   function onNetEvent(kind, p) {
     const s = store.state;
+    logWire('net', { type: kind, p: (p && p.room) || (p && p.state) || '' });
     if (kind === 'open') {
       // we are host now
+      // Hosting is a new room: anything left from solo play or a previous room
+      // is not this room's table.
+      resetTables();
+      grace.stop();
+      hideBanner();
+      if (redialTimer) { clearTimeout(redialTimer); redialTimer = null; }
+      redialDelay = 1500;
       store.openRoom(p.room, true);
       store.upsertMember({ id: s.me.id, name: s.me.name, host: true, game: s.openGame });
       noteSeen(s.me.id);
@@ -570,9 +725,36 @@ export async function boot() {
     }
   }
 
+  // Rolling transcript of wire traffic. There was no message logging anywhere in
+  // the hub, which is why "it just won't work" was unfollowable: an intent
+  // that went out, one that came back, and one that was dropped all looked
+  // identical from the outside. Read it with BubHub.log() in the console.
+  const wireLog = [];
+  function logWire(direction, m) {
+    const line = {
+      at: Date.now(),
+      dir: direction,
+      type: m && m.type,
+      p: m && m.p
+    };
+    wireLog.push(line);
+    if (wireLog.length > 200) wireLog.shift();
+    try { console.log('[bubhub ' + direction + ']', m && m.type, m && m.p); } catch (e) {}
+    return line;
+  }
+  function logNote(text) {
+    wireLog.push({ at: Date.now(), dir: 'note', type: 'note', p: text });
+    if (wireLog.length > 200) wireLog.shift();
+    try { console.warn('[bubhub]', text); } catch (e) {}
+  }
+
   function onMessage(fromConn, m) {
     const s = store.state;
+    logWire('in', m);
     if (s.isHost) noteSeen(senderOf(m));
+    if (s.isHost && m && m.type === T.INTENT && !(m.p && m.p.denied)) {
+      logWire('out', msg(T.STATE, { game: m.p.game, view: '(projected)' }));
+    }
     if (m.type === T.HELLO) {
       if (!s.isHost) return;
       const want = String(m.p.name || 'Player').slice(0, 24);
@@ -592,6 +774,9 @@ export async function boot() {
         room: s.roomId,
         roster: store.rosterList(),
         seats: Object.assign({}, s.seats),
+        // Every table's seat map, so a guest's local mirror matches the host's
+        // for all of them and not just whichever game is open right now.
+        seatMaps: store.seatMaps(),
         states: s.lastState
       }));
       if (name !== want) ensureNet().sendTo(slotId, msg(T.RENAME, { id: slotId, name: name }));
@@ -607,7 +792,12 @@ export async function boot() {
       store.openRoom(m.p.room, false);
       store.setHostId(null);
       store.setRoster(m.p.roster || []);
-      if (m.p.seats) Object.keys(m.p.seats).forEach(function (k) { store.claimSeat(k, m.p.seats[k]); });
+      // A guest never holds authoritative tables of its own — anything it
+      // built by running init() itself is a fiction that beats the host's real
+      // state in mountGame. Drop it and take the host's word for everything.
+      resetTables();
+      if (m.p.seatMaps) store.state.seatsByGame = Object.assign({}, m.p.seatMaps);
+      else if (m.p.seats) Object.keys(m.p.seats).forEach(function (k) { store.claimSeat(k, m.p.seats[k]); });
       if (m.p.you) store.setMe(m.p.you.id, m.p.you.name);
       if (m.p.states) Object.keys(m.p.states).forEach(function (g) { store.cacheState(g, m.p.states[g]); });
       showRoom();
@@ -626,6 +816,10 @@ export async function boot() {
     } else if (m.type === T.ROSTER) {
       if (s.isHost) return;
       store.setRoster(m.p.roster || []);
+      if (m.p.seatMaps) {
+        store.state.seatsByGame = Object.assign({}, m.p.seatMaps);
+        if (s.openGame) store.state.seats = store.seatMap(s.openGame);
+      }
       renderRoster();
       pushRosterToGames();
     } else if (m.type === T.CHAT) {
@@ -644,6 +838,17 @@ export async function boot() {
         if (was && was !== now && pruneOneGame(was, m.p.id)) pushRosterToGames();
         broadcastRoster();
         renderRoster();
+      }
+    } else if (m.type === T.SNAPSHOT) {
+      // A guest just opened a game. Answer with the real table, projected for
+      // them. Only module games have a host-side table to send; legacy frames
+      // are pushed their state by pushRosterToGames / the onHello handler.
+      if (!s.isHost) return;
+      const gid = m.p && m.p.game;
+      const want = (m.p && m.p.id) || senderOf(m);
+      if (!gid || !byId.get(gid)) return;
+      if (!sendSnapshotTo(gid, want)) {
+        console.warn('could not send a snapshot of "' + gid + '" to ' + want);
       }
     } else if (m.type === T.INTENT) {
       if (s.isHost) {
@@ -690,6 +895,7 @@ export async function boot() {
       // countdown + redial back into the room we were just removed from.
       closeStageOnly();
       store.closeRoom();
+      resetTables();
       store.setMe(keepId, keepName);
       teardownNet();
       showLobby();
@@ -809,7 +1015,11 @@ export async function boot() {
   function broadcastRoster() {
     const s = store.state;
     if (!s.isHost) return;
-    ensureNet().broadcast(msg(T.ROSTER, { roster: store.rosterList(), seats: Object.assign({}, s.seats) }));
+    ensureNet().broadcast(msg(T.ROSTER, {
+      roster: store.rosterList(),
+      seats: Object.assign({}, s.seats),
+      seatMaps: store.seatMaps()
+    }));
   }
 
   // ---------- host loss / grace ----------
@@ -957,6 +1167,36 @@ export async function boot() {
     }
   }
 
+  // Start a fresh room from wherever you are. Deliberately not confirm-gated:
+  // "new room" is the button you press when the current one is dead, so
+  // asking "are you sure?" about it is a question nobody wants answered.
+  // Leaving the old room is still confirm-gated — that is the one that leaves.
+  async function newRoom() {
+    if (store.state.inRoom) {
+      const keepName = store.state.me.name;
+      const keepId = store.state.me.id;
+      const want = randomRoom();
+      // closeRoom FIRST: teardownNet severs the host connection, and while
+      // inRoom is still true its 'close' event looks like host loss — which
+      // starts a 30s grace timer that then kills the room we are about to
+      // create, a minute later, with a message blaming a host who is there.
+      closeStageOnly();
+      store.closeRoom();
+      resetTables();
+      teardownNet();
+      store.setMe(keepId, keepName);
+      document.getElementById('host-id-input').value = want;
+      showLobby();
+      histReplace({ room: '', game: '' });
+      await hostRoom();
+      return;
+    }
+    // Not in a room: just leave the game and show the lobby.
+    leaveOpenGame();
+    showLobby();
+    setStatus('join-status', 'Press Host to make a room, or join one you were sent.');
+  }
+
   async function joinRoom(roomId, game) {
     errBox(null);
     if (!nameConfirmed) { setStatus('join-status', 'Confirm your name first (✓).'); return; }
@@ -981,9 +1221,12 @@ export async function boot() {
     if (!window.confirm('Leave ' + label + '?')) return;
     const keepName = s.me.name;
     const keepId = s.me.id;
-    teardownNet();
+    // closeRoom before teardownNet — see newRoom(): severing the host
+    // connection while still inRoom reads as host loss and re-arms grace.
     closeStageOnly();
     store.closeRoom();
+    resetTables();
+    teardownNet();
     store.setMe(keepId, keepName);
     clearSession();
     histReplace({ room: '', game: '' });
@@ -1025,6 +1268,7 @@ export async function boot() {
     document.getElementById('btn-host').addEventListener('click', hostRoom);
     document.getElementById('btn-join').addEventListener('click', function () { joinRoom(); });
     document.getElementById('btn-disconnect').addEventListener('click', leaveRoom);
+    document.getElementById('btn-new-room').addEventListener('click', function () { newRoom(); });
 
     chat.wire();
     // chat needs live net access: patch send path
@@ -1112,6 +1356,21 @@ export async function boot() {
   wireUI();
   pushRosterToGames();
 
-  // expose for debugging + play tests
-  window.BubHub = { store: store, openGame: openGame, leaveRoom: leaveRoom, registry: registry };
+  // expose for debugging + play tests. leaveOpenGame/newRoom/modState were
+  // unreachable from the console, which made a game switch impossible to
+  // reproduce or recover without a reload.
+  window.BubHub = {
+    store: store,
+    registry: registry,
+    openGame: openGame,
+    leaveRoom: leaveRoom,
+    leaveOpenGame: leaveOpenGame,
+    newRoom: newRoom,
+    hostRoom: hostRoom,
+    joinRoom: joinRoom,
+    getNet: getNet,
+    modState: modState,
+    log: function () { return wireLog.slice(); },
+    stage: stage
+  };
 }

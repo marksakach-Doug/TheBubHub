@@ -11,6 +11,7 @@ export const T = {
   PRESENCE: 'presence', // all -> host -> all: { id, game }
   INTENT: 'intent',     // guest -> host: { game, action, from }
   STATE: 'state',       // host -> guests: { game, view, from? }
+  SNAPSHOT: 'snapshot', // guest -> host: "I just opened { game } — send me the table"
   RESULT: 'result',     // host -> all: { entry }
   KICK: 'kick',         // host -> one guest: booted, leave the room
   PING: 'ping'          // host -> all heartbeat; guests reply with { id }

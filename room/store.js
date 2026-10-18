@@ -21,7 +21,12 @@ export function createStore() {
     me: { id: 'p-' + Math.random().toString(36).slice(2, 10), name: '' },
     // roster: [{ id, name, host, game, spectator, bot }]
     roster: [],
-    seats: {}, // seatIndex -> playerId (hub-owned)
+    seats: {}, // seatIndex -> playerId (hub-owned, legacy flat view)
+    // gameId -> { seatIndex -> playerId }. Seats are per table: one flat map
+    // meant the seat you held at one game counted as taken at the next one, so
+    // numbers climbed forever and games saw a "seated" viewer they had no slot
+    // for. s.seats mirrors the currently open game's map for old callers.
+    seatsByGame: {},
     lastState: {}, // gameId -> latest host state/view (for late joiners)
     openGame: null
   };
@@ -78,7 +83,12 @@ export function createStore() {
     },
     closeRoom() {
       s.roomId = ''; s.inRoom = false; s.isHost = false; s.hostId = '';
-      s.roster = []; s.seats = {}; s.openGame = null;
+      s.roster = []; s.seats = {}; s.seatsByGame = {}; s.openGame = null;
+      // lastState is a cache of HOST state and must not outlive the room it
+      // came from: mountGame prefers a cached view over a freshly created
+      // table, so a stale entry from the previous room is what a player got
+      // when they made a new room in the same tab.
+      s.lastState = {};
       emit();
     },
     setHostId(id) { s.hostId = id; emit(); },
@@ -91,7 +101,11 @@ export function createStore() {
     },
     removeMember(id) {
       s.roster = s.roster.filter(function (x) { return x.id !== id; });
-      // free any seat they held
+      // free any seat they held, in every table they were sitting at
+      Object.keys(s.seatsByGame).forEach(function (g) {
+        const m = s.seatsByGame[g];
+        Object.keys(m).forEach(function (k) { if (m[k] === id) delete m[k]; });
+      });
       Object.keys(s.seats).forEach(function (k) { if (s.seats[k] === id) delete s.seats[k]; });
       emit();
     },
@@ -101,36 +115,63 @@ export function createStore() {
       if (m) { m.game = game || null; emit(); }
     },
 
-    // Hub-owned seating: seat 0..n. Spectators are roster members with no seat.
-    // Whoever opens a game takes the lowest free seat — not only seat 0. Only
-    // seat 0 was ever claimed, so every guest in a room resolved to
-    // isSpectator() === true and could never join a table.
-    claimSeat(seat, playerId) { s.seats[seat] = playerId; emit(); },
-    claimFreeSeat(playerId) {
-      const taken = Object.keys(s.seats).map(Number);
+    // ---------- hub-owned seating ----------
+    // Seat 0..n, per table. Whoever opens a game takes the lowest free seat —
+    // not only seat 0. Only seat 0 was ever claimed, so every guest in a room
+    // resolved to isSpectator() === true and could never join a table.
+    // `gameId` defaults to the open game so pre-per-game callers keep working.
+    seatMap(gameId) {
+      const g = gameId || s.openGame || '_';
+      if (!s.seatsByGame[g]) s.seatsByGame[g] = {};
+      return s.seatsByGame[g];
+    },
+    seatMaps() { return Object.assign({}, s.seatsByGame); },
+    claimSeat(seat, playerId, gameId) { this.seatMap(gameId)[seat] = playerId; emit(); },
+    claimFreeSeat(playerId, gameId) {
+      const m = this.seatMap(gameId);
+      const taken = Object.keys(m).map(Number);
       let seat = 0;
       while (taken.indexOf(seat) >= 0) seat++;
-      s.seats[seat] = playerId;
+      m[seat] = playerId;
       emit();
       return seat;
     },
-    freeSeat(seat) { delete s.seats[seat]; emit(); },
-    mySeat() {
-      const ids = Object.keys(s.seats);
+    freeSeat(seat, gameId) { delete this.seatMap(gameId)[seat]; emit(); },
+    // Give back every seat a player holds at a table. Leaving a game has to
+    // free the seat, or the next game to open in this room hands out higher
+    // and higher numbers and games think the leaver is still seated.
+    freePlayerSeats(playerId, gameId) {
+      const m = this.seatMap(gameId);
+      let freed = null;
+      Object.keys(m).forEach(function (k) { if (m[k] === playerId) { freed = Number(k); delete m[k]; } });
+      emit();
+      return freed;
+    },
+    mySeat(gameId) {
+      const m = this.seatMap(gameId);
+      const ids = Object.keys(m);
       for (let i = 0; i < ids.length; i++) {
-        if (s.seats[ids[i]] === s.me.id) return Number(ids[i]);
+        if (m[ids[i]] === s.me.id) return Number(ids[i]);
       }
       return null;
     },
+    seatCount(gameId) { return Object.keys(this.seatMap(gameId)).length; },
     isSpectator() {
       if (!s.inRoom) return false;
       if (s.isHost) return false;
-      return this.mySeat() === null;
+      return this.mySeat(s.openGame) === null;
     },
 
     cacheState(game, view) { s.lastState[game] = view; },
     getCached(game) { return s.lastState[game]; },
+    clearStates() { s.lastState = {}; },
 
-    setOpenGame(g) { s.openGame = g; emit(); }
+    // Opening a different table re-points the flat `seats` mirror at that
+    // table's map, so roster labels and api.seats describe the game on screen.
+    setOpenGame(g) {
+      s.openGame = g;
+      s.seats = g ? this.seatMap(g) : {};
+      emit();
+    }
   };
 }

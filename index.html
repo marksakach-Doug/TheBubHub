@@ -61,10 +61,12 @@ body.focus-mode.in-room #chat-pill{display:block;position:fixed;right:12px;botto
     <span id="name-state" class="text-[11px] font-mono text-slate-400"></span>
   </div>
 </header>
-<div id="hub-err" class="hidden text-sm bg-red-900/60 border border-red-500 rounded p-2 relative z-10"></div>
+<!-- z-50: the focus bar is z-40 and fixed at the top, so a connection error
+     raised while a game is open painted straight behind it. -->
+<div id="hub-err" class="hidden text-sm bg-red-900/60 border border-red-500 rounded p-2 fixed left-2 right-2 top-12 z-50"></div>
 
 <div id="focus-bar">
-  <button id="btn-focus-exit" class="btn-bouncy bg-slate-700 rounded px-2 py-1 text-sm font-bold">☰ Games</button>
+  <button id="btn-focus-exit" class="btn-bouncy bg-slate-700 rounded px-2 py-1 text-sm font-bold" title="Leave this game and choose another">← Games</button>
   <span id="focus-title" class="font-extrabold text-sm truncate"></span>
   <button id="focus-room" class="text-xs font-mono underline text-teal-300 truncate ml-auto"></button>
 </div>
@@ -144,7 +146,7 @@ body.focus-mode.in-room #chat-pill{display:block;position:fixed;right:12px;botto
     <div id="game-invites" class="mt-2 flex flex-col gap-2"></div>
   <div id="multiplayer-section" class="bg-slate-800/70 rounded-2xl p-4">
     <h2 class="font-extrabold mb-2">Multiplayer</h2>
-    <div id="game-buttons" class="flex flex-wrap gap-2"></div>
+    <div id="game-buttons" class="flex flex-col gap-3"></div>
   </div>
   <div id="solo-section" class="bg-slate-800/70 rounded-2xl p-4">
     <h2 class="font-extrabold mb-2">Solo</h2>
@@ -154,7 +156,10 @@ body.focus-mode.in-room #chat-pill{display:block;position:fixed;right:12px;botto
     <h2 class="font-extrabold mb-2">Who's here</h2>
     <p id="peer-status" class="text-xs text-slate-400"></p>
     <ul id="roster-list" class="mt-1 flex flex-col gap-1 text-sm"></ul>
-    <button id="btn-disconnect" class="btn-bouncy bg-red-800 rounded px-3 py-1 text-xs font-bold mt-3">Leave room</button>
+    <div class="flex gap-2 mt-3">
+      <button id="btn-disconnect" class="btn-bouncy bg-red-800 rounded px-3 py-1 text-xs font-bold">Leave room</button>
+      <button id="btn-new-room" class="btn-bouncy bg-teal-800 rounded px-3 py-1 text-xs font-bold">New room</button>
+    </div>
   </div>
   <div id="chat-container" class="bg-slate-800/70 rounded-2xl p-4">
     <h2 class="font-extrabold mb-2">Chat</h2>
