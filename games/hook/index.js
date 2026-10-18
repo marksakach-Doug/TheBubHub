@@ -10,7 +10,7 @@ const deadline = (now, ms) => (PLAY_MS && ms ? now + ms : 0);   // 0 everywhere 
 
 // The rule, in the player's words. Solo has no table to vote in, so it gets its own line.
 const RULES_TABLE = 'You make the best hook to fit between the intro and outro. We will vote on who found the best hook.';
-const RULES_SOLO = 'You make the best hook to fit between the intro and outro. No table, no vote — just build the hook that fits.';
+const RULES_SOLO = 'You make the best hook to fit between the intro and outro. Just build the hook that fits.';
 
 export const meta = { id: 'hook', title: "What's the Hook?", players: { min: 1, max: 8 }, color: '#ff00ff',
   icon: '🌉', desc: 'Fill the gap in a matched intro-outro pair. The table votes.', soloable: true };
@@ -235,7 +235,7 @@ const play = (part, notes) => {
     const newGame = seated && api.isHost ? ' <button data-a="newpair">New game</button>' : '';
     $('#game').innerHTML = head + (v.phase === 'play'
       ? `<div class="box"><pre>intro  ${fmt(v.pair.intro.steps, v.scale)}\nhook   ${fmt(hookSteps(v.pair, draft), v.scale)}\noutro  ${fmt(v.pair.outro.steps, v.scale)}</pre>
-          <p>${filled}/${n} slots filled — tap a column to set its note, tap again to clear it.${newGame}</p>${playsHtml(draft)}</div>
+          <p>${filled}/${n} slots filled. Tap a column to set its note.  ${newGame}</p>${playsHtml(draft)}</div>
         ${seated && !v.locked[v.you] ? `${gridHtml(n, pp)}
           <button data-a="clear">Clear</button> <button data-a="lock">Lock in</button>` : ''}
         <p>${Object.keys(v.locked).length}/${v.order.length} locked in${v.locked[v.you] ? ' (including you)' : ''}</p>`

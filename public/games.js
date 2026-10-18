@@ -26,9 +26,9 @@ window.BUB_GAMES = [
     activityRecord: true,
     icon: '🔔', desc: 'Build a chain-reaction machine together out of parts, then press play and watch it go.' },
   { id: 'daltadka', file: 'daltadka.html', title: 'Dal Tadka', players: 'solo', color: '#d9b26f', solo: true, lobby: true, fill: true,
-    icon: '🍲', desc: 'Cook dal from scratch for hungry judges, who score how well you timed each step.' },
+    icon: '🍲', desc: 'Cook dal.' },
   { id: 'warp', file: 'warpfront.html', title: 'Warp Front', players: '1-3', color: '#00ffcc', soloable: true,
-    icon: '🛸', desc: 'Claim a faction and play cards onto planets — first side to five planets wins.' },
+    icon: '🛸', desc: 'A co-op race to save planets. Borg are the bad guys. Get to the planets first.' },
   { id: 'lotr', file: 'lotr.html', title: 'LOTR Cards', players: '2-6', color: '#b9c98a',
     // `grow` (not `fill`): the frame is sized to the game and the WHOLE PAGE
     // scrolls as one. `fill` would pin the frame to the viewport and make the
@@ -36,9 +36,9 @@ window.BUB_GAMES = [
     grow: true,
     icon: '🃏', desc: 'Race to Level 15 while monsters hunt whoever is in the lead.' },
   { id: 'blastoff', file: 'blastoff.html', title: 'Blast Off!', players: '2-6', color: '#00f2ff', soloable: true,
-    icon: '🚀', desc: 'Pick destinations and maneuver your rocket; the hand holding most red cards launches first.' },
+    icon: '🚀', desc: 'Pick destinations and maneuver your rocket.' },
   { id: 'grammar', file: 'discover_the_grammar.html', title: 'Discover the Grammar', players: '2-4', color: '#f3f0e8', soloable: true,
-    icon: '🔤', desc: 'Compare strange sentences side by side and work out the hidden rule behind them.' },
+    icon: '🔤', desc: 'A complex code breaking mind game.' },
   // `soloable: true` also runs a real solo table with no room, so it belongs in
 // the pre-room "Solo Corner". Word Bridge has its own solo mode (you play both
 // sides), so it qualifies — it was simply never flagged.
@@ -50,16 +50,16 @@ window.BUB_GAMES = [
   // `fill` lets the stage own the viewport (solo games never report a height,
   // so the hub sizes the frame itself instead of pinning it).
   { id: 'waltz', file: 'LobbyWaltzEngine.html', title: 'Waltz Engine', players: 'solo', color: '#d9b26f', solo: true, lobby: true, fill: true,
-    icon: '💃', desc: 'Step, turn and glide in time with a waltz the engine writes for you.' },
+    icon: '💃', desc: 'Step, tap, tap.' },
   { id: 'truth', file: 'truths.html', title: 'Write Something True', players: 'solo', color: '#b8a77e', solo: true, lobby: true, fill: true, noRecord: true,
     menuLabel: 'Write something true',
-    icon: '✍️', desc: 'Write one honest line a day — editable until midnight, sealed after.' },
+    icon: '✍️', desc: 'Write one true thing a day.' },
   //{ id: 'DrawDrive', file: 'DrawDrive.html', title: 'Draw and Drive', players: '1-4', color: '#3cc3d4', fill: true,
   //  icon: '✏️', desc: 'Draw a track, then drive a car along what you drew.' },
    { id: 'mucking', file: 'muckingaround.html', title: 'Mucking Around', players: '2-6', color: '#ffd23f', fill: true, soloable: true,
     icon: '🍂', desc: 'You just kind of... muck around.' },
   { id: 'chess', file: 'chess.html', title: 'Chess', players: '2', color: '#c89b6d', fill: true, soloable: true,
-    icon: '♞', desc: 'Full-rules chess — you are White, against a friend or a simple greedy bot.' },
+    icon: '♞', desc: 'Its just chess' },
   // Telephone game: write a sentence, the next player draws it, the one after
   // describes what they see without ever reading it. Not `soloable` and not
   // `lobby` — the game itself needs a room and at least MIN_PLAYERS (3) people,
@@ -67,5 +67,5 @@ window.BUB_GAMES = [
   // `fill` because the layout is a viewport-filling flex column around a
   // fixed 3:2 canvas, not a document that scrolls.
   { id: 'the96game', file: 'the96game.html', title: 'The 96 Game', players: '3-8', color: '#b5541f', fill: true,
-    icon: '🖍️', desc: 'Telephone for the table — one writes, the next draws, the next describes it blind.' },
+    icon: '🖍️', desc: 'One person writes, the next draws, the next writes and so on.' },
 ]

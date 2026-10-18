@@ -110,7 +110,8 @@ HARNESS = r"""
   ok('first update asks to join', intents.some((a) => a.a === 'join'));
   ok('the rule is on screen under the title',
     /You make the best hook to fit between the intro and outro\./.test(q('#rules').textContent));
-  ok('a table of one is not promised a vote', /No table, no vote/.test(q('#rules').textContent));
+  ok('a table of one is not promised a vote',
+    /Just build the hook that fits\./.test(q('#rules').textContent));
   // The clock is switched off at the moment: no countdown on screen, and nothing times a
   // round out. PLAY_MS is the one constant that brings it back.
   ok('the round is untimed', state.deadline === 0);

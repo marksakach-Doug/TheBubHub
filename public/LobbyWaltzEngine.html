@@ -45,6 +45,7 @@ input[type=range]{width:120px;accent-color:var(--brass)}
 }
 @media (prefers-reduced-motion:reduce){*{transition:none!important}}
 
+select{background:#3a2f4d;color:var(--ivory);border:0;border-radius:8px;padding:8px;font:inherit;max-width:190px}
 </style>
 </head>
 <body>
@@ -63,10 +64,9 @@ input[type=range]{width:120px;accent-color:var(--brass)}
     <p id="result" hidden></p>
     <p id="help"></p>
     <div class="toggles">
-      <label class="row">Partner connection <input class="sw" type="checkbox" id="modPartner" checked></label>
-      <label class="row">Chaotic child <input class="sw" type="checkbox" id="modChild"></label>
-      <label class="row sub">Child skill <input type="range" id="childSkill" min="0" max="100" value="20"></label>
-      <label class="row">Partner leads <input class="sw" type="checkbox" id="modLead"></label>
+      <label class="row">Stage <select id="stage"><option value="baby">1 · Baby</option><option value="kid">2 · Kid</option><option value="teen">3 · Teen</option><option value="adult">4 · Adult</option><option value="old">5 · Old age</option></select></label>
+      <label class="row">Pattern <select id="pat"><option value="auto">Auto</option><option value="free">Free</option><option value="box">Box</option><option value="turn">Turn</option><option value="line">Line</option></select></label>
+      <label class="row">Her skill <input type="range" id="childSkill" min="0" max="100" value="20"></label>
       <label class="row">Obstacles <input class="sw" type="checkbox" id="modObs" checked></label>
     </div>
     <button id="startBtn">Start dance</button>
@@ -82,16 +82,26 @@ const Hub = {
 let waltzInst = 0;
 const canvas = $('gameCanvas'), ctx = canvas.getContext('2d');
 const mainMenu = $('mainMenu'), hud = $('hud'), scoreDisp = $('scoreDisplay'), comboDisp = $('comboDisplay'), timerDisp = $('timerDisplay'), startBtn = $('startBtn');
-const modPartner = $('modPartner'), modChild = $('modChild'), childSkillSlider = $('childSkill'), modLead = $('modLead'), modObs = $('modObs');
+const patSel = $('pat'), stageSel = $('stage'), childSkillSlider = $('childSkill'), modObs = $('modObs');
 const SERIF = '"Cormorant Garamond", Georgia, serif';
 const coarse = matchMedia('(pointer: coarse)').matches;
 const calm = matchMedia('(prefers-reduced-motion: reduce)').matches;
 
-const BPM = 60, secPerBeat = 60 / BPM, SCHEDULE_AHEAD = 0.1, DURATION = 30, COUNT_IN = 3;
-const ARM_LENGTH = 50, FRICTION = 0.80;
+const SCHEDULE_AHEAD = 0.1, COUNT_IN = 3; let spb = 1, DURATION = 30;
+const STAGES = {
+ baby:{n:'Midnight Lullaby',bpm:44,win:.5,dur:30,sz:16,force:.7,pat:'free',f:['#1a2147','#0a0c1c'],lk:['#f9a8d4','#6b4a3a','','',''],dd:['#2b3a66','#2a2320'],h:'Waltz her to sleep. Keep steps smooth and gentle to fill the <b>Sleep Meter</b>. Mind the toys.'},
+ kid:{n:'The Teaching Years',bpm:84,win:.4,dur:36,sz:20,force:1,pat:'box',f:['#5a4430','#24180f'],lk:['#fcd34d','#5a3a2a','#fde68a','#f3d2bd','#e5484d'],dd:['#2b3a66','#2a2320'],h:'She is full of energy. When she disrupts the dance, keep landing perfect steps, then <b>swipe toward her</b> on the next beat one to recover. Perfect combos under chaos teach her.'},
+ teen:{n:'Pushing Away',bpm:68,win:.4,dur:36,sz:24,force:1,pat:'box',f:['#26302e','#0c1110'],lk:['#4b7f6a','#2a1f1a','','#2c3a4f','#f4f4f4'],dd:['#2b3a66','#2a2320'],h:'The tempo drifts. When she pulls away, <b>let go</b>: touch nothing. When she returns, swipe to catch the beat.'},
+ adult:{n:'The Wedding Dance',bpm:92,win:.4,dur:30,sz:26,force:1.1,pat:'turn',f:['#4a3b22','#140f08'],lk:['#fffaf0','#4a2f22','#f7f1e6','#fffaf0','#fffaf0'],dd:['#15151f','#2a2320'],h:'What you taught her shows. Make <b>big sweeping swipes</b> on beat one (Shift + arrow on keyboard) to spin and lift.'},
+ old:{n:'The Role Reversal',bpm:46,win:.45,dur:36,sz:26,force:.9,pat:'box',f:['#3b2a2a','#0e0a0c'],lk:['#a78bfa','#6a4a38','','#3a3350','#2a2030'],dd:['#4b4f63','#cfcfd6'],h:'Your hands are slower now. Follow the pulses <b>she</b> sends out. She will carry what you miss.'}
+};
+const PATS = { free: null, box: [[0,-1],[1,0],[0,1],[-1,0]], turn: [0,1,2,3,4,5].map(i => [Math.cos(i * 1.0472 - 1.5708), Math.sin(i * 1.0472 - 1.5708)]), line: [[1,0],[1,0],[0,1],[-1,0],[-1,0],[0,-1]] };
+let floorCv = null, pat = null, patName = '', an = { p: {}, q: {} }, T = 0;
+let cfg = STAGES.baby, stageKey = 'baby', ev = null, sleep = 50, tri = 0, inputsInRebel = 0, rebAng = 0, skillF = 20, off = [], armLen = 66;
+const ARM_LENGTH = 66, FRICTION = 0.80;
 const LABELS = ['Swipe', 'Tap', 'Tap'];
 
-let audioCtx = null, startTime = 0, nextNoteTime = 0, scheduledBeat = 0, lastActiveBeat = -1;
+let audioCtx = null, startTime = 0, nextNoteTime = 0, scheduledBeat = 0, lastActiveBeat = -COUNT_IN - 1;
 let isPlaying = false, score = 0, combo = 0, gameTimer = DURATION, lastTime = 0, shakeAmount = 0;
 let W = 0, H = 0, dpr = 1, lightsY = 0, arena = { l: 0, r: 0, t: 0, b: 0 };
 let player, partner, angularVelocity = 0, childJerkTimer = 0, lastCollisionTime = 0;
@@ -100,9 +110,13 @@ let obstacles = [], floatingTexts = [], trailP = [], trailQ = [], drag = null;
 let highscore = 0;
 try { highscore = Number(localStorage.getItem('waltzHighScore')) || 0; } catch (e) {}
 $('highScoreDisplay').textContent = `Best: ${highscore}`;
-$('help').innerHTML = coarse
+const INHELP = coarse
   ? '<b>Swipe</b> on the first beat to step in any direction. <b>Tap</b> on the next two. Match the ticks.'
   : '<b>Swipe</b> on beat one: drag the mouse or press an arrow key (or WASD). <b>Tap</b> on beats two and three: click or press Space.';
+function setStage() { stageKey = stageSel.value; cfg = STAGES[stageKey]; floorCv = null; $('help').innerHTML = cfg.h + '<br><br>' + INHELP; if (!isPlaying) drawFloor(); }
+stageSel.addEventListener('change', setStage);
+try { const sv = localStorage.getItem('waltzSkill'); if (sv !== null) childSkillSlider.value = sv; } catch (e) {}
+setStage();
 
 function resize() {
   dpr = Math.min(window.devicePixelRatio || 1, 2);
@@ -112,6 +126,7 @@ function resize() {
   lightsY = hud.getBoundingClientRect().bottom + 62;
   arena = { l: 44, r: W - 44, t: lightsY + 46, b: H - 60 };
   if (player) clampToArena();
+  floorCv = null;
   if (!isPlaying) drawFloor();
 }
 function clampToArena() {
@@ -119,13 +134,88 @@ function clampToArena() {
   player.y = Math.max(arena.t, Math.min(arena.b, player.y));
 }
 
-function drawFloor() {
-  const g = ctx.createRadialGradient(W / 2, H * .55, 20, W / 2, H * .55, Math.max(W, H) * .7);
-  g.addColorStop(0, '#2d2042'); g.addColorStop(1, '#120e1c');
-  ctx.fillStyle = g; ctx.fillRect(0, 0, W, H);
-  const cx = W / 2, cy = (arena.t + arena.b) / 2, R = Math.max(40, Math.min(arena.r - arena.l, arena.b - arena.t) / 2);
-  ctx.strokeStyle = 'rgba(217,178,111,.12)'; ctx.lineWidth = 1.5;
-  for (let i = 1; i <= 3; i++) { ctx.beginPath(); ctx.arc(cx, cy, R * i / 3, 0, 7); ctx.stroke(); }
+function buildFloor() {
+  if (!W) return;
+  floorCv = document.createElement('canvas'); floorCv.width = W * dpr; floorCv.height = H * dpr;
+  const c = floorCv.getContext('2d'); c.setTransform(dpr, 0, 0, dpr, 0, 0);
+  const k = stageKey, cx = W / 2, cy = (arena.t + arena.b) / 2, R = Math.max(40, Math.min(arena.r - arena.l, arena.b - arena.t) / 2);
+  const g = c.createRadialGradient(cx, H * .55, 20, cx, H * .55, Math.max(W, H) * .7); g.addColorStop(0, cfg.f[0]); g.addColorStop(1, cfg.f[1]); c.fillStyle = g; c.fillRect(0, 0, W, H);
+  const planks = (col, gap, vert) => { c.strokeStyle = col; c.lineWidth = 1; c.beginPath(); for (let p = 0; p < (vert ? W : H); p += gap) { if (vert) { c.moveTo(p, 0); c.lineTo(p, H); } else { c.moveTo(0, p); c.lineTo(W, p); } } c.stroke(); };
+  const rr = (x, y, w, h, r, fill, stroke) => { c.beginPath(); c.roundRect(x, y, w, h, r); if (fill) { c.fillStyle = fill; c.fill(); } if (stroke) { c.strokeStyle = stroke; c.lineWidth = 3; c.stroke(); } };
+  const glow = (x, y, r, col) => { const q = c.createRadialGradient(x, y, 0, x, y, r); q.addColorStop(0, col); q.addColorStop(1, 'rgba(0,0,0,0)'); c.fillStyle = q; c.fillRect(0, 0, W, H); };
+  if (k === 'baby') {
+    planks('rgba(255,255,255,.04)', 34, false);
+    c.beginPath(); c.arc(cx, cy, R * .95, 0, 7); c.fillStyle = 'rgba(70,80,140,.35)'; c.fill();
+    c.strokeStyle = 'rgba(157,183,255,.22)'; c.lineWidth = 2; for (let i = 1; i < 4; i++) { c.beginPath(); c.arc(cx, cy, R * i / 4, 0, 7); c.stroke(); }
+    rr(6, H - 54, 96, 46, 6, '#3a3157', '#6f64a0'); c.strokeStyle = '#6f64a0'; c.lineWidth = 2; c.beginPath(); for (let x = 20; x < 100; x += 12) { c.moveTo(x, H - 52); c.lineTo(x, H - 10); } c.stroke();
+    glow(W - 30, H - 30, 140, 'rgba(255,200,120,.28)');
+  } else if (k === 'kid') {
+    planks('rgba(0,0,0,.18)', 38, true);
+    rr(arena.l - 20, arena.t - 10, arena.r - arena.l + 40, arena.b - arena.t + 20, 18, 'rgba(200,90,90,.45)', 'rgba(255,220,140,.6)');
+    rr(arena.l, arena.t + 8, arena.r - arena.l, arena.b - arena.t - 16, 12, null, 'rgba(255,220,140,.3)');
+    rr(16, H - 46, W - 32, 40, 12, '#6a4b8c'); c.strokeStyle = 'rgba(0,0,0,.25)'; c.lineWidth = 2; c.beginPath(); c.moveTo(W / 3, H - 44); c.lineTo(W / 3, H - 8); c.moveTo(2 * W / 3, H - 44); c.lineTo(2 * W / 3, H - 8); c.stroke();
+    glow(cx, 0, Math.max(W, H) * .6, 'rgba(255,240,200,.16)');
+  } else if (k === 'teen') {
+    planks('rgba(255,255,255,.06)', 22, true);
+    c.strokeStyle = 'rgba(255,255,255,.35)'; c.lineWidth = 3; c.strokeRect(arena.l - 10, arena.t - 6, arena.r - arena.l + 20, arena.b - arena.t + 12);
+    c.beginPath(); c.moveTo(arena.l - 10, cy); c.lineTo(arena.r + 10, cy); c.moveTo(cx + R * .4, cy); c.arc(cx, cy, R * .4, 0, 7); c.stroke();
+    for (let i = 0; i < 3; i++) rr(0, H - 36 + i * 12, W, 12, 0, i % 2 ? '#3b3f46' : '#2b2f36');
+    glow(cx, cy, Math.max(W, H) * .5, 'rgba(210,225,210,.1)');
+  } else if (k === 'adult') {
+    for (let y = 0, a = 0; y < H; y += 40, a++) for (let x = 0, b = 0; x < W; x += 40, b++) if ((a + b) % 2) { c.fillStyle = 'rgba(255,230,170,.07)'; c.fillRect(x, y, 40, 40); }
+    c.strokeStyle = 'rgba(217,178,111,.7)'; c.lineWidth = 4; c.beginPath(); c.arc(cx, cy, R * 1.02, 0, 7); c.stroke();
+    c.lineWidth = 1.5; c.beginPath(); c.arc(cx, cy, R * .9, 0, 7); c.stroke();
+    glow(cx, cy, R * 1.3, 'rgba(255,220,140,.22)');
+  } else {
+    planks('rgba(0,0,0,.2)', 30, true);
+    c.beginPath(); c.ellipse(cx, cy, R * 1.1, R * .85, 0, 0, 7); c.fillStyle = 'rgba(150,80,70,.35)'; c.fill(); c.strokeStyle = 'rgba(230,180,150,.3)'; c.lineWidth = 3; c.stroke();
+    c.beginPath(); c.moveTo(0, 50); c.lineTo(W * .55, 50); c.lineTo(W * 1.05, H * .9); c.lineTo(W * .3, H * .9); c.closePath();
+    const lg = c.createLinearGradient(0, 50, W * .6, H * .9); lg.addColorStop(0, 'rgba(255,190,110,.28)'); lg.addColorStop(1, 'rgba(255,190,110,0)'); c.fillStyle = lg; c.fill();
+    rr(-10, H * .22, 26, H * .42, 0, '#2a1d18', '#6b4a38'); rr(W - 70, H - 70, 56, 56, 14, '#5b3d34', '#8a6050');
+  }
+}
+function drawFloor() { if (!floorCv) buildFloor(); if (floorCv) ctx.drawImage(floorCv, 0, 0, W, H); }
+
+/* ---------- Top-down people ---------- */
+const SKIN = '#e8c3a0', ease = a => a <= 0 ? 0 : a < .3 ? Math.sin(a / .3 * 1.5708) : a < 1 ? 1 : a < 1.5 ? Math.cos((a - 1) / .5 * 1.5708) : 0;
+function feetOf(d, o, a) {
+  const r = d.size / 2, l = Math.hypot(o.x - d.x, o.y - d.y) || 1, ux = (o.x - d.x) / l, uy = (o.y - d.y) / l, out = [];
+  for (let i = 0; i < 2; i++) {
+    const s = i ? 1 : -1; let x = d.x - uy * s * r * .5 + ux * r * .1, y = d.y + ux * s * r * .5 + uy * r * .1, lift = 0;
+    const st = a.step; if (st && st.foot === i) { const p = ease((T - st.t) / spb); x += st.dx * r * 2.4 * p; y += st.dy * r * 2.4 * p; } // long leg step
+    const tp = a.tap; if (tp && tp.foot === i) { const q = (T - tp.t) / spb; if (q > 0 && q < .5) { lift = Math.sin(q / .5 * Math.PI); x += ux * r * .5 * lift; y += uy * r * .5 * lift; } }
+    out.push({ x, y, lift });
+  }
+  return { out, ux, uy, r };
+}
+function legs(d, F, leg, shoe) {
+  F.out.forEach((f, i) => {
+    const s = i ? 1 : -1, r = F.r;
+    ctx.strokeStyle = leg; ctx.lineWidth = r * .5; ctx.lineCap = 'round'; ctx.beginPath();
+    ctx.moveTo(d.x - F.uy * s * r * .5, d.y + F.ux * s * r * .5); ctx.lineTo(f.x, f.y); ctx.stroke();
+    const z = 1 + .35 * f.lift; ctx.fillStyle = shoe; ctx.beginPath(); ctx.ellipse(f.x, f.y, r * .5 * z, r * .27 * z, Math.atan2(F.uy, F.ux), 0, 7); ctx.fill();
+    if (f.lift > .1) { ctx.strokeStyle = 'rgba(255,255,255,' + f.lift * .5 + ')'; ctx.lineWidth = 2; ctx.beginPath(); ctx.arc(f.x, f.y, r * .8 * (1 + f.lift * .5), 0, 7); ctx.stroke(); }
+  });
+}
+function torso(d, o, body, hair, skirt, baby) {
+  const r = d.size / 2, l = Math.hypot(o.x - d.x, o.y - d.y) || 1, a = Math.atan2((o.y - d.y) / l, (o.x - d.x) / l);
+  ctx.shadowColor = 'rgba(0,0,0,.5)'; ctx.shadowBlur = 10;
+  if (skirt) { ctx.fillStyle = skirt; ctx.beginPath(); ctx.arc(d.x, d.y, r * 1.5, 0, 7); ctx.fill(); }
+  ctx.fillStyle = body; ctx.beginPath(); ctx.ellipse(d.x, d.y, r * (baby ? 1.1 : .55), r * (baby ? 1.1 : 1.05), a, 0, 7); ctx.fill(); ctx.shadowBlur = 0;
+  const hr = r * (baby ? .6 : .52);
+  ctx.fillStyle = SKIN; ctx.beginPath(); ctx.arc(d.x, d.y, hr, 0, 7); ctx.fill();
+  ctx.fillStyle = hair; ctx.beginPath(); ctx.arc(d.x, d.y, hr * 1.05, a + Math.PI * .5, a + Math.PI * 1.5); ctx.fill();
+}
+function drawObs(o, i) {
+  const r = o.size / 2, k = i % 3, s = stageKey, col = ['#e5484d', '#3b82f6', '#facc15', '#34d399'][i % 4];
+  const P = (fl, fn) => { ctx.fillStyle = fl; ctx.beginPath(); fn(); ctx.fill(); }, circ = (fl, q, x = 0, y = 0) => P(fl, () => ctx.arc(x, y, q, 0, 7)), rect = (fl, w, h, rd = 3) => P(fl, () => ctx.roundRect(-w / 2, -h / 2, w, h, rd));
+  ctx.save(); ctx.translate(o.x, o.y); ctx.rotate(i * 1.3); ctx.shadowColor = 'rgba(0,0,0,.45)'; ctx.shadowBlur = 6;
+  if (s === 'baby') { if (k === 1) { circ('#facc15', r * .8); P('#fb923c', () => { ctx.moveTo(r * .6, -4); ctx.lineTo(r * 1.1, 0); ctx.lineTo(r * .6, 4); }); } else { rect(col, r * 2, r * 1.4); circ('rgba(255,255,255,.45)', 3, -r * .4); circ('rgba(255,255,255,.45)', 3, r * .4); } }
+  else if (s === 'kid') { if (k === 1) { circ('#e5484d', r * .9); rect('#fff', r * 1.8, 4, 0); } else { rect(col, r * 1.5, r * 1.5); rect('rgba(255,255,255,.3)', r * .8, r * .8); } }
+  else if (s === 'teen') { if (k === 0) { rect('#3b82f6', r * 1.4, r * 1.9, 5); rect('#1e40af', r, r * .6); } else if (k === 1) { circ('#fb923c', r * .8); circ('#fff', r * .45); circ('#fb923c', r * .2); } else { circ('#c2410c', r * .9); ctx.strokeStyle = '#111'; ctx.lineWidth = 2; ctx.beginPath(); ctx.moveTo(-r * .9, 0); ctx.lineTo(r * .9, 0); ctx.moveTo(0, -r * .9); ctx.lineTo(0, r * .9); ctx.stroke(); } }
+  else if (s === 'adult') { circ('#f4ead7', r * 1.3); circ('#d9b26f', r * .9); circ('#fff', 3); for (let a = 0; a < 5; a++) circ('#7c3f2a', 3.5, Math.cos(a * 1.257) * r * 1.6, Math.sin(a * 1.257) * r * 1.6); }
+  else { if (k === 0) rect('#7b4b3a', r * 2, r * 1.4, 7); else if (k === 1) { circ('#8b8d98', r * .8); circ('#8b8d98', r * .45, r * .8, 0); } else { circ('#6b4331', r * 1.1); circ('#fcd34d', r * .4); } }
+  ctx.restore();
 }
 
 /* ---------- Input: touch, mouse and keyboard all feed _input ---------- */
@@ -148,19 +238,60 @@ addEventListener('keydown', e => {
   if (!isPlaying || e.repeat || e.metaKey || e.ctrlKey || e.altKey) return;
   const k = e.key.length === 1 ? e.key.toLowerCase() : e.key;
   const v = DIRS[k];
-  if (v) { e.preventDefault(); _input('SWIPE', v[0] * 45, v[1] * 45, 45); }
+  if (v) { e.preventDefault(); const m = e.shiftKey ? 120 : 45; _input('SWIPE', v[0] * m, v[1] * m, m); }
   else if (k.length === 1 || k === 'Enter') { e.preventDefault(); _input('TAP', 0, 0, 0); }
 });
 
 /* ---------- Audio: a soft plucked waltz pulse ---------- */
-function playTick(time, isDownbeat) {
-  const osc = audioCtx.createOscillator(), gain = audioCtx.createGain();
-  osc.type = 'triangle';
-  osc.frequency.value = isDownbeat ? 196 : 392;
-  osc.connect(gain); gain.connect(audioCtx.destination);
-  gain.gain.setValueAtTime(isDownbeat ? 0.5 : 0.22, time);
-  gain.gain.exponentialRampToValueAtTime(0.001, time + (isDownbeat ? 0.35 : 0.18));
-  osc.start(time); osc.stop(time + 0.4);
+function tone(t, f, type, v, d) {
+  const o = audioCtx.createOscillator(), g = audioCtx.createGain();
+  o.type = type; o.frequency.value = f; o.connect(g); g.connect(audioCtx.destination);
+  g.gain.setValueAtTime(v, t); g.gain.exponentialRampToValueAtTime(0.001, t + d); o.start(t); o.stop(t + d + .05);
+}
+function playTick(t, down, n) {
+  const i = ((n % 3) + 3) % 3;
+  if (stageKey === 'baby' || stageKey === 'old') { tone(t, [262, 659, 784][i], 'sine', i ? .16 : .3, i ? .5 : .8); return; } // music box
+  tone(t, down ? 196 : 392, 'triangle', down ? .5 : .22, down ? .35 : .18);
+  if (stageKey === 'adult' && down) { tone(t, 294, 'triangle', .18, .5); tone(t, 392, 'sine', .14, .6); }
+  if (stageKey === 'teen' && (down || ev)) tone(t, (down ? 196 : 392) * (ev && ev.t === 'rebel' ? 1.09 : 1.03), 'sawtooth', .05, .3);
+}
+
+/* ---------- Stage helpers ---------- */
+const bt = n => startTime + n * spb + (n > 0 && off[n] ? off[n] : 0);   // beat n in audio time (teen drifts)
+function buildOffsets() { off = []; if (stageKey !== 'teen') return; const p = Math.random() * 6; for (let n = 1; n < 220; n++) off[n] = (Math.sin(n * .7 + p) * .09 + Math.sin(n * .23 + p * 2) * .12) * spb; }
+const txt = (t, c = '#f4ead7') => floatingTexts.push({ x: player.x, y: player.y - 70, text: t, color: c, life: 1.6 });
+const win = () => stageKey === 'adult' ? 0.4 + 0.15 * skillF / 100 : cfg.win;
+const gainSkill = v => { skillF = Math.min(100, skillF + v * (1 - skillF / 140)); };
+function teach(p, idx) {
+  if (!p) { tri = 0; return; }
+  tri = idx === 0 ? 1 : tri + 1;
+  if (idx === 2 && tri === 3 && stageKey === 'kid') { const hot = !!ev; gainSkill(hot ? 2.2 : 0.25); if (hot) txt('She is learning', '#fbcfe8'); }
+}
+function beatTick(n) {
+  const i = ((n % 3) + 3) % 3, sk = skillF / 100;
+  if (ev && n >= ev.end) {
+    const t = ev.t; ev = null;
+    if (t === 'rebel') { if (!inputsInRebel) { score += 300; txt('Patience', '#86efac'); } ev = { t: 'return', end: n + 3 }; txt('Catch the beat'); }
+    else if (t === 'step' || t === 'pull' || t === 'twirl') { ev = { t: 'recover', end: n + 3 }; txt('Recovery beat!', '#7dd3fc'); }
+  }
+  if (!ev && i === 0 && n >= 3) {
+    if (stageKey === 'kid' && Math.random() < 0.6 - 0.35 * sk) {
+      const t = ['step', 'pull', 'twirl'][Math.random() * 3 | 0]; ev = { t, end: n + 3, a: Math.random() * 6.28 }; txt('Oops!', '#fb7185');
+      if (t === 'twirl') angularVelocity += 0.35 * (Math.random() < .5 ? 1 : -1);
+    }
+    if (stageKey === 'teen' && n % 12 === 3) { ev = { t: 'rebel', end: n + 6 }; inputsInRebel = 0; rebAng = Math.random() * 6.28; txt('Let go...', '#a99bbd'); }
+  }
+}
+function vig(x, y, r, a) {
+  const g = ctx.createRadialGradient(x, y, r, x, y, Math.max(W, H)); g.addColorStop(0, 'rgba(10,8,16,0)'); g.addColorStop(1, 'rgba(10,8,16,' + a + ')');
+  ctx.fillStyle = g; ctx.fillRect(-30, -30, W + 60, H + 60);
+}
+function drawOverlay() {
+  const t = 1 - gameTimer / DURATION;
+  if (stageKey === 'baby') { const w = Math.min(W - 90, 260), x = (W - w) / 2, y = lightsY + 28; ctx.fillStyle = 'rgba(255,255,255,.12)'; ctx.fillRect(x, y, w, 8); ctx.fillStyle = '#9db7ff'; ctx.fillRect(x, y, w * sleep / 100, 8); }
+  else if (stageKey === 'adult') vig((player.x + partner.x) / 2, (player.y + partner.y) / 2, Math.min(W, H) * .35, .7);
+  else if (stageKey === 'old') vig(W / 2, H / 2, Math.min(W, H) * (.6 - .3 * t), .5 + .4 * t);
+  else if (stageKey === 'teen' && ev && ev.t === 'rebel') vig(W / 2, H / 2, Math.min(W, H) * .4, .55);
 }
 
 startBtn.addEventListener('click', async () => {
@@ -168,52 +299,73 @@ startBtn.addEventListener('click', async () => {
   if (audioCtx.state === 'suspended') await audioCtx.resume();
   mainMenu.style.display = 'none';
   hud.classList.add('on');
+  cfg = STAGES[stageSel.value]; stageKey = stageSel.value; floorCv = null; an = { p: {}, q: {} };
+  { const pk = patSel.value === 'auto' ? cfg.pat : patSel.value; pat = PATS[pk]; patName = { box: 'Box', turn: 'Turn', line: 'Line' }[pk] || ''; }
+  spb = 60 / cfg.bpm; DURATION = cfg.dur; armLen = ARM_LENGTH;
+  ev = null; sleep = 50; tri = 0; inputsInRebel = 0; skillF = +childSkillSlider.value; buildOffsets();
   score = 0; combo = 0; gameTimer = DURATION; shakeAmount = 0;
   const cx = (arena.l + arena.r) / 2, cy = (arena.t + arena.b) / 2;
-  player = { x: cx, y: cy, vx: 0, vy: 0, size: 30, mass: 2.0 };
-  partner = { x: cx, y: cy + ARM_LENGTH, vx: 0, vy: 0, size: 20, mass: 1.0 };
-  angularVelocity = 0; childJerkTimer = secPerBeat;
+  player = { x: cx, y: cy, vx: 0, vy: 0, size: 42, mass: 2.0 };
+  partner = { x: cx, y: cy + ARM_LENGTH, vx: 0, vy: 0, size: cfg.sz * 1.35, mass: 1.0 };
+  angularVelocity = 0; childJerkTimer = spb;
   obstacles = []; floatingTexts = []; trailP = []; trailQ = []; drag = null; lastCollisionTime = 0;
   if (modObs.checked) spawnObstacles();
   updateHud();
   isPlaying = true;
   // One bar of count-in ticks, then the dance begins on a swipe beat.
-  startTime = audioCtx.currentTime + COUNT_IN * secPerBeat + 0.1;
-  nextNoteTime = startTime - COUNT_IN * secPerBeat;
-  scheduledBeat = -COUNT_IN; lastActiveBeat = -1;
+  startTime = audioCtx.currentTime + COUNT_IN * spb + 0.1;
+  nextNoteTime = startTime - COUNT_IN * spb;
+  scheduledBeat = -COUNT_IN; lastActiveBeat = -COUNT_IN - 1;
   lastTime = performance.now();
   requestAnimationFrame(_process);
 });
 
-function _input(action, dx, dy, swipeMag) {
-  const songPos = audioCtx.currentTime - startTime;
-  if (songPos < -0.4 * secPerBeat) return; // still counting in
-  const exactBeat = songPos / secPerBeat, closestBeat = Math.round(exactBeat);
-  const diff = Math.abs(exactBeat - closestBeat);
-  const expected = (closestBeat % 3 === 0) ? 'SWIPE' : 'TAP';
-
-  if (diff >= 0.4) return registerHit('Miss', '#f87171');
-  if (action !== expected) return registerHit('Wrong move', '#f87171');
-
-  const timingQuality = 1 - diff / 0.4;
+const patDir = n => pat[((n / 3) % pat.length + pat.length) % pat.length];
+function _input(action, dx, dy, mag) {
+  if (stageKey === 'old' && Math.random() < 0.1) return txt('...', '#a99bbd');
+  const lag = stageKey === 'old' ? 0.1 + 0.1 * (1 - gameTimer / DURATION) : 0;  // the dad reacts late
+  const songPos = audioCtx.currentTime - startTime - lag;
+  if (songPos < -0.4 * spb) return;
+  if (ev && ev.t === 'rebel') { inputsInRebel++; combo = 0; score = Math.max(0, score - 40); updateHud(); return txt('Let go', '#fb923c'); }
+  const n0 = Math.round(songPos / spb); let n = n0, best = 9;
+  for (let k = n0 - 1; k <= n0 + 1; k++) { const d = Math.abs(songPos - (bt(k) - startTime)) / spb; if (d < best) { best = d; n = k; } }
+  const idx = ((n % 3) + 3) % 3, expected = idx === 0 ? 'SWIPE' : 'TAP', W2 = win(), sk = skillF / 100;
+  const fail = m => { tri = 0; registerHit(m, '#f87171'); };
+  if ((best >= W2 || action !== expected) && stageKey === 'old' && best < W2 + 0.25 && Math.random() < 0.25 + 0.65 * sk) { registerHit('Guided', '#c084fc'); return; }
+  if (best >= W2) return fail('Miss');
+  if (action !== expected) return fail('Wrong move');
+  const q = 1 - best / W2, perfect = q > 0.7;
   if (action === 'SWIPE') {
-    const dirX = dx / swipeMag, dirY = dy / swipeMag;
-    let stepForce = Math.min(swipeMag, 45) * (0.6 + timingQuality * 0.4);
-    const synergy = dirX * partner.vx + dirY * partner.vy;
-    if (synergy > 3) { stepForce *= 1.2; registerHit('Synergy!', '#c084fc'); }
-    else if (synergy < -3) { stepForce *= 0.8; registerHit('Resisted', '#fb923c'); }
-    else registerHit(timingQuality > 0.7 ? 'Perfect!' : 'Good', '#86efac');
+    const dirX = dx / mag, dirY = dy / mag, cap = stageKey === 'adult' ? 110 : stageKey === 'baby' ? 28 : 45;
+    let f = Math.min(mag, cap) * (0.6 + q * 0.4) * cfg.force, msg = perfect ? 'Perfect!' : 'Good', col = '#86efac';
+    const syn = dirX * partner.vx + dirY * partner.vy;
+    if (syn > 3) { f *= 1.2; msg = 'Synergy!'; col = '#c084fc'; } else if (syn < -3) { f *= 0.8; msg = 'Resisted'; col = '#fb923c'; }
+    if (pat && (msg === 'Perfect!' || msg === 'Good' || msg === 'Synergy!')) { const e = patDir(n); if (dirX * e[0] + dirY * e[1] > .6) { score += 60; msg = patName + '!'; col = '#fde68a'; } }
+    if (ev && ev.t === 'recover' && !ev.done && dirX * (partner.x - player.x) + dirY * (partner.y - player.y) > 0) { msg = 'Recovered!'; col = '#7dd3fc'; score += 150; gainSkill(1.5); ev.done = true; }
+    else if (ev && ev.t === 'return') { msg = 'Caught it'; score += 200 + Math.round(skillF * 3); ev = null; }
+    if (stageKey === 'adult') {
+      partner.vx += dirX * f * (0.15 + 0.35 * sk); partner.vy += dirY * f * (0.15 + 0.35 * sk);   // she moves with you
+      if (mag > 100) { const a = 0.4 + sk; angularVelocity += 0.5 * a; score += Math.round(300 * a); msg = sk > .5 ? 'Spin!' : 'Clumsy spin'; col = '#fde68a'; }
+    }
     const armX = partner.x - player.x, armY = partner.y - player.y;
-    angularVelocity -= (dirX * armY - dirY * armX) * stepForce * 0.0001;
-    player.vx += dirX * stepForce; player.vy += dirY * stepForce;
+    angularVelocity -= (dirX * armY - dirY * armX) * f * 0.0001;
+    player.vx += dirX * f; player.vy += dirY * f;
+    { const nt = audioCtx.currentTime, lead = Math.round(n / 3) & 1, dl = (stageKey === 'kid' ? (1 - sk) * .3 : .05) * spb * Math.random();
+      an.p.step = { t: nt, dx: dirX, dy: dirY, foot: lead }; an.q.step = { t: nt + dl, dx: -dirX * .8, dy: -dirY * .8, foot: 1 - lead }; }
+    registerHit(msg, col);
+    if (msg === 'Resisted') tri = 0; else teach(perfect, idx);
   } else {
-    registerHit(timingQuality > 0.7 ? 'Perfect!' : 'Good', '#86efac');
+    const nt = audioCtx.currentTime, lead = an.p.step ? an.p.step.foot : 0, tf = idx === 1 ? 1 - lead : lead, dl = (stageKey === 'kid' ? (1 - sk) * .3 : .05) * spb * Math.random();
+    an.p.tap = { t: nt, foot: tf }; an.q.tap = { t: nt + dl, foot: 1 - tf };   // alternating foot taps
+    registerHit(perfect ? 'Perfect!' : 'Good', '#86efac'); teach(perfect, idx);
   }
 }
 
 function registerHit(msg, color) {
   floatingTexts.push({ x: player.x, y: player.y - 40, text: msg, color, life: 1.6 });
-  if (['Perfect!', 'Good', 'Synergy!'].includes(msg)) {
+  const good = ['Perfect!', 'Good', 'Synergy!', 'Guided', 'Recovered!', 'Spin!', 'Clumsy spin', 'Caught it'].includes(msg) || (!!patName && msg === patName + '!');
+  if (stageKey === 'baby') sleep = Math.max(0, Math.min(100, sleep + (good ? 2.2 : -3)));
+  if (good) {
     score += 100 + combo * 10; combo++;
     if (navigator.vibrate) navigator.vibrate(20);
   } else combo = 0;
@@ -221,7 +373,7 @@ function registerHit(msg, color) {
 }
 
 function updateHud() {
-  scoreDisp.textContent = score;
+  scoreDisp.textContent = stageKey === 'baby' ? Math.round(sleep) + '%' : score;
   comboDisp.textContent = combo > 1 ? `${combo} in a row` : '';
   const t = Math.ceil(gameTimer);
   timerDisp.textContent = `${Math.floor(t / 60)}:${String(t % 60).padStart(2, '0')}`;
@@ -248,34 +400,30 @@ function _process(timestamp) {
   const f = delta * 60; // normalise physics to 60fps so 120Hz screens feel the same
 
   while (nextNoteTime < audioCtx.currentTime + SCHEDULE_AHEAD) {
-    playTick(nextNoteTime, scheduledBeat % 3 === 0);
-    scheduledBeat++; nextNoteTime += secPerBeat;
+    playTick(nextNoteTime, scheduledBeat % 3 === 0, scheduledBeat);
+    scheduledBeat++; nextNoteTime = bt(scheduledBeat);
   }
 
   const songPos = audioCtx.currentTime - startTime;
-  const activeBeat = Math.floor(songPos / secPerBeat);
-  if (activeBeat > lastActiveBeat && activeBeat >= 0) {
-    lastActiveBeat = activeBeat;
-    if (modLead.checked && activeBeat % 3 === 0) {
-      player.vx += (Math.random() - 0.5) * 35; player.vy += (Math.random() - 0.5) * 35;
-    }
-  }
+  let activeBeat = lastActiveBeat;
+  while (bt(activeBeat + 1) <= audioCtx.currentTime) { activeBeat++; if (activeBeat >= 0) beatTick(activeBeat); }
+  lastActiveBeat = activeBeat;
   gameTimer = Math.max(0, DURATION - Math.max(0, songPos));
   if (gameTimer <= 0) { endGame(); return; }
   updateHud();
 
-  if (modChild.checked && songPos > 0) {
-    childJerkTimer -= delta;
-    if (childJerkTimer <= 0) {
-      const skill = childSkillSlider.value / 100, variance = (1 - skill) * secPerBeat;
-      childJerkTimer = secPerBeat + (Math.random() * variance * 2 - variance);
-      const a = Math.random() * Math.PI * 2, force = 20 - skill * 15;
-      partner.vx += Math.cos(a) * force; partner.vy += Math.sin(a) * force;
-    }
+  if (songPos > 0 && ev) {
+    if (ev.t === 'pull') { partner.vx += Math.cos(ev.a) * 1.6 * f; partner.vy += Math.sin(ev.a) * 1.6 * f; }
+    if (ev.t === 'rebel') { partner.vx += Math.cos(rebAng) * 0.7 * f; partner.vy += Math.sin(rebAng) * 0.7 * f; }
+  }
+  armLen += (((ev && ev.t === 'rebel') ? 170 : ARM_LENGTH) - armLen) * 0.05 * f;
+  if (stageKey === 'old' && modObs.checked) for (const o of obstacles) { // she steers you clear
+    const ox = player.x - o.x, oy = player.y - o.y, d = Math.hypot(ox, oy);
+    if (d < 90 && d > 1) { player.vx += ox / d * skillF / 100 * 1.2 * f; player.vy += oy / d * skillF / 100 * 1.2 * f; }
   }
 
   angularVelocity *= Math.pow(0.90, f);
-  if (Math.abs(angularVelocity) > 0.005 && modPartner.checked) {
+  if (Math.abs(angularVelocity) > 0.005 && true) {
     const s = Math.sin(angularVelocity * f), c = Math.cos(angularVelocity * f);
     const px = partner.x - player.x, py = partner.y - player.y;
     partner.x = px * c - py * s + player.x; partner.y = px * s + py * c + player.y;
@@ -286,27 +434,28 @@ function _process(timestamp) {
   player.x += player.vx * f; player.y += player.vy * f;
   clampToArena();
 
-  if (modPartner.checked) {
+  if (true) {
     partner.vx += player.vx * 0.1 * f; partner.vy += player.vy * 0.1 * f;
     partner.vx *= fr; partner.vy *= fr;
     partner.x += partner.vx * f; partner.y += partner.vy * f;
     const pdx = partner.x - player.x, pdy = partner.y - player.y, dist = Math.hypot(pdx, pdy);
-    if (dist > ARM_LENGTH) {
-      const angle = Math.atan2(pdy, pdx), overlap = dist - ARM_LENGTH;
+    if (dist > armLen) {
+      const angle = Math.atan2(pdy, pdx), overlap = dist - armLen;
       const pr = partner.mass / (player.mass + partner.mass), qr = player.mass / (player.mass + partner.mass);
       player.x += Math.cos(angle) * overlap * pr * 0.5; player.y += Math.sin(angle) * overlap * pr * 0.5;
       partner.x -= Math.cos(angle) * overlap * qr * 0.5; partner.y -= Math.sin(angle) * overlap * qr * 0.5;
     }
   }
 
+  partner.x = Math.max(20, Math.min(W - 20, partner.x)); partner.y = Math.max(arena.t - 20, Math.min(H - 20, partner.y));
   if (modObs.checked && timestamp - lastCollisionTime > 500) {
     for (const o of obstacles) {
       const dx = player.x - o.x, dy = player.y - o.y;
       if (Math.hypot(dx, dy) < player.size / 2 + o.size / 2) {
-        combo = 0; score = Math.max(0, score - 50); updateHud();
+        combo = 0; score = Math.max(0, score - 50); if (stageKey === 'baby') sleep = Math.max(0, sleep - 12); updateHud();
         const a = Math.atan2(dy, dx);
         player.vx = Math.cos(a) * 15; player.vy = Math.sin(a) * 15;
-        floatingTexts.push({ x: player.x, y: player.y - 40, text: 'Ouch!', color: '#fb7185', life: 1.6 });
+        floatingTexts.push({ x: player.x, y: player.y - 40, text: stageKey === 'baby' ? 'Squeak!' : 'Ouch!', color: '#fb7185', life: 1.6 });
         triggerShake(10); lastCollisionTime = timestamp; break;
       }
     }
@@ -327,41 +476,32 @@ function render(songPos, activeBeat, delta) {
     shakeAmount *= 0.8; if (shakeAmount < 0.5) shakeAmount = 0;
   }
   const beatIdx = ((activeBeat % 3) + 3) % 3;
-  const beatProgress = (((songPos % secPerBeat) + secPerBeat) % secPerBeat) / secPerBeat;
+  const b0 = bt(activeBeat), beatProgress = Math.max(0, Math.min(1, (audioCtx.currentTime - b0) / (bt(activeBeat + 1) - b0))), jit = ev && ev.t === 'step';
   const down = beatIdx === 0;
 
-  // beat ripple from the lead
+  const src = stageKey === 'old' ? partner : player;  // in old age she sends the pulses
   ctx.strokeStyle = down ? 'rgba(217,178,111,.5)' : 'rgba(244,234,215,.22)';
-  ctx.globalAlpha = 1 - beatProgress; ctx.lineWidth = down ? 3 : 2;
-  ctx.beginPath(); ctx.arc(player.x, player.y, 22 + beatProgress * 70, 0, 7); ctx.stroke();
+  ctx.globalAlpha = (1 - beatProgress) * (stageKey === 'old' ? 0.5 + skillF / 200 : 1); ctx.lineWidth = down ? 3 : 2;
+  ctx.beginPath(); ctx.arc(src.x, src.y, 22 + beatProgress * 70, 0, 7); ctx.stroke();
   ctx.globalAlpha = 1;
 
-  // obstacles: brass-ringed pillars
-  obstacles.forEach(o => {
-    ctx.fillStyle = '#2a2040'; ctx.strokeStyle = '#d9b26f'; ctx.lineWidth = 3;
-    ctx.beginPath(); ctx.arc(o.x, o.y, o.size / 2, 0, 7); ctx.fill(); ctx.stroke();
-  });
-
-  // trails
-  const trail = (arr, color, r) => arr.forEach((p, i) => {
-    ctx.globalAlpha = (i / arr.length) * 0.28; ctx.fillStyle = color;
-    ctx.beginPath(); ctx.arc(p.x, p.y, r * (i / arr.length), 0, 7); ctx.fill();
-  });
-  trail(trailP, '#f4ead7', player.size / 2);
-  if (modPartner.checked) trail(trailQ, '#e87a90', partner.size / 2);
-  ctx.globalAlpha = 1;
-
-  const dancer = (d, fill, glow, r, dy) => {
-    ctx.shadowColor = glow; ctx.shadowBlur = 24; ctx.fillStyle = fill;
-    ctx.beginPath(); ctx.arc(d.x, d.y + dy, r, 0, 7); ctx.fill(); ctx.shadowBlur = 0;
-  };
-  if (modPartner.checked) {
-    ctx.strokeStyle = 'rgba(217,178,111,.7)'; ctx.lineWidth = 3;
-    ctx.beginPath(); ctx.moveTo(player.x, player.y); ctx.lineTo(partner.x, partner.y); ctx.stroke();
-    dancer(partner, '#e87a90', 'rgba(232,122,144,.8)', partner.size / 2, 0);
+  T = audioCtx.currentTime;
+  obstacles.forEach(drawObs);
+  if (pat) {  // pattern guide: arrow and ghost footprint for the next swipe
+    const ix = ((activeBeat % 3) + 3) % 3, e = patDir(activeBeat + ((3 - ix) % 3)), a = Math.atan2(e[1], e[0]), bx = player.x, by = player.y;
+    const col = stageKey === 'old' ? '232,122,144' : '217,178,111', ex = bx + e[0] * 84, ey = by + e[1] * 84;
+    ctx.strokeStyle = `rgba(${col},${.35 + .3 * (.5 + .5 * Math.sin(T * 6))})`; ctx.lineWidth = 3; ctx.lineCap = 'round';
+    ctx.beginPath(); ctx.moveTo(bx + e[0] * 30, by + e[1] * 30); ctx.lineTo(ex, ey); ctx.stroke();
+    ctx.beginPath(); ctx.moveTo(ex + Math.cos(a + 2.6) * 12, ey + Math.sin(a + 2.6) * 12); ctx.lineTo(ex, ey); ctx.lineTo(ex + Math.cos(a - 2.6) * 12, ey + Math.sin(a - 2.6) * 12); ctx.stroke();
+    ctx.fillStyle = `rgba(${col},.25)`; ctx.beginPath(); ctx.ellipse(bx + e[0] * 106, by + e[1] * 106, 13, 7, a, 0, 7); ctx.fill();
   }
-  const bob = (!down && beatProgress < 0.3) ? -4 * Math.sin(beatProgress / 0.3 * Math.PI) : 0;
-  dancer(player, '#f4ead7', 'rgba(217,178,111,.9)', player.size / 2, bob);
+  const pf = feetOf(player, partner, an.p), qf = feetOf(partner, player, an.q), baby = stageKey === 'baby', lk = cfg.lk, dd = cfg.dd;
+  if (jit) { qf.out[1].x = player.x + 5; qf.out[1].y = player.y - 3; }   // she stands on your foot
+  legs(player, pf, '#1c2438', '#0b0b10'); if (!baby) legs(partner, qf, lk[3], lk[4]);
+  const td = Math.hypot(partner.x - player.x, partner.y - player.y), mx = (player.x + partner.x) / 2, my = (player.y + partner.y) / 2, aw = Math.max(2, pf.r * (baby ? .9 : .4) - (td - ARM_LENGTH) / 60);
+  ctx.lineCap = 'round'; ctx.lineWidth = aw; ctx.strokeStyle = dd[0]; ctx.beginPath(); ctx.moveTo(player.x, player.y); ctx.lineTo(mx, my); ctx.stroke();
+  if (!baby) { ctx.strokeStyle = lk[0]; ctx.beginPath(); ctx.moveTo(partner.x, partner.y); ctx.lineTo(mx, my); ctx.stroke(); ctx.fillStyle = SKIN; ctx.beginPath(); ctx.arc(mx, my, aw * .6, 0, 7); ctx.fill(); }
+  torso(partner, player, lk[0], lk[1], lk[2] || null, baby); torso(player, partner, dd[0], dd[1], null, false);
 
   // drag line (mouse or finger)
   if (drag) {
@@ -372,21 +512,22 @@ function render(songPos, activeBeat, delta) {
 
   // beat lights with Swipe / Tap / Tap above them
   const cx = W / 2, gap = Math.min(80, W / 4);
-  ctx.textAlign = 'center';
+  ctx.textAlign = 'center'; if (stageKey === 'old') ctx.globalAlpha = .35;
   for (let i = 0; i < 3; i++) {
-    const x = cx + (i - 1) * gap, on = i === beatIdx;
+    const x = cx + (i - 1) * gap + (jit ? (Math.random() - .5) * 26 : 0), on = i === beatIdx && !(jit && Math.random() < .35);
     ctx.font = `italic 700 ${on ? 28 : 24}px ${SERIF}`;
     ctx.fillStyle = on ? '#d9b26f' : 'rgba(244,234,215,.5)';
     ctx.fillText(LABELS[i], x, lightsY - 24);
     ctx.shadowColor = '#d9b26f'; ctx.shadowBlur = on ? 22 : 0;
     ctx.fillStyle = on ? '#d9b26f' : 'rgba(244,234,215,.14)';
     ctx.beginPath(); ctx.arc(x, lightsY, on ? 13 : 10, 0, 7); ctx.fill(); ctx.shadowBlur = 0;
-    if (i === (beatIdx + 1) % 3) { // closing ring cues the next beat
+    if (i === (beatIdx + 1) % 3 && !jit) { // closing ring cues the next beat
       ctx.strokeStyle = `rgba(244,234,215,${beatProgress * 0.8})`; ctx.lineWidth = 2;
       ctx.beginPath(); ctx.arc(x, lightsY, 10 + (1 - beatProgress) * 20, 0, 7); ctx.stroke();
     }
   }
 
+  ctx.globalAlpha = 1;
   // floating feedback
   ctx.font = `italic 700 28px ${SERIF}`; ctx.lineJoin = 'round'; ctx.lineWidth = 4; ctx.strokeStyle = 'rgba(20,16,31,.8)';
   for (let i = floatingTexts.length - 1; i >= 0; i--) {
@@ -397,24 +538,23 @@ function render(songPos, activeBeat, delta) {
     if (t.life <= 0) floatingTexts.splice(i, 1);
   }
   ctx.globalAlpha = 1;
+  drawOverlay();
   ctx.restore();
 }
 
 function endGame() {
-  isPlaying = false; drag = null;
-  hud.classList.remove('on');
-  const best = score > highscore;
-  if (best) {
-    highscore = score;
-    try { localStorage.setItem('waltzHighScore', highscore); } catch (e) {}
-  }
-  $('highScoreDisplay').textContent = `Best: ${highscore}`;
+  isPlaying = false; drag = null; hud.classList.remove('on');
+  const fin = stageKey === 'baby' ? Math.round(sleep) : score, key = 'waltzBest_' + stageKey;
+  let hs = 0; try { hs = Number(localStorage.getItem(key)) || 0; } catch (e) {}
+  const best = fin > hs; if (best) { hs = fin; try { localStorage.setItem(key, hs); } catch (e) {} }
+  $('highScoreDisplay').textContent = `${cfg.n} · Best: ${hs}`;
+  if (stageKey === 'kid') { childSkillSlider.value = Math.round(skillF); try { localStorage.setItem('waltzSkill', skillF); } catch (e) {} }  // Skill carries forward
+  const tail = { baby: fin >= 70 ? 'She is asleep.' : 'She stirs, then settles.', kid: 'She is learning.', teen: 'She comes back to you.',
+    adult: skillF >= 60 ? 'It feels effortless.' : 'You hold on to each other.', old: skillF >= 60 ? 'She carries you.' : 'Slow, but together.' }[stageKey];
   const r = $('result'); r.hidden = false;
-  r.textContent = best ? `New best: ${score}` : `Final score: ${score}`;
-  Hub.up('result', { inst: ++waltzInst, score });
-  startBtn.textContent = 'Dance again';
-  mainMenu.style.display = 'flex';
-  drawFloor();
+  r.textContent = `${best ? 'New best' : 'Score'}: ${fin}${stageKey === 'baby' ? '%' : ''} · ${tail}`;
+  Hub.up('result', { inst: ++waltzInst, stage: stageKey, score: fin, skill: Math.round(skillF) });
+  startBtn.textContent = 'Dance again'; mainMenu.style.display = 'flex'; drawFloor();
 }
 
 addEventListener('resize', resize);
