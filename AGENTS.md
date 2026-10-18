@@ -49,6 +49,13 @@ playwright && playwright install chromium`). A new test belongs in one of
 `test.sh`'s two suite tables in the same commit as the code it covers — an
 unwired test is a test nobody runs.
 
+**Two suites text-match source files.** `tests/presence_test.py` asserts that
+particular *lines* exist in `src/main.js` (`function leaveOpenGame()`,
+`pruneOneGame(was, m.p.id)`, the presence sends), and `tests/chess_rules.py`
+parses `chess.html` textually and needs `const GLYPH = …;` to keep both its
+name and its semicolon. Refactor either and the suite fails with "does not
+contain: …" and no other clue.
+
 Two rules that bite every module game: never send anything from inside
 `mount()` (the hub has not assigned the handle yet — send from the first
 `update()`), and never let an intent sent mid-frame start a second

@@ -269,8 +269,15 @@ HARNESS = r"""
   ok('the lobby offers a replay to the host', q('.dr-btn').textContent === 'Play again');
   ok('the lobby counts two at the table',
     q('.dr-table').querySelectorAll('.dr-seat.on').length === 2);
-  ok('the table strip still names nobody',
-    !/Sam|Bo/.test(q('.dr-overlay').textContent));
+  // The results screen is the ONE place names are allowed now: the round is
+  // over, so the seat dots alone have stopped saying who was there. Times stay
+  // off it — per-dot seconds are how you would find the circle.
+  ok('the results board names everyone who played',
+    q('.dr-board').hidden === false && /Sam/.test(q('.dr-board').textContent));
+  ok('your own row is marked',
+    /\(you\)/.test(q('.dr-board').textContent));
+  ok('the results board shows no times',
+    !/[\d.]+s/.test(q('.dr-board').textContent));
 
   // the next round, used by the guest and spectator screens below
   const live = dr.reduce(dr.reduce(finished, { a: 'start' },
