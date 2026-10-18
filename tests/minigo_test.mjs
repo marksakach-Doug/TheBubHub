@@ -195,8 +195,27 @@ ok(sw2.players[0] === 'b', 'human game swaps colours by default');
 let jn = G.init({ atTable: [people[0]] });
 jn = G.reduce(jn, { a: 'join' }, ctxOf('b', 'Bo'));
 ok(!jn.vsBot && jn.players[1] === 'b' && jn.names.b === 'Bo', 'a newcomer takes the bot seat before the first move');
+// A join that cannot be seated must SAY SO. It used to answer with the state
+// unchanged, the client saw no difference, and never asked again — which is
+// how "we can't play each other" happened.
 let jn2 = G.reduce(G.init({ atTable: [people[0]] }), { a: 'play', i: 24 }, ctxOf('a'));
-ok(G.reduce(jn2, { a: 'join' }, ctxOf('b', 'Bo')).players[1] === 'bot', 'no seat change once a bot game is under way');
+const jnRefused = G.reduce(jn2, { a: 'join' }, ctxOf('b', 'Bo'));
+ok(!!jnRefused.error, 'a refused join returns an error, not silence');
+ok(/bot is mid-game/.test(jnRefused.error || ''), 'the refusal explains why: ' + JSON.stringify(jnRefused.error));
+ok(G.reduce(jn2, { a: 'join' }, ctxOf('a')).players[1] === 'bot', 'no seat change once a bot game is under way');
+// After New game the same newcomer CAN sit down — moves is back to 0.
+const jnAfter = G.reduce(G.reduce(jn2, { a: 'resign' }, ctxOf('a')), { a: 'new' }, ctxOf('a'));
+ok(G.reduce(jnAfter, { a: 'join' }, ctxOf('b', 'Bo')).players[1] === 'b', 'a newcomer can take the seat after a new game');
+// A third player at a human table is told the table is full, not left watching.
+const full = G.init({ atTable: people });
+ok(/full/.test(G.reduce(full, { a: 'join' }, ctxOf('c', 'Cy')).error || ''), 'a third player is told the table is full');
+// vsBot must clear when both seats fill through join, or the bot buttons and
+// Swap sides stay on screen through a human game.
+const jfilled = G.reduce(G.reduce(G.init({}), { a: 'join' }, ctxOf('a')), { a: 'join' }, ctxOf('b'));
+ok(jfilled.vsBot === false && jfilled.players.indexOf('bot') < 0, 'two joins clear vsBot');
+const jsc = G.reduce(G.reduce(G.reduce(jfilled, { a: 'pass' }, ctxOf('a')), { a: 'pass' }, ctxOf('b')), { a: 'accept' }, ctxOf('a'));
+ok(jsc.phase === 'score', 'one accept is not enough in a joined human game');
+ok(G.reduce(jsc, { a: 'accept' }, ctxOf('b')).phase === 'over', 'both accepts end a joined human game');
 const pr = G.prune(G.init({ atTable: people }), 'b');
 ok(pr.players[1] === null, 'prune frees the seat');
 ok(G.reduce(pr, { a: 'play', i: 24 }, ctxOf('a')).error, 'cannot play with an empty seat');

@@ -86,17 +86,34 @@ function resignMove(state, loser) {
   return Object.assign({}, state, { phase: 'over', how: 'resign', winner: 3 - loser, margin: 0 });
 }
 
+// Taking a seat. This used to answer with the state either way, so a joiner who
+// could not be seated was re-sent the identical state, their client computed an
+// unchanged key and never asked again — a permanent spectator with no way to
+// find out why. Every refusal is an error now, and the client shows it and
+// retries.
 function joinSeat(state, id, name) {
-  if (!id || colorOf(state, id)) return state;
+  if (!id) return { error: 'No player id.' };
+  if (colorOf(state, id)) return state;                       // already seated
   const players = state.players.slice();
-  let vsBot = state.vsBot, took = false;
+  let vsBot = state.vsBot;
   const open = players.indexOf(null);
-  if (open >= 0) { players[open] = id; took = true; }
-  else if (state.vsBot && state.moves === 0 && state.phase === 'play') {
+  if (open >= 0) {
+    players[open] = id;
+  } else if (state.vsBot && state.moves === 0 && state.phase === 'play') {
     // Nobody has moved yet, so a newcomer can take the bot's seat and make it a human game.
-    players[players.indexOf('bot')] = id; vsBot = false; took = true;
+    const bi = players.indexOf('bot');
+    if (bi < 0) return { error: 'This table has no open seat.' };
+    players[bi] = id;
+    vsBot = false;
+  } else if (!vsBot) {
+    return { error: 'This table is full — MiniGo is two players.' };
+  } else {
+    return { error: 'The bot is mid-game. Finish this game, or press New game, and take the seat.' };
   }
-  if (!took) return state;
+  // Both seats human: the flag has to clear here too. Filling both via join
+  // never touched it, so a genuine human game still ran with the Bot level
+  // buttons and Swap sides on screen.
+  if (players.indexOf('bot') < 0) vsBot = false;
   const names = Object.assign({}, state.names);
   names[id] = name || names[id] || 'Player';
   return Object.assign({}, state, { players: players, vsBot: vsBot, names: names });
@@ -151,7 +168,11 @@ export function reduce(state, action, ctx) {
     if (state.phase !== 'score') return { error: 'Nothing to accept right now.' };
     const acc = state.acc.slice();
     acc[seat] = 1;
-    if (state.vsBot) acc[state.players.indexOf('bot') + 1] = 1;     // the bot accepts whatever you mark
+    // The bot accepts whatever you mark, so one accept settles a bot game.
+    // Guarded on the index: when both seats are human, indexOf('bot') is -1 and
+    // this used to write acc[0], an unused slot.
+    const bi = state.players.indexOf('bot');
+    if (state.vsBot && bi >= 0) acc[bi + 1] = 1;
     const s = Object.assign({}, state, { acc: acc });
     return (acc[1] && acc[2]) ? finishScore(s) : s;
   }
@@ -257,6 +278,7 @@ export function mount(root, api) {
   let level = 'medium', thinkKey = null, thinking = false;
   let worker = null, workerUrl = null, workerBad = false, inline = null;
   let joinKey = '', destroyed = false, flashTimer = null;
+  let retryTimer = null, joinFail = '';
 
   // ---- who is who
   function nameOf(id) {
@@ -273,6 +295,22 @@ export function mount(root, api) {
   function canAct() {
     return !!view && view.phase === 'play' && view.seat === view.turn &&
       view.players[0] !== null && view.players[1] !== null;
+  }
+  // Ask for a seat. The key used to be (gameNo, moves, phase) with no retry, so
+  // a rejected join — the table full, the bot mid-game, a seat that only opened
+  // after somebody left — was never asked about again for the life of the mount.
+  // The message is kept on screen until we get a seat or a new reason.
+  function maybeJoin() {
+    if (destroyed || !view || view.seat || api.isSpectator) return;
+    if (view.players.indexOf('bot') < 0 && view.players.every(function (p) { return p; })) {
+      // Both seats are real players: there is genuinely nothing for us here.
+      if (joinFail !== 'full') { joinFail = 'full'; flash('This table is full — MiniGo is two players.'); }
+      return;
+    }
+    const k = view.gameNo + ':' + view.moves + ':' + view.phase;
+    if (k === joinKey) return;
+    joinKey = k; joinFail = '';
+    api.send({ a: 'join' });
   }
   function flash(t) {
     q('#err').textContent = t || '';
@@ -341,6 +379,8 @@ export function mount(root, api) {
       const lp = v.lastPass ? nameOf(v.players[2 - v.turn]) + ' passed. ' : '';
       if (v.players[0] === null || v.players[1] === null) return 'Waiting for an opponent to join.';
       if (botTurn) return lp + 'Bot is thinking…';
+      // Unseated with two real players: say the useful thing, not "watching".
+      if (!v.seat && v.players.indexOf('bot') < 0) return 'MiniGo is a two-player game — this table is full.';
       if (!v.seat) return '👁 Watching — ' + nameOf(v.players[v.turn - 1]) + ' to move.';
       return lp + (v.seat === v.turn ? 'Your move.' : 'Waiting for ' + nameOf(v.players[v.turn - 1]) + '…');
     }
@@ -449,7 +489,7 @@ export function mount(root, api) {
     if (i < 0) return;
     if (view.phase === 'score') { if (view.seat) api.send({ a: 'mark', i: i }); return; }
     if (view.phase !== 'play') return;
-    if (!view.seat) return flash('👁 You are watching this table.');
+    if (!view.seat) return flash(joinFail === 'full' ? 'This table is full — MiniGo is two players.' : '👁 You are watching this table.');
     if (view.players[0] === null || view.players[1] === null) return flash('Waiting for an opponent.');
     if (view.seat !== view.turn) return flash("It isn't your turn.");
     const r = engine.applyMove(view, i, view.turn);
@@ -489,12 +529,22 @@ export function mount(root, api) {
     // talks to the host (taking a seat, the bot's moves) starts from the first update().
     update: function (v) {
       view = v;
-      if (!v.seat && !api.isSpectator) {
-        const k = v.gameNo + ':' + v.moves + ':' + v.phase;
-        if (k !== joinKey) { joinKey = k; api.send({ a: 'join' }); }
-      }
+      maybeJoin();
       render();
       maybeBot();
+    },
+    // The hub routes a refusal here. MiniGo had no denied() at all, so every
+    // error reduce() returned — including "the table is full" — was dropped and
+    // the client just sat there watching.
+    denied: function (text) {
+      if (destroyed) return;
+      flash(text || 'Not allowed.');
+      joinFail = text || 'Not allowed.';
+      // A refusal means the table could not take us: ask again shortly, since
+      // a seat can open up when somebody leaves.
+      if (!retryTimer) retryTimer = api.setTimeout(function () {
+        retryTimer = null; joinKey = ''; maybeJoin();
+      }, 2500);
     },
     destroy: function () {
       destroyed = true;
