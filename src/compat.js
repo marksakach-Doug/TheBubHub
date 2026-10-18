@@ -11,6 +11,11 @@ export function createCompat(stageRoot) {
 
   function ensureFrame(meta, file) {
     let f = frames.get(meta.id);
+    // A cached frame that has left the document has lost its browsing context,
+    // so it can never postMessage again. Rebuild rather than hand back a dead
+    // iframe — this is what used to make the second visit to any legacy game
+    // open as a blank stage.
+    if (f && !f.el.isConnected) { frames.delete(meta.id); f = null; }
     if (f) return f;
     const el = document.createElement('iframe');
     el.id = 'frame-' + meta.id;
@@ -34,7 +39,20 @@ f = { el: el, ready: false, queue: [], meta: meta };
     if (from !== undefined) m.from = from;
     if (!f) return;
     if (!f.ready) { f.queue.push(m); return; }
-    try { f.el.contentWindow.postMessage(m, '*'); } catch (e) {}
+    // A game the host never opened has no frame to speak to. That is a
+    // silently dropped intent otherwise — say so once instead of vanishing.
+    if (!f.el.isConnected || !f.el.contentWindow) {
+      warnDeadFrame(gameId);
+      return;
+    }
+    try { f.el.contentWindow.postMessage(m, '*'); } catch (e) { warnDeadFrame(gameId); }
+  }
+
+  const warnedDead = new Set();
+  function warnDeadFrame(gameId) {
+    if (warnedDead.has(gameId)) return;
+    warnedDead.add(gameId);
+    console.warn('legacy frame for "' + gameId + '" is gone — messages to it are dropped. Re-open the game.');
   }
 
   function pushRoster(gameId, rosterMsg) { down(gameId, 'roster', rosterMsg); }
@@ -42,6 +60,9 @@ f = { el: el, ready: false, queue: [], meta: meta };
   function open(meta, file) {
     frames.forEach(function (f) { f.el.classList.add('hidden'); });
     const f = ensureFrame(meta, file);
+    // Frames live in the stage and hide rather than unmount, so re-assert
+    // parenthood in case anything upstream moved them.
+    if (f.el.parentNode !== stageRoot) stageRoot.appendChild(f.el);
     f.el.classList.remove('hidden');
     stageRoot.classList.remove('stage-idle');
     openId = meta.id;

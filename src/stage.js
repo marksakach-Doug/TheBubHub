@@ -15,7 +15,12 @@ export function createStage(rootEl) {
     c.timeouts.forEach(function (id) { try { clearTimeout(id); } catch (e) {} });
     c.intervals.forEach(function (id) { try { clearInterval(id); } catch (e) {} });
     c.rafIds.length = 0; c.timeouts.length = 0; c.intervals.length = 0;
-    rootEl.innerHTML = '';
+    // Only OUR node. Wiping innerHTML here also deleted every legacy iframe
+    // (compat appends them to this same element) while compat.frames kept its
+    // cache entries — so ensureFrame handed back a detached frame on the second
+    // visit to any iframe game: blank stage, no error, and no way back without
+    // a reload. Frames are hidden, not destroyed, and reused from here on.
+    if (c.host && c.host.parentNode === rootEl) rootEl.removeChild(c.host);
     rootEl.classList.add('stage-idle');
     // Only drop the shell modes when no legacy frame is still visible — a
     // module clear racing an iframe open must not strip the stage out from
@@ -26,7 +31,8 @@ export function createStage(rootEl) {
   }
 
   function errorCard(meta, err) {
-    rootEl.innerHTML = '';
+    const old = rootEl.querySelector('.stage-host');
+    if (old) rootEl.removeChild(old);
     rootEl.classList.remove('stage-idle');
     const d = document.createElement('div');
     d.className = 'stage-host pop-in';
