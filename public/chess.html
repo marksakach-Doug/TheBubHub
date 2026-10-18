@@ -162,8 +162,8 @@ const START = 'rnbqkbnrpppppppp................................PPPPPPPPRNBQKBNR'
 // evenly: white rendered and black became a black blob or an emoji pawn, so
 // Black's pieces looked like a different game. Letters are in every font
 // there is, and colour alone tells the sides apart.
-const GLYPH = { K:'K', Q:'Q', R:'R', B:'B', N:'N', P:'P' };
-const GLYPH_B = { K:'K', Q:'Q', R:'R', B:'B', N:'N', P:'P' };
+const GLYPH = { K:'♚\uFE0E', Q:'♛\uFE0E', R:'♜\uFE0E', B:'♝\uFE0E', N:'♞\uFE0E', P:'♟\uFE0E' };
+const GLYPH_B = GLYPH;
 const glyphOf = (piece) => (isWhite(piece) ? GLYPH[typeOf(piece)] : GLYPH_B[typeOf(piece)]);
 const VAL = { P:1, N:3, B:3, R:5, Q:9, K:200 };
 const FILES = 'abcdefgh';
