@@ -31,6 +31,10 @@ export async function loadRegistry() {
         meta: {
           id: g.id, title: g.title, icon: g.icon || '', color: g.color || '#334155',
           file: g.file, players: g.players, compat: 'iframe', desc: g.desc || '',
+          // A cap the game actually enforces, when it differs from `players`.
+          // Goldberg's menu count is 2-3 but nothing in the game stops a
+          // fourth, so it refuses at the door instead of quietly misbehaving.
+          maxPlayers: g.maxPlayers || null,
           solo: !!g.solo, soloable: !!g.soloable, lobby: !!g.lobby,
           fill: !!g.fill, grow: !!g.grow, height: g.height || 0,
           noRecord: !!g.noRecord, activityRecord: !!g.activityRecord,
@@ -50,9 +54,86 @@ export function soloCorner(reg) {
   });
 }
 
+// Menu order, by hand, because alphabetical-by-import-path is not a menu.
+// Module games come first in the glob order; the legacy list follows in the
+// order of public/games.js. This is the order people asked for.
+const MENU_ORDER = [
+  // Small tables first — the games that are only ever two or three people.
+  'chess',
+  'minigo',
+  'goldberg',
+  'warp',
+  // Then the 2-8 crowd, in the order people use.
+  'mucking',      // Mucking Around
+  'eggs',         // Eggs
+  'hook',         // What's the Hook?
+  'dotreturn',    // Focus
+  'the96game',    // The 96 Game
+  'lotr',         // LOTR Cards
+  'wordbridge',   // Word Bridge
+  'blastoff',     // Blast Off!
+  'grammar'       // Discover the Grammar
+];
+
+export function menuOrder(reg) {
+  return reg.slice().sort(function (a, b) {
+    const ia = MENU_ORDER.indexOf(a.meta.id), ib = MENU_ORDER.indexOf(b.meta.id);
+    // Anything not named above keeps its registry position and sorts after the
+    // list — a new game shows up without having to be remembered here.
+    if (ia < 0 && ib < 0) return 0;
+    if (ia < 0) return 1;
+    if (ib < 0) return -1;
+    return ia - ib;
+  });
+}
+
+// How many players a game takes, as a real range. Legacy games declare a string
+// ('2-6', 'solo', '2') and modules declare {min,max}; nothing normalised them,
+// so every caller had to guess. This is the one place that knows both shapes.
+export function playerRange(meta) {
+  const p = meta && meta.players;
+  if (!p) return null;
+  if (typeof p === 'object') {
+    return { min: Number(p.min), max: Number(p.max) };
+  }
+  const s = String(p).trim().toLowerCase();
+  if (s === 'solo' || s === '1') return { min: 1, max: 1 };
+  const m = s.match(/^(\d+)\s*-\s*(\d+)$/);
+  if (m) return { min: Number(m[1]), max: Number(m[2]) };
+  const one = s.match(/^(\d+)$/);
+  if (one) return { min: Number(one[1]), max: Number(one[1]) };
+  return null;
+}
+
+export function playerLabel(meta) {
+  const r = playerRange(meta);
+  if (!r) return '';
+  if (r.min === r.max) return r.min + (r.min === 1 ? ' player' : ' players');
+  return r.min + '-' + r.max + ' players';
+}
+
+// The multiplayer menu, grouped. Small tables first — the two-player games
+// with nothing else — then the 2-8 crowd, in the order above. Games whose
+// range fits neither (or that are not really multiplayer) land in their own
+// trailing section rather than being dropped.
+export function multiplayerSections(reg) {
+  const small = [], wide = [], other = [];
+  menuOrder(reg.filter(function (g) { return !g.meta.solo; })).forEach(function (g) {
+    const r = playerRange(g.meta);
+    if (r && r.max <= 3) small.push(g);
+    else if (r && r.min <= 2 && r.max >= 6) wide.push(g);
+    else other.push(g);
+  });
+  const out = [];
+  if (small.length) out.push({ title: 'Two or three players', games: small });
+  if (wide.length) out.push({ title: 'Two to eight players', games: wide });
+  if (other.length) out.push({ title: 'Other tables', games: other });
+  return out;
+}
+
 export function roomLists(reg) {
   return {
-    multi: reg.filter(function (g) { return !g.meta.solo; }),
+    multi: menuOrder(reg.filter(function (g) { return !g.meta.solo; })),
     solo: reg.filter(function (g) { return !!g.meta.solo; })
   };
 }

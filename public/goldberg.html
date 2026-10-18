@@ -1527,6 +1527,7 @@ function onRoster(p){
     isHost=realHost||localHost;
   }
   $('role').textContent=(localHost?'solo':(isHost?'host':'guest'))+' · '+myName+' · '+(Hub.roster.length)+' players';
+  checkRoomSize();
   if(!booted){ booted=true; bootAll(); }
   if(isHost){
     // bootstrap late joiners with the full world before the first tick
@@ -1535,6 +1536,24 @@ function onRoster(p){
     if(clearVote) checkVote(); // the room changed: re-tally
   }
   reportHeight();
+}
+/* Goldberg is a two-or-three table. Nothing inside the physics cares how many
+   people are connected, so the menu count was the only place the number was
+   ever mentioned — and a fourth player simply got a slower, laggier machine
+   with no explanation. Say it at the door instead. */
+const MAX_PEERS = 3;
+let overCapacity = false;
+function checkRoomSize(){
+  const n = (Hub.roster||[]).length;
+  const over = !localHost && n > MAX_PEERS;
+  if (over === overCapacity) return;
+  overCapacity = over;
+  if (over) flashNote('Too many for Goldberg — it is a 2-3 player table. Anything you build here is not shared.');
+}
+function blockedByRoomSize(){
+  if (!overCapacity) return false;
+  flashNote('Goldberg is a 2-3 player table — ask one of them to leave, then try again.');
+  return true;
 }
 // Drop the live world but keep engine, walls, and the saved table.
 function clearLiveTable(){
@@ -2059,6 +2078,7 @@ function draftPreview(d){
 }
 function doAdd(kind,x0,y0,x1,y1){
   if(kind==='ramp')kind='plank'; // legacy button id, just in case
+  if(blockedByRoomSize()) return null;
   const o=draftFor(kind,x0,y0,(x1===undefined?x0:x1),(y1===undefined?y0:y1));
   const rec=makeRecord(kind,o.x,o.y,o);
   if(isHost){ hostAdd(rec); return rec; }

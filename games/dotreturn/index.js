@@ -12,10 +12,18 @@
 // so every client sees the same new heading — and it is silent on purpose: no
 // flash, no counter, just a dot that suddenly no longer wants to go that way.
 
+// The menu says 2-8, because that is the table size Focus is for — a dot is
+// one person, and one person is a solo game, which the Solo Corner already
+// lists. Nothing here REFUSES a ninth or tenth dot: it is one more entry in an
+// array and one more circle on screen. So the number people read and the number
+// the game accepts are deliberately allowed to disagree in the generous
+// direction. MAX_DOTS below is the real ceiling.
+const MENU_SEATS = 8;
+
 export const meta = {
   id: 'dotreturn',
   title: 'Focus',
-  players: { min: 1, max: 10 },
+  players: { min: 2, max: MENU_SEATS },
   color: '#e9e4d8',
   icon: '⚪',
   desc: 'Swipe to steer a slow dot around a centre you cannot see — every time it drifts home it picks a new direction.',
@@ -196,9 +204,19 @@ export function reduce(state, action, ctx) {
     // best. Divided by the frozen table, not the live roster, so a benched
     // mid-round joiner is never counted.
     const perPlayer = Math.round((away / 1000 / n) * 10) / 10;
+    // Who played, in seat order, for the results screen. This is a ROSTER, not
+    // a ranking: Focus has one shared team score and the per-dot times stay
+    // hidden even now that the round is over, because the times would reveal
+    // where the circle was. So nobody's own number is on the board.
+    const rows = table.map(function (id) {
+      return { id: id, away: Math.round(((dots[id] && dots[id].away) || 0) / 100) / 10 };
+    });
     return same({
       phase: 'over',
-      over: { away: away, lapses: state.lapses, players: table.length, perPlayer: perPlayer, duration: state.duration },
+      over: {
+        away: away, lapses: state.lapses, players: table.length,
+        perPlayer: perPlayer, duration: state.duration, rows: rows
+      },
       dots: dots
     });
   }
@@ -254,7 +272,7 @@ export function reduce(state, action, ctx) {
 
 // -------------------------------------------------------------- project ----
 
-export function project(state, playerId) {
+export function project(state, playerId, api) {
   // The whole point of the round is the reveal, so the score simply is not in
   // the snapshot until the clock runs out. Dots are stripped to heading and
   // bench flag: everyone's `out` flag, and now `away`, would otherwise leak
@@ -269,7 +287,12 @@ export function project(state, playerId) {
     you: playerId || '',
     dots: dots,
     lapses: hidden ? null : state.lapses,
-    over: hidden ? null : state.over
+    over: hidden ? null : state.over,
+    // The results screen needs names, and the hub's roster is the only place
+    // they live — so the client resolves them through api.roster. Mid-round
+    // the ids below are already in state.players and get projected as-is, so
+    // this leaks nothing the table did not already know.
+    roster: (api && api.roster) || null
   });
 }
 
@@ -359,12 +382,19 @@ const CSS = [
   'border:0;border-radius:8px;background:#e9e4d8;color:#15181d;cursor:pointer}',
   '.dr-btn.alt{background:transparent;color:#e9e4d8;box-shadow:inset 0 0 0 1px #3a4048}',
   '.dr-btn:disabled{opacity:.4;cursor:default}',
-  // Dots only. The table size is public; who is sitting in it is not our
-  // business to paint, and a name here is the one leak the game cannot undo.
+  // Dots only DURING a round: the table size is public, but who is sitting in
+  // it is not our business to paint mid-round. Once the clock has run out there
+  // is nothing left to protect, so the results screen names everyone (dr-board).
   '.dr-table{display:flex;gap:9px;justify-content:center;align-items:center;min-height:16px}',
   '.dr-seat{width:9px;height:9px;border-radius:50%;background:#3a4048}',
   '.dr-seat.on{background:#e9e4d8}',
   '.dr-seat.self{box-shadow:0 0 0 2px #15181d,0 0 0 3px #7dd3fc}',
+  // The results board: who was at the table, in seat order. No times — Focus
+  // has one team score and the per-dot seconds would give the circle away.
+  '.dr-board{display:flex;flex-wrap:wrap;gap:6px 14px;justify-content:center;',
+  'max-width:26rem;margin:0 auto;font-size:.95rem;color:#c3c8cf}',
+  '.dr-board b{color:#e9e4d8;font-weight:600}',
+  '.dr-board .you{color:#7dd3fc}',
   '.dr-note{font-size:.9rem;color:#a3a8b0;margin:0}',
   '.dr-hi{color:#e9e4d8;font-weight:600}'
 ].join('');
@@ -419,6 +449,7 @@ export function mount(root, api) {
     '<div class="dr-overlay"><h1 class="dr-title">Focus</h1>' +
     '<p class="dr-body"></p><p class="dr-num" hidden></p>' +
     '<div class="dr-table" hidden></div>' +
+    '<div class="dr-board" hidden></div>' +
     '<div class="dr-btns"><button class="dr-btn" type="button">Start</button></div>' +
     '<p class="dr-note"></p></div>';
   root.appendChild(wrap);
@@ -438,6 +469,7 @@ export function mount(root, api) {
   const ovBody = wrap.querySelector('.dr-body');
   const ovNum = wrap.querySelector('.dr-num');
   const ovTable = wrap.querySelector('.dr-table');
+  const ovBoard = wrap.querySelector('.dr-board');
   const ovNote = wrap.querySelector('.dr-note');
   const btns = wrap.querySelector('.dr-btns');
   const btn = wrap.querySelector('.dr-btn');
@@ -788,6 +820,34 @@ export function mount(root, api) {
     }
   }
 
+  // The results board: everyone who played, in seat order, with "you" marked.
+// Names come from the hub roster (project() hands it through as view.roster);
+// there are no times beside them, because the times are how you would find the
+// circle. Same list every round — only the count changes — so it is a record
+// of who sat in, not a ranking.
+  function nameOfRoster(id) {
+    const r = (view && view.roster) || [];
+    for (let i = 0; i < r.length; i++) if (r[i] && r[i].id === id) return r[i].name;
+    if (id === myId) return (api.me && api.me.name) || 'You';
+    return 'A player';
+  }
+  function escHtml(s) {
+    return String(s || '').replace(/[&<>"']/g, function (c) {
+      return { '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;', "'": '&#39;' }[c];
+    });
+  }
+  function renderBoard(o) {
+    const rows = (o && o.rows) || [];
+    const ids = rows.length ? rows.map(function (r) { return r.id; }) : (view.table || view.players || []);
+    if (!ids.length) { ovBoard.hidden = true; return; }
+    ovBoard.hidden = false;
+    ovBoard.innerHTML = ids.map(function (id) {
+      const nm = nameOfRoster(id);
+      const you = id === myId;
+      return '<span' + (you ? ' class="you"' : '') + '>' + escHtml(nm) + (you ? ' <b>(you)</b>' : '') + '</span>';
+    }).join('');
+  }
+
   function renderChrome() {
     if (!view) return;
     const playing = view.phase === 'play' || view.phase === 'reveal';
@@ -821,6 +881,12 @@ export function mount(root, api) {
 
     ovTitle.classList.toggle('observing', watching || waiting);
     renderSeats(list, !playing && !watching);
+    // The board only belongs on the results screen; during a round the seat dots
+    // alone are the honest amount of information. Empty it rather than just
+    // hiding it: `hidden` leaves the names in the DOM, where they are one
+    // textContent away from anyone reading the page.
+    if (!playing && !watching) renderBoard(view.over);
+    else { ovBoard.hidden = true; ovBoard.innerHTML = ''; }
 
     // Buttons are rebuilt per render because who may start depends on the
     // table size, which changes while this screen is up.

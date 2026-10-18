@@ -22,27 +22,31 @@ window.BUB_GAMES = [
   // machine and presses play; there is no round and therefore nothing to send
   // at the end. compat fires onTouched for EVERY intent from EVERY iframe
   // game, so this flag is what stops chess moves leaving lines behind.
-  { id: 'goldberg', file: 'goldberg.html', title: 'Goldberg', players: '2-6', color: '#e6c280', fill: true,
+  // Goldberg has no seat system at all — it is one shared machine — so the
+  // menu count was the only place "how many" was ever mentioned, and a fourth
+  // player just got a slower table with no explanation. `maxPlayers` is read by
+  // goldberg.html itself, which refuses at the door.
+  { id: 'goldberg', file: 'goldberg.html', title: 'Goldberg', players: '2-3', maxPlayers: 3, color: '#e6c280', fill: true,
     activityRecord: true,
     icon: '🔔', desc: 'Build a chain-reaction machine together out of parts, then press play and watch it go.' },
   { id: 'daltadka', file: 'daltadka.html', title: 'Dal Tadka', players: 'solo', color: '#d9b26f', solo: true, lobby: true, fill: true,
     icon: '🍲', desc: 'Cook dal.' },
   { id: 'warp', file: 'warpfront.html', title: 'Warp Front', players: '1-3', color: '#00ffcc', soloable: true,
     icon: '🛸', desc: 'A co-op race to save planets. Borg are the bad guys. Get to the planets first.' },
-  { id: 'lotr', file: 'lotr.html', title: 'LOTR Cards', players: '2-6', color: '#b9c98a',
+  { id: 'lotr', file: 'lotr.html', title: 'LOTR Cards', players: '2-8', color: '#b9c98a',
     // `grow` (not `fill`): the frame is sized to the game and the WHOLE PAGE
     // scrolls as one. `fill` would pin the frame to the viewport and make the
     // game scroll inside it instead, which is a nested scroll on a phone.
     grow: true,
     icon: '🃏', desc: 'Race to Level 15 while monsters hunt whoever is in the lead.' },
-  { id: 'blastoff', file: 'blastoff.html', title: 'Blast Off!', players: '2-6', color: '#00f2ff', soloable: true,
+  { id: 'blastoff', file: 'blastoff.html', title: 'Blast Off!', players: '2-8', color: '#00f2ff', soloable: true,
     icon: '🚀', desc: 'Pick destinations and maneuver your rocket.' },
   { id: 'grammar', file: 'discover_the_grammar.html', title: 'Discover the Grammar', players: '2-4', color: '#f3f0e8', soloable: true,
     icon: '🔤', desc: 'A complex code breaking mind game.' },
   // `soloable: true` also runs a real solo table with no room, so it belongs in
 // the pre-room "Solo Corner". Word Bridge has its own solo mode (you play both
 // sides), so it qualifies — it was simply never flagged.
-  { id: 'wordbridge', file: 'wordbridge.html', title: 'Word Bridge', players: '2-6', color: '#000000', soloable: true,
+  { id: 'wordbridge', file: 'wordbridge.html', title: 'Word Bridge', players: '2-8', color: '#000000', soloable: true,
     icon: '🌉', desc: 'Everyone writes one word that fits both meanings, then the table judges each bridge.' },
 // { id: 'wordwright', file: 'wordwright.html', title: 'Wordwright', players: '2-6', color: '#a5b4fc', icon: '📝', desc: 'Co-write a story one sentence at a time.' },
   // solo: playable with no room and no bridge. `lobby: true` also lists it
@@ -56,7 +60,7 @@ window.BUB_GAMES = [
     icon: '✍️', desc: 'Write one true thing a day.' },
   //{ id: 'DrawDrive', file: 'DrawDrive.html', title: 'Draw and Drive', players: '1-4', color: '#3cc3d4', fill: true,
   //  icon: '✏️', desc: 'Draw a track, then drive a car along what you drew.' },
-   { id: 'mucking', file: 'muckingaround.html', title: 'Mucking Around', players: '2-6', color: '#ffd23f', fill: true, soloable: true,
+   { id: 'mucking', file: 'muckingaround.html', title: 'Mucking Around', players: '2-8', color: '#ffd23f', fill: true, soloable: true,
     icon: '🍂', desc: 'You just kind of... muck around.' },
   { id: 'chess', file: 'chess.html', title: 'Chess', players: '2', color: '#c89b6d', fill: true, soloable: true,
     icon: '♞', desc: 'Its just chess' },

@@ -45,10 +45,14 @@ body{
 .sq.last::after{content:""; position:absolute; inset:0; background:rgba(255,240,180,.35); pointer-events:none}
 .sq.sel::after{content:""; position:absolute; inset:0; background:rgba(255,235,140,.45); pointer-events:none}
 .sq.check{background:#e05a42}
-.pc{position:relative; z-index:2; font-size:min(8vw,38px); line-height:1;
+/* Letters instead of glyphs, so the two sides are the same shape and every
+   device renders them identically. Weight + size carry the piece; colour alone
+   carries the side. */
+.pc{position:relative; z-index:2; font-size:min(7vw,34px); line-height:1;
+  font-weight:900; font-family:ui-sans-serif,system-ui,"Segoe UI",Helvetica,Arial,sans-serif;
   cursor:grab; filter:drop-shadow(0 2px 2px rgba(0,0,0,.45)); transform:translateY(-2%)}
-.pc.w{color:#f0e6d2; text-shadow:0 0 2px rgba(0,0,0,.3),0 1px 2px rgba(0,0,0,.5)}
-.pc.b{color:#3a2a1a; text-shadow:0 0 2px white,0 1px 2px rgba(0,0,0,.4)}
+.pc.w{color:#f7efe0; text-shadow:0 1px 2px rgba(0,0,0,.75), 0 0 1px rgba(0,0,0,.9)}
+.pc.b{color:#2b1c0e; text-shadow:0 0 3px #fff, 0 0 6px rgba(255,255,255,.85)}
 .pc.drag{opacity:.3}
 .pc.ghost{position:fixed; z-index:60; pointer-events:none; font-size:44px; transform:none}
 .dot{position:absolute; z-index:3; width:26%; height:26%; border-radius:50%; background:rgba(20,10,0,.42); pointer-events:none}
@@ -67,8 +71,8 @@ body{
 .status{flex:1; text-align:center; font-weight:700; font-size:14px; min-width:130px}
 .status.good{color:var(--good)} .status.bad{color:var(--bad)}
 #captured{font-size:19px; min-height:24px; letter-spacing:1px; background: #f5f0e8; padding: 4px; border-radius: 4px;}
-#captured .cw{color:#f8f1e8; text-shadow:0 0 2px #2b1a0d}
-#captured .cb{color:#4a3a2a; text-shadow:0 0 2px rgba(255,255,255,.5)}
+#captured .cw{color:#f8f1e8; text-shadow:0 0 2px #2b1a0d; font-weight:900}
+#captured .cb{color:#4a3a2a; text-shadow:0 0 2px rgba(255,255,255,.9); font-weight:900}
 #captured .lab{font-size:10px; font-family:ui-monospace,monospace; color:var(--dim); letter-spacing:0}
 button{font:inherit; font-weight:800; cursor:pointer; color:#22160a;
   background:linear-gradient(180deg,#d8b57c,#b78f52); border:1px solid #7a5628;
@@ -150,8 +154,16 @@ const note = (t) => { $('note').textContent = t || ''; };
    ===================================================================== */
 const WHITE = 'w', BLACK = 'b';
 const START = 'rnbqkbnrpppppppp................................PPPPPPPPRNBQKBNR';
-const GLYPH = { K:'♔', Q:'♕', R:'♖', B:'♗', N:'♘', P:'♙' };   // white: hollow glyphs
-const GLYPH_B = { K:'♚', Q:'♛', R:'♜', B:'♝', N:'♞', P:'♟' }; // black: solid glyphs
+// ONE piece set for both sides.
+//
+// This used to be two: hollow white chess glyphs (U+2654-5) and solid black
+// ones (U+2656-7). Any phone whose system font lacks that block falls back —
+// usually to emoji, sometimes to a notdef box — and it did not fall back
+// evenly: white rendered and black became a black blob or an emoji pawn, so
+// Black's pieces looked like a different game. Letters are in every font
+// there is, and colour alone tells the sides apart.
+const GLYPH = { K:'K', Q:'Q', R:'R', B:'B', N:'N', P:'P' };
+const GLYPH_B = { K:'K', Q:'Q', R:'R', B:'B', N:'N', P:'P' };
 const glyphOf = (piece) => (isWhite(piece) ? GLYPH[typeOf(piece)] : GLYPH_B[typeOf(piece)]);
 const VAL = { P:1, N:3, B:3, R:5, Q:9, K:200 };
 const FILES = 'abcdefgh';

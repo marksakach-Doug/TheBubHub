@@ -228,6 +228,9 @@ const myId = () => Hub.me && Hub.me.id;
 const myName = () => (Hub.names && Hub.names[myId()]) || (Hub.me && cleanName(Hub.me.name)) || 'Player';
 const isHost = () => localSolo || !!(Hub.me && Hub.me.isHost);
 const peerCount = () => Hub.roster.length;
+// Matches the menu count in games.js. There is no seat table here; everyone
+// connected gets a pilot, so the cap is enforced at startGame and nowhere else.
+const MAX_PLAYERS = 8;
 const hostPresent = () => Hub.roster.some(m => m.host);
 // rosterAdopt: hosting (or newly hosting after a takeover) means the table
 // continues as-is — never start over. The host re-broadcasts on every
@@ -367,8 +370,8 @@ function startGame(){
     if (!isHost()) return false;
     if (localSolo){
         if (!Hub.names || !Hub.names[myId()]) Hub.names = Object.assign(rosterNames(), { [myId()]: cleanName(Hub.me && Hub.me.name) });
-    } else if (peerCount() < 2 || peerCount() > 6){
-        $('bo-setup-note').textContent = 'Need 2–6 players in the room.';
+    } else if (peerCount() < 2 || peerCount() > MAX_PLAYERS){
+        $('bo-setup-note').textContent = 'Need 2–' + MAX_PLAYERS + ' players in the room.';
         return false;
     }
     fresh();
