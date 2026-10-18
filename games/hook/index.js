@@ -12,7 +12,11 @@ const deadline = (now, ms) => (PLAY_MS && ms ? now + ms : 0);   // 0 everywhere 
 const RULES_TABLE = 'You make the best hook to fit between the intro and outro. We will vote on who found the best hook.';
 const RULES_SOLO = 'You make the best hook to fit between the intro and outro. Just build the hook that fits.';
 
-export const meta = { id: 'hook', title: "What's the Hook?", players: { min: 1, max: 8 }, color: '#ff00ff',
+// The multiplayer table is 2-8. Playing alone is real and works (there is a
+// solo rule and no vote), but that is what the Solo Corner is for, and a
+// button labelled "1-8 players" in the multiplayer list is a table of one that
+// nobody else can join. reduce() still seats one person fine.
+export const meta = { id: 'hook', title: "What's the Hook?", players: { min: 2, max: 8 }, color: '#ff00ff',
   icon: '🌉', desc: 'Fill the gap in a matched intro-outro pair. The table votes.', soloable: true };
 
 // A fresh round: one matched pair from the shuffled bag (never a random intro + random outro, never the same pair twice running), a scale ('any' pairs get a random one), a new clock.

@@ -115,6 +115,30 @@ else
   echo "browser probe: unavailable ($BROWSER_WHY)"
 fi
 
+# The hub-shell suite drives the BUILT bundle, so it needs dist/ and a server.
+# Build only when dist/ is missing or older than any source file, so a normal
+# run does not pay for a rebuild every time.
+ensure_dist() {
+  local newest
+  newest=$(find index.html src net room plugins games public vite.config.js \
+             -type f -newer dist/index.html 2>/dev/null | head -1)
+  if [ ! -f dist/index.html ] || [ -n "$newest" ]; then
+    step "building dist/ (sources are newer)"
+    if ! bun run build >/tmp/bubhub-build.log 2>&1; then
+      fail "bun run build"
+      tail -5 /tmp/bubhub-build.log
+      return 1
+    fi
+    pass "build"
+  fi
+  if ! curl -sf "http://127.0.0.1:$SERVE_PORT/index.html" >/dev/null 2>&1; then
+    python3 -m http.server "$SERVE_PORT" --directory dist >/dev/null 2>&1 &
+    HTTP_PID=$!
+    trap 'kill $HTTP_PID 2>/dev/null' EXIT
+    sleep 1
+  fi
+}
+
 # ---- suite tables ----
 # name|script  — order is the run order.
 OFFLINE_SUITES=(
@@ -123,6 +147,8 @@ OFFLINE_SUITES=(
   "bun lockfile|lockfile_test.py"
   "kick/ghost|kick_ghost_test.py"
 )
+
+SERVE_PORT="${SERVE_PORT:-5180}"
 
 BROWSER_SUITES=(
   "record sentences|record_test.py"
@@ -143,6 +169,11 @@ BROWSER_SUITES=(
   "chess capture play test|chess_capture_play.py"
   "the 96 game play test|t96_play.py"
   "eggs|eggs_test.py"
+  # Drives the production build, so it runs after the games that guard the
+  # source. This is the only suite that proves the module games survived Vite —
+  # the bug that shipped 15 iframe games and zero module games was invisible
+  # everywhere else.
+  "hub shell (built)|hub_switch_test.py"
   # A node harness, not python: minigo_test.mjs drives the shipped module and
   # the MCTS bot with no browser. It was in this table being run by python3,
   # which could only ever SyntaxError — a suite that has never once passed.
@@ -153,7 +184,15 @@ for entry in "${OFFLINE_SUITES[@]}"; do
   run_offline "${entry%%|*}" "${entry##*|}"
 done
 for entry in "${BROWSER_SUITES[@]}"; do
-  run_browser "${entry%%|*}" "${entry##*|}"
+  case "$entry" in
+    "hub shell (built)|"*)
+      [ "$BROWSER_OK" = "1" ] || { skip "hub_switch_test.py ($BROWSER_WHY)"; continue; }
+      if ensure_dist; then
+        run_browser "hub shell (built)" "hub_switch_test.py $SERVE_PORT"
+      fi
+      ;;
+    *) run_browser "${entry%%|*}" "${entry##*|}" ;;
+  esac
 done
 
 printf '\nALL GREEN (%d passed, %d skipped)\n' "$PASS" "$SKIPPED"

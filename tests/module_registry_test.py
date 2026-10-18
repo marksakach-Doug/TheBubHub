@@ -41,23 +41,22 @@ LEGACY = [
     {"id": "warp", "title": "Warp Front", "file": "warpfront.html", "players": "1-3"},
     {"id": "goldberg", "title": "Goldberg", "file": "goldberg.html", "players": "2-3",
      "maxPlayers": 3},
+    # 3-8: needs three, takes eight. It belongs in the 2-8 group, and the
+    # "max <= 3 or else 2-8" split must not leave it in a bucket of its own.
+    {"id": "the96game", "title": "The 96 Game", "file": "the96game.html", "players": "3-8"},
 ]
 
-# The menu order people asked for (src/registry.js MENU_ORDER). Chess, MiniGo,
-# Goldberg and Warp Front are small tables and lead; the rest follow in this
-# order under "Two to eight players".
-# Only the games this fixture actually registers: the four module ids below
-# plus the three legacy stand-ins. Compare against that subsequence of the real
-# order rather than hard-coding a list the fixture cannot produce.
-# A subsequence of src/registry.js MENU_ORDER: this fixture only registers the
-# four module ids below plus the three legacy stand-ins, so it cannot produce
-# the whole list. The ids it CAN produce must appear in MENU_ORDER, and in this
-# relative order — which is what catches a rename or a forgotten entry.
+# A subsequence of src/registry.js MENU_ORDER: this fixture registers the four
+# module ids plus the legacy stand-ins above, so it cannot produce the whole
+# list. The ids it CAN produce must appear in MENU_ORDER, and in this relative
+# order — which is what catches a rename or a forgotten entry. The two
+# source_checks below compare against the real games/ directory and games.js,
+# so this stays honest without duplicating the full order here.
 MENU_ORDER = [
     # small tables
     "chess", "minigo", "goldberg", "warp",
     # the 2-8 crowd
-    "eggs", "hook", "dotreturn",
+    "eggs", "hook", "dotreturn", "the96game",
 ]
 
 
@@ -150,6 +149,8 @@ INSPECT = r"""
         sections: multiplayerSections(full).map((s) => s.title),
         small: (multiplayerSections(full)[0] || { games: [] })
           .games.map((g) => g.meta.id),
+        wide: (multiplayerSections(full)[1] || { games: [] })
+          .games.map((g) => g.meta.id),
         counts: full.reduce((acc, g) => {
           const l = playerLabel(g.meta);
           if (l) acc[g.meta.id] = l;
@@ -158,7 +159,7 @@ INSPECT = r"""
       };
     })
   : { modules: [], legacy: [], soloCorner: [], roomList: [], dupes: [],
-      order: [], sections: [], small: [], counts: {},
+      order: [], sections: [], small: [], wide: [], counts: {},
       note: 'loadRegistry was never defined — the file did not parse' })
 """
 
@@ -226,12 +227,17 @@ def main():
          got["order"] == MENU_ORDER),
         ("the small tables group first", got["sections"][0] == "Two or three players"),
         ("the 2-8 crowd is its own group", got["sections"][1] == "Two to eight players"),
+        # Two groups and no third: a game that needs three and takes eight is
+        # not "other", it is one of the eight-player tables.
+        ("there is no leftover Other group", len(got["sections"]) == 2),
         ("Chess, MiniGo, Goldberg and Warp Front share the small group",
          got["small"] == ["chess", "minigo", "goldberg", "warp"]),
         ("a module count and a legacy count read the same",
          got["counts"]["eggs"] == "2-8 players" and got["counts"]["chess"] == "2 players"
          and got["counts"]["goldberg"] == "2-3 players"),
         ("Focus says 2-8 on the menu", got["counts"]["dotreturn"] == "2-8 players"),
+        ("a game that needs three still lands in the 2-8 group",
+         "the96game" in got["wide"]),
         ("a built bundle still registers the legacy games",
          got["legacy"] == [g["id"] for g in LEGACY]),
         ("a module id wins over a legacy entry with the same id",

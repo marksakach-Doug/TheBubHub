@@ -117,17 +117,18 @@ export function playerLabel(meta) {
 // range fits neither (or that are not really multiplayer) land in their own
 // trailing section rather than being dropped.
 export function multiplayerSections(reg) {
-  const small = [], wide = [], other = [];
+  const small = [], wide = [];
   menuOrder(reg.filter(function (g) { return !g.meta.solo; })).forEach(function (g) {
     const r = playerRange(g.meta);
+    // Two groups, as asked for: the games that are only ever two or three
+    // people, and everything else. Not "min <= 2 && max >= 8" — The 96 Game
+    // needs three and takes eight, and belongs in the second group.
     if (r && r.max <= 3) small.push(g);
-    else if (r && r.min <= 2 && r.max >= 6) wide.push(g);
-    else other.push(g);
+    else wide.push(g);
   });
   const out = [];
   if (small.length) out.push({ title: 'Two or three players', games: small });
   if (wide.length) out.push({ title: 'Two to eight players', games: wide });
-  if (other.length) out.push({ title: 'Other tables', games: other });
   return out;
 }
 

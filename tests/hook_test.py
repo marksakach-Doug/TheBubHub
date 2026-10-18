@@ -40,7 +40,10 @@ JS_CASES = r"""
   out.push(['meta id is hook', meta.id === 'hook']);
   out.push(['meta title is What\'s the Hook?', meta.title === "What's the Hook?"]);
   out.push(['hook is soloable', meta.soloable === true]);
-  out.push(['table holds 1-8', meta.players && meta.players.min === 1 && meta.players.max === 8]);
+  // 2-8, not 1-8: the game seats one person fine, but that is the Solo
+  // Corner's job, and a multiplayer button that says "1-8 players" reads as a
+  // table nobody else can join.
+  out.push(['table holds 2-8', meta.players && meta.players.min === 2 && meta.players.max === 8]);
 
   // ---- init seats the table, not the room
   const room = [
