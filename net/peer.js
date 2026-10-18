@@ -23,6 +23,7 @@ export function createNet(onEvent) {
   let peer = null;
   let hostConn = null; // guest -> host connection
   const guests = new Map(); // host-side: playerId -> conn
+  let closed = false;
 
   function destroyPeer() {
     try { if (hostConn) hostConn.close(); } catch (e) {}
@@ -49,11 +50,7 @@ export function createNet(onEvent) {
       if (hostConn === conn) hostConn = null;
       onEvent('host-conn', { state: 'closed' });
     });
-    // These were empty handlers, so a failing data connection was completely
-    // silent. PeerJS fires 'error' for an ordinary dead peer; say so once.
-    conn.on('error', function (e) {
-      onEvent('peer-error', { err: (e && e.message) ? e : new Error('connection error') });
-    });
+    conn.on('error', function () {});
   }
 
   function wireHostConn(conn) {
@@ -68,9 +65,7 @@ export function createNet(onEvent) {
       if (gone) guests.delete(gone);
       onEvent('guest-left', { id: gone });
     });
-    conn.on('error', function (e) {
-      onEvent('peer-error', { err: (e && e.message) ? e : new Error('guest connection error') });
-    });
+    conn.on('error', function () {});
   }
 
   return {
@@ -78,6 +73,7 @@ export function createNet(onEvent) {
     get peer() { return peer; },
 
     host(roomId, attempt) {
+      closed = false;
       destroyPeer();
       const Peer = getPeerCtor();
       return new Promise(function (resolve, reject) {
@@ -87,15 +83,10 @@ export function createNet(onEvent) {
         p.on('open', function () { onEvent('open', { room: roomId }); resolve(roomId); });
         p.on('connection', function (conn) {
           wireHostConn(conn);
-          // remember by peer label once hello arrives; keep pending meanwhile.
-          // The poll used to clear itself ONLY when the conn opened, so a conn
-          // that never opened leaked a 500ms timer forever.
+          // remember by peer label once hello arrives; keep pending meanwhile
           const t = setInterval(function () {
-            if (conn.open || conn.destroyed === true) clearInterval(t);
+            if (conn.open) { clearInterval(t); }
           }, 500);
-          const stop = function () { clearInterval(t); };
-          conn.on('close', stop);
-          conn.on('error', stop);
         });
         p.on('disconnected', function () { try { p.reconnect(); } catch (e) {} });
         p.on('error', function (err) {
@@ -116,14 +107,7 @@ export function createNet(onEvent) {
     },
 
     // called by host when a hello arrives to bind id -> conn
-    bindGuest(id, conn) {
-      // A redial makes a new conn for the same player. The old one was left open
-      // and left in the map, so every send went to whichever entry won last and
-      // sockets piled up for the life of the room.
-      const old = guests.get(id);
-      if (old && old !== conn) { try { old.close(); } catch (e) {} }
-      guests.set(id, conn);
-    },
+    bindGuest(id, conn) { guests.set(id, conn); },
 
     isOpen(id) { const c = guests.get(id); return !!(c && c.open); },
 
@@ -137,6 +121,7 @@ export function createNet(onEvent) {
     },
 
     join(roomId) {
+      closed = false;
       destroyPeer();
       const Peer = getPeerCtor();
       return new Promise(function (resolve, reject) {
@@ -171,13 +156,7 @@ export function createNet(onEvent) {
         const conn = p.connect(roomId, { reliable: true });
         wireGuestConn(conn, onHello);
       });
-      p.on('error', function (err) {
-        // Swallowed every redial error, so a guest could redial forever against
-        // a host that was gone and never find out why. A missing peer is the
-        // normal case grace exists to cover; anything else is worth saying.
-        if (err && err.type === 'peer-unavailable') return;
-        onEvent('peer-error', { err: err });
-      });
+      p.on('error', function () {});
       return p;
     },
 
@@ -201,6 +180,6 @@ export function createNet(onEvent) {
 
     sendHello(conn, hello) { try { conn.send(msg(T.HELLO, hello)); } catch (e) {} },
 
-    close() { destroyPeer(); }
+    close() { closed = true; destroyPeer(); }
   };
 }
