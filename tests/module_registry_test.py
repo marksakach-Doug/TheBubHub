@@ -26,7 +26,12 @@ from playwright.sync_api import sync_playwright
 
 ROOT = pathlib.Path(__file__).resolve().parent.parent
 REGISTRY = ROOT / "src" / "registry.js"
+GAMES_JS = ROOT / "public" / "games.js"
 GAMES = sorted((ROOT / "games").glob("*/index.js"))
+
+# Ids declared in the real public/games.js, commented-out lines excluded.
+LEGACY_IDS = set(re.findall(r"^\s*\{ id: '([a-z0-9]+)'",
+                            GAMES_JS.read_text(encoding="utf-8"), re.M))
 
 # Stand-ins for window.BUB_GAMES, so the legacy branch has something to find.
 # Keep these ids that have NO games/<id>/index.js — a module id here would be
@@ -34,6 +39,25 @@ GAMES = sorted((ROOT / "games").glob("*/index.js"))
 LEGACY = [
     {"id": "chess", "title": "Chess", "file": "chess.html", "players": "2"},
     {"id": "warp", "title": "Warp Front", "file": "warpfront.html", "players": "1-3"},
+    {"id": "goldberg", "title": "Goldberg", "file": "goldberg.html", "players": "2-3",
+     "maxPlayers": 3},
+]
+
+# The menu order people asked for (src/registry.js MENU_ORDER). Chess, MiniGo,
+# Goldberg and Warp Front are small tables and lead; the rest follow in this
+# order under "Two to eight players".
+# Only the games this fixture actually registers: the four module ids below
+# plus the three legacy stand-ins. Compare against that subsequence of the real
+# order rather than hard-coding a list the fixture cannot produce.
+# A subsequence of src/registry.js MENU_ORDER: this fixture only registers the
+# four module ids below plus the three legacy stand-ins, so it cannot produce
+# the whole list. The ids it CAN produce must appear in MENU_ORDER, and in this
+# relative order — which is what catches a rename or a forgotten entry.
+MENU_ORDER = [
+    # small tables
+    "chess", "minigo", "goldberg", "warp",
+    # the 2-8 crowd
+    "eggs", "hook", "dotreturn",
 ]
 
 
@@ -84,6 +108,26 @@ def source_checks():
         "every shipped game module sits at games/<id>/index.js",
         bool(GAMES) and all(g.parent.parent.name == "games" and g.name == "index.js"
                             for g in GAMES)))
+
+    # Every game the hub can show must have a place in the menu order, or it
+    # falls off the end of the list and lands wherever the sort puts it. Read
+    # the real games/ directory and the real games.js, not the fixture above.
+    # Solo games (`solo: true`) go in the Solo list, not the multiplayer menu,
+    # so they have no place in MENU_ORDER. Everything else must.
+    solo_ids = set(re.findall(r"^\s*\{ id: '([a-z0-9]+)'[^\n]*solo: true",
+                              GAMES_JS.read_text(encoding="utf-8"), re.M))
+    real_ids = ({g.parent.name for g in GAMES} | set(LEGACY_IDS)) - solo_ids
+    mo = re.search(r"const MENU_ORDER = \[(.*?)\];", src, re.S)
+    declared = re.findall(r"'([a-z0-9]+)'", mo.group(1)) if mo else []
+    out.append((
+        "the menu order names every game that exists",
+        bool(declared) and real_ids <= set(declared)))
+    out.append((
+        "the menu order names no game that does not exist",
+        set(declared) <= real_ids))
+    out.append((
+        "no game is listed twice in the menu order",
+        len(declared) == len(set(declared))))
     return out
 
 
@@ -101,10 +145,20 @@ INSPECT = r"""
         legacy: ids((g) => g.kind === 'iframe'),
         soloCorner: ids((g) => g.meta.solo || g.meta.soloable || g.meta.lobby),
         roomList: ids((g) => !g.meta.solo),
-        dupes: all.filter((id, i) => all.indexOf(id) !== i)
+        dupes: all.filter((id, i) => all.indexOf(id) !== i),
+        order: roomLists(full).multi.map((g) => g.meta.id),
+        sections: multiplayerSections(full).map((s) => s.title),
+        small: (multiplayerSections(full)[0] || { games: [] })
+          .games.map((g) => g.meta.id),
+        counts: full.reduce((acc, g) => {
+          const l = playerLabel(g.meta);
+          if (l) acc[g.meta.id] = l;
+          return acc;
+        }, {})
       };
     })
   : { modules: [], legacy: [], soloCorner: [], roomList: [], dupes: [],
+      order: [], sections: [], small: [], counts: {},
       note: 'loadRegistry was never defined — the file did not parse' })
 """
 
@@ -136,11 +190,17 @@ def main():
         pg.evaluate("() => { window.BUB_GAMES = " + json.dumps(LEGACY) + "; }")
         # real loader *functions*, not JSON strings — a string would throw
         # inside the registry and be swallowed as "game module failed"
+        # Real player ranges for the module games, because the menu grouping is
+        # under test: a stub of '1-2' for everything would group them all as
+        # small tables and the assertions would be about the stub.
         pg.evaluate("""(ids) => {
+          const RANGES = {
+            dotreturn: '2-8', eggs: '2-8', hook: '2-8', minigo: '2'
+          };
           window.__loaded = {};
           ids.forEach((id) => {
             window.__loaded['../games/' + id + '/index.js'] = () => Promise.resolve({
-              meta: { id: id, title: id, players: '1-2', soloable: true }
+              meta: { id: id, title: id, players: RANGES[id] || '2-8', soloable: true }
             });
           });
         }""", game_ids)
@@ -162,6 +222,16 @@ def main():
     results += [
         ("a built bundle registers every module game",
          sorted(got["modules"]) == sorted(game_ids)),
+        ("the multiplayer menu is in the order people asked for",
+         got["order"] == MENU_ORDER),
+        ("the small tables group first", got["sections"][0] == "Two or three players"),
+        ("the 2-8 crowd is its own group", got["sections"][1] == "Two to eight players"),
+        ("Chess, MiniGo, Goldberg and Warp Front share the small group",
+         got["small"] == ["chess", "minigo", "goldberg", "warp"]),
+        ("a module count and a legacy count read the same",
+         got["counts"]["eggs"] == "2-8 players" and got["counts"]["chess"] == "2 players"
+         and got["counts"]["goldberg"] == "2-3 players"),
+        ("Focus says 2-8 on the menu", got["counts"]["dotreturn"] == "2-8 players"),
         ("a built bundle still registers the legacy games",
          got["legacy"] == [g["id"] for g in LEGACY]),
         ("a module id wins over a legacy entry with the same id",

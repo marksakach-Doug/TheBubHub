@@ -91,7 +91,7 @@ def main():
               pg.evaluate(f"()=>!!document.querySelector(\"#board .sq[data-sq='{D6}'] .ring\")"), True)
         pg.click(f"#board .sq[data-sq='{D6}']")
         pg.wait_for_timeout(300)
-        check("knight_click_capture_lands", glyph(pg, str(D6)), "\u2658")
+        check("knight_click_capture_lands", glyph(pg, str(D6)), "N")
         check("knight_origin_empty", glyph(pg, str(E4)), None)
 
         # ---- king click-capture ----
@@ -104,7 +104,7 @@ def main():
               pg.evaluate(f"()=>!!document.querySelector(\"#board .sq[data-sq='{D5}'] .ring\")"), True)
         pg.click(f"#board .sq[data-sq='{D5}']")
         pg.wait_for_timeout(300)
-        check("king_click_capture_lands", glyph(pg, str(D5)), "\u2654")
+        check("king_click_capture_lands", glyph(pg, str(D5)), "K")
 
         # ---- queen drag-capture ----
         D1, D7 = sq_index("d1"), sq_index("d7")
@@ -117,7 +117,7 @@ def main():
         pg.mouse.move(dst["x"] + dst["width"] / 2, dst["y"] + dst["height"] / 2, steps=8)
         pg.mouse.up()
         pg.wait_for_timeout(300)
-        check("queen_drag_capture_lands", glyph(pg, str(D7)), "\u2655")
+        check("queen_drag_capture_lands", glyph(pg, str(D7)), "Q")
 
         # ---- en passant via clicks (white e5 takes d6, victim off d5) ----
         E5B, D6B = sq_index("e5"), sq_index("d6")
@@ -135,7 +135,7 @@ def main():
               pg.evaluate(f"()=>!!document.querySelector(\"#board .sq[data-sq='{D6B}'] .ring\")"), True)
         pg.click(f"#board .sq[data-sq='{D6B}']")
         pg.wait_for_timeout(300)
-        check("ep_click_capture_lands", glyph(pg, str(D6B)), "\u2659")
+        check("ep_click_capture_lands", glyph(pg, str(D6B)), "P")
         check("ep_victim_removed",
               pg.evaluate("()=>!document.querySelector(\"#board .sq[data-sq='27'] .pc\")"), True)
 
@@ -157,6 +157,33 @@ def main():
         # e2 is empty after 1.e4, so Ng1 has three destinations: f3, h3, e2.
         check("knight_select_shows_three_dots",
               pg.evaluate("()=>document.querySelectorAll('#board .dot').length"), 3)
+
+        # ---- one piece set for both sides ----
+        # White used to be hollow chess glyphs (U+2654-5) and Black solid ones
+        # (U+2656-7). A phone whose font lacks that block fell back to emoji for
+        # one side and not the other, so Black's pieces looked like a different
+        # game. Letters render the same everywhere, so both sides must now use
+        # the same character and differ only by colour.
+        distinct = pg.evaluate("""() => {
+            const cells = [...document.querySelectorAll('#board .sq')];
+            const letter = (c) => (c ? c.textContent : '');
+            const kinds = new Set();
+            cells.forEach((sq) => {
+              const pc = sq.querySelector('.pc');
+              if (pc) kinds.add(pc.className.replace(/\\s+/g,'') + ':' + pc.textContent);
+            });
+            return [...kinds].sort();
+        }""")
+        check("white and black share one letter per piece kind",
+              all(len(k.split(':')[1]) == 1 for k in distinct), True)
+        check("no chess-block glyphs are left on the board",
+              pg.evaluate("""() => [...document.querySelectorAll('#board .pc')]
+                  .some((p) => /[\\u2654-\\u265F]/.test(p.textContent))"""), False)
+        # The white pawn on e2 and a black pawn must be the same character.
+        check("white and black pawns are the same character",
+              pg.evaluate(f"""() => {{
+                  const w = document.querySelector("#board .sq[data-sq='{sq_index('d2')}'] .pc");
+                  return w ? w.textContent : null; }}"""), "P")
 
         if errs:
             print("PAGE ERRORS:", errs, file=sys.stderr)
