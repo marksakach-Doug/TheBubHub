@@ -245,6 +245,9 @@ const myId = () => Hub.me && Hub.me.id;
 const myName = () => (Hub.names && Hub.names[myId()]) || (Hub.me && cleanName(Hub.me.name)) || 'Player';
 const isHost = () => !!(Hub.me && Hub.me.isHost);
 const peerCount = () => Hub.roster.length;
+// Matches the menu count in games.js. The game itself has no seat limit — it
+// just seats everybody connected — so the number is only ever enforced here.
+const MAX_PLAYERS = 8;
 const hostPresent = () => Hub.roster.some(m => m.host);
 // rosterAdopt: hosting (or newly hosting after a takeover) means the table
 // continues as-is — never start over. The host re-broadcasts on every
@@ -478,7 +481,7 @@ function resolveChoice(i){
     }
     else if (o.go === 'drop'){ S.lootD.push(c); say(`${pn(p)} discards ${wname(c)}.`); }
     else if (o.go === 'place'){
-        S.pend = { who: p.id, kind: 'place', cards: stashCands(p), incoming: c,
+        S.pend = { who: p.id, kind: 'place', cards: placeCands(p), incoming: c,
                    dropSpare: !!o.dropSpare, then: 'chain',
                    prevOpts: pd.opts, prevWhy: pd.why, prevKind: pd.kind,
                    why: 'Gear is full — choose a weapon to move to the spare' +
@@ -569,9 +572,29 @@ function resolveDropBoth(){
 }
 // Narsil (K) cannot be discarded or stashed while another weapon is equipped
 // (house rule) — so it only appears as a choice when it is the lone option.
+//
+// THE SPARE IS A CANDIDATE. This list used to be built from p.eq alone, so a
+// card sitting in the one spare slot was never on the table when the game took
+// something away. Combined with eq being sorted strongest-first (normSort) and
+// K being filtered out, the list usually collapsed to exactly one entry — and
+// the next branch silently ate the player's best equipped weapon while the
+// card they were actually saving sat untouched. If you can lose either, you
+// are asked.
 function stashCands(p){
-    const noK = p.eq.filter(c => c.r !== 'K');
-    return (p.eq.length > 1 && noK.length) ? noK : p.eq.slice();
+    const all = p.eq.concat(p.hand.slice());
+    const noK = all.filter(c => c.r !== 'K');
+    return (all.length > 1 && noK.length) ? noK : all.slice();
+}
+// For a gear-full placement the spare is NOT up for grabs — the player is
+// choosing which equipped weapon to demote, not which card to lose. Keep the
+// old gear-only list for that prompt so "move to spare" and "discard" stay
+// distinct choices, and dropSpare is stated as a consequence rather than done
+// silently.
+function placeCands(p){ return p.eq.slice(); }
+// What may be lost, for the button text. Anything not in p.eq is the spare.
+function isSpare(p, c){ return p.hand.indexOf(c) >= 0; }
+function loseLabel(p, c){
+    return isSpare(p, c) ? wname(c) + ' (your spare)' : wname(c) + ' (equipped)';
 }
 // Weapon losses (fight defeats, Dragon flees/falls) queue up so every player
 // with more than one candidate chooses their own discard, one at a time.
@@ -579,19 +602,21 @@ function queueLose(p){ if (p && !p.gone) S.lossQ.push(p.id); }
 function pumpLose(){
     while (S.lossQ.length){
         const p = S.pl.find(x => x.id === S.lossQ[0]);
-        if (!p || p.gone || !p.eq.length){ S.lossQ.shift(); continue; }
+        // A player holding only a spare still has something to lose. This used
+        // to skip them, and their queued loss just vanished.
+        if (!p || p.gone || (!p.eq.length && !p.hand.length)){ S.lossQ.shift(); continue; }
         const cands = stashCands(p);
         if (cands.length <= 1){
-            const d = cands[0] || p.eq[0];
+            const d = cands[0];
             if (d){
                 p.eq = p.eq.filter(c => c !== d); p.hand = p.hand.filter(c => c !== d);
                 S.lootD.push(d);
-                say(`${pn(p)} loses ${wname(d)}.`);
+                say(`${pn(p)} loses ${wname(d)}${isSpare(p, d) ? ' from the spare' : ''}.`);
             }
             S.lossQ.shift(); continue;
         }
         S.pend = { who: p.id, kind: 'lose', cards: cands,
-                   why: `${pn(p)} lost the fight — choose which weapon to discard.` };
+                   why: `${pn(p)} lost the fight — choose what to discard: ${cands.map(c => loseLabel(p, c)).join(', ')}.` };
         S.phase = 'decide';
         S.msg = S.pend.why;
         return true;
@@ -614,9 +639,10 @@ function resolveDecision(i){
         p.eq.push(pd.incoming);
         say(`${pn(p)} moves ${wname(pick)} to the spare and equips ${wname(pd.incoming)}.`);
     } else if (pd.kind === 'lose'){
+        const wasSpare = isSpare(p, pick);
         p.eq = p.eq.filter(c => c !== pick); p.hand = p.hand.filter(c => c !== pick);
         S.lootD.push(pick);
-        say(`${pn(p)} discards ${wname(pick)}.`);
+        say(`${pn(p)} discards ${wname(pick)}${wasSpare ? ' from the spare slot' : ''}.`);
         S.lossQ.shift();
     }
     S.pend = null;
@@ -652,7 +678,7 @@ function startGame(dr){
     if (!isHost()) return false;
     if (dr === undefined) dr = remembered.dread;
     remembered.dread = dr;
-    if (peerCount() < 2 || peerCount() > 6){ $('lr-setup-note').textContent = 'Need 2–6 players in the room.'; return false; }
+    if (peerCount() < 2 || peerCount() > MAX_PLAYERS){ $('lr-setup-note').textContent = 'Need 2–' + MAX_PLAYERS + ' players in the room.'; return false; }
     fresh(dr);
     say(`LOTR Cards begins — ${S.pl.length} players, Rising Dread ${dr ? 'ON' : 'off'}. ${pn(cur())} goes first.`);
     S.msg = `${pn(cur())}'s turn.`;
@@ -818,7 +844,7 @@ function handle(d){
             if (p.eq.length >= cap(p)){
                 // gear full: ask which equipped weapon moves to the spare
                 // instead of silently replacing your best one.
-                S.pend = { who: p.id, kind: 'place', cards: stashCands(p), incoming: x,
+                S.pend = { who: p.id, kind: 'place', cards: placeCands(p), incoming: x,
                            dropSpare: false, then: 'back', back: S.phase,
                            why: 'Gear is full — choose a weapon to move to the spare.' };
                 S.phase = 'decide';
