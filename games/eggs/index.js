@@ -50,7 +50,15 @@ export function roundId(state) {
 
 export function summarize(state, nameOf) {
   if (!state.hostState || !state.hostState.matchOver || !state.hostState.roundWinner) return null;
-  return `${nameOf(state.hostState.roundWinner.id)} won a match of Eggs!`;
+  // roundWinner is `{id, name}` — it has no idx, and one client crashed reading
+  // one. Guard the id so a malformed winner records nothing rather than writing
+  // "undefined won a match of Eggs!" onto the shared sheet.
+  const id = state.hostState.roundWinner.id;
+  if (!id) return null;
+  let who = null;
+  try { who = nameOf(id); } catch (e) { who = null; }
+  if (!who) return null;
+  return `${who} won a match of Eggs!`;
 }
 
 // `players` holds objects, not ids, so the hub's prunePlayerState() (which does
@@ -114,8 +122,20 @@ export function mount(root, api) {
   let matchOver=false, roundWinner=null, overtime=false, hurryShown=false, lastCount=0;
   let ban=null, lastMutId='', COUNT=2.6, roundNo=0, roundsNeed=3, sceneT=0;
   
-  let cfg = { rounds: 1, chaos: 1, cpu: 0 };
-  const ROWS = ['match', 'chaos', 'cpu', 'start'];
+  let cfg = { mode: 0, rounds: 1, chaos: 1, cpu: 0 };
+  const ROWS = ['mode', 'match', 'chaos', 'cpu', 'start'];
+
+  // Three round types. STOCKS is three lives each; SPLAT RACE is ninety seconds
+  // and most smashes wins; KING OF THE NEST is a moving nest that only counts
+  // while one egg is sitting in it alone. Nest was a real mode in the standalone
+  // build and arrived here as a dead drawNest() — nest was in the state, never
+  // created, so nothing rendered and nothing scored.
+  const MODES = [
+   { id: 'stocks', name: 'STOCKS', desc: 'Three lives each. Last egg standing takes the round.' },
+   { id: 'timed', name: 'SPLAT RACE', desc: '90 seconds on the clock. Most smashes wins the round.' },
+   { id: 'nest', name: 'KING OF THE NEST', desc: 'Hold the glowing nest alone. First to 25 seconds wins.' }
+  ];
+  const NEST_WIN = 25, NEST_MOVE_EVERY = 20;
   
   const NOINP = {ax:0, jump:false, brake:false, up:false, dash:false, item:false};
 
@@ -683,14 +703,36 @@ export function mount(root, api) {
    lastMutId=mut?mut.id:'';
    applyMut(mut);
    newWorld();
+   nest=null;
+   if(mode==='nest'){nest={x:0,y:0,r:82,moveT:0,holder:-1,contested:false};moveNest();}
    eggs.forEach(function(g,i){
     g.stocks=3;g.pts=0;g.nestPts=0;g.diedAt=0;
     respawn(g,true,W*(i+1)/(eggs.length+1));
     g.inv=COUNT+1.5;
    });
    feed=[];scene='countdown';sceneT=0;roundT=0;overtime=false;hurryShown=false;lastCount=0;matchOver=false;roundWinner=null;
-   var sub=(mut?mut.name+' — '+mut.desc:'STOCKS - Three lives each.');
-   ban={text:(roundsNeed>1?'ROUND '+roundNo:'STOCKS'),sub:sub,t:0,dur:COUNT,col:'#ffd23f'};
+   var md=MODES.filter(function(m){return m.id===mode;})[0]||MODES[0];
+   var sub=(mut?mut.name+' — '+mut.desc:md.desc);
+   ban={text:(roundsNeed>1?'ROUND '+roundNo:md.name),sub:sub,t:0,dur:COUNT,col:'#ffd23f'};
+  }
+
+  // Park the nest on some real platform, not in mid-air, and every twenty
+  // seconds somewhere new so nobody can camp it.
+  function moveNest(){
+   if(!nest)return;
+   var c=plats.filter(function(p){return p.w<W-1&&p.y>210&&p.y<H-230;});
+   var p=c.length?c[(Math.random()*c.length)|0]:{x:W/2,y:H/2};
+   nest.x=Math.round(p.x);nest.y=Math.round(p.y-62);nest.moveT=0;
+   if(scene==='play')popText(nest.x,nest.y-70,'NEST MOVED!');
+  }
+  // Highest scorer, or null on a tie — a tie must not hand anybody the round.
+  function leader(key){
+   var best=null,tie=false;
+   eggs.forEach(function(e){
+    if(!best||e[key]>best[key]){best=e;tie=false;}
+    else if(e[key]===best[key])tie=true;
+   });
+   return tie?null:best;
   }
 
   function endRound(w){
@@ -703,6 +745,20 @@ export function mount(root, api) {
   }
   function checkRound(){
    if(scene!=='play')return;
+   if(mode==='nest'){
+    // First to 25 seconds alone in the nest takes it. A tie at the top means
+    // nobody has earned it, so the round runs on until the clock.
+    var top=leader('nestPts');
+    if(top&&top.nestPts>=NEST_WIN){endRound(top);return;}
+   }
+   if(mode!=='stocks'){
+    var limit=(mode==='timed')?90:150;
+    if(roundT>=limit){
+     var L=leader(mode==='timed'?'pts':'nestPts');
+     if(L)endRound(L);else overtime=true;
+    }
+    return;
+   }
    var alive=eggs.filter(function(g){return g.stocks>0;});
    if(alive.length<=1){
     var w=alive[0]||null;
@@ -725,6 +781,15 @@ export function mount(root, api) {
    }else if(scene==='play'){
     roundT+=rdt;
     if(mode==='stocks'&&roundT>75&&!hurryShown){hurryShown=true;ban={text:'HURRY UP!',sub:'Damage is climbing for everyone',t:0,dur:2.2,col:'#f87171'};}
+    // King of the nest: the nest counts only while exactly one egg is in it.
+    if(mode==='nest'&&nest){
+     nest.moveT+=rdt;
+     if(nest.moveT>NEST_MOVE_EVERY)moveNest();
+     var ins=eggs.filter(function(e){return !e.dead&&Math.hypot(e.x-nest.x,e.y-nest.y)<nest.r+e.r*0.4;});
+     nest.holder=ins.length===1?ins[0].idx:-1;
+     nest.contested=ins.length>1;
+     if(ins.length===1)ins[0].nestPts+=rdt;
+    }
    }else if(scene==='roundEnd'){
     if(sceneT>3.4){
      if(matchOver){scene='matchEnd';sceneT=0;}
@@ -741,6 +806,12 @@ export function mount(root, api) {
    var tgt=null,bd=1e9,i;
    for(i=0;i<eggs.length;i++){var e=eggs[i];if(e===g||e.dead)continue;var d=Math.hypot(e.x-g.x,e.y-g.y);if(d<bd){bd=d;tgt=e;}}
    var goal=tgt?{x:tgt.x,y:tgt.y}:{x:W/2,y:H-100};
+   // In nest mode the job is to sit in the nest, not to hunt. Go there unless
+   // somebody is already in it, in which case go bonk them out.
+   if(mode==='nest'&&nest){
+    var enemyIn=tgt&&Math.hypot(tgt.x-nest.x,tgt.y-nest.y)<nest.r+10;
+    if(!enemyIn)goal={x:nest.x,y:nest.y};
+   }
    var pb=null,pd=420;
    pus.forEach(function(p){var d=Math.hypot(p.x-g.x,p.y-g.y);if(d<pd){pd=d;pb=p;}});
    if(pb)goal={x:pb.x,y:pb.y};
@@ -1068,11 +1139,21 @@ export function mount(root, api) {
     if(g.dmg>0)txt(Math.round(g.dmg)+'%',x+bw-12,y+27,22,g.dmg>=180?'#f87171':'#f472b6','right',900);
     if(mode==='stocks'){
      for(var s=0;s<3;s++)drawEggIcon(x+26+s*26,y+46,0.52,g.idx,s<g.stocks?1:0.18);
+    }else if(mode==='nest'){
+     // A progress bar to 25 seconds, so "am I winning" is on screen rather
+     // than something you work out by watching the nest for a minute.
+     var frac=Math.min(1,g.nestPts/NEST_WIN);
+     ctx.fillStyle='rgba(255,255,255,.15)';rrect(x+14,y+44,bw-28,10,5);ctx.fill();
+     ctx.fillStyle='#ffd23f';rrect(x+14,y+44,Math.max(2,(bw-28)*frac),10,5);ctx.fill();
+     txt(g.nestPts.toFixed(1)+'s',x+bw-14,y+40,17,'#ffd23f','right',900);
+    }else{
+     txt(String(g.pts||0)+' splats',x+26,y+52,17,'#ffd23f','left',900);
     }
     ctx.restore();
    }
    
-   var label = (roundsNeed>1?'ROUND '+roundNo:'STOCKS') + (mut?'  ·  '+mut.name:'');
+   var md = MODES.filter(function(m){return m.id===mode;})[0]||MODES[0];
+   var label = (roundsNeed>1?'ROUND '+roundNo:md.name) + (mut?'  ·  '+mut.name:'');
    ctx.font='900 15px system-ui,sans-serif';
    var pw=ctx.measureText(label).width+28;
    ctx.globalAlpha = hudAlpha;
@@ -1115,15 +1196,45 @@ export function mount(root, api) {
    ctx.fillStyle='rgba(20,14,8,.96)';rrect(x,y,w,h,18);ctx.fill();
    ctx.strokeStyle=stroke||'#6b5636';ctx.lineWidth=3;rrect(x,y,w,h,18);ctx.stroke();
   }
+  // The last resort: render() threw. Say so on the canvas instead of freezing
+  // whatever was there before, and only once, so a per-frame failure does not
+  // spam the log.
+  var paintErrShown = false;
+  function drawPaintError(err){
+   var msg=String((err&&err.message)||err);
+   if(!paintErrShown)console.error('eggs render() threw:',err);
+   try{
+    ctx.fillStyle='rgba(10,7,4,.95)';ctx.fillRect(0,0,W,H);
+    panel(W/2-460,Math.max(90,H/2-140),920,280,'#e05a42');
+    txt('THE MATCH SCREEN COULD NOT BE DRAWN',W/2,Math.max(90,H/2-140)+80,34,'#fca5a5','center',900,{w:8,c:'rgba(10,7,4,.9)'});
+    fitTxt(msg,W/2-400,Math.max(90,H/2-140)+150,800,22,'#f0e6d2','center',400);
+    txt('Tap to go back to the lobby.',W/2,Math.max(90,H/2-140)+210,22,'#ffd23f','center',900,{w:5,c:'rgba(10,7,4,.9)'});
+   }catch(e2){}
+   paintErrShown=true;
+  }
+  // The panel used to be a fixed 560px tall with a row every 46px from y=480,
+// so an eight-player table's standings ran off the bottom of the panel and
+// past the edge of the world — and the champion's own colour was read off
+// champ.idx, which roundWinner never stored, so this threw on EVERY frame of
+// the end screen. A throw inside draw() left the dimmed world behind with
+// nothing on it, which is the "black screen at the end" report.
   function drawMatchEnd(){
    ctx.fillStyle='rgba(10,7,4,0.7)';ctx.fillRect(0,0,W,H);
-   panel(W/2-460,150,920,560,'#ffd23f');
    var champ=roundWinner;
-   txt(champ?champ.name+' IS THE EGG CHAMPION':'IT\'S A DRAW',W/2,250,52,champ?colorOf(champ.idx).shell:'#f0e6d2','center',900,{w:8,c:'rgba(10,7,4,.9)'});
-   if(champ)drawEggIcon(W/2,330,3.2+Math.sin(performance.now()/300)*0.1,champ.idx,1);
+   var champEgg = champ ? eggs.find(function(g){return g.id===champ.id;}) : null;
+   var champIdx = champEgg ? champEgg.idx : 0;
+   var champCol = champEgg ? colorOf(champIdx).shell : '#f0e6d2';
    var sorted=eggs.slice().sort(function(a,b){return b.wins-a.wins||b.kills-a.kills;});
+   // Size the panel to the table, so eight players are not a scroll of rows
+   // running off the bottom.
+   var rowH=Math.max(34,Math.min(46,Math.floor(430/Math.max(1,sorted.length))));
+   var bodyH=120+sorted.length*rowH;
+   var top=Math.max(90,H/2-bodyH/2);
+   panel(W/2-460,top,920,bodyH,'#ffd23f');
+   txt(champ?champ.name+' IS THE EGG CHAMPION':'IT\'S A DRAW',W/2,top+70,52,champCol,'center',900,{w:8,c:'rgba(10,7,4,.9)'});
+   if(champEgg)drawEggIcon(W/2,top+150,3.2+Math.sin(performance.now()/300)*0.1,champIdx,1);
    sorted.forEach(function(g,i){
-    var y=480+i*46;
+    var y=top+240+i*rowH;
     drawEggIcon(W/2-380,y-8,0.9,g.idx,1);
     txt(g.name,W/2-340,y,26,colorOf(g.idx).shell,'left',900);
     txt(String(g.wins),W/2+60,y,26,'#fff','right',900);
@@ -1155,7 +1266,10 @@ export function mount(root, api) {
     }
    }
 
-   var ROW_X=760, ROW_Y0=232, ROW_H=72, ROW_W=560;
+   // There is a fifth row now (mode, match, chaos, cpu, start). At ROW_Y0 232 with
+  // ROW_H 72 the last row would end at 592 and the guest note at 662 — inside
+  // the 900-tall world, but crowding it. Start higher.
+  var ROW_X=760, ROW_Y0=200, ROW_H=72, ROW_W=560;
    var ROUND_NAMES = ['Single round','Best of 3','Best of 5'];
 
    for(let i=0; i<ROWS.length; i++){
@@ -1164,10 +1278,11 @@ export function mount(root, api) {
     ctx.strokeStyle='#4a3a26';ctx.lineWidth=3;rrect(ROW_X,ry,ROW_W,62,14);ctx.stroke();
     
     var big=(rr==='start');
-    var label = rr==='match'?'MATCH':rr==='chaos'?'CHAOS RULES':rr==='cpu'?'CPU EGGS':'START MATCH';
+    var label = rr==='mode'?'MODE':rr==='match'?'MATCH':rr==='chaos'?'CHAOS RULES':rr==='cpu'?'CPU EGGS':'START MATCH';
     txt(label, big?ROW_X+ROW_W/2:ROW_X+22,ry+40,big?28:22,api.isHost?'#ffd23f':'#8a7a5c',big?'center':'left',900);
     
     var v = '';
+    if(rr==='mode') v = MODES[cfg.mode|0].name;
     if(rr==='match') v = ROUND_NAMES[cfg.rounds];
     if(rr==='chaos') v = cfg.chaos ? 'ON' : 'OFF';
     if(rr==='cpu') v = cfg.cpu === 0 ? 'NONE' : String(cfg.cpu);
@@ -1233,8 +1348,18 @@ export function mount(root, api) {
   cv.addEventListener('mousedown', function(e) {
     var r = cv.getBoundingClientRect();
     var p = { x: (e.clientX - r.left) * W / r.width, y: (e.clientY - r.top) * H / r.height };
+    // A paint error shows "tap to go back to the lobby" — honour it. Without
+    // this the error card is a dead end and the only way out is the hub menu.
+    if (paintErrShown && api.isHost) {
+      paintErrShown = false;
+      scene = 'lobby';
+      sceneT = 0;
+      matchOver = false;
+      roundWinner = null;
+      return;
+    }
     if (scene === 'lobby' && api.isHost) {
-      var ROW_X = 760, ROW_Y0 = 232, ROW_H = 72, ROW_W = 560;
+      var ROW_X = 760, ROW_Y0 = 200, ROW_H = 72, ROW_W = 560;
       for(var i=0; i<ROWS.length; i++) {
         var ry = ROW_Y0 + i*ROW_H;
         if (p.x >= ROW_X && p.x <= ROW_X+ROW_W && p.y >= ry && p.y <= ry+62) {
@@ -1243,6 +1368,7 @@ export function mount(root, api) {
             startMatch(viewState.players);
           } else {
             var d = (p.x < ROW_X + ROW_W/2) ? -1 : 1;
+            if (rr === 'mode') cfg.mode = (cfg.mode + d + MODES.length) % MODES.length;
             if (rr === 'match') cfg.rounds = (cfg.rounds + d + 3) % 3;
             if (rr === 'chaos') cfg.chaos = cfg.chaos ? 0 : 1;
             if (rr === 'cpu') cfg.cpu = (cfg.cpu + d + 4) % 4;
@@ -1281,6 +1407,9 @@ export function mount(root, api) {
       levelName = hs.levelName || 'coop'; roundNo = hs.roundNo || 1; 
       matchOver = hs.matchOver || false; roundWinner = hs.roundWinner || null;
       overtime = hs.overtime || false; cfg = hs.cfg || cfg;
+      // Host-authoritative: which round type is being played comes from the
+      // host's cfg, or a guest would be scoring nest time in a stocks round.
+      mode = (MODES[cfg.mode | 0] || MODES[0]).id;
 
       if (!eggs || eggs.length === 0) {
           eggs = hs.eggs || [];
@@ -1319,7 +1448,7 @@ export function mount(root, api) {
       for (let i = 0; i < cfg.cpu; i++) {
           eggs.push(spawnEgg(eggs.length, { id: 'cpu' + i, name: 'CPU ' + (i + 1), bot: true }));
       }
-      mode = 'stocks';
+      mode = (MODES[cfg.mode | 0] || MODES[0]).id;
       roundsNeed = [1, 3, 5][cfg.rounds];
       roundNo = 0; lastMutId = '';
       api.send({ type: 'MATCH_ID', matchId: Math.random().toString(36).slice(2) });
@@ -1377,8 +1506,16 @@ api.setInterval(function loop() {
               }
           });
       }
-      
-render();
+
+      // A throw inside render() kills the whole 16ms loop, and the canvas keeps
+      // whatever was last painted. On the end screen that last frame was the
+      // dimmed world with nothing on it — a black screen, permanently. Show the
+      // error instead, and keep the loop alive.
+      try {
+          render();
+      } catch (err) {
+          drawPaintError(err);
+      }
   }, 16); // 16ms interval targets ~60fps
 
   return {

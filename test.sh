@@ -55,11 +55,17 @@ run_offline() {
 }
 
 # Browser suite: loud failure without Chromium, SKIP with --skip-browser.
+# A .mjs entry runs under node (it needs no browser), everything else python3.
 run_browser() {
   local name="$1" script="$2"
   step "$name — tests/$script"
   if [ "$BROWSER_OK" = "1" ]; then
-    if python3 "tests/$script"; then pass "$script"; else fail "$script"; bail; fi
+    local rc=0
+    case "$script" in
+      *.mjs) node "tests/$script" || rc=$? ;;
+      *) python3 "tests/$script" || rc=$? ;;
+    esac
+    if [ "$rc" -eq 0 ]; then pass "$script"; else fail "$script"; bail; fi
   elif [ "$SKIP_BROWSER" = "1" ]; then
     skip "$script ($BROWSER_WHY)"
   else
@@ -136,7 +142,11 @@ BROWSER_SUITES=(
   "chess captures|chess_captures.py"
   "chess capture play test|chess_capture_play.py"
   "the 96 game play test|t96_play.py"
-  "minigo_test.mjs"
+  "eggs|eggs_test.py"
+  # A node harness, not python: minigo_test.mjs drives the shipped module and
+  # the MCTS bot with no browser. It was in this table being run by python3,
+  # which could only ever SyntaxError — a suite that has never once passed.
+  "minigo|minigo_test.mjs"
 )
 
 for entry in "${OFFLINE_SUITES[@]}"; do
