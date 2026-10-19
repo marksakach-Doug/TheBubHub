@@ -20,7 +20,7 @@ let gameState = {
 
 function init(ctx) {
   // Initialize game state
-  gameState = {
+  const state = {
     level: 1,
     score: 0,
     buttons: [],
@@ -30,21 +30,21 @@ function init(ctx) {
   };
   
   // Create buttons for level 1
-  generateButtons();
-  return gameState;
+  generateButtons(state);
+  return state;
 }
 
-function generateButtons() {
+function generateButtons(state) {
   const gridSize = 9;
   const buttons = [];
   const order = [];
   
   // Clear existing buttons
-  gameState.buttons = [];
-  gameState.order = [];
+  state.buttons = [];
+  state.order = [];
   
   // Generate buttons for current level
-  for (let i = 0; i < gameState.level; i++) {
+  for (let i = 0; i < state.level; i++) {
     let x, y;
     do {
       x = Math.floor(Math.random() * gridSize);
@@ -55,10 +55,10 @@ function generateButtons() {
     order.push({ x, y });
   }
   
-  gameState.buttons = buttons;
-  gameState.order = order;
-  gameState.currentIndex = 0;
-  gameState.clickedOrder = [];
+  state.buttons = buttons;
+  state.order = order;
+  state.currentIndex = 0;
+  state.clickedOrder = [];
 }
 
 function reduce(state, action, ctx) {
@@ -70,9 +70,6 @@ function reduce(state, action, ctx) {
       const expectedButton = state.order[state.currentIndex];
       if (clickedButton.x === expectedButton.x && clickedButton.y === expectedButton.y) {
         // Correct click
-        state.clickedOrder.push({ x: clickedButton.x, y: clickedButton.y });
-        
-        // Update button colors
         const updatedButtons = state.buttons.map(btn => {
           if (btn.x === expectedButton.x && btn.y === expectedButton.y) {
             return { ...btn, color: 'blue' };
@@ -81,11 +78,12 @@ function reduce(state, action, ctx) {
         });
         
         // Move to next button
-        state.currentIndex++;
+        const newCurrentIndex = state.currentIndex + 1;
         
         // Check if all buttons have been clicked
-        if (state.currentIndex >= state.order.length) {
+        if (newCurrentIndex >= state.order.length) {
           // Level complete, increase score and level
+          generateButtons({ ...state, level: state.level + 1 });
           return {
             ...state,
             score: state.score + 1,
@@ -96,7 +94,7 @@ function reduce(state, action, ctx) {
           };
         } else {
           // Update next button color to red
-          const nextButton = state.order[state.currentIndex];
+          const nextButton = state.order[newCurrentIndex];
           const nextUpdatedButtons = updatedButtons.map(btn => {
             if (btn.x === nextButton.x && btn.y === nextButton.y) {
               return { ...btn, color: 'red' };
@@ -109,8 +107,8 @@ function reduce(state, action, ctx) {
           return {
             ...state,
             buttons: nextUpdatedButtons,
-            currentIndex: state.currentIndex,
-            clickedOrder: [...state.clickedOrder],
+            currentIndex: newCurrentIndex,
+            clickedOrder: [...state.clickedOrder, { x: clickedButton.x, y: clickedButton.y }],
           };
         }
       }
@@ -123,7 +121,7 @@ function project(state, playerId) {
   return state;
 }
 
-export function mount(root, api) {
+export export function mount(root, api) {
   const gridSize = 9;
   const gridCellSize = 50;
   
@@ -194,13 +192,14 @@ export function mount(root, api) {
     // Update level display
     levelDisplay.textContent = `Level: ${view.level}`;
     
-    // Update buttons
+    // Reset all buttons to blue
     Object.keys(buttons).forEach(key => {
       const [x, y] = key.split(',').map(Number);
       const button = buttons[key];
       button.style.backgroundColor = 'blue';
     });
     
+    // Apply button colors from view
     view.buttons.forEach(btn => {
       const button = buttons[`${btn.x},${btn.y}`];
       if (button) {
@@ -208,15 +207,20 @@ export function mount(root, api) {
           button.style.backgroundColor = 'red';
         } else if (btn.color === 'orange') {
           button.style.backgroundColor = 'orange';
-        } else if (btn.color === 'blue') {
-          button.style.backgroundColor = 'blue';
         }
       }
     });
   };
   
   // Initial update
-  update(gameState);
+  update({
+    level: 1,
+    score: 0,
+    buttons: [],
+    currentIndex: 0,
+    order: [],
+    clickedOrder: [],
+  });
   
   // Destroy function
   const destroy = () => {
