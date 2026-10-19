@@ -172,6 +172,7 @@ OFFLINE_SUITES=(
 SERVE_PORT="${SERVE_PORT:-5180}"
 
 BROWSER_SUITES=(
+  "cule|cule_test.py"
   "record sentences|record_test.py"
   "legacy record sentences|record_legacy_test.py"
   "record durability|record_durability_test.py"

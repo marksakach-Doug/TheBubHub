@@ -948,9 +948,9 @@ export function mount(root, api) {
       ctx.fillRect(x, y, tile, tile);
 
       if (t === engine.TILE_WALL) {
-        ctx.fillStyle = '#090d16';
+        ctx.fillStyle = '#7B7D8A';
         ctx.fillRect(x + 2, y + 2, tile - 4, tile - 4);
-        ctx.fillStyle = '#1e293b';
+        ctx.fillStyle = '#2A0E3A';
         ctx.fillRect(x + 5, y + 5, tile - 10, tile - 10);
       } else if (t === engine.TILE_TRAFFIC) {
         ctx.fillStyle = 'rgba(245, 158, 11, 0.24)';

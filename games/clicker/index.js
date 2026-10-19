@@ -222,10 +222,21 @@ export function summarize(state, nameOf) {
 
 export function mount(root, api) {
   const wrap = document.createElement('div');
-  wrap.style.cssText = 'max-width:min(460px, 65vh);margin:0 auto;padding:8px 10px 18px;'
+  
+  wrap.addEventListener('touchstart', function (e) {
+    if (e.target !== reset) e.preventDefault();
+  }, { passive: false });
+  wrap.addEventListener('touchend', function (e) {
+    if (e.target !== reset) e.preventDefault();
+  }, { passive: false });
+  wrap.addEventListener('dblclick', function (e) {
+    e.preventDefault();
+  });
+  
+wrap.style.cssText = 'max-width:min(460px, 65vh);margin:0 auto;padding:8px 10px 18px;'
     + 'font-family:system-ui,-apple-system,Segoe UI,Roboto,sans-serif;color:#e8ecf4;'
-    + 'user-select:none;-webkit-user-select:none;';
-
+    + 'user-select:none;-webkit-user-select:none;touch-action:none;';
+    
   const head = document.createElement('div');
   head.style.cssText = 'display:flex;align-items:baseline;gap:10px;margin-bottom:4px;';
 
@@ -257,7 +268,7 @@ export function mount(root, api) {
     const b = document.createElement('div');
     b.dataset.cell = String(i);
     b.style.cssText = 'border-radius:8px;background:#1d2434;border:1px solid #2b3448;'
-      + 'cursor:pointer;transition:background .12s ease,transform .08s ease;';
+      + 'cursor:pointer;touch-action:none;transition:background .12s ease,transform .08s ease;';
     b.addEventListener('pointerdown', function (e) {
       if (e.button !== undefined && e.button !== 0) return;
       e.preventDefault();

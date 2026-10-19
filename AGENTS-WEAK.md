@@ -5,6 +5,13 @@ Read this whole file before touching anything. It is the short version of
 
 If a step here is unclear, stop and ask. Do not guess.
 
+## Before you build a new game
+Run MarkDougCheck idea mode (MARKDOUGCHECK.md) on the idea first.
+DROP: stop and tell MarkDoug why. RESHAPE: build the reshaped version (the
+verb must change, not just the skin).
+If the idea could be played on paper tonight, say so first.
+After building, run `Check games/<id>/` and put the verdict in your final message.
+
 ---
 
 ## 0. The one rule
