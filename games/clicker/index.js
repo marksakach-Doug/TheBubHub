@@ -123,7 +123,7 @@ function project(state, playerId) {
   return state;
 }
 
-function mount(root, api) {
+export function mount(root, api) {
   const gridSize = 9;
   const gridCellSize = 50;
   
