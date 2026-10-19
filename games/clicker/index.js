@@ -1,16 +1,17 @@
 // Clicker — a solo module game.
 //
 // A 9x9 grid. Level 1 lights one button; every level adds one more button in a
-// random free cell. The buttons carry a hidden order: the one you owe a click
-// is red, the one that comes after it is orange, everything else is blue. Clear
-// the whole queue and you score a point and the level grows.
+// random free cell. You only ever click the red button: orange shows which cell
+// will turn red next, and blue cells are waiting further back in the queue.
+// Clear the whole queue before the 16.0s level clock expires to score a point
+// and grow the level.
 //
-// The contract has no tick — nothing moves except when the player clicks — so
-// every rule below lives in reduce(), and the DOM in mount() only ever renders
-// what project() hands it.
+// Determinism lives in reduce(), and the DOM in mount() renders what project()
+// hands it while driving the per-level countdown clock.
 
 const GRID = 9;                 // 9x9, as asked for
 const MAX_LEVEL = GRID * GRID;  // the grid is full; nothing can be added after this
+const LEVEL_MS = 16000;         // 16.0s per level (~197.5ms/click at level 81)
 
 export const meta = {
   id: 'clicker',
@@ -18,7 +19,7 @@ export const meta = {
   players: 'solo',
   color: '#ff6b6b',
   icon: '🎯',
-  desc: 'One button is red, the next is orange, the rest are blue. Clear the queue to score, and the grid grows a button every level.',
+  desc: 'Always click the red button. Orange shows which cell turns red next; blue cells wait their turn. Clear each level inside 16 seconds.',
   solo: true
 };
 
@@ -41,9 +42,8 @@ function cellAt(cell) {
 }
 
 // How a cell should be painted, from its position in the queue RELATIVE to the
-// step already cleared. Index 0 is red (click me now), 1 orange (then me), the
-// rest blue. The offset matters: at step 1 of 5, the queue's own index 1 is the
-// one owed a click, not the one after it.
+// step already cleared. Index 0 is red (click now), 1 is orange (turns red
+// next), and the rest are blue (waiting).
 function colourOf(queue, cell, step) {
   const i = queue.indexOf(cell) - step;
   if (i === 0) return 'red';
@@ -61,6 +61,8 @@ function freshRun(rng) {
     queue: deal(rng, 1),
     step: 0,        // how many of `queue` have been cleared
     misses: 0,      // wrong clicks this run, shown as a wobble
+    timedOut: false,// true when the level clock expires
+    won: false,     // true when level 81 is cleared in time
     last: null,     // { score, level } of a finished run, for the record sheet
     run: 1          // bumped per reset; roundId() keys on it
   };
@@ -100,17 +102,27 @@ export function reduce(state, action, ctx) {
   if (state.players.indexOf(id) < 0) return { error: 'You are watching — not seated.' };
 
   if (kind === 'reset') {
-    // A solo table of one is always its own host, and ctx.from.host is true in
-    // the Solo Corner too — but this game has nothing table-shared to gate, so
-    // the seated check above is the whole permission model.
     const next = freshRun(rng);
     next.players = state.players;
     next.run = state.run + 1;
-    next.last = { score: state.score, level: state.level };
+    next.last = (state.timedOut || state.won)
+      ? state.last
+      : { score: state.score, level: state.level };
     return next;
   }
 
+  if (kind === 'timeout') {
+    if (state.timedOut || state.won) return state;
+    return same({
+      timedOut: true,
+      last: { score: state.score, level: state.level }
+    });
+  }
+
   if (kind !== 'hit') return { error: 'Unknown action: ' + kind };
+
+  if (state.timedOut) return { error: 'Time ran out — reset the run to play again.' };
+  if (state.won) return { error: 'You beat all 81 levels — reset to play again.' };
 
   const cell = Number(action.cell);
   if (!isFinite(cell) || cell < 0 || cell >= GRID * GRID) {
@@ -119,9 +131,11 @@ export function reduce(state, action, ctx) {
   if (state.step >= state.queue.length) return { error: 'Level already cleared.' };
 
   if (state.queue[state.step] !== cell) {
-    // A wrong click costs nothing but the step is unchanged, so the red button
-    // stays exactly where it was. The wobble is cosmetic and lives in the view.
-    return { error: 'That one is blue — find the red button.' };
+    const c = colourOf(state.queue, cell, state.step);
+    if (c === 'orange') {
+      return { error: 'Not yet — orange just shows which one turns red next.' };
+    }
+    return { error: 'Only click the red button.' };
   }
 
   const step = state.step + 1;
@@ -132,13 +146,23 @@ export function reduce(state, action, ctx) {
     return same({ step: step, misses: 0, last: null });
   }
 
-  // Queue cleared: a point, and one more button for the next level. Nothing is
-  // laid out until the player clicks, so the new board appears on this view.
+  // Queue cleared inside the time limit: score a point and advance.
+  const score = state.score + 1;
+  if (state.level >= MAX_LEVEL) {
+    return same({
+      score: score,
+      step: step,
+      won: true,
+      misses: 0,
+      last: { score: score, level: state.level }
+    });
+  }
+
   const level = state.level + 1;
   return same({
     level: level,
-    score: state.score + 1,
-    queue: level > MAX_LEVEL ? state.queue : deal(rng, level),
+    score: score,
+    queue: deal(rng, level),
     step: 0,
     misses: 0,
     last: null
@@ -147,17 +171,16 @@ export function reduce(state, action, ctx) {
 
 // -------------------------------------------------------------- project ----
 
-// One place that turns state into a view, so `project()` and the defensive
-// path in update() can never drift apart.
 function viewFrom(state, you, api) {
-  // Cells are public information — they are on the board either way — but the
-  // queue is not, so the view carries colours rather than the order itself. The
-  // colour IS the order to the client, which is the point: the board tells you
-  // what to do, and only `step` tells the hub how far you have got.
   const cells = [];
   state.queue.forEach(function (cell, i) {
     const p = cellAt(cell);
-    cells.push({ col: p.col, row: p.row, colour: colourOf(state.queue, cell, state.step), done: i < state.step });
+    cells.push({
+      col: p.col,
+      row: p.row,
+      colour: colourOf(state.queue, cell, state.step),
+      done: i < state.step
+    });
   });
   return {
     you: you || '',
@@ -166,6 +189,9 @@ function viewFrom(state, you, api) {
     step: state.step,
     total: state.queue.length,
     misses: state.misses,
+    timedOut: !!state.timedOut,
+    won: !!state.won,
+    levelMs: LEVEL_MS,
     run: state.run,
     last: state.last,
     cells: cells,
@@ -181,17 +207,11 @@ export function project(state, playerId, api) {
 
 // ------------------------------------------------------------------ record ----
 
-// A stable id for the run `state` is currently in. summarize() re-succeeds on
-// every reduce() after a reset, so keying on the sentence would either throttle
-// genuinely distinct identical runs or write the same run to the sheet twice.
 export function roundId(state) {
   return 'run' + ((state && state.run) || 1);
 }
 
 export function summarize(state, nameOf) {
-  // Clicker has no natural finish line — it runs until you press Reset — so the
-  // run is reported when it ends, and `last` is cleared on the first click of
-  // the next one. Null while a run is still going.
   if (!state.last || state.last.score <= 0) return null;
   const s = state.last.score;
   return nameOf(state.players[0]) + ' scored ' + s + ' point' + (s === 1 ? '' : 's')
@@ -207,14 +227,23 @@ export function mount(root, api) {
     + 'user-select:none;-webkit-user-select:none;';
 
   const head = document.createElement('div');
-  head.style.cssText = 'display:flex;align-items:baseline;gap:10px;margin-bottom:2px;';
+  head.style.cssText = 'display:flex;align-items:baseline;gap:10px;margin-bottom:4px;';
 
   const scoreEl = document.createElement('div');
   scoreEl.style.cssText = 'font-size:26px;font-weight:700;';
+  const timerEl = document.createElement('div');
+  timerEl.style.cssText = 'font-size:18px;font-weight:700;font-variant-numeric:tabular-nums;margin-left:auto;';
   const levelEl = document.createElement('div');
-  levelEl.style.cssText = 'font-size:16px;opacity:.75;margin-left:auto;';
+  levelEl.style.cssText = 'font-size:15px;opacity:.75;';
   head.appendChild(scoreEl);
+  head.appendChild(timerEl);
   head.appendChild(levelEl);
+
+  const track = document.createElement('div');
+  track.style.cssText = 'width:100%;height:6px;background:#1d2434;border-radius:3px;overflow:hidden;margin-bottom:8px;';
+  const fill = document.createElement('div');
+  fill.style.cssText = 'height:100%;width:100%;background:#4cd137;transition:width .05s linear;';
+  track.appendChild(fill);
 
   const hint = document.createElement('div');
   hint.style.cssText = 'font-size:14px;opacity:.8;margin-bottom:10px;min-height:20px;';
@@ -229,8 +258,6 @@ export function mount(root, api) {
     b.dataset.cell = String(i);
     b.style.cssText = 'border-radius:8px;background:#1d2434;border:1px solid #2b3448;'
       + 'cursor:pointer;transition:background .12s ease,transform .08s ease;';
-    // pointerdown, not click: a tap that starts as a scroll must not count as a
-    // miss, and touch-action:manipulation above stops the 300ms delay.
     b.addEventListener('pointerdown', function (e) {
       if (e.button !== undefined && e.button !== 0) return;
       e.preventDefault();
@@ -249,10 +276,7 @@ export function mount(root, api) {
   reset.addEventListener('click', function () { api.send({ a: 'reset' }); });
   const legend = document.createElement('div');
   legend.style.cssText = 'font-size:13px;opacity:.7;margin-left:auto;text-align:right;';
-  // Built with real elements, not innerHTML. Nothing here comes from another
-  // player, but the habit is the point: every game in this repo that reaches
-  // for innerHTML is one refactor away from shipping someone else's <script>.
-  [['#ff4d4d', 'click me'], ['#ff9f43', 'then me'], ['#2f6bd8', 'not yet']].forEach(function (pair) {
+  [['#ff4d4d', 'click now'], ['#ff9f43', 'red next'], ['#2f6bd8', 'queued']].forEach(function (pair) {
     const bit = document.createElement('span');
     bit.style.color = pair[0];
     const box = document.createElement('span');
@@ -267,20 +291,45 @@ export function mount(root, api) {
   bar.appendChild(legend);
 
   wrap.appendChild(head);
+  wrap.appendChild(track);
   wrap.appendChild(hint);
   wrap.appendChild(board);
   wrap.appendChild(bar);
   root.appendChild(wrap);
 
-  // Live view of what the last update painted, kept so a local tap can be
-  // ignored instantly rather than waiting for the round trip.
   let view = null;
   let spectating = false;
+  let destroyed = false;
+  let clockKey = '';
+  let clockGen = 0;
+  let deadline = 0;
+
+  function startLevelClock(limitMs) {
+    clockGen++;
+    const gen = clockGen;
+    deadline = Date.now() + limitMs;
+
+    function tick() {
+      if (destroyed || gen !== clockGen || !view) return;
+      if (view.timedOut || view.won) return;
+      const rem = Math.max(0, deadline - Date.now());
+      const pct = Math.max(0, Math.min(100, (rem / limitMs) * 100));
+      timerEl.textContent = (rem / 1000).toFixed(1) + 's';
+      timerEl.style.color = rem <= 3500 ? '#ff4d4d' : (rem <= 7000 ? '#ff9f43' : '#8ef5a0');
+      fill.style.width = pct + '%';
+      fill.style.background = timerEl.style.color;
+
+      if (rem <= 0) {
+        if (!spectating) api.send({ a: 'timeout' });
+        return;
+      }
+      api.setTimeout(tick, 50);
+    }
+    tick();
+  }
 
   function onTap(cell) {
-    if (spectating || !view) return;
-    // Local courtesy check only. The authority is reduce(); this just stops a
-    // tap on a blue square from becoming a round trip and a red wobble.
+    if (spectating || !view || view.timedOut || view.won) return;
     if (view.cells.some(function (c) {
       return c.col + c.row * GRID === cell && !c.done && c.colour !== 'red';
     })) {
@@ -290,37 +339,47 @@ export function mount(root, api) {
     api.send({ a: 'hit', cell: cell });
   }
 
-  let wobbleId = 0;
   function wobble(cell) {
     const b = cells[cell];
     if (!b) return;
-    const to = api.setTimeout(function () { b.style.transform = ''; }, 160);
+    api.setTimeout(function () { b.style.transform = ''; }, 160);
     b.style.transform = 'scale(.88)';
     b.style.transition = 'transform .08s ease';
-    wobbleId = to;
   }
 
   function update(v) {
     view = v;
     spectating = !!api.isSpectator;
 
+    const nextKey = v.run + ':' + v.level;
+    if (nextKey !== clockKey && !v.timedOut && !v.won) {
+      clockKey = nextKey;
+      startLevelClock(v.levelMs || LEVEL_MS);
+    }
+
     scoreEl.textContent = v.score + (v.score === 1 ? ' point' : ' points');
     levelEl.textContent = 'Level ' + v.level + ' of ' + v.maxLevel
       + '  ·  ' + v.step + '/' + v.total;
 
-    if (spectating) {
+    if (v.timedOut) {
+      clockGen++;
+      timerEl.textContent = '0.0s';
+      timerEl.style.color = '#ff4d4d';
+      fill.style.width = '0%';
+      hint.textContent = 'Time ran out on level ' + v.level + '! Reset to try again.';
+      hint.style.color = '#ff6b6b';
+    } else if (v.won) {
+      clockGen++;
+      hint.textContent = 'Sub-superhuman! All 81 levels cleared!';
+      hint.style.color = '#8ef5a0';
+    } else if (spectating) {
       hint.textContent = '👁 watching — nobody is playing at this table.';
       hint.style.color = '#ffd479';
-    } else if (v.clear) {
-      hint.textContent = 'Level ' + v.level + ' cleared! Click any button.';
-      hint.style.color = '#8ef5a0';
     } else {
-      hint.textContent = 'Click the red button, then the orange one.';
+      hint.textContent = 'Click only the red button — orange shows which one turns red next.';
       hint.style.color = '#e8ecf4';
     }
 
-    // Paint every cell from the view — a stale colour left over from the
-    // previous level is the one bug this board cannot show.
     cells.forEach(function (b) { b.style.background = '#1d2434'; });
     v.cells.forEach(function (c) {
       const b = cells[c.col + c.row * GRID];
@@ -331,16 +390,17 @@ export function mount(root, api) {
       else b.style.background = '#2f6bd8';
     });
 
-    reset.style.display = v.score > 0 ? '' : 'none';
+    reset.style.display = (v.score > 0 || v.timedOut || v.won) ? '' : 'none';
   }
 
-  // The hub routes a refused intent here so the board can say why.
   function denied(text) {
     hint.textContent = text || 'Not allowed.';
     hint.style.color = '#ffd479';
   }
 
   function destroy() {
+    destroyed = true;
+    clockGen++;
     view = null;
     cells.forEach(function (b) { b.replaceWith(b.cloneNode(true)); });
   }

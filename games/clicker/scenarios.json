@@ -15,7 +15,7 @@
     { "id": "p1", "name": "Alice", "host": true }
   ],
 
-  "rules": "A 9x9 grid. Level 1 lights one button. Every level adds one more button in a random free cell. The button you owe a click is red, the one after it is orange, the rest are blue. Clear the whole queue and you score a point.",
+  "rules": "A 9x9 grid with a 16-second clock per level. Level 1 lights one button. Every level adds one more button in a random free cell. You only ever click the red button; the orange button shows which cell will turn red next, and the rest are blue. Clear the whole queue before time runs out to score a point.",
   "cellNote": "cell = col + row * 9 on the 9x9 board. These numbers depend on the seed AND on the gate giving each reduce() a fresh ctx.rng — which is what makes a replay reproducible. Change the seed and they all change.",
 
   "scenarios": [
@@ -52,6 +52,16 @@
         { "as": "p1", "action": { "a": "reset" } }
       ],
       "expect": { "summarize": "Alice scored 3 points in Clicker, reaching level 4" }
+    },
+    {
+      "name": "timing out ends and reports the run immediately",
+      "steps": [
+        { "as": "p1", "action": { "a": "hit", "cell": 9 } },
+        { "as": "p1", "action": { "a": "hit", "cell": 9 } },
+        { "as": "p1", "action": { "a": "hit", "cell": 45 } },
+        { "as": "p1", "action": { "a": "timeout" } }
+      ],
+      "expect": { "summarize": "Alice scored 2 points in Clicker, reaching level 3" }
     }
   ]
 }
