@@ -1,7 +1,7 @@
 // Clicker — a solo module game.
 //
 // A 9x9 grid. Level 1 lights one button; every level adds one more button in a
-// random free cell. You only ever click the red button: orange shows which cell
+// random free cell. You only ever click the red button: yellow shows which cell
 // will turn red next, and blue cells are waiting further back in the queue.
 // Clear the whole queue before the 16.0s level clock expires to score a point
 // and grow the level.
@@ -19,7 +19,7 @@ export const meta = {
   players: 'solo',
   color: '#ff6b6b',
   icon: '🎯',
-  desc: 'Always click the red button. Orange shows which cell turns red next; blue cells wait their turn. Clear each level inside 16 seconds.',
+  desc: 'Always click the red button. Yellow shows which cell turns red next; blue cells wait their turn. Clear each level inside 16 seconds.',
   solo: true
 };
 
@@ -42,12 +42,12 @@ function cellAt(cell) {
 }
 
 // How a cell should be painted, from its position in the queue RELATIVE to the
-// step already cleared. Index 0 is red (click now), 1 is orange (turns red
+// step already cleared. Index 0 is red (click now), 1 is yellow (turns red
 // next), and the rest are blue (waiting).
 function colourOf(queue, cell, step) {
   const i = queue.indexOf(cell) - step;
   if (i === 0) return 'red';
-  if (i === 1) return 'orange';
+  if (i === 1) return 'yellow';
   return 'blue';
 }
 
@@ -132,8 +132,8 @@ export function reduce(state, action, ctx) {
 
   if (state.queue[state.step] !== cell) {
     const c = colourOf(state.queue, cell, state.step);
-    if (c === 'orange') {
-      return { error: 'Not yet — orange just shows which one turns red next.' };
+    if (c === 'yellow') {
+      return { error: 'Not yet — yellow just shows which one turns red next.' };
     }
     return { error: 'Only click the red button.' };
   }
@@ -222,7 +222,7 @@ export function summarize(state, nameOf) {
 
 export function mount(root, api) {
   const wrap = document.createElement('div');
-  wrap.style.cssText = 'max-width:520px;margin:0 auto;padding:8px 10px 18px;'
+  wrap.style.cssText = 'max-width:min(460px, 65vh);margin:0 auto;padding:8px 10px 18px;'
     + 'font-family:system-ui,-apple-system,Segoe UI,Roboto,sans-serif;color:#e8ecf4;'
     + 'user-select:none;-webkit-user-select:none;';
 
@@ -250,7 +250,7 @@ export function mount(root, api) {
 
   const board = document.createElement('div');
   board.style.cssText = 'display:grid;grid-template-columns:repeat(' + GRID + ',1fr);'
-    + 'gap:4px;width:100%;aspect-ratio:1/1;touch-action:manipulation;';
+    + 'gap:4px;width:100%;aspect-ratio:1/1;touch-action:none;';
 
   const cells = [];
   for (let i = 0; i < GRID * GRID; i++) {
@@ -276,7 +276,7 @@ export function mount(root, api) {
   reset.addEventListener('click', function () { api.send({ a: 'reset' }); });
   const legend = document.createElement('div');
   legend.style.cssText = 'font-size:13px;opacity:.7;margin-left:auto;text-align:right;';
-  [['#ff4d4d', 'click now'], ['#ff9f43', 'red next'], ['#2f6bd8', 'queued']].forEach(function (pair) {
+  [['#ff4d4d', 'click now'], ['#facc15', 'red next'], ['#2f6bd8', 'queued']].forEach(function (pair) {
     const bit = document.createElement('span');
     bit.style.color = pair[0];
     const box = document.createElement('span');
@@ -315,7 +315,7 @@ export function mount(root, api) {
       const rem = Math.max(0, deadline - Date.now());
       const pct = Math.max(0, Math.min(100, (rem / limitMs) * 100));
       timerEl.textContent = (rem / 1000).toFixed(1) + 's';
-      timerEl.style.color = rem <= 3500 ? '#ff4d4d' : (rem <= 7000 ? '#ff9f43' : '#8ef5a0');
+      timerEl.style.color = rem <= 3500 ? '#ff4d4d' : (rem <= 7000 ? '#facc15' : '#8ef5a0');
       fill.style.width = pct + '%';
       fill.style.background = timerEl.style.color;
 
@@ -376,7 +376,7 @@ export function mount(root, api) {
       hint.textContent = '👁 watching — nobody is playing at this table.';
       hint.style.color = '#ffd479';
     } else {
-      hint.textContent = 'Click only the red button — orange shows which one turns red next.';
+      hint.textContent = 'Click only the red button — yellow shows which one turns red next.';
       hint.style.color = '#e8ecf4';
     }
 
@@ -386,7 +386,7 @@ export function mount(root, api) {
       if (!b) return;
       if (c.done) b.style.background = '#1d2434';
       else if (c.colour === 'red') b.style.background = '#ff4d4d';
-      else if (c.colour === 'orange') b.style.background = '#ff9f43';
+      else if (c.colour === 'yellow') b.style.background = '#facc15';
       else b.style.background = '#2f6bd8';
     });
 
