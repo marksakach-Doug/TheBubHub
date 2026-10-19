@@ -9,7 +9,10 @@
     "preview": "vite preview",
     "deploy": "bun run build && wrangler deploy",
     "test": "./test.sh",
-    "test:syntax": "./test.sh --skip-browser"
+    "test:syntax": "./test.sh --skip-browser",
+    "check:game": "node scripts/check-game.mjs",
+    "new:game": "node scripts/new-game.mjs",
+    "gate:test": "node tests/gate_test.mjs"
   },
   "dependencies": {
     "peerjs": "^1.5.2"
