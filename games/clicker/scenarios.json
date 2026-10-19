@@ -1,0 +1,57 @@
+{
+  "id": "clicker",
+  "title": "Clicker",
+  "version": 1,
+  "note": "Hand-written card, not generated. Clicker is a solo game whose layout comes from ctx.rng, so the cell numbers below are only true for seed 12345 — which is why the seed is pinned here. A scenario file does not have to come from scripts/new-game.mjs; it only has to be a spec a stranger can check.",
+
+  "players": "solo",
+  "maxLines": 400,
+  "maxLinesNote": "Higher than a builder card. The 250 cap is there to stop a small model writing an essay; Clicker is hand-written and heavily commented, in the house style.",
+  "summarizeMaxChars": 120,
+  "seed": 12345,
+  "hidden": ["queue"],
+
+  "roster": [
+    { "id": "p1", "name": "Alice", "host": true }
+  ],
+
+  "rules": "A 9x9 grid. Level 1 lights one button. Every level adds one more button in a random free cell. The button you owe a click is red, the one after it is orange, the rest are blue. Clear the whole queue and you score a point.",
+  "cellNote": "cell = col + row * 9 on the 9x9 board. These numbers depend on the seed AND on the gate giving each reduce() a fresh ctx.rng — which is what makes a replay reproducible. Change the seed and they all change.",
+
+  "scenarios": [
+    {
+      "name": "level 1 is a single button",
+      "steps": [{ "as": "p1", "action": { "a": "hit", "cell": 9 } }],
+      "expect": { "summarize": null }
+    },
+    {
+      "name": "one click scores a point and the grid grows by one",
+      "steps": [{ "as": "p1", "action": { "a": "hit", "cell": 9 } }],
+      "expect": { "summarize": null }
+    },
+    {
+      "name": "clicking a blue cell is refused",
+      "steps": [{ "as": "p1", "action": { "a": "hit", "cell": 10 } }],
+      "expect": { "error": true }
+    },
+    {
+      "name": "a cell off the board is refused",
+      "steps": [{ "as": "p1", "action": { "a": "hit", "cell": 81 } }],
+      "expect": { "error": true }
+    },
+    {
+      "name": "three levels in a row, then the run is reported",
+      "steps": [
+        { "as": "p1", "action": { "a": "hit", "cell": 9 } },
+        { "as": "p1", "action": { "a": "hit", "cell": 9 } },
+        { "as": "p1", "action": { "a": "hit", "cell": 45 } },
+        { "as": "p1", "action": { "a": "hit", "cell": 9 } },
+        { "as": "p1", "action": { "a": "hit", "cell": 45 } },
+        { "as": "p1", "action": { "a": "hit", "cell": 41 } },
+        { "as": "p1", "action": { "a": "hit", "cell": 9 } },
+        { "as": "p1", "action": { "a": "reset" } }
+      ],
+      "expect": { "summarize": "Alice scored 3 points in Clicker, reaching level 4" }
+    }
+  ]
+}
