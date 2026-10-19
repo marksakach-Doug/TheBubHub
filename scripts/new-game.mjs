@@ -374,16 +374,20 @@ function main() {
   const shown = demo ? outDir : path.join('games', id);
   console.log(demo ? 'wrote (demo — nothing in the repo changed):' : 'wrote:');
   console.log(`  ${shown}/scenarios.json   ${card.scenarios.length} scenarios`);
-  console.log(`  ${shown}/index.js         builder fills in 3 marked regions`);
+  console.log(`  ${shown}/index.js         builder fills in 4 marked regions`);
   console.log('');
   // A builder finds its region by searching for the marker. If an example
   // comment ever repeats it, there are two regions and the model writes into
   // the wrong one — which is how a scaffold quietly stops being a scaffold.
   const generated = fs.readFileSync(path.join(outDir, 'index.js'), 'utf8');
+  // Four regions: the state, the rules, the buttons, the repaint. The count is
+  // written out rather than inferred so that adding a region without updating
+  // this line is a build failure, not a silently shorter scaffold.
+  const WANT = 4;
   const starts = (generated.match(/BUILDER STARTS HERE/g) || []).length;
   const ends = (generated.match(/BUILDER ENDS HERE/g) || []).length;
-  if (starts !== 3 || ends !== 3) {
-    console.error(`the scaffold has ${starts} START and ${ends} END markers, expected 3 of each.`);
+  if (starts !== WANT || ends !== WANT) {
+    console.error(`the scaffold has ${starts} START and ${ends} END markers, expected ${WANT} of each.`);
     console.error('A marker must appear exactly once per region — including inside example');
     console.error('comments, where a second copy makes the region ambiguous.');
     process.exit(1);
