@@ -223,9 +223,11 @@ export function summarize(state, nameOf) {
 // The worker's source is the engine itself: makeEngine() is self-contained, so its text
 // plus a few lines of glue is a complete program. No separate worker file, no build step.
 function workerSource() {
-  return '(function(){var E=(' + makeEngine.toString() + ')();var s=new E.Searcher();' +
+  return '(function(){var E=(' + makeEngine.toString() + ')();var s=new E.Searcher();var rt=new E.Rater();' +
     'self.onmessage=function(e){var m=e.data;' +
     'if(m.cmd==="reset"){s.reset();return;}' +
+    'if(m.cmd==="rate"){rt.start(m.pos,m.move,m.cfg);while(!rt.step(50)){}var o=rt.result();o.id=m.id;self.postMessage(o);return;}' +
+    'if(m.cmd==="puzzle"){self.postMessage({id:m.id,puzzle:E.tsumegoGenerate(m.level,m.goal,m.ms)});return;}' +
     's.start(m.pos,m.cfg);while(!s.step(50)){}' +
     'var r=s.result();r.id=m.id;self.postMessage(r);};})();';
 }
@@ -253,19 +255,27 @@ const CSS = [
   'button.dim{opacity:.45}',
   'button.sel{background:#d9a05b;color:#1a1208}',
   '[hidden]{display:none!important}',
-  '.lvl{font-size:13px;align-items:center}.lvl span{color:#94a3b8;flex:0 0 auto}.lvl button{min-height:36px;padding:6px}'
+  '.lvl{font-size:13px;align-items:center}.lvl span{color:#94a3b8;flex:0 0 auto}.lvl button{min-height:36px;padding:6px}',
+  '#fb{min-height:34px;padding:6px 10px;border-radius:10px;background:#1e293b;font-size:13px;line-height:1.35;text-align:center;border-left:4px solid #64748b}',
+  '#fb b{font-size:15px}#fb.g{border-color:#3fb950}#fb.o{border-color:#d9a05b}#fb.r{border-color:#e5484d}#fb small{display:block;color:#94a3b8}'
 ].join('');
 
 const HTML =
   '<div class="wrap">' +
-  '<div class="top"><div class="chip" id="c1"><span class="dot b"></span><b id="n1">Black</b><small id="p1"></small></div>' +
+  '<div class="top" id="top"><div class="chip" id="c1"><span class="dot b"></span><b id="n1">Black</b><small id="p1"></small></div>' +
   '<div class="chip" id="c2"><span class="dot w"></span><b id="n2">White</b><small id="p2"></small></div></div>' +
   '<div id="st"></div>' +
+  '<div id="fb" hidden></div>' +
   '<canvas id="cv" width="1280" height="1280" aria-label="7 by 7 Go board"></canvas>' +
   '<div id="err"></div>' +
-  '<div class="row"><button id="b1">Pass</button><button id="b2">Resign</button></div>' +
+  '<div class="row" id="ctl"><button id="b1">Pass</button><button id="b2">Resign</button></div>' +
   '<div class="row lvl" id="lvl" hidden><span>Bot level</span>' +
   '<button data-l="easy">Easy</button><button data-l="medium">Medium</button><button data-l="hard">Hard</button></div>' +
+  '<div class="row lvl" id="opts"><button id="fbBtn">Move feedback: on</button><button id="pzBtn">Tsumego puzzles</button></div>' +
+  '<div id="pz" hidden>' +
+  '<div class="row lvl"><span>Level</span><button data-pl="easy">Easy</button><button data-pl="medium">Medium</button><button data-pl="hard">Hard</button></div>' +
+  '<div class="row"><button id="pzHint">Hint</button><button id="pzAns">Show answer</button><button id="pzNext">New puzzle</button></div>' +
+  '<div class="row"><button id="pzBack">Back to game</button></div></div>' +
   '</div>';
 
 export function mount(root, api) {
@@ -279,6 +289,13 @@ export function mount(root, api) {
   let worker = null, workerUrl = null, workerBad = false, inline = null;
   let joinKey = '', destroyed = false, flashTimer = null;
   let retryTimer = null, joinFail = '';
+  // Move feedback. Private to this screen: nothing about it is sent to the table.
+  let fbOn = true, fbCls = '', fbHtml = '', fbPoint = -1, pendingRate = null, rateTok = 0;
+  // A second worker, for rating moves and making puzzles, so the bot's own search is never held up.
+  let aux = null, auxUrl = null, auxBad = false, auxId = 0;
+  const auxPending = {};
+  // Tsumego practice, also private: it never touches the table's state.
+  let pz = null, pzLevel = 'easy', pzReq = 0, pzCount = 0, pzSolved = 0;
 
   // ---- who is who
   function nameOf(id) {
@@ -332,8 +349,21 @@ export function mount(root, api) {
     ctx.beginPath(); ctx.arc(x, y, 38, 0, Math.PI * 2); ctx.fill();
     ctx.globalAlpha = 1;
   }
+  const ZERO = new Array(AREA).fill(0);
+  function coord(i) { return i === PASS ? 'pass' : 'ABCDEFG'[i % N] + (N - ((i / N) | 0)); }
+  function scene() {
+    if (pz && pz.p) return { b: pz.b, dead: ZERO, last: pz.last, phase: 'play', puzzle: true };
+    return view;
+  }
+  function ring(i, color, dashed) {
+    ctx.strokeStyle = color; ctx.lineWidth = 4;
+    if (dashed) ctx.setLineDash([8, 6]);
+    ctx.beginPath(); ctx.arc(px(i), py(i), 30, 0, Math.PI * 2); ctx.stroke();
+    ctx.setLineDash([]);
+  }
   function draw() {
     if (!ctx) return;
+    const S = scene();
     ctx.clearRect(0, 0, SZ, SZ);
     const g = ctx.createLinearGradient(0, 0, SZ, SZ);
     g.addColorStop(0, '#c98f55'); g.addColorStop(1, '#a56a35');
@@ -347,12 +377,20 @@ export function mount(root, api) {
     [[2, 2], [2, 4], [4, 2], [4, 4], [3, 3]].forEach(function (p) {
       ctx.beginPath(); ctx.arc(M + p[0] * CELL, M + p[1] * CELL, 6, 0, Math.PI * 2); ctx.fill();
     });
-    if (!view) return;
-    const sc = view.phase === 'play' ? null : engine.score(view.b, view.dead, view.komi);
+    // coordinates, so feedback can say "C3" and mean something
+    ctx.fillStyle = '#432610'; ctx.font = '20px system-ui, sans-serif';
+    ctx.textAlign = 'center'; ctx.textBaseline = 'middle';
+    for (let k = 0; k < N; k++) { ctx.fillText('ABCDEFG'[k], M + k * CELL, SZ - 16); ctx.fillText(String(N - k), 22, M + k * CELL); }
+    if (!S) return;
+    if (pz && pz.p) {                                  // the part of the board the puzzle is about
+      ctx.fillStyle = 'rgba(255,236,170,.28)';
+      pz.p.zone.forEach(function (i) { ctx.fillRect(px(i) - CELL / 2, py(i) - CELL / 2, CELL, CELL); });
+    }
+    const sc = (S.puzzle || S.phase === 'play') ? null : engine.score(S.b, S.dead, S.komi);
     for (let i = 0; i < AREA; i++) {
-      if (view.b[i]) {
-        stone(px(i), py(i), view.b[i], view.dead[i] ? 0.4 : 1);
-        if (view.dead[i]) {
+      if (S.b[i]) {
+        stone(px(i), py(i), S.b[i], S.dead[i] ? 0.4 : 1);
+        if (S.dead[i]) {
           ctx.strokeStyle = '#e5484d'; ctx.lineWidth = 4; ctx.beginPath();
           ctx.moveTo(px(i) - 12, py(i) - 12); ctx.lineTo(px(i) + 12, py(i) + 12);
           ctx.moveTo(px(i) + 12, py(i) - 12); ctx.lineTo(px(i) - 12, py(i) + 12);
@@ -364,10 +402,18 @@ export function mount(root, api) {
         ctx.beginPath(); ctx.rect(px(i) - 11, py(i) - 11, 22, 22); ctx.fill(); ctx.stroke();
       }
     }
-    if (view.phase === 'play' && view.last >= 0) {
+    if (S.phase === 'play' && S.last >= 0) {
       ctx.strokeStyle = '#e5484d'; ctx.lineWidth = 4;
-      ctx.beginPath(); ctx.arc(px(view.last), py(view.last), 14, 0, Math.PI * 2); ctx.stroke();
+      ctx.beginPath(); ctx.arc(px(S.last), py(S.last), 14, 0, Math.PI * 2); ctx.stroke();
     }
+    if (pz && pz.p) {
+      if (pz.hint >= 0) ring(pz.hint, '#3fb950', true);
+      if (pz.answer) pz.answer.forEach(function (i) { ring(i, '#3fb950', false); });
+      if (pz.status === 'play' && hov >= 0 && pz.p.zone.indexOf(hov) >= 0 &&
+          !engine.applyMove({ b: pz.b, ko: pz.ko, hist: [] }, hov, pz.turn).err) stone(px(hov), py(hov), pz.turn, 0.5);
+      return;
+    }
+    if (fbOn && fbPoint >= 0 && fbPoint < AREA && !view.b[fbPoint]) ring(fbPoint, '#3fb950', true);
     if (hov >= 0 && canAct() && !engine.applyMove(view, hov, view.turn).err) stone(px(hov), py(hov), view.turn, 0.5);
   }
 
@@ -396,6 +442,11 @@ export function mount(root, api) {
 
   function render() {
     draw();
+    q('#pz').hidden = !pz;
+    q('#top').hidden = !!pz; q('#ctl').hidden = !!pz; q('#opts').hidden = !!pz;
+    q('#fbBtn').textContent = 'Move feedback: ' + (fbOn ? 'on' : 'off');
+    paintFb();
+    if (pz) { renderPuzzle(); return; }
     if (!view) return;
     const v = view, b1 = q('#b1'), b2 = q('#b2');
     q('#n1').textContent = chipName(1);
@@ -474,6 +525,174 @@ export function mount(root, api) {
     else searchInline(pos, cfg, key);
   }
 
+  // ---- the second worker: rating your moves and making puzzles
+  function ensureAux() {
+    if (aux || auxBad) return aux;
+    try {
+      auxUrl = URL.createObjectURL(new Blob([workerSource()], { type: 'text/javascript' }));
+      aux = new Worker(auxUrl);
+      aux.onmessage = function (e) {
+        const job = auxPending[e.data.id];
+        if (job) { delete auxPending[e.data.id]; job.cb(e.data); }
+      };
+      aux.onerror = function () {
+        // No worker: finish whatever was waiting on the page itself, in slices.
+        auxBad = true; aux = null;
+        Object.keys(auxPending).forEach(function (id) {
+          const job = auxPending[id];
+          delete auxPending[id];
+          runInline(job.msg, job.cb);
+        });
+      };
+    } catch (e) { auxBad = true; aux = null; }
+    return aux;
+  }
+  function runInline(msg, cb) {
+    if (msg.cmd === 'rate') {
+      const r = new engine.Rater();
+      r.start(msg.pos, msg.move, msg.cfg);
+      const tick = function () { if (destroyed) return; if (r.step(25)) cb(r.result()); else api.setTimeout(tick, 0); };
+      tick();
+    } else {
+      const tick = function () {
+        if (destroyed || msg.tok !== pzReq) return;
+        const p = engine.tsumegoGenerate(msg.level, msg.goal, 30);
+        if (p) cb({ puzzle: p }); else api.setTimeout(tick, 0);
+      };
+      tick();
+    }
+  }
+  function askAux(msg, cb) {
+    msg.id = ++auxId;
+    const w = ensureAux();
+    if (w) { auxPending[msg.id] = { msg: msg, cb: cb }; w.postMessage(msg); }
+    else runInline(msg, cb);
+  }
+
+  // ---- move feedback
+  const LABELS = [[90, 'Excellent'], [70, 'Good'], [45, 'Inaccurate'], [20, 'Mistake'], [0, 'Blunder']];
+  function paintFb() {
+    const el = q('#fb');
+    el.className = fbCls;
+    el.innerHTML = fbHtml;
+    el.hidden = !(fbOn && fbHtml) || !!pz;
+  }
+  function setFb(cls, html) { fbCls = cls; fbHtml = html; paintFb(); }
+
+  // Called the moment you play: remember the position BEFORE the move, because that is the
+  // position the move has to be judged in.
+  function noteMove(i) {
+    fbPoint = -1; rateTok++;
+    setFb('', '');
+    if (!fbOn || !view || !view.seat) { pendingRate = null; return; }
+    pendingRate = {
+      gameNo: view.gameNo, moves: view.moves, move: i,
+      pos: { b: view.b.slice(), ko: view.ko, turn: view.turn, passes: view.passes, last: view.last, komi: view.komi, hist: view.hist.slice() }
+    };
+  }
+
+  function maybeRate() {
+    const p = pendingRate;
+    if (!p || !fbOn || destroyed || !view) return;
+    if (view.gameNo !== p.gameNo) { pendingRate = null; return; }
+    if (view.moves <= p.moves) return;                  // the table has not applied the move yet
+    if (thinking) return;                               // let the bot answer first
+    pendingRate = null;
+    const tok = rateTok;
+    setFb('', 'Rating your move…');
+    askAux({ cmd: 'rate', pos: p.pos, move: p.move, cfg: {} }, function (r) {
+      if (destroyed || tok !== rateTok || !fbOn || !view || view.gameNo !== p.gameNo) return;
+      let label = 'Blunder';
+      for (let k = 0; k < LABELS.length; k++) if (r.rating >= LABELS[k][0]) { label = LABELS[k][1]; break; }
+      const cls = r.rating >= 70 ? 'g' : r.rating >= 45 ? 'o' : 'r';
+      let note = '';
+      if (r.best !== p.move && r.rating < 90) { note = 'The bot preferred ' + coord(r.best) + '. '; fbPoint = r.best; }
+      if (r.decided) note += 'The game already looks decided, so this is mostly about points. ';
+      setFb(cls, 'Your move <b>' + coord(p.move) + '</b>: <b>about ' + (Math.round(r.rating / 5) * 5) + '%</b> · ' + label +
+        '<small>' + note + 'An estimate from the bot\u2019s search, not a verdict.</small>');
+      draw();
+    });
+  }
+
+  // ---- tsumego practice
+  const colorName = function (c) { return c === 1 ? 'Black' : 'White'; };
+  function pzState() {
+    return { b: pz.b, ko: pz.ko, turn: pz.turn, passes: pz.passes, att: pz.p.att, def: pz.p.def, zone: pz.p.zone, goal: pz.p.goal, depth: pz.p.depth };
+  }
+  function pzSols() {
+    try { return pz.first ? pz.p.solutions : engine.tsumegoSolutions(pzState()); } catch (e) { return null; }
+  }
+  function pzPlay(i) {                                  // i may be PASS
+    if (i === PASS) { pz.passes++; pz.ko = -1; pz.last = -1; }
+    else {
+      const r = engine.applyMove({ b: pz.b, ko: pz.ko, hist: [] }, i, pz.turn);
+      pz.b = r.b; pz.ko = r.ko; pz.passes = 0; pz.last = i;
+    }
+    pz.turn = 3 - pz.turn;
+  }
+  function pzNew(tries) {
+    const tok = ++pzReq;
+    tries = tries || 0;
+    pz = { loading: true, p: null, status: 'play', msg: '', hint: -1, answer: null, first: true };
+    render();
+    askAux({ cmd: 'puzzle', level: pzLevel, goal: 'any', ms: 1500, tok: tok }, function (d) {
+      if (destroyed || tok !== pzReq || !pz) return;
+      if (!d.puzzle) {
+        if (tries < 3) return pzNew(tries + 1);
+        pz = { loading: false, p: null, failed: true, msg: 'Could not make a puzzle just now. Try again.' };
+        return render();
+      }
+      pzCount++;
+      const P = d.puzzle;
+      pz = { loading: false, p: P, b: P.b.slice(), ko: -1, turn: P.toPlay, passes: 0, last: -1, status: 'play', msg: '', hint: -1, answer: null, first: true };
+      render();
+    });
+  }
+  function pzClick(i) {
+    if (!pz || !pz.p || pz.status !== 'play') return;
+    if (pz.p.zone.indexOf(i) < 0) return flash('Play inside the shaded area.');
+    const r = engine.applyMove({ b: pz.b, ko: pz.ko, hist: [] }, i, pz.turn);
+    if (r.err) return flash(r.err);
+    const sols = pzSols();
+    if (!sols) return flash('Could not check that position.');
+    const kill = pz.p.goal === 'kill';
+    pz.hint = -1;
+    pzPlay(i);
+    if (sols.indexOf(i) < 0) {
+      pz.status = 'wrong';
+      pz.answer = sols;
+      pz.msg = kill ? 'Not that one: the group can still live. The answer is marked.' : 'Not that one: the group dies. The answer is marked.';
+      return render();
+    }
+    let done = engine.tsumegoDone(pzState());
+    if (!done) {
+      try { pzPlay(engine.tsumegoReply(pzState()).move); } catch (e) { return flash('Could not check that position.'); }
+      done = engine.tsumegoDone(pzState());
+    }
+    pz.first = false;
+    if (done) { pz.status = 'solved'; pzSolved++; pz.msg = kill ? 'Solved! The group is dead.' : 'Solved! The group lives.'; }
+    else pz.msg = 'Correct. Keep going.';
+    render();
+  }
+  function pzStatus() {
+    if (pz.loading) return 'Making a ' + pzLevel + ' puzzle…';
+    if (!pz.p) return pz.msg;
+    const tally = ' (solved ' + pzSolved + ' of ' + pzCount + ')';
+    if (pz.status !== 'play') return pz.msg + tally;
+    const kill = pz.p.goal === 'kill';
+    return (pz.msg ? pz.msg + ' ' : '') + colorName(pz.p.toPlay) + ' to play: ' + (kill ? 'kill' : 'save') + ' the ' + colorName(pz.p.def) + ' group.' + tally;
+  }
+  function renderPuzzle() {
+    q('#lvl').hidden = true;
+    q('#st').textContent = pzStatus();
+    root.querySelectorAll('#pz [data-pl]').forEach(function (btn) {
+      btn.className = btn.getAttribute('data-pl') === pzLevel ? 'sel' : '';
+    });
+    const live = !!pz.p && pz.status === 'play';
+    q('#pzHint').className = live ? '' : 'dim';
+    q('#pzAns').className = live ? '' : 'dim';
+  }
+
   // ---- input
   function at(e) {
     const r = cv.getBoundingClientRect();
@@ -484,6 +703,7 @@ export function mount(root, api) {
   }
 
   cv.addEventListener('pointerdown', function (e) {
+    if (pz) { const pi = at(e); if (pi >= 0) pzClick(pi); return; }
     if (!view) return;
     const i = at(e);
     if (i < 0) return;
@@ -495,6 +715,7 @@ export function mount(root, api) {
     const r = engine.applyMove(view, i, view.turn);
     if (r.err) return flash(r.err);
     hov = -1;
+    noteMove(i);
     api.send({ a: 'play', i: i });
   });
   cv.addEventListener('pointermove', function (e) {
@@ -506,7 +727,7 @@ export function mount(root, api) {
 
   q('#b1').addEventListener('click', function () {
     if (!view || !view.seat) return;
-    if (view.phase === 'play') { if (canAct()) api.send({ a: 'pass' }); }
+    if (view.phase === 'play') { if (canAct()) { noteMove(PASS); api.send({ a: 'pass' }); } }
     else if (view.phase === 'score') api.send({ a: 'accept' });
     else api.send({ a: 'new', swap: false });
   });
@@ -523,6 +744,29 @@ export function mount(root, api) {
   root.querySelectorAll('#lvl button').forEach(function (btn) {
     btn.addEventListener('click', function () { level = btn.getAttribute('data-l'); render(); });
   });
+  q('#fbBtn').addEventListener('click', function () {
+    fbOn = !fbOn;
+    if (!fbOn) { pendingRate = null; rateTok++; fbPoint = -1; setFb('', ''); }
+    render();
+  });
+  q('#pzBtn').addEventListener('click', function () { pzNew(); });
+  q('#pzNext').addEventListener('click', function () { pzNew(); });
+  q('#pzBack').addEventListener('click', function () { pzReq++; pz = null; render(); });
+  q('#pzHint').addEventListener('click', function () {
+    if (!pz || !pz.p || pz.status !== 'play') return;
+    const sols = pzSols();
+    if (sols && sols.length) { pz.hint = sols[0]; draw(); }
+  });
+  q('#pzAns').addEventListener('click', function () {
+    if (!pz || !pz.p || pz.status !== 'play') return;
+    const sols = pzSols();
+    if (!sols) return flash('Could not check that position.');
+    pz.answer = sols; pz.status = 'shown'; pz.msg = 'The answer is marked.';
+    render();
+  });
+  root.querySelectorAll('#pz [data-pl]').forEach(function (btn) {
+    btn.addEventListener('click', function () { pzLevel = btn.getAttribute('data-pl'); pzNew(); });
+  });
 
   return {
     // Never send from mount(): the hub has not assigned the handle yet. Everything that
@@ -532,6 +776,7 @@ export function mount(root, api) {
       maybeJoin();
       render();
       maybeBot();
+      maybeRate();
     },
     // The hub routes a refusal here. MiniGo had no denied() at all, so every
     // error reduce() returned — including "the table is full" — was dropped and
@@ -539,6 +784,7 @@ export function mount(root, api) {
     denied: function (text) {
       if (destroyed) return;
       flash(text || 'Not allowed.');
+      pendingRate = null;                                 // a refused move is not worth rating
       joinFail = text || 'Not allowed.';
       // A refusal means the table could not take us: ask again shortly, since
       // a seat can open up when somebody leaves.
@@ -550,6 +796,8 @@ export function mount(root, api) {
       destroyed = true;
       if (worker) worker.terminate();
       if (workerUrl) URL.revokeObjectURL(workerUrl);
+      if (aux) aux.terminate();
+      if (auxUrl) URL.revokeObjectURL(auxUrl);
     }
   };
 }

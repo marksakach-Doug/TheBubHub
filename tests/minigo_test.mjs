@@ -224,5 +224,123 @@ ok(G.reduce(pr, { a: 'join' }, ctxOf('c', 'Cy')).players[1] === 'c', 'a freed se
 ok(G.summarize(h, id => id === 'a' ? 'Ann' : 'Bo').includes('at MiniGo'), 'summarize names both players');
 ok(JSON.stringify(G.init({ atTable: people })).length < 4000, 'state stays small');
 
+
+// ---------- move rating ----------
+{
+  // Straight three. White is dead if Black plays the middle, alive otherwise. At komi 30 that decides
+  // the whole game, so the rating has something real to measure.
+  const rows = ['xo...ox', 'xooooox', 'xxxxxxx', 'xxxxxxx', 'xxxxxxx', 'xxxxxxx', '.xxxxx.'];
+  const posn = { b: B(rows), turn: 1, komi: 30, passes: 0, last: -1, hist: [], ko: -1 };
+  const rate = (m, extra) => {
+    const r = new E.Rater();
+    r.start(posn, m, { ms: 1500, iters: 2500, extra: extra || 400 });
+    while (!r.step(1e9)) {}
+    return r.result();
+  };
+  E.seed(11);
+  const kill = rate(pt(3, 0)), wrong = rate(pt(2, 0)), pass = rate(E.PASS), eye = rate(pt(0, 6));
+  ok(kill.rating >= 90, 'rating: the vital point scores high (' + kill.rating + '%)');
+  ok(wrong.rating <= 25, 'rating: a move that lets the group live scores low (' + wrong.rating + '%)');
+  ok(pass.rating <= 25, 'rating: passing there scores low (' + pass.rating + '%)');
+  ok(eye.rating <= 25 && typeof eye.rating === 'number', 'rating: filling your own eye is rated, not ignored (' + eye.rating + '%)');
+  ok(wrong.best === pt(3, 0), 'rating: names the better move');
+  ok(kill.rating === 100 && kill.best === pt(3, 0), 'rating: the best move is exactly 100');
+  // the opening: a corner point is worse than the centre, on average over a few runs
+  const empty = { b: new Array(49).fill(0), turn: 1, komi: 9.5, passes: 0, last: -1, hist: [], ko: -1 };
+  const avg = m => { let t = 0; for (let k = 1; k <= 3; k++) { E.seed(k * 7); const r = new E.Rater(); r.start(empty, m, { ms: 700, iters: 2500, extra: 600 }); while (!r.step(1e9)) {} t += r.result().rating; } return t / 3; };
+  const centre = avg(pt(3, 3)), corner = avg(pt(0, 0));
+  ok(centre > corner + 25, 'rating: centre beats the 1-1 point on average (' + Math.round(centre) + ' vs ' + Math.round(corner) + ')');
+}
+
+// ---------- tsumego ----------
+{
+  const rows = ['xo...ox', 'xooooox', 'xxxxxxx', 'xxxxxxx', 'xxxxxxx', 'xxxxxxx', '.xxxxx.'];
+  const b = B(rows), zone = [pt(2, 0), pt(3, 0), pt(4, 0)];
+  const st = { b, ko: -1, turn: 1, passes: 0, att: 1, def: 2, zone, goal: 'kill', depth: 12 };
+  ok(E._benson(b, 1).alive && !E._benson(b, 2).alive, 'benson: the walled-in side lives, the straight three does not');
+  ok(JSON.stringify(E.tsumegoSolutions(st)) === JSON.stringify([pt(3, 0)]), 'straight three: only the middle kills');
+  ok(JSON.stringify(E.tsumegoSolutions(Object.assign({}, st, { turn: 2, goal: 'live' }))) === JSON.stringify([pt(3, 0)]), 'straight three: only the middle lives');
+  const two = B(['.o.o.xx', 'ooooxxx', 'xxxxxxx', 'xxxxxxx', 'xxxxxxx', 'xxxxxxx', '.xxxxx.']);
+  ok(E._benson(two, 2).alive, 'benson: two separate eyes are alive');
+  ok(E.tsumegoSolutions(Object.assign({}, st, { b: two, zone: [pt(0, 0), pt(2, 0), pt(4, 0)] })).length === 0, 'two eyes: nothing kills');
+  ok(E._benson(B(['.o.xxxx', 'ooxxxxx', 'xxxxxxx', 'xxxxxxx', 'xxxxxxx', 'xxxxxxx', '.xxxxx.']), 2).alive === false, 'benson: one eye is not enough');
+
+  // An independent solver for checking generated puzzles. It shares no code with the engine's:
+  // plain minimax over applyMove, no Benson inside the kill search, its own terminal rules.
+  const naive = (p, kill) => {
+    const memo = new Map();
+    const win = (bd, ko, turn, passes, d) => {
+      const hasDef = bd.includes(p.def);
+      if (kill ? !hasDef : (hasDef && E._benson(bd, p.def).alive)) return true;
+      if (!kill && !hasDef) return false;
+      if (passes >= 2 || d <= 0) return false;
+      const key = bd.join('') + turn + ko + passes + ':' + d;
+      if (memo.has(key)) return memo.get(key);
+      const mv = [];
+      for (const z of p.zone) if (bd[z] === 0 && z !== ko) { const r = E.applyMove({ b: bd, ko, hist: [] }, z, turn); if (!r.err) mv.push([r.b, r.ko, 0]); }
+      mv.push([bd, -1, passes + 1]);
+      const seeker = kill ? p.att : p.def;
+      const res = turn === seeker ? mv.some(m => win(m[0], m[1], 3 - turn, m[2], d - 1)) : mv.every(m => win(m[0], m[1], 3 - turn, m[2], d - 1));
+      memo.set(key, res);
+      return res;
+    };
+    return win;
+  };
+  const counts = { easy: 12, medium: 6, hard: 1 };
+  for (const level of E.tsumegoLevels) {
+    let good = 0, made = 0, played = 0, sawLive = 0, sawKill = 0;
+    for (let k = 0; k < counts[level]; k++) {
+      const p = E.tsumegoGenerate(level, 'any', 20000);
+      if (!p) continue;
+      made++;
+      p.goal === 'live' ? sawLive++ : sawKill++;
+      const kill = p.goal === 'kill', seeker = kill ? p.att : p.def, win = naive(p, kill);
+      const mine = [];
+      for (const z of p.zone) {
+        if (p.b[z] !== 0) continue;
+        const r = E.applyMove({ b: p.b, ko: -1, hist: [] }, z, seeker);
+        if (!r.err && win(r.b, r.ko, 3 - seeker, 0, p.depth - 1)) mine.push(z);
+      }
+      const same = mine.length === p.solutions.length && mine.every(z => p.solutions.includes(z));
+      const sane = E._benson(p.b, p.att).alive && !E._benson(p.b, p.def).alive && p.solutions.length >= 1 && p.solutions.length <= 2 &&
+        p.toPlay === seeker && p.solutions.every(z => p.zone.includes(z) && p.b[z] === 0);
+      if (same && sane) good++;
+      // play it out the way a solver would: always a right move, the engine answering, until it is solved
+      const s2 = { b: p.b.slice(), ko: -1, turn: p.toPlay, passes: 0, att: p.att, def: p.def, zone: p.zone, goal: p.goal, depth: p.depth };
+      let plies = 0, done = '';
+      while (!done && plies < 40) {
+        const sols = E.tsumegoSolutions(s2);
+        if (!sols.length) break;
+        let r = E.applyMove({ b: s2.b, ko: s2.ko, hist: [] }, sols[0], s2.turn);
+        if (r.err) break;
+        s2.b = r.b; s2.ko = r.ko; s2.turn = 3 - s2.turn; plies++;
+        done = E.tsumegoDone(s2);
+        if (done) break;
+        const rep = E.tsumegoReply(s2);
+        if (rep.move === E.PASS) { s2.passes++; s2.ko = -1; s2.turn = 3 - s2.turn; }
+        else { r = E.applyMove({ b: s2.b, ko: s2.ko, hist: [] }, rep.move, s2.turn); if (r.err) break; s2.b = r.b; s2.ko = r.ko; s2.passes = 0; s2.turn = 3 - s2.turn; }
+        plies++;
+        done = E.tsumegoDone(s2);
+      }
+      if (done) played++;
+    }
+    ok(made === counts[level], 'tsumego ' + level + ': made ' + made + ' of ' + counts[level]);
+    ok(good === made, 'tsumego ' + level + ': every answer agrees with the independent solver, and every position is sane (' + good + '/' + made + ')');
+    ok(played === made, 'tsumego ' + level + ': following the answers always solves it (' + played + '/' + made + ')');
+  }
+  const lp = E.tsumegoGenerate('easy', 'live', 20000), kp = E.tsumegoGenerate('easy', 'kill', 20000);
+  ok(lp && lp.goal === 'live' && lp.toPlay === lp.def, 'tsumego: a live problem has the defender to play');
+  ok(kp && kp.goal === 'kill' && kp.toPlay === kp.att, 'tsumego: a kill problem has the attacker to play');
+  ok(E.tsumegoGenerate('nonsense', 'any', 20000) !== null, 'tsumego: an unknown level falls back to easy');
+  // the same engine, stripped of everything but its own text, still makes puzzles and rates moves
+  const E3 = vm.runInNewContext('(' + makeEngine.toString() + ')()', sandbox);
+  const vp = E3.tsumegoGenerate('easy', 'any', 20000);
+  ok(vp && vp.solutions.length > 0, 'tsumego: works inside the empty context the worker runs in');
+  const vr = new E3.Rater();
+  vr.start({ b: Array(49).fill(0), turn: 1, komi: 9.5, passes: 0, last: -1, hist: [], ko: -1 }, 24, { ms: 200, iters: 400, extra: 100 });
+  while (!vr.step(1e9)) {}
+  ok(typeof vr.result().rating === 'number', 'rating: works inside the empty context the worker runs in');
+}
+
 console.log(fails ? fails + ' of ' + n + ' FAILED' : 'minigo: all ' + n + ' checks passed');
 process.exit(fails ? 1 : 0);
