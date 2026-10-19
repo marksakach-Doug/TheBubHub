@@ -517,7 +517,16 @@ export async function boot() {
           }
           modState.set(g.meta.id, st);
         }
-        if (view === undefined) view = st.state;
+        // Project it, even for the very first paint. Every other path in here
+        // goes through safeProject — the cached view, the snapshot reply, the
+        // rebroadcast — so handing update() the RAW state here made the first
+        // frame the only unprojected one a client ever saw. Most games survive
+        // that by accident, because their raw state happens to carry the same
+        // field names they render; a game that shapes its view at all (Clicker
+        // turns `queue` into coloured cells) throws on its first update() and
+        // shows a permanently empty board. One line, and the contract the README
+        // describes is the contract the hub actually honours.
+        if (view === undefined) view = safeProject(mod, st.state, s.me.id);
       }
       // A guest used to run mod.init() here too, on its own local roster, and
       // that fiction won over the host's real state because `cached` was
