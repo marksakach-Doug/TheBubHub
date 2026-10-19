@@ -73,8 +73,7 @@ const MENU_ORDER = [
   'wordbridge',   // Word Bridge
   'blastoff',     // Blast Off!
   'grammar',      // Discover the Grammar
-   'TRAFFIC',       // TRAFFIC
-   'clicker'        // Clicker
+  'TRAFFIC'       // TRAFFIC
 ];
 
 export function menuOrder(reg) {

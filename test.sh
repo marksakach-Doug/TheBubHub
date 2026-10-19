@@ -47,11 +47,23 @@ bail() {
   exit 1
 }
 
-# Offline suite: always runs; needs only python3 + esprima.
+# A .mjs suite runs under node, a .py suite under python3. Several of the best
+# suites here are node harnesses that need no browser at all — they drive the
+# shipped module directly — so the same dispatch has to work in the OFFLINE
+# table too, not only the browser one. Getting that wrong is how minigo ended up
+# in the browser table being run by python3, which could only ever SyntaxError.
+run_suite() {
+  case "$1" in
+    *.mjs) node "$1" ;;
+    *) python3 "$1" ;;
+  esac
+}
+
+# Offline suite: always runs; needs only node, python3 and esprima.
 run_offline() {
   local name="$1" script="$2"
   step "$name — tests/$script"
-  if python3 "tests/$script"; then pass "$script"; else fail "$script"; bail; fi
+  if run_suite "tests/$script"; then pass "$script"; else fail "$script"; bail; fi
 }
 
 # Browser suite: loud failure without Chromium, SKIP with --skip-browser.
@@ -146,6 +158,15 @@ OFFLINE_SUITES=(
   "secrets|secrets_test.py"
   "bun lockfile|lockfile_test.py"
   "kick/ghost|kick_ghost_test.py"
+  # Every test file has to be in a table, or it never runs. chess_play.py sat
+  # unwired in tests/ for a year looking exactly like coverage.
+  "test wiring|test_wiring.py"
+  # The gate's own test: six deliberately broken games, each one a mistake that
+  # has actually shipped, each one has to fail on the check that owns it.
+  "game gate|gate_test.mjs"
+  # One shared suite for every game with a card, so adding a game never means
+  # editing this file.
+  "game scenarios|game_scenarios.mjs"
 )
 
 SERVE_PORT="${SERVE_PORT:-5180}"
@@ -174,6 +195,11 @@ BROWSER_SUITES=(
   # the bug that shipped 15 iframe games and zero module games was invisible
   # everywhere else.
   "hub shell (built)|hub_switch_test.py"
+  # Every game with a card has to open, render, and take a tap. Needs dist/ too —
+  # and this is where the first-paint regression lives: main.js once handed
+  # update() the raw state instead of calling project(), and a game that shapes
+  # its view showed a permanently empty board while logging nothing.
+  "game smoke (built)|game_smoke.py"
   # A node harness, not python: minigo_test.mjs drives the shipped module and
   # the MCTS bot with no browser. It was in this table being run by python3,
   # which could only ever SyntaxError — a suite that has never once passed.
@@ -191,10 +217,10 @@ for entry in "${OFFLINE_SUITES[@]}"; do
 done
 for entry in "${BROWSER_SUITES[@]}"; do
   case "$entry" in
-    "hub shell (built)|"*)
-      [ "$BROWSER_OK" = "1" ] || { skip "hub_switch_test.py ($BROWSER_WHY)"; continue; }
+    "hub shell (built)|"*|"game smoke (built)|"*)
+      [ "$BROWSER_OK" = "1" ] || { skip "${entry##*|} ($BROWSER_WHY)"; continue; }
       if ensure_dist; then
-        run_browser "hub shell (built)" "hub_switch_test.py $SERVE_PORT"
+        run_browser "${entry%%|*}" "${entry##*|} $SERVE_PORT"
       fi
       ;;
     *) run_browser "${entry%%|*}" "${entry##*|}" ;;

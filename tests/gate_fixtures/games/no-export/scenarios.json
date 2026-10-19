@@ -1,0 +1,273 @@
+{
+  "id": "no-export",
+  "title": "Nim",
+  "version": 1,
+  "note": "The reference card. Written by hand, before the builder agent existed. A builder fills in the region between BUILDER STARTS HERE and BUILDER ENDS HERE in games/nim/index.js \u2014 nothing else in the file is fair game.",
+  "players": {
+    "min": 2,
+    "max": 2
+  },
+  "maxLines": 250,
+  "summarizeMaxChars": 120,
+  "seed": 12345,
+  "hidden": [],
+  "roster": [
+    {
+      "id": "p1",
+      "name": "Alice",
+      "host": true
+    },
+    {
+      "id": "p2",
+      "name": "Bo",
+      "host": false
+    }
+  ],
+  "rules": "Fifteen sticks. On your turn take 1 to 3. Whoever takes the last stick loses.",
+  "actions": {
+    "take": {
+      "n": "integer 1..3"
+    },
+    "reset": {}
+  },
+  "summarize": "<name> beat <name> at Nim, null until over",
+  "scenarios": [
+    {
+      "name": "the start of a game is quiet on the record sheet",
+      "steps": [],
+      "expect": {
+        "summarize": null
+      }
+    },
+    {
+      "name": "a full game: Bo empties the table and loses",
+      "steps": [
+        {
+          "as": "p1",
+          "action": {
+            "a": "take",
+            "n": 3
+          }
+        },
+        {
+          "as": "p2",
+          "action": {
+            "a": "take",
+            "n": 3
+          }
+        },
+        {
+          "as": "p1",
+          "action": {
+            "a": "take",
+            "n": 3
+          }
+        },
+        {
+          "as": "p2",
+          "action": {
+            "a": "take",
+            "n": 3
+          }
+        },
+        {
+          "as": "p1",
+          "action": {
+            "a": "take",
+            "n": 2
+          }
+        },
+        {
+          "as": "p2",
+          "action": {
+            "a": "take",
+            "n": 1
+          }
+        }
+      ],
+      "expect": {
+        "summarize": "Alice beat Bo at Nim"
+      }
+    },
+    {
+      "name": "taking four is not a legal move",
+      "steps": [
+        {
+          "as": "p1",
+          "action": {
+            "a": "take",
+            "n": 4
+          }
+        }
+      ],
+      "expect": {
+        "error": true
+      }
+    },
+    {
+      "name": "taking nothing is not a legal move",
+      "steps": [
+        {
+          "as": "p1",
+          "action": {
+            "a": "take",
+            "n": 0
+          }
+        }
+      ],
+      "expect": {
+        "error": true
+      }
+    },
+    {
+      "name": "out of your turn",
+      "steps": [
+        {
+          "as": "p2",
+          "action": {
+            "a": "take",
+            "n": 1
+          }
+        }
+      ],
+      "expect": {
+        "error": true
+      }
+    },
+    {
+      "name": "a game mid-way through says nothing yet",
+      "steps": [
+        {
+          "as": "p1",
+          "action": {
+            "a": "take",
+            "n": 1
+          }
+        },
+        {
+          "as": "p2",
+          "action": {
+            "a": "take",
+            "n": 2
+          }
+        }
+      ],
+      "expect": {
+        "summarize": null
+      }
+    },
+    {
+      "name": "the other player can be the one who loses (15 single sticks: p1 makes move 15 and loses, so Bo wins)",
+      "steps": [
+        {
+          "as": "p1",
+          "action": {
+            "a": "take",
+            "n": 1
+          }
+        },
+        {
+          "as": "p2",
+          "action": {
+            "a": "take",
+            "n": 1
+          }
+        },
+        {
+          "as": "p1",
+          "action": {
+            "a": "take",
+            "n": 1
+          }
+        },
+        {
+          "as": "p2",
+          "action": {
+            "a": "take",
+            "n": 1
+          }
+        },
+        {
+          "as": "p1",
+          "action": {
+            "a": "take",
+            "n": 1
+          }
+        },
+        {
+          "as": "p2",
+          "action": {
+            "a": "take",
+            "n": 1
+          }
+        },
+        {
+          "as": "p1",
+          "action": {
+            "a": "take",
+            "n": 1
+          }
+        },
+        {
+          "as": "p2",
+          "action": {
+            "a": "take",
+            "n": 1
+          }
+        },
+        {
+          "as": "p1",
+          "action": {
+            "a": "take",
+            "n": 1
+          }
+        },
+        {
+          "as": "p2",
+          "action": {
+            "a": "take",
+            "n": 1
+          }
+        },
+        {
+          "as": "p1",
+          "action": {
+            "a": "take",
+            "n": 1
+          }
+        },
+        {
+          "as": "p2",
+          "action": {
+            "a": "take",
+            "n": 1
+          }
+        },
+        {
+          "as": "p1",
+          "action": {
+            "a": "take",
+            "n": 1
+          }
+        },
+        {
+          "as": "p2",
+          "action": {
+            "a": "take",
+            "n": 1
+          }
+        },
+        {
+          "as": "p1",
+          "action": {
+            "a": "take",
+            "n": 1
+          }
+        }
+      ],
+      "expect": {
+        "summarize": "Bo beat Alice at Nim"
+      }
+    }
+  ]
+}
