@@ -249,7 +249,13 @@ export function summarize(state, nameOf) {
   // null until the game is genuinely over, or the record sheet fills with lines
   // nobody can take back. Use nameOf(id) for names — never a raw id.
   if (!state.over || !state.over.winner) return null;
-  const loser = (state.last && state.last.player) || '';
+  // The loser is "the other player", derived rather than recorded. Writing it
+  // down when the game ends gets it wrong for anything but a game whose LAST
+  // mover is the loser: in a race to ten the winner is the last mover, so
+  // "Alice beat Alice" is what a hard-coded version produces. If your game does
+  // not end with one winner and one loser, change this line — it is the only
+  // part of this scaffold that is not one-size-fits-all.
+  const loser = (state.players || []).filter((p) => p !== state.over.winner)[0] || '';
   return nameOf(state.over.winner) + ' beat ' + nameOf(loser) + ' at ${card.title || card.id}';
 }
 
