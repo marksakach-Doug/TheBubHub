@@ -72,7 +72,9 @@ const MENU_ORDER = [
   'lotr',         // LOTR Cards
   'wordbridge',   // Word Bridge
   'blastoff',     // Blast Off!
-  'grammar'       // Discover the Grammar
+  'grammar',      // Discover the Grammar
+   'TRAFFIC',       // TRAFFIC
+   'clicker'        // Clicker
 ];
 
 export function menuOrder(reg) {

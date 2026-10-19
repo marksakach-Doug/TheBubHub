@@ -36,6 +36,10 @@ many there are — `dealPair()` shuffles whatever is in the list and the hook te
 read `PAIRS.length` instead of a number. Adding a batch of pairs is a content
 change, not a code change: commit and push them, and do not touch the tests.
 
+> Pointing a small or weak model at this repo? Use `AGENTS-WEAK.md` instead of
+> this file. It carries the same rules in a shorter, more prescriptive form and
+> says plainly which files a weak model should hand back.
+
 ## The loop
 
 ```bash

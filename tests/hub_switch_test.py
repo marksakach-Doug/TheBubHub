@@ -41,11 +41,15 @@ def main():
         pg.click("#btn-welcome-go")
         pg.wait_for_timeout(600)
 
-        # ---- the module games survived the build
+        # ---- the module games survived the build.
+        # Enumerated off the real games/ directory rather than a hardcoded list:
+        # a fixed list silently stops checking the fifth game onward, so the
+        # exact bug this file exists to catch (module games vanishing from the
+        # production bundle) would return unnoticed.
+        module_ids = sorted(g.parent.name for g in (ROOT / "games").glob("*/index.js"))
         ids = pg.evaluate("() => window.BubHub ? BubHub.registry.map(g => g.meta.id) : null")
-        check("the built bundle registers all four module games",
-              sorted(i for i in ids if i in ("dotreturn", "eggs", "hook", "minigo")),
-              ["dotreturn", "eggs", "hook", "minigo"])
+        check("the built bundle registers every module game (%d)" % len(module_ids),
+              sorted(i for i in ids if i in module_ids), module_ids)
 
         # ---- the multiplayer menu is grouped and ordered.
         # #game-buttons lives inside #room-ui, which is display:none until you

@@ -57,6 +57,9 @@ MENU_ORDER = [
     "chess", "minigo", "goldberg", "warp",
     # the 2-8 crowd
     "eggs", "hook", "dotreturn", "the96game",
+    # trailing: TRAFFIC is registered by the stub below (its folder is
+    # games/TRAFFIC) but has no entry in the LEGACY stand-ins, so it sorts last.
+    "TRAFFIC",
 ]
 
 
@@ -117,7 +120,10 @@ def source_checks():
                               GAMES_JS.read_text(encoding="utf-8"), re.M))
     real_ids = ({g.parent.name for g in GAMES} | set(LEGACY_IDS)) - solo_ids
     mo = re.search(r"const MENU_ORDER = \[(.*?)\];", src, re.S)
-    declared = re.findall(r"'([a-z0-9]+)'", mo.group(1)) if mo else []
+    # Ids may be upper case (TRAFFIC is), so this cannot assume [a-z0-9] only —
+    # an all-caps id written here would be invisible to the parser and the
+    # "names every game that exists" check would fail for the wrong reason.
+    declared = re.findall(r"'([A-Za-z0-9]+)'", mo.group(1)) if mo else []
     out.append((
         "the menu order names every game that exists",
         bool(declared) and real_ids <= set(declared)))
