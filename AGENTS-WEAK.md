@@ -101,24 +101,37 @@ Stop and ask a human. Say what you found and what you would have done.
 
 ## 7. Adding a game — the checklist
 
+If a builder agent is available (`@builder`), skip to step 9 and let it write
+`index.js`. These steps are what you do when there is not one.
+
 1. `ls games/` — confirm the folder name and its exact casing.
 2. `meta.id` **must match the folder name, casing included.** A test compares
    them, and a mismatch fails the suite for a reason that looks unrelated.
-3. Copy `games/dotreturn/index.js`. Export: `meta`, `init`, `reduce`,
-   `project`, `mount`, `summarize`. Optionally `roundId` and `prune`.
-4. All state changes go through `reduce()`. There is **no tick** — nothing
+3. Copy `games/nim/index.js` — a small, complete module game whose parts are all
+   named. `games/dotreturn/index.js` is the deep reference but it is 1,145
+   lines, and copying it invites copying its rules.
+4. **Every export needs the word `export` in front of it.** A function you only
+   declare is invisible to the hub, and the game dies on open with
+   `a.mount is not a function` — with no other symptom.
+5. All state changes go through `reduce()`. There is **no tick** — nothing
    changes except when a player sends an action.
-5. Never send anything from inside `mount()`. The hub has not assigned the
+6. **Return a new state; never edit the one you were handed.** The previous
+   state may already have gone to another player.
+7. Never send anything from inside `mount()`. The hub has not assigned the
    handle yet — send from the first `update()`.
-6. Never let an action start a second animation loop. Guard with a boolean,
-   not a null check on the loop id.
-7. Export `prune(state, goneId)` if your state keeps its own list of players.
+8. **Never let an action start a second animation loop**, and never leave
+   module-level `let`/`var`. A global board is invisible to the hub, which is
+   how a game ends up with a permanently empty screen: the hub holds one copy
+   and `mount()` reads another.
+9. Export `prune(state, goneId)` if your state keeps its own list of players.
    Without it, someone who leaves still holds a seat and the round deadlocks.
-8. Add the id to `MENU_ORDER` in `src/registry.js` — at the **end** of the
-   list. Putting it elsewhere moves other games' menu positions.
-9. Write `tests/<id>_test.mjs`. Copy the shape of `tests/minigo_test.mjs`.
-10. Add one line to a suite table in `test.sh`.
-11. **Run `bun run test` and paste the output.**
+10. Write the card at `cards/<id>.md` and run `node scripts/new-game.mjs
+    cards/<id>.md`. It writes `games/<id>/scenarios.json` (the spec, with the
+    scenarios) and `games/<id>/index.js` (a working scaffold with the rules left
+    blank). Fill in only the regions between the `BUILDER` comments.
+11. Run `node scripts/check-game.mjs <id>` until it passes. Its **exit code** is
+    the verdict — not the text on screen.
+12. **Run `bun run test` and paste the output.**
 
 ## 8. The contract, in ten lines
 

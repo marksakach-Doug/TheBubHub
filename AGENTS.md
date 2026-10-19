@@ -18,10 +18,19 @@ Two kinds of game:
 | Reaches the hub via | `api.send()` → `reduce()` → `project()` | a `postMessage` bridge |
 | Test it with | a suite in `test.sh` | open the file |
 
-`games/dotreturn/` is the reference module game, with its own test suite — copy
-it to start a new one. The six exports every module game needs
+`games/nim/` is the small reference module game — 200 lines, every part named,
+and the thing to copy to start a new one. `games/dotreturn/` is the deep
+reference for a game that has to think about authority, timing and hiding
+things, with its own test suite. The six exports every module game needs
 (`meta`, `init`, `reduce`, `project`, `mount`, `summarize`, plus the optional
 `roundId` and `prune`) are listed in the contract table above.
+
+**Adding a game does not mean editing `src/` or `test.sh`.** Write a card at
+`cards/<id>.md`, run `node scripts/new-game.mjs cards/<id>.md`, fill in the
+regions it marks, and run `node scripts/check-game.mjs <id>`. `menuOrder()`
+already sorts an unlisted game to the end of the menu, and the shared
+`game scenarios` suite in `test.sh` picks up every card. The gate's exit code
+is the verdict — never trust a transcript someone pasted.
 
 Two contract details worth knowing before you write rules: `ctx.from.host`
 tells a reduce whether the sender hosts the table (a solo room has a host), so

@@ -16,8 +16,11 @@ There are two kinds of game:
 | Networking | hub calls your `reduce()` and `project()` | you implement host/guest yourself |
 | Seating | hub-owned, handed to you | you implement it |
 
-Start with [`games/dotreturn/index.js`](games/dotreturn/index.js) — it is a complete,
-working game in one file and is the shortest path to understanding the contract.
+Start with [`games/nim/index.js`](games/nim/index.js) — a small, complete game
+in one file, and the shortest path to understanding the contract.
+[`games/dotreturn/index.js`](games/dotreturn/index.js) is the deep reference for
+a game that has to think about authority, timing and hiding things; it is 1,145
+lines and copying it invites copying its rules.
 
 ---
 
