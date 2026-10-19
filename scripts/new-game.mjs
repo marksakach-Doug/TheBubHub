@@ -273,6 +273,7 @@ export function mount(root, api) {
   //     + 'border:1px solid #3a465f;background:#232c3f;color:#e8ecf4;cursor:pointer;';
   //   b.addEventListener('click', function () { api.send({ a: 'yourAction', n: 3 }); });
   //   board.appendChild(b);
+  // When you are done, delete this whole comment — it must not stay here.
   // ---- BUILDER ENDS HERE ----
 
   const reset = document.createElement('button');
@@ -375,6 +376,19 @@ function main() {
   console.log(`  ${shown}/scenarios.json   ${card.scenarios.length} scenarios`);
   console.log(`  ${shown}/index.js         builder fills in 3 marked regions`);
   console.log('');
+  // A builder finds its region by searching for the marker. If an example
+  // comment ever repeats it, there are two regions and the model writes into
+  // the wrong one — which is how a scaffold quietly stops being a scaffold.
+  const generated = fs.readFileSync(path.join(outDir, 'index.js'), 'utf8');
+  const starts = (generated.match(/BUILDER STARTS HERE/g) || []).length;
+  const ends = (generated.match(/BUILDER ENDS HERE/g) || []).length;
+  if (starts !== 3 || ends !== 3) {
+    console.error(`the scaffold has ${starts} START and ${ends} END markers, expected 3 of each.`);
+    console.error('A marker must appear exactly once per region — including inside example');
+    console.error('comments, where a second copy makes the region ambiguous.');
+    process.exit(1);
+  }
+
   console.log('The generated index.js does NOT pass the gate yet — the rules are blank.');
   console.log('That is expected: it passes once the BUILDER regions are filled in.');
 }

@@ -29,12 +29,24 @@ const SANDBOX = '/tmp/bubhub-builder';
 
 // ---------------------------------------------------------------- git bits ----
 
+// git exits non-zero for plenty of ordinary answers ("no differences"), and a
+// throw here would hide the very output the caller asked for. Return the
+// output either way and let the caller decide what a non-zero exit means.
 function git(args, cwd = ROOT, quiet = true) {
   const opts = quiet
     ? { cwd, encoding: 'utf8', stdio: ['ignore', 'pipe', 'pipe'] }
     : { cwd, stdio: 'inherit' };   // inherit returns null for stdout
-  const out = execFileSync('git', args, opts);
-  return out === null ? '' : String(out).trim();
+  try {
+    const out = execFileSync('git', args, opts);
+    return out === null ? '' : String(out).trim();
+  } catch (e) {
+    if (quiet) {
+      const out = [e.stdout, e.stderr].filter(Boolean).join('\n').trim();
+      if (args[0] === 'diff') return out.replace(/^error:.*$/gm, '').trim();
+      return out;
+    }
+    throw e;
+  }
 }
 
 // Everything that is NOT games/<id>/index.js must be byte-identical to the
@@ -49,7 +61,10 @@ function allowed(id) {
 }
 
 function changedFiles(cwd, id) {
-  const out = git(['status', '--porcelain'], cwd);
+  // -uall: without it git collapses a new directory into one "??" line, which
+  // made the allowlist report games/<id>/ as a stray change on a run where the
+  // agent had written nothing at all.
+  const out = git(['status', '--porcelain', '-uall'], cwd);
   const files = [];
   out.split('\n').filter(Boolean).forEach((line) => {
     const path = line.slice(3).trim();
@@ -137,10 +152,112 @@ function verify() {
   return 0;
 }
 
+
+// ------------------------------------------------------------------ review ----
+//
+// The half that is not the agent's. Nothing here merges anything: it runs the
+// gate on the sandbox, reports whether the agent stayed inside the allowlist,
+// and prints the diff. The decision is yours.
+
+function review(id) {
+  const wt = path.join(SANDBOX, id);
+  if (!fs.existsSync(wt)) {
+    console.error(`no sandbox at ${wt}. Run scripts/run-builder.mjs cards/${id}.md first.`);
+    process.exit(2);
+  }
+  let rc = 0;
+
+  // 1. The gate, run where the builder wrote the file. Not here: the point is
+  //    that the sandbox is self-contained. A non-zero exit is the expected way
+  //    this ends when the agent has not finished, so read the output out of the
+  //    throw rather than letting it become a stack trace.
+  console.log('=== the gate, in the sandbox ===');
+  let gateOut = '';
+  try {
+    execFileSync('node', [path.join(wt, 'scripts', 'check-game.mjs'), id],
+      { cwd: wt, encoding: 'utf8', stdio: ['ignore', 'pipe', 'pipe'] });
+  } catch (e) {
+    gateOut = String(e.stdout || '') + String(e.stderr || '');
+  }
+  process.stdout.write(gateOut);
+  if (!/PASS/.test(gateOut)) rc = 1;
+
+  // 2. Did it stay inside the allowlist? A permission block that does not hold
+  //    is worth more than a gate failure, because it is the one that is silent.
+  console.log('');
+  console.log('=== did it stay inside the allowlist? ===');
+  const bad = checkAllowlist(wt, id);
+  if (bad.length) {
+    bad.forEach((f) => console.log(`FAIL  ${f.status}  ${f.path}`));
+    console.log('');
+    console.log(`${bad.length} file(s) changed that the builder has no business touching.`);
+    console.log('The permission block in .opencode/agents/builder.md is not holding.');
+    console.log('Do not merge. Re-run scripts/run-builder.mjs --verify, and treat this');
+    console.log('as a hole in the sandbox rather than a mistake by the model.');
+    rc = 1;
+  } else {
+    console.log('  ok   only games/<id>/index.js changed');
+  }
+
+  // 3. The diff. Small by construction — that is the whole point of the cap.
+  const changed = changedFiles(wt, id);
+  console.log('');
+  console.log('=== the diff ===');
+  if (!changed.length) {
+    console.log('  (nothing changed — the builder did not write anything)');
+    rc = 1;
+  } else {
+    const main = path.join('games', id, 'index.js');
+    if (fs.existsSync(path.join(wt, main))) {
+      const d = git(['diff', '--no-index', '--stat',
+        path.join(ROOT, main), path.join(wt, main)], wt);
+      if (d) console.log(d);
+    }
+    console.log('');
+    console.log(`changed: ${changed.map((f) => f.path).join(', ')}`);
+    console.log(`  ${git(['diff', '--stat'], wt) || '(untracked — read the file)'}`);
+  }
+
+  console.log('');
+  if (rc) {
+    console.log('NOT READY TO MERGE. Fix what is above, or do not merge.');
+  } else {
+    console.log('Green, and inside the allowlist. Play it before you trust it:');
+    console.log('');
+    console.log(`  cd ${wt} && bun install && bun run dev`);
+    console.log('');
+    console.log('Then merge by hand. This script will not do it for you:');
+    console.log('');
+    console.log(`  git checkout games/${id}/index.js && cp ${wt}/games/${id}/index.js games/${id}/index.js`);
+    console.log(`  git diff games/${id}/index.js        # read this before committing`);
+    console.log(`  git worktree remove --force ${wt} && git branch -D build/${id}`);
+  }
+  return rc;
+}
+
 // -------------------------------------------------------------------- main ----
 
+const TASK_PROMPT = [
+  'Build the game described in {card}.',
+  '',
+  'Read {card} and games/{id}/scenarios.json first — the scenarios are the spec.',
+  'Then fill in ONLY the regions between the BUILDER START/END comments in',
+  'games/{id}/index.js. Do not touch anything else.',
+  '',
+  'After you write, stop and wait. You have no shell: the harness runs the gate',
+  'for you and shows you the first failing check.'
+].join('\n');
+
 function usage() {
-  console.error('usage: node scripts/run-builder.mjs <card.md> [--try N] [--keep] [--verify]');
+  console.error([
+    'usage:',
+    '  node scripts/run-builder.mjs <card.md>        scaffold a sandbox for the agent',
+    '  node scripts/run-builder.mjs <card.md> --review  judge what it wrote',
+    '  node scripts/run-builder.mjs --verify          print the refusal proof',
+    '',
+    'The agent runs inside the sandbox, not here:  cd <sandbox> && opencode --agent builder',
+    'Nothing in this script merges anything, and nothing in it can push.'
+  ].join('\n'));
   process.exit(2);
 }
 
@@ -149,100 +266,117 @@ function main() {
   if (argv.includes('--verify')) process.exit(verify());
   if (argv.includes('--help')) usage();
 
-  const tries = argv.includes('--try') ? Number(argv[argv.indexOf('--try') + 1]) : 3;
-  const keep = argv.includes('--keep');
-  const cardFile = argv.find((a) => !a.startsWith('--') && argv[argv.indexOf(a) - 1]?.startsWith('--') !== true);
-  if (!cardFile) usage();
+  // --review takes the id, which the card's `id:` line is the source of.
+  if (argv.includes('--review')) {
+    const at = argv.indexOf('--review');
+    const explicit = argv[at + 1] && !argv[at + 1].startsWith('--') ? argv[at + 1] : null;
+    if (explicit) process.exit(review(explicit));
+    const cards = argv.filter((a) => a.endsWith('.md'));
+    if (cards.length !== 1) usage();
+    const id = (fs.readFileSync(cards[0], 'utf8').match(/^id:\s*(\S+)/m) || [])[1];
+    if (!id) { console.error('the card has no "id:" line'); process.exit(2); }
+    process.exit(review(id));
+  }
 
+  const cardFile = argv.find((a) => !a.startsWith('--'));
+  if (!cardFile) usage();
   if (!fs.existsSync(cardFile)) {
     console.error(`no card at ${cardFile}`);
     process.exit(2);
   }
 
   const id = (fs.readFileSync(cardFile, 'utf8').match(/^id:\s*(\S+)/m) || [])[1];
-  if (!id) {
-    console.error('the card has no "id:" line');
-    process.exit(2);
-  }
+  if (!id) { console.error('the card has no "id:" line'); process.exit(2); }
 
   const branch = `build/${id}`;
   const wt = path.join(SANDBOX, id);
 
-  // A worktree is a full checkout: it has the repo's files but NOT its
+  // A worktree is a full checkout: it has the repo's tracked files but NOT its
   // untracked ones, so node_modules and dist/ are absent. That is deliberate —
   // the gate runs on plain node with no dependencies, so there is nothing to
   // install, and there is therefore no way to reach `bun install` and rewrite
   // bun.lock in the format CI cannot read.
+  // This branch exists only to be thrown away, so a leftover one from a run
+  // that was interrupted is not worth failing over — clear it and carry on.
+  // `git worktree add` refuses to reuse the name, and the resulting message
+  // ("a branch named build/x already exists") tells a person nothing about what
+  // to do next.
   if (fs.existsSync(wt)) {
-    console.error(`${wt} already exists — remove it or pass a different card id.`);
-    process.exit(2);
+    console.log(`clearing a leftover sandbox at ${wt}`);
+    git(['worktree', 'remove', '--force', wt]);
   }
+  git(['worktree', 'prune']);
+  git(['branch', '-D', branch]);
   fs.mkdirSync(SANDBOX, { recursive: true });
+
   console.log(`sandbox: ${wt}  (branch ${branch})`);
   try {
     git(['worktree', 'add', '-b', branch, wt], ROOT, false);
   } catch (e) {
-    console.error('could not create the worktree. Is the branch name already taken?');
-    console.error(String(e.stderr || e.message).slice(0, 300));
+    console.error(`could not create the worktree at ${wt}.`);
+    console.error(String(e.stderr || e.message || '').slice(0, 300));
     process.exit(1);
   }
 
-  // Scaffold inside the sandbox, so the repo is untouched.
+  // Scaffold inside the sandbox, so this working tree is never touched.
   //
   // The worktree is built from HEAD, which means the GATE has to be committed
-  // before a builder can run. That is not an inconvenience — it is the workflow
-  // working: the gate is shared infrastructure, and a builder that judges itself
-  // with a version of the gate you cannot reproduce is not a real check. Say so
-  // plainly rather than letting node print MODULE_NOT_FOUND.
+  // before a builder can run. That is the workflow working, not an
+  // inconvenience: a builder judged by a version of the gate you cannot
+  // reproduce is not a real check. Say so plainly rather than letting node
+  // print MODULE_NOT_FOUND.
   for (const need of ['scripts/new-game.mjs', 'scripts/check-game.mjs', 'scripts/fake-dom.mjs']) {
     if (fs.existsSync(path.join(wt, need))) continue;
-    console.error(`The sandbox is missing ${need}.`);
     console.error('');
+    console.error(`The sandbox is missing ${need}.`);
     console.error('It was created from the last commit, and the gate is not committed yet —');
     console.error('so the builder would have nothing to be judged by. Commit the tooling');
     console.error('(scripts/, cards/, .opencode/agents/) and run this again.');
     console.error('');
-    console.error(`Cleaning up ${wt}.`);
+    console.log(`Cleaning up ${wt}.`);
     git(['worktree', 'remove', '--force', wt]);
     git(['branch', '-D', branch]);
     process.exit(2);
   }
 
-  const cardInWt = fs.existsSync(path.join(wt, 'cards'))
-    ? path.join(wt, 'cards', path.basename(cardFile))
-    : null;
-  if (!cardInWt) {
-    fs.mkdirSync(path.join(wt, 'cards'), { recursive: true });
-    fs.copyFileSync(cardFile, path.join(wt, 'cards', path.basename(cardFile)));
+  fs.mkdirSync(path.join(wt, 'cards'), { recursive: true });
+  const cardName = path.basename(cardFile);
+  if (path.resolve(cardFile) !== path.resolve(path.join(wt, 'cards', cardName))) {
+    fs.copyFileSync(cardFile, path.join(wt, 'cards', cardName));
   }
   try {
-    execFileSync('node', [path.join(wt, 'scripts', 'new-game.mjs'),
-      path.join(wt, 'cards', path.basename(cardFile))],
+    execFileSync('node', [path.join(wt, 'scripts', 'new-game.mjs'), `cards/${cardName}`],
       { cwd: wt, encoding: 'utf8' });
   } catch (e) {
     console.error(`new-game.mjs failed:\n${(e.stdout || '') + (e.stderr || '')}`);
     process.exit(1);
   }
 
-  console.log('');
-  console.log(`scaffolded games/${id}/ in the sandbox.`);
-  console.log('');
-  console.log('Now run the builder agent against the sandbox, not this repo:');
-  console.log('');
-  console.log(`  cd ${wt} && opencode --agent builder`);
-  console.log(`  > ${TASK_PROMPT.replace('{id}', id).replace('{card}', `cards/${path.basename(cardFile)}`)}`);
-  console.log('');
-  console.log('Then come back and judge it:');
-  console.log('');
-  console.log(`  node scripts/run-builder.mjs ${cardFile} --review`);
-  console.log('');
+  const prompt = TASK_PROMPT
+    .replace(/\{card\}/g, `cards/${cardName}`)
+    .replace(/\{id\}/g, id);
 
-  if (!keep) {
-    console.log(`(the sandbox is still there — remove ${wt} when you are done)`);
-  }
+  console.log('');
+  console.log(`scaffolded games/${id}/ in the sandbox. It will not pass the gate yet —`);
+  console.log('the rules are blank. That is what the agent is for.');
+  console.log('');
+  console.log('  1. run the agent against the SANDBOX, not this repo:');
+  console.log('');
+  console.log(`       cd ${wt}`);
+  console.log('       opencode');
+  console.log('');
+  console.log('     then paste this prompt:');
+  console.log('');
+  prompt.split('\n').forEach((l) => console.log('       ' + l));
+  console.log('');
+  console.log('  2. judge what it wrote:');
+  console.log('');
+  console.log(`       node scripts/run-builder.mjs cards/${cardName} --review`);
+  console.log('');
+  console.log(`  3. play it in the sandbox before merging:   cd ${wt} && bun install && bun run dev`);
+  console.log('');
+  console.log(`Remove the sandbox when you are done:  git worktree remove --force ${wt}`);
   process.exit(0);
 }
-
-const TASK_PROMPT = `Build the game described in {card}. Read the card and games/{id}/scenarios.json first, fill in the BUILDER regions of games/{id}/index.js, and stop after each write for the harness to run the gate.`;
 
 if (process.argv[1] && pathToFileURL(process.argv[1]).href === import.meta.url) main();
