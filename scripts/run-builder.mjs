@@ -67,10 +67,15 @@ function changedFiles(cwd, id) {
   const out = git(['status', '--porcelain', '-uall'], cwd);
   const files = [];
   out.split('\n').filter(Boolean).forEach((line) => {
-    const path = line.slice(3).trim();
-    // "R  old -> new" shows as "old -> new"; the new path is what matters.
-    const target = path.includes('->') ? path.split('->').pop().trim() : path;
-    files.push({ status: line.slice(0, 2).trim(), path: target });
+    // Porcelain is XY<space>PATH. A fixed offset breaks as soon as a status is
+    // three characters wide — which happens the moment `git add -N` leaves an
+    // "A " behind — and it silently drops the first letter of the filename.
+    const m = line.match(/^(.{1,2})\s+(.*)$/);
+    if (!m) return;
+    let path = m[2].trim();
+    // "R  old -> new": the new path is what matters.
+    if (path.includes('->')) path = path.split('->').pop().trim();
+    files.push({ status: m[1].trim(), path });
   });
   return files;
 }
@@ -153,6 +158,14 @@ function verify() {
 }
 
 
+function cardCap(wt, id) {
+  try {
+    return JSON.parse(fs.readFileSync(path.join(wt, 'games', id, 'scenarios.json'), 'utf8')).maxLines || 250;
+  } catch (e) {
+    return 250;
+  }
+}
+
 // ------------------------------------------------------------------ review ----
 //
 // The half that is not the agent's. Nothing here merges anything: it runs the
@@ -174,13 +187,15 @@ function review(id) {
   console.log('=== the gate, in the sandbox ===');
   let gateOut = '';
   try {
-    execFileSync('node', [path.join(wt, 'scripts', 'check-game.mjs'), id],
-      { cwd: wt, encoding: 'utf8', stdio: ['ignore', 'pipe', 'pipe'] });
+    gateOut = String(execFileSync('node', [path.join(wt, 'scripts', 'check-game.mjs'), id],
+      { cwd: wt, encoding: 'utf8', stdio: ['ignore', 'pipe', 'pipe'] }) || '');
   } catch (e) {
+    // A non-zero exit is the normal way this ends when the agent is not done,
+    // so read the report out of the throw rather than printing a stack trace.
     gateOut = String(e.stdout || '') + String(e.stderr || '');
   }
   process.stdout.write(gateOut);
-  if (!/PASS/.test(gateOut)) rc = 1;
+  if (!/^PASS\b/m.test(gateOut)) rc = 1;
 
   // 2. Did it stay inside the allowlist? A permission block that does not hold
   //    is worth more than a gate failure, because it is the one that is silent.
@@ -200,22 +215,32 @@ function review(id) {
   }
 
   // 3. The diff. Small by construction — that is the whole point of the cap.
+  //
+  // `git add -N` marks the new files as intent-to-add WITHOUT staging their
+  // contents, which is the only way to get a real `git diff` for a file the
+  // agent created. Staging them for real would leave the sandbox in a state
+  // that looks like a half-finished commit.
   const changed = changedFiles(wt, id);
+  const newOnes = changed.filter((f) => f.status === '??').map((f) => f.path);
+  if (newOnes.length) git(['add', '-N', '--'].concat(newOnes), wt);
+
   console.log('');
   console.log('=== the diff ===');
   if (!changed.length) {
     console.log('  (nothing changed — the builder did not write anything)');
     rc = 1;
   } else {
-    const main = path.join('games', id, 'index.js');
-    if (fs.existsSync(path.join(wt, main))) {
-      const d = git(['diff', '--no-index', '--stat',
-        path.join(ROOT, main), path.join(wt, main)], wt);
-      if (d) console.log(d);
-    }
+    const stat = git(['diff', '--stat'], wt);
+    console.log(stat || '  (no textual diff)');
     console.log('');
     console.log(`changed: ${changed.map((f) => f.path).join(', ')}`);
-    console.log(`  ${git(['diff', '--stat'], wt) || '(untracked — read the file)'}`);
+    const gameLines = stat.split('\n').filter((l) => l.includes(`games/${id}/index.js`))[0] || '';
+    const m = gameLines.match(/(\d+) insertions?/);
+    if (m && Number(m[1]) > 400) {
+      console.log('');
+      console.log(`That is a ${m[1]}-line change to a file the card caps at ${cardCap(wt, id)}.`);
+      console.log('Read it before merging, and check it did not simply rewrite the scaffold.');
+    }
   }
 
   console.log('');
@@ -228,8 +253,12 @@ function review(id) {
     console.log('');
     console.log('Then merge by hand. This script will not do it for you:');
     console.log('');
-    console.log(`  git checkout games/${id}/index.js && cp ${wt}/games/${id}/index.js games/${id}/index.js`);
-    console.log(`  git diff games/${id}/index.js        # read this before committing`);
+    console.log(`  cp ${wt}/games/${id}/index.js games/${id}/index.js`);
+    console.log(`  cp ${wt}/games/${id}/scenarios.json games/${id}/scenarios.json`);
+    console.log(`  git diff --stat                 # read this before committing`);
+    console.log('');
+    console.log('and when you are done with the sandbox:');
+    console.log('');
     console.log(`  git worktree remove --force ${wt} && git branch -D build/${id}`);
   }
   return rc;
