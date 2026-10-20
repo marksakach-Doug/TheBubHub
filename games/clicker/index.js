@@ -155,7 +155,7 @@ export function mount(root, api) {
   const scoreBig = el('font-size:48px;font-weight:700;');
   const moreSmall = el('font-size:18px;opacity:.8;');
   const nextBtn = el('font:inherit;font-size:18px;padding:10px 20px;border-radius:8px;border:none;background:#4cd137;color:#111;cursor:pointer;', 'NEXT', 'button');
-  nextBtn.addEventListener('click', () => api.send({ a: 'next' }));
+  nextBtn.addEventListener('pointerdown', () => api.send({ a: 'next' }));
   card.append(scoreBig, moreSmall, nextBtn);
 
   const bar = el('display:flex;align-items:center;gap:10px;margin-top:12px;');
