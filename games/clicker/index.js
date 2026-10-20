@@ -163,7 +163,7 @@ export function mount(root, api) {
     + 'border-radius:10px;border:1px solid #3a465f;background:#232c3f;color:#e8ecf4;cursor:pointer;', 'Reset run', 'button');
   reset.addEventListener('click', () => api.send({ a: 'reset' }));
 ;
-  bar.append(reset, legend);
+  bar.append(reset);
 
   // Block page gestures (scroll/zoom/double-tap) everywhere except the reset button.
   ['touchstart', 'touchend'].forEach((t) => wrap.addEventListener(t, (e) => {
