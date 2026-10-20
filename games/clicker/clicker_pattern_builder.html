@@ -1,0 +1,683 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>Clicker Pattern Builder</title>
+  <script src="https://cdn.tailwindcss.com"></script>
+  <style>
+    /* Custom styling matching Clicker dark palette */
+    body {
+      background-color: #161c28;
+      color: #e8ecf4;
+      font-family: system-ui, -apple-system, Segoe UI, Roboto, sans-serif;
+      user-select: none;
+      -webkit-user-select: none;
+    }
+    .panel {
+      background-color: #1d2434;
+      border: 1px solid #2b3448;
+    }
+    .cell-btn {
+      background-color: #232c3f;
+      border: 1px solid #2b3448;
+      transition: background-color 0.1s ease, transform 0.08s ease, box-shadow 0.1s ease;
+    }
+    .cell-btn:hover {
+      border-color: #4a5a7a;
+    }
+    .cell-btn:active {
+      transform: scale(0.92);
+    }
+    .cell-red {
+      background-color: #ff4d4d !important;
+      color: #111827 !important;
+      border-color: #ff8080 !important;
+      box-shadow: 0 0 12px rgba(255, 77, 77, 0.45);
+    }
+    .cell-yellow {
+      background-color: #facc15 !important;
+      color: #111827 !important;
+      border-color: #fde047 !important;
+      box-shadow: 0 0 10px rgba(250, 204, 21, 0.35);
+    }
+    .cell-blue {
+      background-color: #2f6bd8 !important;
+      color: #ffffff !important;
+      border-color: #60a5fa !important;
+    }
+    .cell-done {
+      background-color: #1a2130 !important;
+      color: #5a6b8c !important;
+      border-color: #252f42 !important;
+    }
+    /* Custom scrollbar for pattern list and code box */
+    ::-webkit-scrollbar {
+      width: 6px;
+      height: 6px;
+    }
+    ::-webkit-scrollbar-track {
+      background: #161c28;
+    }
+    ::-webkit-scrollbar-thumb {
+      background: #2b3448;
+      border-radius: 3px;
+    }
+    ::-webkit-scrollbar-thumb:hover {
+      background: #3a465f;
+    }
+  </style>
+</head>
+<body class="min-h-screen p-4 md:p-6 flex flex-col items-center">
+
+  <!-- Main Container -->
+  <div class="w-full max-w-5xl grid grid-cols-1 lg:grid-cols-12 gap-6">
+
+    <!-- Left Column: 9x9 Grid & Transport Controls -->
+    <div class="lg:col-span-7 flex flex-col gap-4">
+      
+      <!-- Top Bar -->
+      <div class="panel rounded-xl p-4 flex flex-wrap items-center justify-between gap-3">
+        <div class="flex items-center gap-3">
+          <span class="text-2xl">🎯</span>
+          <div>
+            <h1 class="text-lg font-bold tracking-tight">Pattern Builder</h1>
+            <p id="noteReadout" class="text-xs text-slate-400 font-mono">Click cells to voice notes (0 / 81)</p>
+          </div>
+        </div>
+
+        <div class="flex items-center gap-2">
+          <span id="stepBadge" class="px-3 py-1 rounded-lg bg-[#232c3f] border border-[#3a465f] text-sm font-bold font-mono">
+            0 steps
+          </span>
+        </div>
+      </div>
+
+      <!-- 9x9 Interactive Board Wrapper -->
+      <div class="panel rounded-xl p-4 flex flex-col items-center relative">
+        <div class="w-full max-w-[460px] aspect-square relative">
+          <!-- SVG overlay for optional path visualization -->
+          <svg id="pathSvg" class="
+            pointer-events-none absolute inset-0 w-full h-full z-10
+          " viewBox="0 0 900 900"></svg>
+
+          <!-- 9x9 Grid -->
+          <div id="grid" class="grid grid-cols-9 gap-1.5 w-full h-full"></div>
+        </div>
+
+        <!-- Pitch Legend -->
+        <div class="w-full max-w-[460px] flex justify-between items-center text-[11px] text-slate-400 font-mono mt-3 px-1">
+          <span>Top Row: E5 (659Hz)</span>
+          <label class="flex items-center gap-1.5 cursor-pointer select-none">
+            <input type="checkbox" id="showLinesToggle" checked class="rounded bg-[#232c3f] border-[#3a465f]">
+            <span>Show path lines</span>
+          </label>
+          <span>Bottom Row: A3 (220Hz)</span>
+        </div>
+      </div>
+
+      <!-- Transport & Edit Controls -->
+      <div class="panel rounded-xl p-4 flex flex-col gap-4">
+        <div class="flex flex-wrap items-center justify-between gap-2">
+          <div class="flex items-center gap-2">
+            <button id="playBtn" class="px-4 py-2 rounded-lg font-bold text-sm bg-[#4cd137] text-slate-950 hover:brightness-110 active:scale-95 transition">
+              ▶ Play
+            </button>
+            <button id="stopBtn" class="px-3 py-2 rounded-lg font-semibold text-sm bg-[#232c3f] border border-[#3a465f] hover:bg-[#2c374f] active:scale-95 transition">
+              ■ Stop
+            </button>
+            <button id="undoBtn" class="px-3 py-2 rounded-lg font-semibold text-sm bg-[#232c3f] border border-[#3a465f] hover:bg-[#2c374f] active:scale-95 transition">
+              Undo
+            </button>
+            <button id="clearBtn" class="px-3 py-2 rounded-lg font-semibold text-sm bg-[#232c3f] border border-[#ff4d4d]/40 text-[#ff6b6b] hover:bg-[#ff4d4d]/10 active:scale-95 transition">
+              Clear
+            </button>
+          </div>
+
+          <!-- Tempo Slider -->
+          <div class="flex items-center gap-2 bg-[#161c28] px-3 py-1.5 rounded-lg border border-[#2b3448]">
+            <label for="bpmSlider" class="text-xs text-slate-400 font-mono">BPM</label>
+            <input id="bpmSlider" type="range" min="60" max="480" value="210" class="w-24 accent-[#facc15] cursor-pointer">
+            <span id="bpmValue" class="text-xs font-mono font-bold w-8 text-right">210</span>
+          </div>
+        </div>
+
+        <!-- Save Pattern Row -->
+        <div class="flex items-center gap-2 pt-2 border-t border-[#2b3448]">
+          <input id="patternNameInput" type="text" placeholder="Pattern title (optional)" 
+            class="flex-1 bg-[#161c28] border border-[#3a465f] rounded-lg px-3 py-2 text-sm text-slate-100 placeholder-slate-500 focus:outline-none focus:border-[#facc15]">
+          <button id="savePatternBtn" class="px-4 py-2 rounded-lg font-bold text-sm bg-[#2f6bd8] text-white hover:bg-[#3b7be8] active:scale-95 transition">
+            + Save to List
+          </button>
+          <button id="updatePatternBtn" class="hidden px-4 py-2 rounded-lg font-bold text-sm bg-[#facc15] text-slate-950 hover:brightness-110 active:scale-95 transition">
+            Update Slot
+          </button>
+        </div>
+      </div>
+
+    </div>
+
+    <!-- Right Column: Saved Patterns Bank & JS Export/Import -->
+    <div class="lg:col-span-5 flex flex-col gap-4">
+
+      <!-- Saved Patterns List -->
+      <div class="panel rounded-xl p-4 flex flex-col gap-3 flex-1 min-h-[260px]">
+        <div class="flex items-center justify-between">
+          <h2 class="text-sm font-bold uppercase tracking-wider text-slate-300">Saved Patterns Bank</h2>
+          <span id="bankCount" class="text-xs font-mono text-slate-400">0 patterns</span>
+        </div>
+
+        <div id="patternList" class="flex-1 overflow-y-auto max-h-[280px] flex flex-col gap-2 pr-1"></div>
+      </div>
+
+      <!-- JS Array Export / Import -->
+      <div class="panel rounded-xl p-4 flex flex-col gap-3">
+        <div class="flex items-center justify-between">
+          <h2 class="text-sm font-bold uppercase tracking-wider text-slate-300">PATTERNS Code</h2>
+          <div class="flex items-center gap-2">
+            <button id="importBtn" class="px-2.5 py-1 rounded-md text-xs font-semibold bg-[#232c3f] border border-[#3a465f] hover:bg-[#2c374f] transition">
+              Load from Box
+            </button>
+            <button id="copyBtn" class="px-3 py-1 rounded-md text-xs font-bold bg-[#4cd137] text-slate-950 hover:brightness-110 transition">
+              Copy JS
+            </button>
+          </div>
+        </div>
+
+        <textarea id="codeBox" rows="9" spellcheck="false"
+          class="w-full bg-[#161c28] border border-[#2b3448] rounded-lg p-3 font-mono text-xs text-emerald-300 focus:outline-none focus:border-[#4cd137] resize-y"
+          placeholder="const PATTERNS = [];"></textarea>
+
+        <div id="statusMsg" class="text-xs font-mono text-slate-400 min-h-[16px]"></div>
+      </div>
+
+    </div>
+
+  </div>
+
+  <script>
+    // Constants matching Clicker index.js
+    const GRID = 9;
+    const CELLS = GRID * GRID;
+    const SCALE = [220, 246.94, 277.18, 329.63, 369.99, 440, 493.88, 554.37, 659.25];
+    const NOTE_NAMES = ['A3', 'B3', 'C#4', 'E4', 'F#4', 'A4', 'B4', 'C#5', 'E5'];
+
+    // State
+    let currentSeq = [];
+    let savedPatterns = [];
+    let editingIndex = -1;
+    let isPlaying = false;
+    let playStep = 0;
+    let playTimer = null;
+    let actx = null;
+
+    // DOM Elements
+    const gridEl = document.getElementById('grid');
+    const pathSvg = document.getElementById('pathSvg');
+    const stepBadge = document.getElementById('stepBadge');
+    const noteReadout = document.getElementById('noteReadout');
+    const playBtn = document.getElementById('playBtn');
+    const stopBtn = document.getElementById('stopBtn');
+    const undoBtn = document.getElementById('undoBtn');
+    const clearBtn = document.getElementById('clearBtn');
+    const bpmSlider = document.getElementById('bpmSlider');
+    const bpmValue = document.getElementById('bpmValue');
+    const showLinesToggle = document.getElementById('showLinesToggle');
+    const patternNameInput = document.getElementById('patternNameInput');
+    const savePatternBtn = document.getElementById('savePatternBtn');
+    const updatePatternBtn = document.getElementById('updatePatternBtn');
+    const patternList = document.getElementById('patternList');
+    const bankCount = document.getElementById('bankCount');
+    const codeBox = document.getElementById('codeBox');
+    const copyBtn = document.getElementById('copyBtn');
+    const importBtn = document.getElementById('importBtn');
+    const statusMsg = document.getElementById('statusMsg');
+
+    const cellButtons = [];
+
+    function cellAt(cell) {
+      return { col: cell % GRID, row: Math.floor(cell / GRID) };
+    }
+
+    // Web Audio API Counterpoint Synthesizer (identical to Clicker)
+    function voice(freq, pan, gainVal, dur, type = 'triangle', delay = 0) {
+      try {
+        if (!actx) actx = new (window.AudioContext || window.webkitAudioContext)();
+        if (actx.state === 'suspended') actx.resume();
+        const t = actx.currentTime + delay;
+        const osc = actx.createOscillator();
+        const g = actx.createGain();
+        osc.type = type;
+        osc.frequency.setValueAtTime(freq, t);
+        g.gain.setValueAtTime(0.0001, t);
+        g.gain.linearRampToValueAtTime(gainVal, t + 0.012);
+        g.gain.exponentialRampToValueAtTime(0.0001, t + dur);
+        if (actx.createStereoPanner) {
+          const p = actx.createStereoPanner();
+          p.pan.setValueAtTime(pan, t);
+          osc.connect(g).connect(p).connect(actx.destination);
+        } else {
+          osc.connect(g).connect(actx.destination);
+        }
+        osc.start(t);
+        osc.stop(t + dur + 0.02);
+      } catch (_) {}
+    }
+
+    function playCounterpoint(redCell, yellowCell) {
+      const r = cellAt(redCell);
+      const rFreq = SCALE[GRID - 1 - r.row] * (1 + (r.col - 4) * 0.015);
+      const rPan = ((r.col / (GRID - 1)) * 2 - 1) * 0.75;
+      voice(rFreq, rPan, 0.16, 0.19, 'triangle', 0);
+
+      if (yellowCell != null) {
+        const y = cellAt(yellowCell);
+        const yFreq = SCALE[GRID - 1 - y.row] * 1.5 * (1 + (y.col - 4) * 0.015);
+        const yPan = ((y.col / (GRID - 1)) * 2 - 1) * 0.75;
+        voice(yFreq, yPan, 0.075, 0.28, 'sine', 0.045);
+      }
+    }
+
+    function describeCellNote(cell) {
+      const { col, row } = cellAt(cell);
+      const name = NOTE_NAMES[GRID - 1 - row];
+      const freq = (SCALE[GRID - 1 - row] * (1 + (col - 4) * 0.015)).toFixed(1);
+      return `Cell ${cell} (r${row + 1}:c${col + 1}) | ${name} (${freq}Hz)`;
+    }
+
+    // Build 9x9 Grid UI
+    function initGrid() {
+      gridEl.innerHTML = '';
+      for (let i = 0; i < CELLS; i++) {
+        const btn = document.createElement('button');
+        btn.type = 'button';
+        btn.className = 'cell-btn rounded-lg flex flex-col items-center justify-center font-mono font-bold text-xs relative';
+        btn.addEventListener('pointerdown', (e) => {
+          if (e.button) return;
+          e.preventDefault();
+          onCellClick(i);
+        });
+        cellButtons.push(btn);
+        gridEl.appendChild(btn);
+      }
+    }
+
+    // Handle clicking a cell in the 9x9 grid
+    function onCellClick(cellIndex) {
+      if (isPlaying) stopPlayback();
+
+      const existingIdx = currentSeq.indexOf(cellIndex);
+
+      if (existingIdx === -1) {
+        // Add new cell to sequence
+        const prevCell = currentSeq.length > 0 ? currentSeq[currentSeq.length - 1] : null;
+        currentSeq.push(cellIndex);
+
+        // Audition the harmony: if there was a previous cell, hear how prev (Red) -> new (Yellow) sounds,
+        // and also hear the new cell's own root note clearly
+        if (prevCell !== null) {
+          playCounterpoint(prevCell, cellIndex);
+        } else {
+          playCounterpoint(cellIndex, null);
+        }
+        noteReadout.textContent = describeCellNote(cellIndex);
+      } else if (existingIdx === currentSeq.length - 1) {
+        // Clicking the last step pops it off
+        currentSeq.pop();
+        voice(130, 0, 0.08, 0.08, 'sine', 0);
+        noteReadout.textContent = currentSeq.length > 0
+          ? describeCellNote(currentSeq[currentSeq.length - 1])
+          : 'Removed last step';
+      } else {
+        // Clicking an earlier step auditions its counterpoint to the next step and trims if Shift is held
+        const nextCell = currentSeq[existingIdx + 1] ?? null;
+        playCounterpoint(cellIndex, nextCell);
+        noteReadout.textContent = `Step ${existingIdx + 1}: ` + describeCellNote(cellIndex) + ' (click last step to remove)';
+      }
+
+      renderBoard();
+      updateCodeOutput();
+    }
+
+    // Render board colors, numbers, and SVG path lines
+    function renderBoard() {
+      const activeIdx = isPlaying ? playStep : 0;
+
+      for (let i = 0; i < CELLS; i++) {
+        const btn = cellButtons[i];
+        btn.className = 'cell-btn rounded-lg flex flex-col items-center justify-center font-mono font-bold text-xs relative';
+        btn.textContent = '';
+      }
+
+      currentSeq.forEach((cell, idx) => {
+        const btn = cellButtons[cell];
+        btn.textContent = idx + 1;
+
+        if (isPlaying) {
+          if (idx < activeIdx) {
+            btn.classList.add('cell-done');
+          } else if (idx === activeIdx) {
+            btn.classList.add('cell-red');
+          } else if (idx === activeIdx + 1) {
+            btn.classList.add('cell-yellow');
+          } else {
+            btn.classList.add('cell-blue');
+          }
+        } else {
+          // Compose view: highlight latest two or first two
+          if (idx === 0) {
+            btn.classList.add('cell-red');
+          } else if (idx === 1) {
+            btn.classList.add('cell-yellow');
+          } else {
+            btn.classList.add('cell-blue');
+          }
+        }
+      });
+
+      stepBadge.textContent = `${currentSeq.length} step${currentSeq.length === 1 ? '' : 's'}`;
+      renderSvgLines(activeIdx);
+    }
+
+    function renderSvgLines(activeIdx = 0) {
+      pathSvg.innerHTML = '';
+      if (!showLinesToggle.checked || currentSeq.length < 2) return;
+
+      for (let i = 0; i < currentSeq.length - 1; i++) {
+        const a = cellAt(currentSeq[i]);
+        const b = cellAt(currentSeq[i + 1]);
+        const x1 = a.col * 100 + 50;
+        const y1 = a.row * 100 + 50;
+        const x2 = b.col * 100 + 50;
+        const y2 = b.row * 100 + 50;
+
+        const line = document.createElementNS('http://www.w3.org/2000/svg', 'line');
+        line.setAttribute('x1', x1);
+        line.setAttribute('y1', y1);
+        line.setAttribute('x2', x2);
+        line.setAttribute('y2', y2);
+
+        const isCurrentTransition = isPlaying ? (i === activeIdx) : (i === currentSeq.length - 2);
+        line.setAttribute('stroke', isCurrentTransition ? '#facc15' : 'rgba(232, 236, 244, 0.28)');
+        line.setAttribute('stroke-width', isCurrentTransition ? '5' : '3');
+        line.setAttribute('stroke-linecap', 'round');
+        pathSvg.appendChild(line);
+      }
+    }
+
+    // Playback Engine
+    function startPlayback() {
+      if (currentSeq.length === 0) return;
+      stopPlayback();
+      isPlaying = true;
+      playStep = 0;
+      playBtn.textContent = '⏸ Playing';
+
+      function tick() {
+        if (!isPlaying) return;
+        if (playStep >= currentSeq.length) {
+          stopPlayback();
+          return;
+        }
+        const redCell = currentSeq[playStep];
+        const yellowCell = playStep + 1 < currentSeq.length ? currentSeq[playStep + 1] : null;
+        playCounterpoint(redCell, yellowCell);
+        noteReadout.textContent = `Step ${playStep + 1}/${currentSeq.length}: ` + describeCellNote(redCell);
+        renderBoard();
+
+        playStep++;
+        const bpm = Number(bpmSlider.value) || 210;
+        const intervalMs = Math.round(60000 / bpm);
+        playTimer = setTimeout(tick, intervalMs);
+      }
+
+      tick();
+    }
+
+    function stopPlayback() {
+      isPlaying = false;
+      if (playTimer) {
+        clearTimeout(playTimer);
+        playTimer = null;
+      }
+      playStep = 0;
+      playBtn.textContent = '▶ Play';
+      renderBoard();
+    }
+
+    // Pattern Bank Management
+    function renderPatternBank() {
+      patternList.innerHTML = '';
+      bankCount.textContent = `${savedPatterns.length} pattern${savedPatterns.length === 1 ? '' : 's'}`;
+
+      if (savedPatterns.length === 0) {
+        const empty = document.createElement('div');
+        empty.className = 'text-xs text-slate-500 italic py-8 text-center';
+        empty.textContent = 'No saved patterns yet. Build a sequence on the grid and click "+ Save to List".';
+        patternList.appendChild(empty);
+        return;
+      }
+
+      savedPatterns.forEach((item, idx) => {
+        const row = document.createElement('div');
+        const isEditing = idx === editingIndex;
+        row.className = `flex items-center justify-between gap-2 p-2.5 rounded-lg border ${
+          isEditing ? 'bg-[#28334a] border-[#facc15]' : 'bg-[#161c28] border-[#2b3448]'
+        }`;
+
+        const info = document.createElement('div');
+        info.className = 'flex flex-col min-w-0 flex-1 cursor-pointer';
+        info.innerHTML = `
+          <div class="flex items-center gap-2">
+            <span class="text-xs font-mono font-bold text-[#facc15]">#${idx + 1}</span>
+            <span class="text-xs font-semibold truncate">${item.name || ('Pattern ' + (idx + 1))}</span>
+            <span class="text-[11px] font-mono text-slate-400">(${item.cells.length} steps)</span>
+          </div>
+          <div class="text-[11px] font-mono text-slate-500 truncate">[${item.cells.join(', ')}]</div>
+        `;
+        info.addEventListener('click', () => loadPatternFromBank(idx));
+
+        const actions = document.createElement('div');
+        actions.className = 'flex items-center gap-1';
+
+        const upBtn = document.createElement('button');
+        upBtn.className = 'px-2 py-1 text-xs rounded bg-[#232c3f] hover:bg-[#2c374f] text-slate-300';
+        upBtn.textContent = '↑';
+        upBtn.title = 'Move Up';
+        upBtn.addEventListener('click', () => movePattern(idx, -1));
+
+        const downBtn = document.createElement('button');
+        downBtn.className = 'px-2 py-1 text-xs rounded bg-[#232c3f] hover:bg-[#2c374f] text-slate-300';
+        downBtn.textContent = '↓';
+        downBtn.title = 'Move Down';
+        downBtn.addEventListener('click', () => movePattern(idx, 1));
+
+        const delBtn = document.createElement('button');
+        delBtn.className = 'px-2 py-1 text-xs rounded bg-[#232c3f] hover:bg-[#ff4d4d]/20 text-[#ff6b6b]';
+        delBtn.textContent = '✕';
+        delBtn.title = 'Delete';
+        delBtn.addEventListener('click', () => deletePattern(idx));
+
+        actions.append(upBtn, downBtn, delBtn);
+        row.append(info, actions);
+        patternList.appendChild(row);
+      });
+    }
+
+    function loadPatternFromBank(idx) {
+      stopPlayback();
+      const item = savedPatterns[idx];
+      if (!item) return;
+      currentSeq = [...item.cells];
+      editingIndex = idx;
+      patternNameInput.value = item.name || '';
+      updatePatternBtn.classList.remove('hidden');
+      renderBoard();
+      renderPatternBank();
+      updateCodeOutput();
+      setStatus(`Loaded pattern #${idx + 1} (${currentSeq.length} steps).`);
+    }
+
+    function movePattern(idx, dir) {
+      const target = idx + dir;
+      if (target < 0 || target >= savedPatterns.length) return;
+      const temp = savedPatterns[idx];
+      savedPatterns[idx] = savedPatterns[target];
+      savedPatterns[target] = temp;
+      if (editingIndex === idx) editingIndex = target;
+      else if (editingIndex === target) editingIndex = idx;
+      renderPatternBank();
+      updateCodeOutput();
+    }
+
+    function deletePattern(idx) {
+      savedPatterns.splice(idx, 1);
+      if (editingIndex === idx) {
+        editingIndex = -1;
+        updatePatternBtn.classList.add('hidden');
+      } else if (editingIndex > idx) {
+        editingIndex--;
+      }
+      renderPatternBank();
+      updateCodeOutput();
+    }
+
+    function updateCodeOutput() {
+      // Export savedPatterns if any exist, otherwise export currentSeq as single pattern
+      const listToExport = savedPatterns.length > 0
+        ? savedPatterns.map((p) => p.cells)
+        : (currentSeq.length > 0 ? [currentSeq] : []);
+
+      const lines = listToExport.map((arr, i) => {
+        const comment = savedPatterns[i] && savedPatterns[i].name ? ` // ${savedPatterns[i].name}` : '';
+        return `  [${arr.join(', ')}]${i < listToExport.length - 1 ? ',' : ''}${comment}`;
+      });
+
+      codeBox.value = lines.length > 0
+        ? `const PATTERNS = [\n${lines.join('\n')}\n];`
+        : `const PATTERNS = [];`;
+    }
+
+    function setStatus(text, isError = false) {
+      statusMsg.textContent = text;
+      statusMsg.className = `text-xs font-mono min-h-[16px] ${isError ? 'text-[#ff6b6b]' : 'text-[#8ef5a0]'}`;
+    }
+
+    // Event Listeners
+    playBtn.addEventListener('click', () => {
+      if (isPlaying) stopPlayback();
+      else startPlayback();
+    });
+
+    stopBtn.addEventListener('click', stopPlayback);
+
+    undoBtn.addEventListener('click', () => {
+      stopPlayback();
+      if (currentSeq.length > 0) {
+        currentSeq.pop();
+        renderBoard();
+        updateCodeOutput();
+      }
+    });
+
+    clearBtn.addEventListener('click', () => {
+      stopPlayback();
+      currentSeq = [];
+      editingIndex = -1;
+      patternNameInput.value = '';
+      updatePatternBtn.classList.add('hidden');
+      renderBoard();
+      renderPatternBank();
+      updateCodeOutput();
+      noteReadout.textContent = 'Board cleared';
+    });
+
+    bpmSlider.addEventListener('input', () => {
+      bpmValue.textContent = bpmSlider.value;
+    });
+
+    showLinesToggle.addEventListener('change', () => renderSvgLines(isPlaying ? playStep : 0));
+
+    savePatternBtn.addEventListener('click', () => {
+      if (currentSeq.length === 0) {
+        setStatus('Click some cells on the grid first.', true);
+        return;
+      }
+      const name = patternNameInput.value.trim() || `Melody ${savedPatterns.length + 1}`;
+      savedPatterns.push({ name, cells: [...currentSeq] });
+      editingIndex = savedPatterns.length - 1;
+      updatePatternBtn.classList.remove('hidden');
+      renderPatternBank();
+      updateCodeOutput();
+      setStatus(`Saved "${name}" (${currentSeq.length} steps).`);
+    });
+
+    updatePatternBtn.addEventListener('click', () => {
+      if (editingIndex < 0 || editingIndex >= savedPatterns.length) return;
+      if (currentSeq.length === 0) {
+        setStatus('Cannot update slot with an empty sequence.', true);
+        return;
+      }
+      const name = patternNameInput.value.trim() || `Melody ${editingIndex + 1}`;
+      savedPatterns[editingIndex] = { name, cells: [...currentSeq] };
+      renderPatternBank();
+      updateCodeOutput();
+      setStatus(`Updated slot #${editingIndex + 1} ("${name}").`);
+    });
+
+    copyBtn.addEventListener('click', () => {
+      codeBox.select();
+      document.execCommand('copy');
+      setStatus('Copied PATTERNS array to clipboard.');
+    });
+
+    importBtn.addEventListener('click', () => {
+      try {
+        const raw = codeBox.value.trim();
+        // Extract array literal inside brackets
+        const start = raw.indexOf('[');
+        const end = raw.lastIndexOf(']');
+        if (start === -1 || end === -1 || end <= start) {
+          setStatus('Could not find a valid array in the box.', true);
+          return;
+        }
+        const jsonReady = raw.slice(start, end + 1)
+          .replace(/\/\/.*$/gm, '')
+          .replace(/,\s*([\]}])/g, '$1');
+        const parsed = JSON.parse(jsonReady);
+        if (!Array.isArray(parsed)) throw new Error('Not an array');
+
+        // Support either 1D array [1, 2, 3] or 2D array [[1, 2], [3, 4]]
+        if (parsed.length > 0 && typeof parsed[0] === 'number') {
+          const valid = parsed.filter((n) => Number.isInteger(n) && n >= 0 && n < CELLS);
+          currentSeq = valid;
+          savedPatterns = [{ name: 'Imported 1', cells: [...valid] }];
+        } else {
+          savedPatterns = parsed
+            .filter((row) => Array.isArray(row))
+            .map((row, idx) => ({
+              name: `Pattern ${idx + 1}`,
+              cells: row.filter((n) => Number.isInteger(n) && n >= 0 && n < CELLS)
+            }))
+            .filter((p) => p.cells.length > 0);
+          currentSeq = savedPatterns.length > 0 ? [...savedPatterns[0].cells] : [];
+        }
+        editingIndex = savedPatterns.length > 0 ? 0 : -1;
+        updatePatternBtn.classList.toggle('hidden', editingIndex === -1);
+        renderBoard();
+        renderPatternBank();
+        updateCodeOutput();
+        setStatus(`Loaded ${savedPatterns.length} pattern(s) from code box.`);
+      } catch (err) {
+        setStatus('Invalid array format. Expected [[0, 1, 2], [4, 5, 6]].', true);
+      }
+    });
+
+    // Initialize
+    initGrid();
+    renderBoard();
+    renderPatternBank();
+    updateCodeOutput();
+  </script>
+</body>
+</html>
