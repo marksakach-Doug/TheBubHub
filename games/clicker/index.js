@@ -6,11 +6,20 @@ const BG = '#1d2434';
 const COLOURS = { red: '#ff4d4d', yellow: '#facc15', blue: '#2f6bd8' };
 const SCALE = [220, 246.94, 277.18, 329.63, 369.99, 440, 493.88, 554.37, 659.25];
 
-// Paste exported patterns from pattern-builder.html here:
+// Paste exported array from pattern-builder.html here:
 const PATTERNS = [
-  [36, 38, 40, 22, 4, 20, 36],
-  [72, 64, 56, 48, 40, 32, 24, 16, 8],
-  [40, 31, 22, 32, 42, 50, 48, 39, 30, 40]
+  [72, 54, 27, 9, 19, 29, 37, 47, 39, 31, 32, 42, 52, 62], // Melody 1
+  [80, 0], // Melody 2
+  [72, 8, 15, 23, 31, 50, 42, 34, 51, 43, 35, 60, 52, 44, 69, 61, 53], // Melody 3
+  [72, 0, 10, 20, 12, 4, 14, 24, 16, 8], // Melody 4
+  [72, 56, 46, 37, 2, 21, 4, 31, 39, 47], // Melody 5
+  [0, 9, 10, 2, 11, 3, 12, 13, 14, 15, 16, 8, 7, 6, 17, 24, 26, 34, 25, 33, 35], // Melody 6
+  [72, 8, 64, 16, 56, 24, 48], // Melody 7
+  [39, 41], // Melody 8
+  [40], // Melody 9
+  [72, 36, 56], // Melody 10
+  [36, 56, 39, 46], // Melody 11
+  [14, 24, 34, 41, 33, 25, 15] // Melody 12
 ];
 
 export const meta = {
@@ -25,14 +34,8 @@ export const meta = {
 
 function deal(rng, level, mode) {
   if (mode === 'patterns' && PATTERNS.length > 0) {
-    const pat = PATTERNS[(level - 1) % PATTERNS.length];
-    if (pat && pat.length > 0) {
-      const out = [];
-      for (let i = 0; i < Math.min(level, MAX_LEVEL); i++) {
-        out.push(pat[i % pat.length]);
-      }
-      return out;
-    }
+    const p = PATTERNS[(level - 1) % PATTERNS.length];
+    if (Array.isArray(p) && p.length > 0) return p.slice(0, MAX_LEVEL);
   }
   const free = Array.from({ length: CELLS }, (_, i) => i);
   for (let i = CELLS - 1; i > 0; i--) {
@@ -43,17 +46,8 @@ function deal(rng, level, mode) {
 }
 
 const freshRun = (rng, mode = null) => ({
-  mode,
-  score: 0,
-  queue: mode ? deal(rng, 1, mode) : [],
-  step: 0,
-  paused: false,
-  timedOut: false,
-  won: false,
-  last: null,
-  run: 1,
-  t0: 0,
-  cadence: 0
+  mode, score: 0, queue: mode ? deal(rng, 1, mode) : [], step: 0,
+  paused: false, timedOut: false, won: false, last: null, run: 1
 });
 
 export function init(ctx) {
@@ -70,12 +64,11 @@ export function reduce(state, action, ctx) {
   const same = (extra) => ({ ...state, ...extra });
   const over = state.timedOut || state.won;
 
-  if (!id) return { error: 'No identity.' };
-  if (!state.players.includes(id)) return { error: 'Not seated.' };
+  if (!id) return { error: 'No identity. Reopen the game.' };
+  if (!state.players.includes(id)) return { error: 'You are watching. Not seated.' };
 
   if (kind === 'mode') {
-    const m = action.mode;
-    if (m !== 'tempo' && m !== 'fork' && m !== 'patterns') return state;
+    const m = ['tempo', 'fork', 'patterns'].includes(action.mode) ? action.mode : 'tempo';
     return { ...freshRun(rng, m), players: state.players, run: state.run + 1 };
   }
   if (kind === 'menu') {
@@ -83,63 +76,34 @@ export function reduce(state, action, ctx) {
   }
   if (kind === 'reset') {
     return {
-      ...freshRun(rng, state.mode), players: state.players, run: state.run + 1,
+      ...freshRun(rng, state.mode || 'tempo'), players: state.players, run: state.run + 1,
       last: over ? state.last : { score: state.score }
     };
   }
   if (kind === 'timeout') return over ? state : same({ timedOut: true, last: { score: state.score } });
   if (kind === 'next') {
-    if (!state.paused) return state;
-    const nextLvl = state.score + 1;
-    return same({ paused: false, queue: deal(rng, nextLvl, state.mode), step: 0, t0: 0, cadence: 0 });
+    return state.paused
+      ? same({ paused: false, queue: deal(rng, state.score + 1, state.mode), step: 0 })
+      : state;
   }
-  if (kind !== 'hit') return { error: 'Unknown action' };
+  if (kind !== 'hit') return { error: 'Unknown action: ' + kind };
   if (!state.mode || state.timedOut || state.won) return state;
 
   const queue = state.queue.slice();
   const cell = Number(action.cell);
-  const now = Number(action.t) || 0;
   if (!(cell >= 0 && cell < CELLS) || state.step >= queue.length) return state;
 
-  if (state.mode === 'fork' && state.step > 0 && queue[state.step] !== cell) {
-    return state;
-  }
-  if (queue[state.step] !== cell) return state;
-
-  // In Fork mode, player chooses which of the two yellows (step+1 or step+2) becomes the next Red
-  if (state.mode === 'fork' && action.pick !== undefined) {
-    const p = Number(action.pick);
-    if (state.step + 2 < queue.length && p === queue[state.step + 2]) {
-      const tmp = queue[state.step + 1];
-      queue[state.step + 1] = queue[state.step + 2];
-      queue[state.step + 2] = tmp;
-    }
-  }
-
-  // In Tempo mode, first two taps set cadence; later taps must stay near that rhythm
-  let t0 = state.t0;
-  let cadence = state.cadence;
-  if (state.mode === 'tempo' && now > 0) {
-    if (state.step === 0) {
-      t0 = now;
-      cadence = 0;
-    } else if (state.step === 1 && t0 > 0) {
-      cadence = Math.max(120, Math.min(2500, now - t0));
-      t0 = now;
-    } else if (cadence > 0 && t0 > 0) {
-      const dt = now - t0;
-      if (Math.abs(dt - cadence) > Math.max(220, cadence * 0.55)) {
-        return same({ timedOut: true, last: { score: state.score } });
-      }
-      t0 = now;
-    }
+  const isForkChoice = state.mode === 'fork' && state.step + 1 < queue.length && queue[state.step + 1] === cell;
+  if (queue[state.step] !== cell && !isForkChoice) return state;
+  if (isForkChoice) {
+    [queue[state.step], queue[state.step + 1]] = [queue[state.step + 1], queue[state.step]];
   }
 
   const step = state.step + 1;
-  if (step < queue.length) return same({ queue, step, t0, cadence, last: null });
+  if (step < queue.length) return same({ queue, step, last: null });
   const score = state.score + 1;
   const won = score >= MAX_LEVEL;
-  return same({ queue, score, step, t0, cadence, won, paused: !won, last: won ? { score } : null });
+  return same({ queue, score, step, won, paused: !won, last: won ? { score } : null });
 }
 
 export function project(state, playerId, api) {
@@ -147,7 +111,7 @@ export function project(state, playerId, api) {
   const fork = mode === 'fork';
   return {
     you: playerId || '',
-    mode,
+    mode: mode || null,
     level: Math.min(score + 1, MAX_LEVEL),
     score, step, paused,
     total: queue.length,
@@ -156,13 +120,12 @@ export function project(state, playerId, api) {
     levelMs: LEVEL_MS,
     run: state.run,
     last: state.last,
-    cells: paused || !mode ? [] : queue.map((cell, i) => {
+    cells: (paused || !mode) ? [] : queue.map((cell, i) => {
       const p = cellAt(cell);
-      const isYellow = fork ? (i === step + 1 || i === step + 2) : (i === step + 1);
-      return {
-        cell, col: p.col, row: p.row, done: i < step,
-        colour: i === step ? 'red' : isYellow ? 'yellow' : 'blue'
-      };
+      let colour = 'blue';
+      if (i === step || (fork && i === step + 1)) colour = 'red';
+      else if (i === step + 1 || (fork && (i === step + 2 || i === step + 3))) colour = 'yellow';
+      return { cell, col: p.col, row: p.row, done: i < step, colour };
     }),
     maxLevel: MAX_LEVEL,
     roster: (api && api.roster) || null
@@ -178,7 +141,7 @@ export const roundId = (state) => 'run' + ((state && state.run) || 1);
 export function summarize(state, nameOf) {
   const s = state.last ? state.last.score : 0;
   if (!(s > 0)) return null;
-  return `${nameOf(state.players[0])} scored ${s} in Clicker`;
+  return `${nameOf(state.players[0])} scored ${s} point${s === 1 ? '' : 's'} in Clicker, reaching level ${Math.min(s + 1, MAX_LEVEL)}`;
 }
 
 export function mount(root, api) {
@@ -190,71 +153,70 @@ export function mount(root, api) {
   };
 
   let actx = null;
-  function voice(freq, pan, gainVal, dur, type = 'triangle', delay = 0) {
+  function unlockAudio() {
     try {
       if (!actx) actx = new (window.AudioContext || window.webkitAudioContext)();
       if (actx.state === 'suspended') actx.resume();
+    } catch (_) {}
+  }
+
+  function voice(freq, gainVal, dur, type = 'triangle', delay = 0) {
+    try {
+      unlockAudio();
+      if (!actx) return;
       const t = actx.currentTime + delay;
       const osc = actx.createOscillator();
       const g = actx.createGain();
       osc.type = type;
       osc.frequency.setValueAtTime(freq, t);
       g.gain.setValueAtTime(0.0001, t);
-      g.gain.linearRampToValueAtTime(gainVal, t + 0.012);
+      g.gain.linearRampToValueAtTime(gainVal, t + 0.01);
       g.gain.exponentialRampToValueAtTime(0.0001, t + dur);
-      if (actx.createStereoPanner) {
-        const p = actx.createStereoPanner();
-        p.pan.setValueAtTime(pan, t);
-        osc.connect(g).connect(p).connect(actx.destination);
-      } else {
-        osc.connect(g).connect(actx.destination);
-      }
+      osc.connect(g);
+      g.connect(actx.destination);
       osc.start(t);
       osc.stop(t + dur + 0.02);
     } catch (_) {}
   }
 
-  function playCounterpoint(redCell, yellows) {
-    const r = cellAt(redCell);
+  function playCounterpoint(hitCell, nextCell) {
+    const r = cellAt(hitCell);
     const rFreq = SCALE[GRID - 1 - r.row] * (1 + (r.col - 4) * 0.015);
-    const rPan = ((r.col / (GRID - 1)) * 2 - 1) * 0.75;
-    voice(rFreq, rPan, 0.16, 0.19, 'triangle', 0);
-
-    (yellows || []).forEach((yCell, idx) => {
-      const y = cellAt(yCell);
+    voice(rFreq, 0.24, 0.18, 'triangle', 0);
+    if (nextCell != null) {
+      const y = cellAt(nextCell);
       const yFreq = SCALE[GRID - 1 - y.row] * 1.5 * (1 + (y.col - 4) * 0.015);
-      const yPan = ((y.col / (GRID - 1)) * 2 - 1) * 0.75;
-      voice(yFreq, yPan, 0.07, 0.28, 'sine', 0.045 + idx * 0.035);
-    });
+      voice(yFreq, 0.12, 0.26, 'sine', 0.045);
+    }
   }
 
   const wrap = el('position:relative;max-width:min(460px, 68vh);margin:0 auto;padding:12px 10px 18px;'
     + 'font-family:system-ui,-apple-system,Segoe UI,Roboto,sans-serif;color:#e8ecf4;'
     + 'user-select:none;-webkit-user-select:none;touch-action:none;');
 
-  const menu = el('display:flex;flex-direction:column;gap:10px;padding:24px;background:' + BG
-    + ';border:1px solid #2b3448;border-radius:12px;');
-  const btnCss = 'font:inherit;font-size:18px;font-weight:700;padding:14px;border-radius:10px;'
-    + 'border:1px solid #3a465f;background:#232c3f;color:#e8ecf4;cursor:pointer;';
-  [
-    ['tempo', 'Tempo'],
-    ['fork', 'Double Yellow'],
-    ['patterns', 'MarkDoug Patterns']
-  ].forEach(([m, label]) => {
-    const b = el(btnCss, label, 'button');
-    b.addEventListener('click', () => api.send({ a: 'mode', mode: m }));
-    menu.append(b);
+  const menu = el('display:flex;flex-direction:column;gap:10px;padding:24px 16px;background:rgba(29,36,52,.95);'
+    + 'border-radius:12px;border:1px solid #2b3448;');
+  [['tempo', 'Tempo'], ['fork', 'Fork'], ['patterns', 'Patterns']].forEach(([m, label]) => {
+    const btn = el('font:inherit;font-size:18px;font-weight:600;padding:14px;border-radius:8px;'
+      + 'border:1px solid #3a465f;background:#232c3f;color:#e8ecf4;cursor:pointer;', label, 'button');
+    btn.addEventListener('pointerdown', (e) => {
+      e.preventDefault();
+      unlockAudio();
+      api.send({ a: 'mode', mode: m });
+    });
+    menu.append(btn);
   });
 
   const board = el('display:none;grid-template-columns:repeat(' + GRID + ',1fr);'
     + 'gap:4px;width:100%;aspect-ratio:1/1;touch-action:none;padding:4px;border-radius:12px;'
-    + 'border:1px solid transparent;transition:border-color .3s ease;');
+    + 'border:2px solid transparent;transition:border-color .12s ease;');
   const cells = Array.from({ length: CELLS }, (_, i) => {
     const b = el('border-radius:8px;background:' + BG + ';border:1px solid #2b3448;'
       + 'cursor:pointer;touch-action:none;transition:background .1s ease,transform .08s ease;');
     b.addEventListener('pointerdown', (e) => {
       if (e.button) return;
       e.preventDefault();
+      unlockAudio();
       onTap(i);
     });
     return b;
@@ -265,35 +227,53 @@ export function mount(root, api) {
     + 'flex-direction:column;align-items:center;gap:12px;padding:26px;text-align:center;'
     + 'background:rgba(29,36,52,.95);border-radius:10px;box-shadow:0 8px 24px rgba(0,0,0,.4);z-index:10;');
   const scoreBig = el('font-size:48px;font-weight:700;');
-  const nextBtn = el('font:inherit;font-size:18px;padding:10px 20px;border-radius:8px;border:none;background:#4cd137;color:#111;cursor:pointer;', 'NEXT', 'button');
-  nextBtn.addEventListener('pointerdown', () => api.send({ a: 'next' }));
-  card.append(scoreBig, nextBtn);
+  const actionBtn = el('font:inherit;font-size:18px;padding:10px 20px;border-radius:8px;border:none;background:#4cd137;color:#111;cursor:pointer;', 'NEXT', 'button');
+  actionBtn.addEventListener('pointerdown', (e) => {
+    e.preventDefault();
+    unlockAudio();
+    if (view && (view.timedOut || view.won)) api.send({ a: 'reset' });
+    else api.send({ a: 'next' });
+  });
+  card.append(scoreBig, actionBtn);
 
-  const bar = el('display:none;justify-content:center;gap:10px;margin-top:12px;');
+  const bar = el('display:flex;justify-content:center;gap:10px;margin-top:12px;');
   const reset = el('font:inherit;font-size:15px;padding:9px 14px;min-height:40px;'
     + 'border-radius:10px;border:1px solid #3a465f;background:#232c3f;color:#e8ecf4;cursor:pointer;', 'Reset', 'button');
-  const modesBtn = el('font:inherit;font-size:15px;padding:9px 14px;min-height:40px;'
+  reset.addEventListener('pointerdown', (e) => { e.preventDefault(); unlockAudio(); api.send({ a: 'reset' }); });
+  const modeBtn = el('font:inherit;font-size:15px;padding:9px 14px;min-height:40px;'
     + 'border-radius:10px;border:1px solid #3a465f;background:#232c3f;color:#e8ecf4;cursor:pointer;', 'Modes', 'button');
-  reset.addEventListener('click', () => api.send({ a: 'reset' }));
-  modesBtn.addEventListener('click', () => api.send({ a: 'menu' }));
-  bar.append(reset, modesBtn);
+  modeBtn.addEventListener('pointerdown', (e) => { e.preventDefault(); unlockAudio(); api.send({ a: 'menu' }); });
+  bar.append(reset, modeBtn);
 
+  wrap.addEventListener('touchstart', () => unlockAudio(), { passive: true });
+  wrap.addEventListener('dblclick', (e) => e.preventDefault());
   wrap.append(menu, board, card, bar);
   root.append(wrap);
 
   let view = null, spectating = false, destroyed = false;
-  let clockKey = '', clockGen = 0, deadline = 0, nextPick = null;
+  let clockKey = '', clockGen = 0, deadline = 0;
+  let lastTapAt = 0, beatMs = 0;
 
   function startLevelClock(limitMs) {
     const gen = ++clockGen;
     deadline = Date.now() + limitMs;
+    lastTapAt = 0;
+    beatMs = 0;
     board.style.borderColor = 'transparent';
     function tick() {
       const now = Date.now();
       if (destroyed || gen !== clockGen || !view || view.timedOut || view.won || !view.mode) return;
       const rem = Math.max(0, deadline - now);
-      board.style.borderColor = rem <= 3500 ? 'rgba(255,77,77,.45)' : 'transparent';
-      if (rem > 0) api.setTimeout(tick, 100);
+      if (rem <= 3500) {
+        board.style.borderColor = 'rgba(255,77,77,.6)';
+      } else if (view.mode === 'tempo' && beatMs > 0 && lastTapAt > 0) {
+        const phase = (now - lastTapAt) % beatMs;
+        const onBeat = phase < beatMs * 0.22 || phase > beatMs * 0.78;
+        board.style.borderColor = onBeat ? 'rgba(76,209,55,.75)' : 'transparent';
+      } else {
+        board.style.borderColor = 'transparent';
+      }
+      if (rem > 0) api.setTimeout(tick, 40);
       else if (!spectating) api.send({ a: 'timeout' });
     }
     tick();
@@ -305,72 +285,70 @@ export function mount(root, api) {
     b.style.transform = 'scale(.92)';
     api.setTimeout(() => { b.style.transform = ''; }, 90);
 
-    const active = view.cells.filter((x) => !x.done);
-    const c = active.find((x) => x.cell === cell);
-    if (!c) {
-      voice(110, 0, 0.1, 0.09, 'sine', 0);
+    const c = view.cells.find((x) => x.cell === cell && !x.done);
+    if (!c || c.colour !== 'red') {
+      voice(110, 0.16, 0.09, 'sine', 0);
       return;
     }
-    if (view.mode === 'fork' && c.colour === 'yellow') {
-      nextPick = cell;
-      playCounterpoint(cell, []);
-      return;
+
+    const now = Date.now();
+    if (view.mode === 'tempo') {
+      if (view.step === 1 && lastTapAt > 0) {
+        beatMs = Math.max(160, Math.min(2000, now - lastTapAt));
+      } else if (view.step > 1 && beatMs > 0) {
+        const dt = now - lastTapAt;
+        if (dt < beatMs * 0.45 || dt > beatMs * 1.85) {
+          voice(110, 0.16, 0.09, 'sine', 0);
+          board.style.borderColor = '#facc15';
+          lastTapAt = now;
+          return;
+        }
+      }
+      lastTapAt = now;
     }
-    if (c.colour !== 'red') {
-      voice(110, 0, 0.1, 0.09, 'sine', 0);
-      return;
-    }
-    const yellows = active.filter((x) => x.colour === 'yellow').map((x) => x.cell);
-    playCounterpoint(cell, yellows);
-    const pick = nextPick;
-    nextPick = null;
-    api.send({ a: 'hit', cell, pick, t: Date.now() });
+
+    const next = view.cells.find((x) => !x.done && x.cell !== cell && (x.colour === 'red' || x.colour === 'yellow'));
+    playCounterpoint(cell, next ? next.cell : null);
+    api.send({ a: 'hit', cell });
   }
 
   function update(v) {
     view = v;
     spectating = !!api.isSpectator;
     const over = v.timedOut || v.won;
+    const inMenu = !v.mode;
 
-    if (!v.mode) {
-      clockGen++;
-      menu.style.display = 'flex';
-      board.style.display = 'none';
-      card.style.display = 'none';
-      bar.style.display = 'none';
-      return;
-    }
+    menu.style.display = inMenu ? 'flex' : 'none';
+    board.style.display = inMenu ? 'none' : 'grid';
+    bar.style.display = inMenu ? 'none' : 'flex';
 
-    menu.style.display = 'none';
-    board.style.display = 'grid';
-
-    const key = v.mode + ':' + v.run + ':' + v.level + ':' + (v.paused ? 'p' : 'c');
-    if (key !== clockKey && !over) {
+    const key = v.run + ':' + (v.mode || '') + ':' + v.level + ':' + (v.paused ? 'p' : 'c');
+    if (key !== clockKey && !over && !inMenu) {
       clockKey = key;
       if (!v.paused) startLevelClock(v.levelMs || LEVEL_MS);
     }
 
-    card.style.display = v.paused ? 'flex' : 'none';
-    if (over || v.paused) {
+    const showCard = !inMenu && (v.paused || over);
+    card.style.display = showCard ? 'flex' : 'none';
+    if (showCard || inMenu) {
       clockGen++;
-      board.style.borderColor = over && v.timedOut ? '#ff4d4d' : 'transparent';
+      board.style.borderColor = 'transparent';
     }
-    if (v.paused) scoreBig.textContent = v.score;
+    if (showCard) {
+      scoreBig.textContent = v.score;
+      actionBtn.textContent = over ? 'AGAIN' : 'NEXT';
+    }
 
-    const byCell = new Map();
-    v.cells.forEach((c) => {
-      if (!c.done && !byCell.has(c.cell)) byCell.set(c.cell, c);
-    });
+    const byCell = new Map(v.cells.map((c) => [c.cell, c]));
     cells.forEach((b, i) => {
       const c = byCell.get(i);
-      b.style.background = c ? COLOURS[c.colour] : BG;
+      b.style.background = c && !c.done ? COLOURS[c.colour] : BG;
     });
-    bar.style.display = (v.paused || over) ? 'flex' : 'none';
   }
 
   return {
     update,
-    denied() {},
+    denied: () => {},
     destroy() {
       destroyed = true;
       clockGen++;
