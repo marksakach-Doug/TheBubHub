@@ -21,13 +21,12 @@ const act = { from: { id: 'p1', host: true }, rng: seeded(11) };
 // return the state after it. Reading `queue` is what the test is allowed to do;
 // a real client only ever sees colours.
 function playLevel(st, c) {
-  // The bound is captured up front: clearing a level deals a NEW, longer queue,
-  // so re-reading st.queue.length would walk straight into the next level.
   const n = st.queue.length;
   for (let i = st.step; i < n; i++) {
     st = clicker.reduce(st, { a: 'hit', cell: st.queue[i] }, c || act);
     if (st.error) throw new Error('playLevel hit a denial: ' + st.error);
   }
+  if (st.paused) st = clicker.reduce(st, { a: 'next' }, c || act);
   return st;
 }
 
@@ -65,7 +64,6 @@ check('init seats one player from atTable and skips spectators', () => {
     rng: seeded(3)
   });
   assert.deepEqual(st.players, ['p1'], 'a spectator and the lobby must not be seated');
-  assert.equal(st.level, 1);
   assert.equal(st.score, 0);
   assert.equal(st.step, 0);
 });
@@ -84,10 +82,15 @@ check('level 1 scores a point on one click and grows the board', () => {
   const out = clicker.reduce(st, { a: 'hit', cell: st.queue[0] }, act);
   assert.notEqual(out, st, 'reduce must return a new state, not the old one');
   assert.equal(out.score, 1);
-  assert.equal(out.level, 2);
-  assert.equal(out.step, 0);
-  assert.equal(out.queue.length, 2, 'one more button every level');
-  assert.equal(new Set(out.queue).size, 2, 'buttons never stack on one cell');
+  assert.equal(out.paused, true, 'clearing a level pauses for the card');
+  assert.equal(out.step, 1, 'all of the level is cleared');
+  assert.equal(out.queue.length, 1, 'next level not dealt until NEXT');
+
+  const advanced = clicker.reduce(out, { a: 'next' }, act);
+  assert.equal(advanced.paused, false, 'NEXT unpauses');
+  assert.equal(advanced.step, 0);
+  assert.equal(advanced.queue.length, 2, 'one more button every level');
+  assert.equal(new Set(advanced.queue).size, 2, 'buttons never stack on one cell');
 });
 
 check('the queue is dealt in random order, so red is not always the first cell', () => {
@@ -123,12 +126,11 @@ check('the queue must be cleared in order, and each step moves red along', () =>
   let st = clicker.init(ctx);
   // Climb to a five-button level so the red -> orange -> blue ladder is real.
   for (let lvl = 1; lvl < 5; lvl++) st = playLevel(st);
-  assert.equal(st.level, 5);
+  assert.equal(st.score, 4);
   assert.equal(st.queue.length, 5);
 
   st = clicker.reduce(st, { a: 'hit', cell: st.queue[0] }, act);
-  assert.equal(st.level, 5, 'not cleared yet, so the level holds');
-  assert.equal(st.score, 4);
+  assert.equal(st.score, 4, 'not cleared yet, so the level holds');
   assert.equal(st.step, 1);
 
   // The cell that was orange is now the one owed.
@@ -158,12 +160,12 @@ check('an unseated player is refused', () => {
 
 check('the board fills at level 81 and stays legal', () => {
   let st = clicker.init(ctx);
-  while (st.level < 81) st = playLevel(st);
-  assert.equal(st.level, 81);
+  while (st.score < 80) st = playLevel(st);
+  assert.equal(st.score, 80);
   assert.equal(st.queue.length, 81);
   assert.equal(new Set(st.queue).size, 81, 'all 81 cells, no duplicates');
   st = clicker.reduce(st, { a: 'hit', cell: st.queue[0] }, act);
-  assert.equal(st.level, 81, 'a full board cannot grow');
+  assert.equal(st.score, 80, 'a full board cannot grow');
   assert.equal(st.queue.length, 81);
   assert.equal(st.score, 80);
 });
@@ -172,13 +174,13 @@ check('the board fills at level 81 and stays legal', () => {
 
 check('project paints exactly one red and one orange, and never leaks the queue', () => {
   let st = clicker.init(ctx);
-  while (st.level < 4) st = playLevel(st);
+  while (st.score < 3) st = playLevel(st);
 
   let view = clicker.project(st, 'p1');
   assert.equal(view.cells.length, 4);
   assert.equal(view.cells.filter(function (c) { return c.colour === 'red'; }).length, 1,
     'one button is owed a click');
-  assert.equal(view.cells.filter(function (c) { return c.colour === 'orange'; }).length, 1,
+  assert.equal(view.cells.filter(function (c) { return c.colour === 'yellow'; }).length, 1,
     'one button is queued after it');
   assert.equal(view.cells.filter(function (c) { return c.colour === 'blue'; }).length, 2);
   assert.equal(view.queue, undefined, 'the view must not carry the hidden order');
@@ -193,7 +195,7 @@ check('project paints exactly one red and one orange, and never leaks the queue'
   const done = view.cells.filter(function (c) { return c.done; });
   assert.equal(done.length, 1);
   assert.equal(view.cells.filter(function (c) { return c.colour === 'red'; }).length, 1);
-  assert.equal(view.cells.filter(function (c) { return c.colour === 'orange'; }).length, 1);
+  assert.equal(view.cells.filter(function (c) { return c.colour === 'yellow'; }).length, 1);
 });
 
 check('the ladder walks all the way down, one click at a time', () => {
@@ -203,21 +205,20 @@ check('the ladder walks all the way down, one click at a time', () => {
   // finished. Only the last click is a level completion, so the whole ladder
   // has to be walked to see it.
   let st = clicker.init(ctx);
-  while (st.level < 5) st = playLevel(st);
+  while (st.score < 4) st = playLevel(st);
   assert.equal(st.queue.length, 5);
 
   for (let i = 0; i < 5; i++) {
     const view = clicker.project(st, 'p1');
     const red = view.cells.filter(function (c) { return c.colour === 'red'; });
     assert.equal(red.length, 1, 'exactly one red at step ' + view.step);
-    const orange = view.cells.filter(function (c) { return c.colour === 'orange'; });
+    const orange = view.cells.filter(function (c) { return c.colour === 'yellow'; });
     assert.equal(orange.length, i === 4 ? 0 : 1, 'one orange until the queue runs out');
     assert.equal(view.cells.filter(function (c) { return !c.done; }).length, 5 - i);
 
     st = clicker.reduce(st, { a: 'hit', cell: red[0].row * 9 + red[0].col }, act);
     if (st.error) throw new Error('step ' + i + ' was denied: ' + st.error);
   }
-  assert.equal(st.level, 6, 'clearing all five advanced the level');
   assert.equal(st.score, 5);
 });
 
@@ -227,7 +228,7 @@ check('every projected cell sits on the 9x9 board', () => {
   clicker.project(st, 'p1').cells.forEach(function (c) {
     assert.ok(c.col >= 0 && c.col < 9, 'col in range: ' + c.col);
     assert.ok(c.row >= 0 && c.row < 9, 'row in range: ' + c.row);
-    assert.ok(['red', 'orange', 'blue'].indexOf(c.colour) >= 0, 'colour is one of three');
+    assert.ok(['red', 'yellow', 'blue'].indexOf(c.colour) >= 0, 'colour is one of three');
   });
 });
 
@@ -237,7 +238,7 @@ check('a run is recorded when it is reset, and not before', () => {
   let st = clicker.init(ctx);
   assert.equal(clicker.summarize(st, (id) => 'Alice'), null, 'nothing while still playing');
 
-  while (st.level < 3) st = playLevel(st);
+  while (st.score < 2) st = playLevel(st);
   assert.equal(clicker.summarize(st, (id) => 'Alice'), null);
 
   const ended = clicker.reduce(st, { a: 'reset' }, act);

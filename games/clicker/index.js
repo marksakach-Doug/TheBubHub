@@ -1,17 +1,9 @@
-// Clicker — a solo module game.
-//
-// A 9x9 grid. Level 1 lights one button; every level adds one more button in a
-// random free cell. You only ever click the red button: yellow shows which cell
-// will turn red next, and blue cells are waiting further back in the queue.
-// Clear the whole queue before the 16.0s level clock expires to score a point
-// and grow the level.
-//
-// Determinism lives in reduce(), and the DOM in mount() renders what project()
-// hands it while driving the per-level countdown clock.
-
-const GRID = 9;                 // 9x9, as asked for
-const MAX_LEVEL = GRID * GRID;  // the grid is full; nothing can be added after this
-const LEVEL_MS = 16000;         // 16.0s per level (~197.5ms/click at level 81)
+const GRID = 9;
+const CELLS = GRID * GRID;
+const MAX_LEVEL = CELLS;
+const LEVEL_MS = 16000;
+const BG = '#1d2434';
+const COLOURS = { red: '#ff4d4d', yellow: '#facc15', blue: '#2f6bd8' };
 
 export const meta = {
   id: 'clicker',
@@ -23,398 +15,246 @@ export const meta = {
   solo: true
 };
 
-// ---------------------------------------------------------------- helpers ----
-
-// A shuffled queue of cells, one per level. The shuffle is what makes the red
-// button jump around between levels rather than always being the newest one.
+// Fisher-Yates over all cells; the first `level` are the queue. (rng call order matters for seeded replays.)
 function deal(rng, level) {
-  const free = [];
-  for (let i = 0; i < GRID * GRID; i++) free.push(i);
-  for (let i = free.length - 1; i > 0; i--) {
+  const free = Array.from({ length: CELLS }, (_, i) => i);
+  for (let i = CELLS - 1; i > 0; i--) {
     const j = Math.floor(rng() * (i + 1));
-    const t = free[i]; free[i] = free[j]; free[j] = t;
+    [free[i], free[j]] = [free[j], free[i]];
   }
   return free.slice(0, Math.min(level, MAX_LEVEL));
 }
 
-function cellAt(cell) {
-  return { col: cell % GRID, row: Math.floor(cell / GRID) };
-}
-
-// How a cell should be painted, from its position in the queue RELATIVE to the
-// step already cleared. Index 0 is red (click now), 1 is yellow (turns red
-// next), and the rest are blue (waiting).
-function colourOf(queue, cell, step) {
-  const i = queue.indexOf(cell) - step;
-  if (i === 0) return 'red';
-  if (i === 1) return 'yellow';
-  return 'blue';
-}
-
-// ------------------------------------------------------------------ state ----
-
-function freshRun(rng) {
-  return {
-    players: [],
-    level: 1,
-    score: 0,
-    queue: deal(rng, 1),
-    step: 0,        // how many of `queue` have been cleared
-    misses: 0,      // wrong clicks this run, shown as a wobble
-    timedOut: false,// true when the level clock expires
-    won: false,     // true when level 81 is cleared in time
-    last: null,     // { score, level } of a finished run, for the record sheet
-    run: 1          // bumped per reset; roundId() keys on it
-  };
-}
-
-// The hub hands init() the whole room roster under `seats`, which is not who is
-// at this table — `atTable` is. Skip spectators: a watcher with a queue to play
-// is worse than no lobby at all.
-function tableOf(ctx) {
-  const c = ctx || {};
-  const list = c.atTable || c.seats || [];
-  const ids = [];
-  list.forEach(function (m) {
-    if (!m || !m.id || m.spectator) return;
-    if (ids.indexOf(m.id) < 0) ids.push(m.id);
-  });
-  return ids.slice(0, 1);   // solo by nature: seat exactly one
-}
+const freshRun = (rng) => ({
+  score: 0, queue: deal(rng, 1), step: 0,
+  paused: false, timedOut: false, won: false, last: null, run: 1
+});
 
 export function init(ctx) {
-  const rng = (ctx && ctx.rng) || Math.random;
-  const st = freshRun(rng);
-  st.players = tableOf(ctx);
-  return st;
+  const c = ctx || {};
+  const seat = (c.atTable || c.seats || []).find((m) => m && m.id && !m.spectator);
+  return { ...freshRun(c.rng || Math.random), players: seat ? [seat.id] : [] };
 }
 
-// ----------------------------------------------------------------- reduce ----
-
 export function reduce(state, action, ctx) {
-  const from = (ctx && ctx.from) || {};
-  const rng = (ctx && ctx.rng) || Math.random;
-  const id = from.id || '';
+  const c = ctx || {};
+  const id = (c.from && c.from.id) || '';
+  const rng = c.rng || Math.random;
   const kind = (action && action.a) || '';
-  const same = function (extra) { return Object.assign({}, state, extra); };
+  const same = (extra) => ({ ...state, ...extra });
+  const over = state.timedOut || state.won;
 
   if (!id) return { error: 'No identity — reopen the game.' };
-  if (state.players.indexOf(id) < 0) return { error: 'You are watching — not seated.' };
+  if (!state.players.includes(id)) return { error: 'You are watching — not seated.' };
 
   if (kind === 'reset') {
-    const next = freshRun(rng);
-    next.players = state.players;
-    next.run = state.run + 1;
-    next.last = (state.timedOut || state.won)
-      ? state.last
-      : { score: state.score, level: state.level };
-    return next;
+    return {
+      ...freshRun(rng), players: state.players, run: state.run + 1,
+      last: over ? state.last : { score: state.score }
+    };
   }
-
-  if (kind === 'timeout') {
-    if (state.timedOut || state.won) return state;
-    return same({
-      timedOut: true,
-      last: { score: state.score, level: state.level }
-    });
+  if (kind === 'timeout') return over ? state : same({ timedOut: true, last: { score: state.score } });
+  if (kind === 'next') {
+    return state.paused ? same({ paused: false, queue: deal(rng, state.score + 1), step: 0 }) : state;
   }
-
   if (kind !== 'hit') return { error: 'Unknown action: ' + kind };
-
   if (state.timedOut) return { error: 'Time ran out — reset the run to play again.' };
   if (state.won) return { error: 'You beat all 81 levels — reset to play again.' };
 
+  const { queue } = state;
   const cell = Number(action.cell);
-  if (!isFinite(cell) || cell < 0 || cell >= GRID * GRID) {
-    return { error: 'That is not a cell on the board.' };
-  }
-  if (state.step >= state.queue.length) return { error: 'Level already cleared.' };
-
-  if (state.queue[state.step] !== cell) {
-    const c = colourOf(state.queue, cell, state.step);
-    if (c === 'yellow') {
-      return { error: 'Not yet — yellow just shows which one turns red next.' };
-    }
-    return { error: 'Only click the red button.' };
+  if (!(cell >= 0 && cell < CELLS)) return { error: 'That is not a cell on the board.' };
+  if (state.step >= queue.length) return { error: 'Level already cleared.' };
+  if (queue[state.step] !== cell) {
+    return { error: queue[state.step + 1] === cell
+      ? 'Not yet — yellow just shows which one turns red next.'
+      : 'Only click the red button.' };
   }
 
   const step = state.step + 1;
-
-  if (step < state.queue.length) {
-    // Still clearing this level. `last` is dropped here so the record sheet
-    // stops reporting a run that has already been written down.
-    return same({ step: step, misses: 0, last: null });
-  }
-
-  // Queue cleared inside the time limit: score a point and advance.
+  if (step < queue.length) return same({ step, last: null });
   const score = state.score + 1;
-  if (state.level >= MAX_LEVEL) {
-    return same({
-      score: score,
-      step: step,
-      won: true,
-      misses: 0,
-      last: { score: score, level: state.level }
-    });
-  }
-
-  const level = state.level + 1;
-  return same({
-    level: level,
-    score: score,
-    queue: deal(rng, level),
-    step: 0,
-    misses: 0,
-    last: null
-  });
+  const won = score >= MAX_LEVEL;
+  return same({ score, step, won, paused: !won, last: won ? { score } : null });
 }
 
-// -------------------------------------------------------------- project ----
-
-function viewFrom(state, you, api) {
-  const cells = [];
-  state.queue.forEach(function (cell, i) {
-    const p = cellAt(cell);
-    cells.push({
-      col: p.col,
-      row: p.row,
-      colour: colourOf(state.queue, cell, state.step),
-      done: i < state.step
-    });
-  });
+export function project(state, playerId, api) {
+  const { queue, step, score, paused } = state;
   return {
-    you: you || '',
-    level: state.level,
-    score: state.score,
-    step: state.step,
-    total: state.queue.length,
-    misses: state.misses,
+    you: playerId || '',
+    level: Math.min(score + 1, MAX_LEVEL),
+    score, step, paused,
+    total: queue.length,
     timedOut: !!state.timedOut,
     won: !!state.won,
     levelMs: LEVEL_MS,
     run: state.run,
     last: state.last,
-    cells: cells,
+    cells: paused ? [] : queue.map((cell, i) => ({
+      cell, done: i < step,
+      colour: i === step ? 'red' : i === step + 1 ? 'yellow' : 'blue'
+    })),
     maxLevel: MAX_LEVEL,
-    clear: state.step >= state.queue.length,
     roster: (api && api.roster) || null
   };
 }
 
-export function project(state, playerId, api) {
-  return viewFrom(state, playerId, api);
-}
-
-// ------------------------------------------------------------------ record ----
-
-export function roundId(state) {
-  return 'run' + ((state && state.run) || 1);
-}
+export const roundId = (state) => 'run' + ((state && state.run) || 1);
 
 export function summarize(state, nameOf) {
-  if (!state.last || state.last.score <= 0) return null;
-  const s = state.last.score;
-  return nameOf(state.players[0]) + ' scored ' + s + ' point' + (s === 1 ? '' : 's')
-    + ' in Clicker, reaching level ' + state.last.level;
+  const s = state.last ? state.last.score : 0;
+  if (!(s > 0)) return null;
+  return `${nameOf(state.players[0])} scored ${s} point${s === 1 ? '' : 's'} in Clicker, reaching level ${Math.min(s + 1, MAX_LEVEL)}`;
 }
 
-// ------------------------------------------------------------------- mount ----
-
 export function mount(root, api) {
-  const wrap = document.createElement('div');
-  
-  wrap.addEventListener('touchstart', function (e) {
-    if (e.target !== reset) e.preventDefault();
-  }, { passive: false });
-  wrap.addEventListener('touchend', function (e) {
-    if (e.target !== reset) e.preventDefault();
-  }, { passive: false });
-  wrap.addEventListener('dblclick', function (e) {
-    e.preventDefault();
-  });
-  
-wrap.style.cssText = 'max-width:min(460px, 65vh);margin:0 auto;padding:8px 10px 18px;'
+  const el = (css, text = '', tag = 'div') => {
+    const e = document.createElement(tag);
+    e.style.cssText = css;
+    e.textContent = text;
+    return e;
+  };
+
+  const wrap = el('max-width:min(460px, 65vh);margin:0 auto;padding:8px 10px 18px;'
     + 'font-family:system-ui,-apple-system,Segoe UI,Roboto,sans-serif;color:#e8ecf4;'
-    + 'user-select:none;-webkit-user-select:none;touch-action:none;';
-    
-  const head = document.createElement('div');
-  head.style.cssText = 'display:flex;align-items:baseline;gap:10px;margin-bottom:4px;';
+    + 'user-select:none;-webkit-user-select:none;touch-action:none;');
+  const head = el('display:flex;align-items:baseline;gap:10px;margin-bottom:4px;');
+  const scoreEl = el('font-size:26px;font-weight:700;');
+  const timerEl = el('font-size:18px;font-weight:700;font-variant-numeric:tabular-nums;margin-left:auto;');
+  const levelEl = el('font-size:15px;opacity:.75;');
+  head.append(scoreEl, timerEl, levelEl);
 
-  const scoreEl = document.createElement('div');
-  scoreEl.style.cssText = 'font-size:26px;font-weight:700;';
-  const timerEl = document.createElement('div');
-  timerEl.style.cssText = 'font-size:18px;font-weight:700;font-variant-numeric:tabular-nums;margin-left:auto;';
-  const levelEl = document.createElement('div');
-  levelEl.style.cssText = 'font-size:15px;opacity:.75;';
-  head.appendChild(scoreEl);
-  head.appendChild(timerEl);
-  head.appendChild(levelEl);
+  const track = el('width:100%;height:6px;background:' + BG + ';border-radius:3px;overflow:hidden;margin-bottom:8px;');
+  const fill = el('height:100%;width:100%;background:#4cd137;transition:width .05s linear;');
+  track.append(fill);
+  const hint = el('font-size:14px;opacity:.8;margin-bottom:10px;min-height:20px;');
 
-  const track = document.createElement('div');
-  track.style.cssText = 'width:100%;height:6px;background:#1d2434;border-radius:3px;overflow:hidden;margin-bottom:8px;';
-  const fill = document.createElement('div');
-  fill.style.cssText = 'height:100%;width:100%;background:#4cd137;transition:width .05s linear;';
-  track.appendChild(fill);
-
-  const hint = document.createElement('div');
-  hint.style.cssText = 'font-size:14px;opacity:.8;margin-bottom:10px;min-height:20px;';
-
-  const board = document.createElement('div');
-  board.style.cssText = 'display:grid;grid-template-columns:repeat(' + GRID + ',1fr);'
-    + 'gap:4px;width:100%;aspect-ratio:1/1;touch-action:none;';
-
-  const cells = [];
-  for (let i = 0; i < GRID * GRID; i++) {
-    const b = document.createElement('div');
-    b.dataset.cell = String(i);
-    b.style.cssText = 'border-radius:8px;background:#1d2434;border:1px solid #2b3448;'
-      + 'cursor:pointer;touch-action:none;transition:background .12s ease,transform .08s ease;';
-    b.addEventListener('pointerdown', function (e) {
-      if (e.button !== undefined && e.button !== 0) return;
+  const board = el('display:grid;grid-template-columns:repeat(' + GRID + ',1fr);'
+    + 'gap:4px;width:100%;aspect-ratio:1/1;touch-action:none;');
+  const cells = Array.from({ length: CELLS }, (_, i) => {
+    const b = el('border-radius:8px;background:' + BG + ';border:1px solid #2b3448;'
+      + 'cursor:pointer;touch-action:none;transition:background .12s ease,transform .08s ease;');
+    b.addEventListener('pointerdown', (e) => {
+      if (e.button) return;
       e.preventDefault();
-      onTap(Number(b.dataset.cell));
+      onTap(i);
     });
-    board.appendChild(b);
-    cells.push(b);
-  }
-
-  const bar = document.createElement('div');
-  bar.style.cssText = 'display:flex;align-items:center;gap:10px;margin-top:12px;';
-  const reset = document.createElement('button');
-  reset.textContent = 'Reset run';
-  reset.style.cssText = 'font:inherit;font-size:15px;padding:9px 14px;min-height:40px;'
-    + 'border-radius:10px;border:1px solid #3a465f;background:#232c3f;color:#e8ecf4;cursor:pointer;';
-  reset.addEventListener('click', function () { api.send({ a: 'reset' }); });
-  const legend = document.createElement('div');
-  legend.style.cssText = 'font-size:13px;opacity:.7;margin-left:auto;text-align:right;';
-  [['#ff4d4d', 'click now'], ['#facc15', 'red next'], ['#2f6bd8', 'queued']].forEach(function (pair) {
-    const bit = document.createElement('span');
-    bit.style.color = pair[0];
-    const box = document.createElement('span');
-    box.style.cssText = 'font-size:11px;vertical-align:middle;';
-    box.textContent = '■';
-    bit.appendChild(box);
-    bit.appendChild(document.createTextNode(' ' + pair[1]));
-    legend.appendChild(bit);
-    legend.appendChild(document.createTextNode('  '));
+    return b;
   });
-  bar.appendChild(reset);
-  bar.appendChild(legend);
+  board.append(...cells);
 
-  wrap.appendChild(head);
-  wrap.appendChild(track);
-  wrap.appendChild(hint);
-  wrap.appendChild(board);
-  wrap.appendChild(bar);
-  root.appendChild(wrap);
+  const card = el('display:none;flex-direction:column;align-items:center;gap:10px;padding:20px;text-align:center;');
+  const scoreBig = el('font-size:48px;font-weight:700;');
+  const moreSmall = el('font-size:18px;opacity:.8;');
+  const nextBtn = el('font:inherit;font-size:18px;padding:10px 20px;border-radius:8px;border:none;background:#4cd137;color:#111;cursor:pointer;', 'NEXT', 'button');
+  nextBtn.onclick = () => api.send({ a: 'next' });
+  card.append(scoreBig, moreSmall, nextBtn);
 
-  let view = null;
-  let spectating = false;
-  let destroyed = false;
-  let clockKey = '';
-  let clockGen = 0;
-  let deadline = 0;
+  const bar = el('display:flex;align-items:center;gap:10px;margin-top:12px;');
+  const reset = el('font:inherit;font-size:15px;padding:9px 14px;min-height:40px;'
+    + 'border-radius:10px;border:1px solid #3a465f;background:#232c3f;color:#e8ecf4;cursor:pointer;', 'Reset run', 'button');
+  reset.onclick = () => api.send({ a: 'reset' });
+  const legend = el('font-size:13px;opacity:.7;margin-left:auto;text-align:right;');
+  legend.innerHTML = [['red', 'click now'], ['yellow', 'red next'], ['blue', 'queued']]
+    .map(([c, t]) => `<span style="color:${COLOURS[c]}"><span style="font-size:11px;vertical-align:middle">■</span> ${t}</span>`)
+    .join('  ');
+  bar.append(reset, legend);
+
+  // Block page gestures (scroll/zoom/double-tap) everywhere except the reset button.
+  ['touchstart', 'touchend'].forEach((t) => wrap.addEventListener(t, (e) => {
+    if (e.target !== reset) e.preventDefault();
+  }, { passive: false }));
+  wrap.addEventListener('dblclick', (e) => e.preventDefault());
+
+  wrap.append(head, track, hint, board, card, bar);
+  root.append(wrap);
+
+  let view = null, spectating = false, destroyed = false;
+  let clockKey = '', clockGen = 0, deadline = 0;
 
   function startLevelClock(limitMs) {
-    clockGen++;
-    const gen = clockGen;
+    const gen = ++clockGen;
     deadline = Date.now() + limitMs;
-
     function tick() {
-      if (destroyed || gen !== clockGen || !view) return;
-      if (view.timedOut || view.won) return;
-      const rem = Math.max(0, deadline - Date.now());
-      const pct = Math.max(0, Math.min(100, (rem / limitMs) * 100));
+      const now = Date.now();
+      if (tick.l === now) return;
+      tick.l = now;
+      if (destroyed || gen !== clockGen || !view || view.timedOut || view.won) return;
+      const rem = Math.max(0, deadline - now);
+      const col = rem <= 3500 ? '#ff4d4d' : rem <= 7000 ? '#facc15' : '#8ef5a0';
       timerEl.textContent = (rem / 1000).toFixed(1) + 's';
-      timerEl.style.color = rem <= 3500 ? '#ff4d4d' : (rem <= 7000 ? '#facc15' : '#8ef5a0');
-      fill.style.width = pct + '%';
-      fill.style.background = timerEl.style.color;
-
-      if (rem <= 0) {
-        if (!spectating) api.send({ a: 'timeout' });
-        return;
-      }
-      api.setTimeout(tick, 50);
+      timerEl.style.color = col;
+      fill.style.width = Math.min(100, (rem / limitMs) * 100) + '%';
+      fill.style.background = col;
+      if (rem > 0) api.setTimeout(tick, 50);
+      else if (!spectating) api.send({ a: 'timeout' });
     }
     tick();
   }
 
   function onTap(cell) {
     if (spectating || !view || view.timedOut || view.won) return;
-    if (view.cells.some(function (c) {
-      return c.col + c.row * GRID === cell && !c.done && c.colour !== 'red';
-    })) {
-      wobble(cell);
-      return;
-    }
-    api.send({ a: 'hit', cell: cell });
+    const c = view.cells.find((c) => c.cell === cell);
+    if (c && !c.done && c.colour !== 'red') return; // yellow/blue: ignore client-side
+    api.send({ a: 'hit', cell });
   }
 
-  function wobble(cell) {
-    const b = cells[cell];
-    if (!b) return;
-    api.setTimeout(function () { b.style.transform = ''; }, 160);
-    b.style.transform = 'scale(.88)';
-    b.style.transition = 'transform .08s ease';
+  function say(text, colour) {
+    hint.textContent = text;
+    hint.style.color = colour;
   }
 
   function update(v) {
     view = v;
     spectating = !!api.isSpectator;
+    const over = v.timedOut || v.won;
+    const playing = !v.paused && !over;
 
-    const nextKey = v.run + ':' + v.level;
-    if (nextKey !== clockKey && !v.timedOut && !v.won) {
-      clockKey = nextKey;
-      startLevelClock(v.levelMs || LEVEL_MS);
+    const key = v.run + ':' + v.level + ':' + (v.paused ? 'p' : 'c');
+    if (key !== clockKey && !over) {
+      clockKey = key;
+      if (!v.paused) startLevelClock(v.levelMs || LEVEL_MS);
     }
 
+    head.style.display = track.style.display = board.style.display = playing ? '' : 'none';
+    card.style.display = v.paused ? '' : 'none';
     scoreEl.textContent = v.score + (v.score === 1 ? ' point' : ' points');
-    levelEl.textContent = 'Level ' + v.level + ' of ' + v.maxLevel
-      + '  ·  ' + v.step + '/' + v.total;
+    levelEl.textContent = `Level ${v.level} of ${v.maxLevel}  ·  ${v.step}/${v.total}`;
 
-    if (v.timedOut) {
-      clockGen++;
+    if (over || v.paused) clockGen++; // stop the clock
+    if (v.paused) {
+      scoreBig.textContent = 'Score: ' + v.score;
+      moreSmall.textContent = (MAX_LEVEL - v.score) + ' more to 81';
+      say('', hint.style.color);
+    } else if (v.timedOut) {
       timerEl.textContent = '0.0s';
       timerEl.style.color = '#ff4d4d';
       fill.style.width = '0%';
-      hint.textContent = 'Time ran out on level ' + v.level + '! Reset to try again.';
-      hint.style.color = '#ff6b6b';
+      say(`Time ran out on level ${v.level}! Reset to try again.`, '#ff6b6b');
     } else if (v.won) {
-      clockGen++;
-      hint.textContent = 'Sub-superhuman! All 81 levels cleared!';
-      hint.style.color = '#8ef5a0';
+      say('Sub-superhuman! All 81 levels cleared!', '#8ef5a0');
     } else if (spectating) {
-      hint.textContent = '👁 watching — nobody is playing at this table.';
-      hint.style.color = '#ffd479';
+      say('👁 watching — nobody is playing at this table.', '#ffd479');
     } else {
-      hint.textContent = 'Click only the red button — yellow shows which one turns red next.';
-      hint.style.color = '#e8ecf4';
+      say('Click only the red button — yellow shows which one turns red next.', '#e8ecf4');
     }
 
-    cells.forEach(function (b) { b.style.background = '#1d2434'; });
-    v.cells.forEach(function (c) {
-      const b = cells[c.col + c.row * GRID];
-      if (!b) return;
-      if (c.done) b.style.background = '#1d2434';
-      else if (c.colour === 'red') b.style.background = '#ff4d4d';
-      else if (c.colour === 'yellow') b.style.background = '#facc15';
-      else b.style.background = '#2f6bd8';
+    const byCell = new Map(v.cells.map((c) => [c.cell, c]));
+    cells.forEach((b, i) => {
+      const c = byCell.get(i);
+      b.style.background = c && !c.done ? COLOURS[c.colour] : BG;
     });
-
-    reset.style.display = (v.score > 0 || v.timedOut || v.won) ? '' : 'none';
+    reset.style.display = v.score > 0 || over ? '' : 'none';
   }
 
-  function denied(text) {
-    hint.textContent = text || 'Not allowed.';
-    hint.style.color = '#ffd479';
-  }
-
-  function destroy() {
-    destroyed = true;
-    clockGen++;
-    view = null;
-    cells.forEach(function (b) { b.replaceWith(b.cloneNode(true)); });
-  }
-
-  return { update: update, denied: denied, destroy: destroy };
+  return {
+    update,
+    denied: (text) => say(text || 'Not allowed.', '#ffd479'),
+    destroy() {
+      destroyed = true;
+      clockGen++;
+      view = null;
+      cells.forEach((b) => b.replaceWith(b.cloneNode(true)));
+    }
+  };
 }

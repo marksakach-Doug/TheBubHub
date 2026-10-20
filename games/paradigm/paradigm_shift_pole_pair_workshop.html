@@ -1,0 +1,1787 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<meta name="color-scheme" content="light">
+<title>Paradigm Shift</title>
+<style>
+:root{--paper:#fff;--ink:#000;--ash:#595959;--rule:#cfcfcf;--gut:clamp(12px,3vw,18px)}
+*{box-sizing:border-box}
+html,body{margin:0;padding:0;background:var(--paper);color:var(--ink)}
+body{font:15px/1.45 "Courier New",Courier,"Liberation Mono","Nimbus Mono PS",monospace;-webkit-text-size-adjust:100%}
+#ps{max-width:860px;margin:0 auto;padding:var(--gut) var(--gut) calc(var(--gut) * 1.4)}
+
+.err{border:2px solid var(--ink);padding:6px 10px;margin:0 0 10px;font-weight:700;background:#fff}
+.bar{display:flex;justify-content:space-between;align-items:center;gap:8px 12px;flex-wrap:wrap;padding-bottom:8px;border-bottom:2px solid var(--ink)}
+.bar-left{display:flex;align-items:center;gap:10px;flex-wrap:wrap}
+.bar h1{margin:0;font-size:18px;line-height:1.2;font-weight:700}
+.tabs{display:inline-flex;border:2px solid var(--ink)}
+.tabs button{border:0;border-right:1px solid var(--ink);min-height:34px;padding:4px 12px;font-size:13px;font-weight:700}
+.tabs button:last-child{border-right:0}
+.tabs button.on{background:var(--ink);color:var(--paper)}
+.menu{display:flex;gap:5px;flex-wrap:wrap}
+.status{margin:8px 0 0;font-size:15px}
+
+button{font:inherit;color:var(--ink);background:var(--paper);border:2px solid var(--ink);border-radius:0;padding:6px 14px;min-height:38px;cursor:pointer}
+button:hover:not([disabled]){background:var(--ink);color:var(--paper)}
+button:active:not([disabled]){transform:translateY(2px)}
+button[disabled]{color:#8c8c8c;border-color:var(--rule);cursor:not-allowed}
+button:focus-visible,input:focus-visible,textarea:focus-visible,summary:focus-visible{outline:3px solid var(--ink);outline-offset:3px}
+button.small{font-size:13px;padding:3px 10px;min-height:32px;border-width:1px}
+button.go{font-weight:700;font-size:15px;padding:7px 16px;background:var(--ink);color:var(--paper)}
+button.go:hover:not([disabled]){background:var(--paper);color:var(--ink)}
+button.go[disabled]{background:var(--paper);color:#8c8c8c;border-color:var(--rule)}
+@media (pointer:coarse){button{min-height:44px}button.small{min-height:40px}}
+
+input[type="text"],textarea{width:100%;font:inherit;font-size:15px;line-height:1.4;padding:6px 10px;border:1px solid var(--ink);border-radius:0;background:var(--paper);color:var(--ink)}
+textarea{resize:vertical}
+
+.arbnote{color:#b00000;font-size:13px;text-align:right;margin:6px 0 0}
+.lead{margin:8px 0 12px;font-size:15px;max-width:66ch}
+.homebtns{display:flex;gap:8px;flex-wrap:wrap;margin-top:10px}
+
+/* Workshop & Coach Styling */
+.ws-sec{margin:14px 0;padding:12px;border:2px solid var(--ink);background:var(--paper)}
+.ws-sec.dashed{border-style:dashed;border-width:1px}
+.ws-sec h2{margin:0 0 6px;font-size:16px;text-transform:uppercase;letter-spacing:.03em}
+.ws-sec h3{margin:10px 0 4px;font-size:14px}
+.ws-sec p{margin:4px 0 8px;font-size:14px;max-width:68ch}
+.muted{color:var(--ash);font-size:13px}
+
+.mental-grid{display:grid;grid-template-columns:1fr 1fr;gap:10px;margin-top:8px}
+@media (max-width:640px){.mental-grid{grid-template-columns:1fr}}
+.mental-card{border:1px solid var(--ink);padding:8px 10px;font-size:13px}
+.mental-card b{display:block;margin-bottom:4px;font-size:14px}
+.ascii-diag{margin:6px 0;padding:6px 8px;border:1px dashed var(--rule);background:#fafafa;font-size:12px;line-height:1.35;white-space:pre-wrap}
+
+.recipe-grid{display:grid;grid-template-columns:repeat(3,1fr);gap:8px;margin-top:8px}
+@media (max-width:680px){.recipe-grid{grid-template-columns:1fr}}
+.recipe-card{border:1px solid var(--ink);padding:8px;display:flex;flex-direction:column;justify-content:space-between;gap:8px;font-size:13px}
+.recipe-card b{font-size:13px;display:block;margin-bottom:3px}
+
+.field-grid{display:grid;grid-template-columns:1fr 1fr;gap:10px;margin-top:8px}
+@media (max-width:600px){.field-grid{grid-template-columns:1fr}}
+.field label{display:block;font-weight:700;font-size:13px;margin-bottom:3px}
+.field label span{display:block;font-weight:400;font-size:12px;color:var(--ash)}
+
+.stem-row{display:flex;flex-wrap:wrap;gap:5px;margin-top:6px;align-items:center}
+.stem-row span{font-size:12px;color:var(--ash)}
+.stem-chip{font-size:12px;padding:2px 7px;min-height:26px;border:1px dashed var(--ink)}
+
+.buzz-box{margin-top:8px;padding:8px 10px;border:1px solid var(--ink);background:#fafafa;font-size:13px}
+.buzz-box.warn{border:2px solid var(--ink)}
+.buzz-box ul{margin:4px 0 0;padding-left:1.3em}
+
+/* 4-Corner Cross-Breeze Matrix */
+.corner-grid{display:grid;grid-template-columns:1fr 1fr;gap:10px;margin-top:8px}
+@media (max-width:620px){.corner-grid{grid-template-columns:1fr}}
+.corner-cell{border:1px solid var(--ink);padding:8px;display:flex;flex-direction:column;gap:6px;background:var(--paper)}
+.corner-cell.bad{border:2px dashed var(--ink);background:#f7f7f7}
+.corner-cell.good{border:2px solid var(--ink)}
+.corner-head{display:flex;justify-content:space-between;align-items:baseline;gap:6px;font-size:12px;color:var(--ash);border-bottom:1px dashed var(--rule);padding-bottom:4px}
+.corner-combo{font-weight:700;font-size:13px;color:var(--ink)}
+.corner-toggles{display:flex;gap:6px;flex-wrap:wrap}
+.corner-toggles button{flex:1;font-size:12px;padding:3px 6px;min-height:30px;border-width:1px}
+.corner-toggles button.on{background:var(--ink);color:var(--paper);font-weight:700}
+
+/* Short-Answer Quiz */
+.quiz-item{border:1px solid var(--ink);padding:10px;margin-top:8px}
+.quiz-item label{display:block;font-weight:700;font-size:13px;margin-bottom:4px}
+.quiz-item .q-sub{font-weight:400;font-size:13px;color:var(--ash);margin-bottom:6px;display:block}
+.quiz-fb{margin-top:6px;font-size:13px;padding:4px 8px;border-left:3px solid var(--ink);background:#fafafa}
+
+/* Deck Manager & Plain-Text Loader */
+.deck-list{display:grid;gap:6px;margin:8px 0}
+.deck-row{border:1px solid var(--ink);padding:6px 8px;display:flex;justify-content:space-between;align-items:center;gap:8px;flex-wrap:wrap;font-size:13px}
+.deck-row.active{border-width:2px;background:#f5f5f5}
+.deck-row-actions{display:flex;gap:4px;flex-wrap:wrap}
+
+/* Axis Banner + Loader Drawer in Play Mode */
+.loader-drawer{margin:10px 0;padding:10px;border:2px dashed var(--ink);background:#fafafa}
+.axes-head{margin:10px 0 8px;padding:8px 10px;border:1px solid var(--ink);display:grid;grid-template-columns:1fr 1fr;gap:8px;font-size:13px}
+.axes-head b{display:block;font-size:14px}
+.axes-head span{color:var(--ash)}
+@media (max-width:560px){.axes-head{grid-template-columns:1fr}}
+
+/* Compass + 4x4 Board */
+.compass{display:grid;grid-template-columns:30px 1fr 30px;grid-template-rows:auto 1fr auto;gap:6px;align-items:center;margin:10px 0}
+.pole{font-weight:700;font-size:13px;text-transform:uppercase;letter-spacing:.04em;text-align:center;padding:5px 8px;border:1px solid var(--ink);background:var(--paper)}
+.pole.top{grid-column:2;grid-row:1}
+.pole.bot{grid-column:2;grid-row:3}
+.pole.left{grid-column:1;grid-row:2;writing-mode:vertical-rl;transform:rotate(180deg);height:100%;display:flex;align-items:center;justify-content:center;padding:8px 2px}
+.pole.right{grid-column:3;grid-row:2;writing-mode:vertical-rl;height:100%;display:flex;align-items:center;justify-content:center;padding:8px 2px}
+.pole small{font-weight:400;color:var(--ash);text-transform:none;margin-left:6px;letter-spacing:0}
+.pole.left small,.pole.right small{margin-left:0;margin-top:6px}
+
+/* 7x7 track inside the compass center: 4 cells + 3 seam tracks */
+.board{grid-column:2;grid-row:2;display:grid;grid-template-columns:1fr 22px 1fr 22px 1fr 22px 1fr;grid-template-rows:repeat(3,minmax(92px,auto) 22px) minmax(92px,auto);border:2px solid var(--ink);padding:6px;background:var(--paper)}
+@media (max-width:600px){
+  .board{grid-template-columns:1fr 18px 1fr 18px 1fr 18px 1fr;grid-template-rows:repeat(3,minmax(78px,auto) 18px) minmax(78px,auto);padding:4px}
+}
+
+.cell{border:1px solid var(--ink);padding:6px;display:flex;flex-direction:column;justify-content:space-between;min-width:0;background:var(--paper);position:relative;transition:background .15s,color .15s}
+.cell.empty{border-style:dashed;border-color:#8c8c8c;color:var(--ash);align-items:center;justify-content:center;cursor:pointer;font-size:12px;text-align:center}
+.cell.empty:hover:not(.locked){border-color:var(--ink);color:var(--ink);border-style:solid}
+.cell.empty.locked{cursor:default;opacity:.55}
+.cell.sel{border:2px solid var(--ink);background:#f3f3f3;color:var(--ink)}
+.cell.just{outline:3px solid var(--ink);outline-offset:-3px}
+.cell.win{background:var(--ink);color:var(--paper)}
+.cell.win .c-who,.cell.win .c-coord{color:#d0d0d0}
+.c-coord{font-size:11px;color:var(--ash);display:flex;justify-content:space-between}
+.c-txt{font-size:clamp(12px,1.8vw,14px);line-height:1.3;margin:4px 0;overflow-wrap:anywhere;font-weight:700}
+.c-who{font-size:11px;color:var(--ash);text-align:right}
+
+/* Seams between orthogonally adjacent cards */
+.seam{display:flex;align-items:center;justify-content:center}
+.seam button{min-height:0;width:20px;height:20px;padding:0;font-size:12px;line-height:1;border:1px dashed var(--ink);background:var(--paper);color:var(--ink);display:flex;align-items:center;justify-content:center}
+.seam button.on{border:2px solid var(--ink);background:var(--ink);color:var(--paper);font-weight:700}
+.seam button:disabled{opacity:1;cursor:default;border-color:var(--rule);color:var(--ash)}
+.seam button.on:disabled{background:var(--ink);color:var(--paper);border-color:var(--ink)}
+.seam.h button.on{width:100%;height:14px}
+.seam.v button.on{width:14px;height:100%}
+.seam-print-dot{display:none}
+
+/* Entry Controls (No forced slide!) */
+.composer{margin:12px 0;padding:10px;border:2px solid var(--ink)}
+.composer label{display:block;font-size:14px;font-weight:700;margin-bottom:6px}
+.composer label span{display:block;font-weight:400;font-size:13px;color:var(--ash);margin-top:2px}
+.comp-actions{margin-top:10px;display:flex;gap:8px;justify-content:space-between;align-items:center;flex-wrap:wrap}
+
+/* Ceremony / Reveal box */
+.ceremony{margin:12px 0;padding:12px;border:2px solid var(--ink)}
+.whyline{font-size:clamp(15px,2.3vw,19px);line-height:1.4;overflow-wrap:anywhere}
+.whyline .wn{font-size:.85em;margin-right:.5em;color:var(--ash)}
+.whyline .caret{display:inline-block;width:.6em;height:1.1em;background:var(--ink);vertical-align:-0.15em;margin-left:2px;animation:blink 1s steps(1) infinite}
+@keyframes blink{50%{opacity:0}}
+
+/* Judge / Seam Inspection Panel */
+.judge-box{margin:10px 0;padding:10px;border:1px solid var(--ink);background:#fafafa}
+.judge-box h3{margin:0 0 6px;font-size:14px}
+.pair-list{display:grid;gap:6px;margin:8px 0}
+.pair-item{display:flex;justify-content:space-between;align-items:center;gap:10px;padding:6px 8px;border:1px solid var(--rule);background:var(--paper);font-size:13px}
+.pair-item.on{border-color:var(--ink);background:var(--ink);color:var(--paper)}
+.pair-item button{min-height:30px;padding:2px 10px;font-size:12px;flex-shrink:0}
+.pair-item.on button{background:var(--paper);color:var(--ink);border-color:var(--paper)}
+
+/* Finale / The Shift */
+.finale{margin:14px 0;padding:14px;border:2px solid var(--ink);background:var(--paper)}
+.finale h2{margin:0 0 6px;font-size:20px}
+.finale .sub{color:var(--ash);font-size:14px;margin:0 0 12px}
+.chain{border-left:3px solid var(--ink);margin:10px 0 14px 8px;padding-left:14px;display:grid;gap:10px}
+.chain-pole{font-weight:700;text-transform:uppercase;letter-spacing:.05em;font-size:13px;color:var(--ash)}
+.chain-step{font-size:clamp(15px,2.2vw,18px);font-weight:700;line-height:1.35}
+.chain-step small{display:block;font-weight:400;font-size:12px;color:var(--ash);margin-top:2px}
+
+.table{display:flex;justify-content:space-between;align-items:center;flex-wrap:wrap;gap:8px 18px;margin-top:14px;padding-top:10px;border-top:1px solid var(--rule)}
+.people{list-style:none;margin:0;padding:0;display:flex;flex-wrap:wrap;gap:4px 16px;font-size:14px}
+.people li.active{font-weight:700;text-decoration:underline}
+.side{display:flex;align-items:center;flex-wrap:wrap;gap:6px 12px;margin-left:auto}
+.tally{color:var(--ash);font-size:13px}
+
+.rules{margin-top:12px;border-top:1px solid var(--rule);padding-top:6px}
+.rules summary{cursor:pointer;font-size:14px;padding:3px 0;font-weight:700}
+.rules ol,.rules p{margin:8px 0 0;max-width:64ch;font-size:14px}
+.rules li{margin:5px 0}
+.print-rules{display:none}
+.hidden{display:none!important}
+
+/* Paper-Playable Print Sheet Formatting */
+@media print{
+  body{font-size:12pt}
+  #ps{max-width:100%;padding:0}
+  .tabs,.menu,#arbnote,#status,#lead,#homebtns,#workshop-view,#loader-drawer,#composer,#ceremony,#judge-box,#finale,#table,#rules{display:none!important}
+  #play-view,#game-ui{display:block!important}
+  .board{grid-template-rows:repeat(3,120px 22px) 120px;border-width:2px}
+  .cell.empty{border-style:solid;border-color:#000;color:#555;align-items:flex-start;justify-content:flex-start;padding:6px}
+  .seam-print-dot{display:inline-block;font-size:14px;color:#000}
+  .seam button{display:none!important}
+  .print-rules{display:block!important;margin-top:14px;padding-top:8px;border-top:2px solid #000;font-size:11pt}
+  .print-rules ol{margin:4px 0 0;padding-left:1.4em}
+}
+@media (prefers-reduced-motion:reduce){*{animation:none!important;transition:none!important}}
+</style>
+</head>
+<body>
+<div id="ps">
+  <div id="err" class="err hidden" role="alert"></div>
+
+  <header class="bar">
+    <div class="bar-left">
+      <h1>Paradigm Shift</h1>
+      <div class="tabs" role="tablist" aria-label="Mode switch">
+        <button id="tab-ws" type="button" class="on" role="tab" aria-selected="true">1. Pole Pair Workshop</button>
+        <button id="tab-play" type="button" role="tab" aria-selected="false">2. Play / Paper Sheet</button>
+      </div>
+    </div>
+    <div id="menu" class="menu">
+      <button id="b-drawer" class="small" type="button">Pole Loader</button>
+      <button id="b-swap" class="small" type="button">Next Pair</button>
+      <button id="b-print" class="small" type="button">Print Paper Board</button>
+      <button id="b-new" class="small" type="button">Clear Board</button>
+      <button id="b-home" class="small hidden" type="button">Leave Table</button>
+    </div>
+  </header>
+
+  <!-- ===================================================================== -->
+  <!-- VIEW 1: POLE PAIR WORKSHOP (Coach, Builder, 4-Corner Test, & Quiz)    -->
+  <!-- ===================================================================== -->
+  <main id="workshop-view">
+    <p class="lead">
+      Seed cards are gone, and every card placed on the 4×4 grid must be <b>something that actually happened to someone at the table</b>. That means your four outer edges (North↔South and West↔East) have to do the heavy lifting: they must make players <i>remember real moments</i> instead of inventing plausible stories.
+    </p>
+
+    <!-- 1. WHY THIS IS HARD (AND THE TRICK TO IT) -->
+    <section class="ws-sec">
+      <h2>Why Writing Pole Pairs Feel Hard (And the Trick to It)</h2>
+      <p>When you try to write two axes by hand, almost everyone falls into one of two traps. Once you see both traps, writing a pair takes three minutes:</p>
+      <div class="mental-grid">
+        <div class="mental-card">
+          <b>Trap 1: The Diagonal Mirror (1 Axis Disguised as 2)</b>
+          Suppose you write North→South as <i>"Guarded → Open"</i> and West→East as <i>"Hiding → Honest"</i>. Those feel like two axes, but they are both just <i>"Closed → Open"</i> twice!
+          <div class="ascii-diag">NW: Guarded + Hiding (works)   NE: Guarded + Honest (???)
+SW: Open + Hiding    (???)     SE: Open + Honest    (works)</div>
+          Look at <b>North-East</b> and <b>South-West</b>: they contradict themselves. Nobody at the table has a real memory that lives in NE or SW, so half your 4×4 board goes dead.
+        </div>
+        <div class="mental-card">
+          <b>Trap 2: Chapter Titles Instead of Postures</b>
+          Words like <i>"Vulnerability"</i>, <i>"Boundaries"</i>, <i>"Alignment"</i>, or <i>"Closure"</i> are essay topics. Nobody wakes up on a Tuesday and says, "I did a boundary today."
+          <div class="ascii-diag">ABSTRACT: "Healthy Boundaries" (players invent speeches)
+CONCRETE: "Saying no without a 3-sentence excuse" (players remember a real text message)</div>
+          <b>The Trick:</b> Cross <b>Axis 1 (How You Carry It Inside)</b> with <b>Axis 2 (Where It Happens / How It Shows on the Outside)</b>.
+        </div>
+      </div>
+    </section>
+
+    <!-- 2. THREE CLICKABLE RECIPES -->
+    <section class="ws-sec">
+      <h2>3 Orthogonal Recipes That Always Work</h2>
+      <p class="muted">Click any recipe to load a working example into the builder below and see why all 4 corners stay alive:</p>
+      <div class="recipe-grid">
+        <div class="recipe-card">
+          <div>
+            <b>Recipe A: Inner Grip (N↔S) × Outer Act (W↔E)</b>
+            <div><b>N↔S:</b> What your stomach or mind is doing.<br><b>W↔E:</b> What your mouth or hands are doing.</div>
+          </div>
+          <button type="button" class="small" data-recipe="0">Load Recipe A ("Money & Shared Life")</button>
+        </div>
+        <div class="recipe-card">
+          <div>
+            <b>Recipe B: The Script (N↔S) × Who Is Watching (W↔E)</b>
+            <div><b>N↔S:</b> Doing what you were taught vs. your own way.<br><b>W↔E:</b> Alone in private vs. in front of others.</div>
+          </div>
+          <button type="button" class="small" data-recipe="1">Load Recipe B ("Work & Competence")</button>
+        </div>
+        <div class="recipe-card">
+          <div>
+            <b>Recipe C: Holding On (N↔S) × Unspoken / Out Loud (W↔E)</b>
+            <div><b>N↔S:</b> Rehearsing the past vs. dropping it.<br><b>W↔E:</b> Kept to yourself vs. put in the room.</div>
+          </div>
+          <button type="button" class="small" data-recipe="2">Load Recipe C ("Old Hurts & Reckoning")</button>
+        </div>
+      </div>
+    </section>
+
+    <!-- 3. STEP-BY-STEP INTERACTIVE BUILDER -->
+    <section class="ws-sec">
+      <div style="display:flex;justify-content:space-between;align-items:center;flex-wrap:wrap;gap:8px">
+        <h2>Step-by-Step Pole Pair Builder</h2>
+        <button id="b-clear-builder" type="button" class="small">Clear Builder to Blank</button>
+      </div>
+
+      <!-- Step 1: Territory -->
+      <div class="field" style="margin-top:8px">
+        <label for="ws-name">Step 1 — Territory Title (What neighborhood of life are we remembering?)
+          <span>Keep it plain: e.g., "Sharing a Kitchen", "Falling Out with a Friend", "Leaving a Job".</span>
+        </label>
+        <input id="ws-name" type="text" maxlength="60" placeholder="e.g., Money & Shared Life">
+      </div>
+
+      <!-- Step 2: North <-> South -->
+      <div style="margin-top:12px;padding-top:10px;border-top:1px dashed var(--rule)">
+        <h3>Step 2 — North ↔ South Axis (Where you start vs. where you end up)</h3>
+        <div class="field-grid">
+          <div class="field">
+            <label for="ws-top">NORTH POLE (Top Edge — Row A)
+              <span>Use an active verb or posture you can picture someone doing.</span>
+            </label>
+            <input id="ws-top" type="text" maxlength="55" placeholder="e.g., Keeping Score in Your Head">
+          </div>
+          <div class="field">
+            <label for="ws-bot">SOUTH POLE (Bottom Edge — Row D)
+              <span>The opposite posture on that exact same scale.</span>
+            </label>
+            <input id="ws-bot" type="text" maxlength="55" placeholder="e.g., Not Checking the Receipt">
+          </div>
+        </div>
+        <div class="stem-row">
+          <span>Click to insert a plain-spoken stem into North/South:</span>
+          <button type="button" class="stem-chip" data-stem-ns="Keeping track of ___|Letting ___ go uncounted">Keeping track of… / Letting… go</button>
+          <button type="button" class="stem-chip" data-stem-ns="Bracing for ___|Taking ___ as it comes">Bracing for… / Taking… as it comes</button>
+          <button type="button" class="stem-chip" data-stem-ns="Asking permission first|Deciding on your own">Asking permission / Deciding on your own</button>
+        </div>
+      </div>
+
+      <!-- Step 3: West <-> East -->
+      <div style="margin-top:12px;padding-top:10px;border-top:1px dashed var(--rule)">
+        <h3>Step 3 — West ↔ East Axis (A perpendicular tension in the same room)</h3>
+        <div class="field-grid">
+          <div class="field">
+            <label for="ws-left">WEST POLE (Left Edge — Column 1)
+              <span>Measure a DIFFERENT dimension (e.g., private vs. spoken, solo vs. together).</span>
+            </label>
+            <input id="ws-left" type="text" maxlength="55" placeholder="e.g., Saying Nothing at the Table">
+          </div>
+          <div class="field">
+            <label for="ws-right">EAST POLE (Right Edge — Column 4)
+              <span>The opposite end of your West pole.</span>
+            </label>
+            <input id="ws-right" type="text" maxlength="55" placeholder="e.g., Bringing It Up Before Bed">
+          </div>
+        </div>
+        <div class="stem-row">
+          <span>Click to insert a perpendicular West/East pair:</span>
+          <button type="button" class="stem-chip" data-stem-we="Kept to yourself|Said out loud in the room">Kept to yourself / Said out loud</button>
+          <button type="button" class="stem-chip" data-stem-we="When no one is looking|With everyone watching">No one looking / Everyone watching</button>
+          <button type="button" class="stem-chip" data-stem-we="In the heat of the moment|Weeks after the fact">In the moment / Weeks later</button>
+        </div>
+      </div>
+
+      <!-- Live Buzzword & Abstraction Detector -->
+      <div id="buzz-box" class="buzz-box"></div>
+    </section>
+
+    <!-- 4. THE 4-CORNER CROSS-BREEZE TEST -->
+    <section class="ws-sec">
+      <h2>Step 4 — The 4-Corner Cross-Breeze Test</h2>
+      <p>
+        Before you bring a pole pair to the table, test the four corner squares of your 4×4 board (`A1`, `A4`, `D1`, `D4`). If your two axes are genuinely perpendicular, <b>each corner will summon a distinct, real memory</b>. If `NE (A4)` or `SW (D1)` feels impossible or identical to another corner, your two axes are secretly the same axis!
+      </p>
+      <div id="corner-grid" class="corner-grid"></div>
+      <div id="corner-diag" class="buzz-box" style="margin-top:10px"></div>
+    </section>
+
+    <!-- 5. SHORT-ANSWER DIAGNOSTIC QUIZ -->
+    <section class="ws-sec">
+      <h2>Step 5 — Short-Answer Diagnostic Quiz (Self-Check Before Play)</h2>
+      <p class="muted">Answer these three short prompts for the pole pair you are building right now. The tool checks your answers live:</p>
+
+      <div class="quiz-item">
+        <label for="q1-in">1. The "No Seed Cards" Memory Check</label>
+        <span class="q-sub">Since there are no pre-printed Seed cards on the board anymore, write <b>one real thing that actually happened to you</b> (under 80 chars) that you could play on Turn 1 for these poles:</span>
+        <input id="q1-in" type="text" maxlength="80" placeholder="e.g., Venmo-requesting my roommate $4 for half a carton of oat milk">
+        <div id="q1-fb" class="quiz-fb">Write a specific memory (an object, habit, or sentence someone actually said).</div>
+      </div>
+
+      <div class="quiz-item">
+        <label for="q2-in">2. The Two-Routes Check (West Route vs. East Route)</label>
+        <span class="q-sub">Can a player travel from <b id="q2-n">North</b> to <b id="q2-s">South</b> down the <b>West</b> side of the board, and could a different table travel from North to South down the <b>East</b> side? In a few words, what is the difference between those two journeys?</span>
+        <input id="q2-in" type="text" maxlength="140" placeholder="e.g., West is making peace quietly by yourself; East is hashing it out face-to-face">
+        <div id="q2-fb" class="quiz-fb">Explain how moving N→S on the West side looks different from moving N→S on the East side.</div>
+      </div>
+
+      <div class="quiz-item">
+        <label for="q3-in">3. The "Did That Step Tell Us Something?" Seam Check</label>
+        <span class="q-sub">We no longer judge seams on whether a transition was "earned." The arbiter clicks a seam only on a table nod for <b>"did that step tell us something?"</b> What is one surprising jump between two memories in this territory that would make the table nod?</span>
+        <input id="q3-in" type="text" maxlength="140" placeholder="e.g., Going from splitting every check to buying their groceries without asking">
+        <div id="q3-fb" class="quiz-fb">Name a two-card step that reveals something true when placed side-by-side.</div>
+      </div>
+
+      <div style="margin-top:12px;display:flex;justify-content:space-between;align-items:center;flex-wrap:wrap;gap:8px">
+        <span id="ws-ready-badge" class="muted">Complete the poles above to add to your loader deck.</span>
+        <div style="display:flex;gap:8px;flex-wrap:wrap">
+          <button id="b-save-pair" type="button">Save to Loader Deck</button>
+          <button id="b-play-pair" type="button" class="go">Save &amp; Put on 4×4 Board →</button>
+        </div>
+      </div>
+    </section>
+
+    <!-- 6. HAND-WRITTEN POLE PAIR LOADER & DECK MANAGER -->
+    <section class="ws-sec">
+      <h2>Hand-Written Pole Pair Loader &amp; Deck</h2>
+      <p>
+        No hardcoded axes or Seed cards. Below is your active deck of hand-written pole pairs, plus the raw plain-text loader (`Title | North | South | West | East`, one pair per line) so you can paste or save your pairs anywhere.
+      </p>
+      <div id="deck-list" class="deck-list"></div>
+
+      <div style="margin-top:12px;padding-top:10px;border-top:1px dashed var(--rule)">
+        <label for="raw-loader" style="display:block;font-weight:700;font-size:13px;margin-bottom:4px">
+          Raw Hand-Written Loader (One line per pair: <code>Title | North Pole | South Pole | West Pole | East Pole</code>)
+        </label>
+        <textarea id="raw-loader" rows="5" spellcheck="false" placeholder="Money & Shared Life | Keeping Score in Your Head | Not Checking the Receipt | Saying Nothing at the Table | Bringing It Up Before Bed"></textarea>
+        <div style="margin-top:8px;display:flex;gap:6px;flex-wrap:wrap;justify-content:space-between">
+          <div style="display:flex;gap:6px;flex-wrap:wrap">
+            <button id="b-parse-replace" type="button" class="small">Replace Deck from Lines</button>
+            <button id="b-parse-append" type="button" class="small">Append Lines to Deck</button>
+          </div>
+          <div style="display:flex;gap:6px;flex-wrap:wrap">
+            <button id="b-copy-loader" type="button" class="small">Copy Lines</button>
+            <button id="b-go-board" type="button" class="go">Open Play / Paper Sheet →</button>
+          </div>
+        </div>
+      </div>
+    </section>
+  </main>
+
+  <!-- ===================================================================== -->
+  <!-- VIEW 2: PLAY / PAPER SHEET (Updated Game + Paper Printable View)      -->
+  <!-- ===================================================================== -->
+  <div id="play-view" class="hidden">
+    <div id="arbnote" class="arbnote hidden"></div>
+    <p id="status" class="status" role="status" aria-live="polite">Connecting to the table...</p>
+    <p id="lead" class="lead hidden">
+      The four edges of the 4×4 board are hand-written human poles. Every detail placed inside the grid must be <b>true: something that actually happened to someone at the table</b>. Cards stay where placed. When two cards touch, the arbiter clicks their seam (<b>●</b>) only on a table nod for <i>"did that step tell us something?"</i>
+    </p>
+
+    <div id="homebtns" class="homebtns hidden">
+      <button id="b-start" class="go hidden" type="button">Start Table</button>
+      <button id="b-solo" class="go" type="button">Solo / Pass &amp; Play</button>
+      <button id="b-open-ws" type="button">Edit Pole Pairs in Workshop</button>
+    </div>
+
+    <!-- Quick Pole Pair Loader Drawer inside Play View -->
+    <div id="loader-drawer" class="loader-drawer hidden">
+      <div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:6px">
+        <b>Load Hand-Written Pole Pair onto Board</b>
+        <button id="b-close-drawer" type="button" class="small">Close</button>
+      </div>
+      <p style="margin:0 0 6px;font-size:13px;color:var(--ash)">Pick a pair from your deck or paste `Title | North | South | West | East` lines:</p>
+      <div id="drawer-deck" class="deck-list"></div>
+      <textarea id="drawer-raw" rows="3" style="margin-top:6px" placeholder="Title | North Pole | South Pole | West Pole | East Pole"></textarea>
+      <div style="margin-top:6px;display:flex;justify-content:space-between;gap:8px;flex-wrap:wrap">
+        <button id="b-drawer-apply" type="button" class="small">Load From Text Box</button>
+        <button id="b-drawer-to-ws" type="button" class="small">Open Full Workshop &amp; Quiz</button>
+      </div>
+    </div>
+
+    <section id="game-ui" class="hidden">
+      <div id="axes-head" class="axes-head"></div>
+
+      <div class="compass">
+        <div id="p-top" class="pole top"></div>
+        <div id="p-left" class="pole left"></div>
+        <div id="board" class="board" role="grid" aria-label="4 by 4 true memory grid"></div>
+        <div id="p-right" class="pole right"></div>
+        <div id="p-bot" class="pole bot"></div>
+      </div>
+
+      <!-- Step 1: Place a true lived detail (No forced slide!) -->
+      <div id="composer" class="composer hidden">
+        <label for="in-detail" id="comp-label">Place a true detail at <span id="comp-coord"></span>:
+          <span>Every detail must be true: something that actually happened to someone at the table (80 chars max).</span>
+        </label>
+        <input id="in-detail" type="text" maxlength="80" autocomplete="off" placeholder="e.g., Leaving the envelope on the hall table for three days without opening it">
+        <div class="comp-actions">
+          <button id="b-cancel" class="small" type="button">Cancel cell</button>
+          <button id="b-lock" class="go" type="button">Place Detail</button>
+        </div>
+      </div>
+
+      <!-- Step 2: Slow cadence reveal of the memory -->
+      <div id="ceremony" class="ceremony hidden"></div>
+
+      <!-- Step 3: Arbiter & table inspect adjacent seams -->
+      <div id="judge-box" class="judge-box hidden">
+        <h3>Examine the Seams</h3>
+        <p style="margin:0 0 6px;font-size:13px;color:var(--ash)">
+          The arbiter clicks a seam (<b>●</b>) only on a table nod, judged on <b>"did that step tell us something?"</b> (not "earned"). Cards stay permanently where placed.
+        </p>
+        <div id="pair-list" class="pair-list"></div>
+        <div style="display:flex;justify-content:flex-end;margin-top:8px">
+          <button id="b-next-turn" class="go" type="button">Finish turn &amp; pass</button>
+        </div>
+      </div>
+
+      <!-- Finale: The Shift -->
+      <div id="finale" class="finale hidden"></div>
+
+      <div id="table" class="table">
+        <ul id="people" class="people" aria-label="Players"></ul>
+        <div class="side">
+          <span id="tally" class="tally"></span>
+        </div>
+      </div>
+
+      <!-- Print-only concise rules footer for pen-and-paper play -->
+      <div class="print-rules">
+        <b>PAPER RULES — PARADIGM SHIFT</b>
+        <ol>
+          <li><b>True Details Only:</b> Every detail written in a box must be true: something that actually happened to someone at the table.</li>
+          <li><b>Permanent Placement:</b> On your turn, write a detail in any empty square. Cards stay where placed.</li>
+          <li><b>Table Nod Seams:</b> When two cards sit orthogonally adjacent, read the step between them aloud. Fill in the seam circle (●) between them only on a table nod, judged on <i>"did that step tell us something?"</i> Complete a continuous orthogonal chain of filled seams from North→South or West→East to complete the shift.</li>
+        </ol>
+      </div>
+    </section>
+
+    <details id="rules" class="rules" open>
+      <summary>Instructions (Updated Paper-Playable Rules)</summary>
+      <ol>
+        <li><b>Hand-Written Pole Pairs:</b> Load your own North↔South and West↔East pole pairs in the <b>Pole Pair Workshop</b> (or click <b>Pole Loader</b>). The board begins completely open with no pre-placed Seed cards.</li>
+        <li><b>Tacit Truth:</b> Every detail must be true: something that actually happened to someone at the table.</li>
+        <li><b>Cards Stay Where Judged:</b> On your turn, click any empty square on the 4×4 grid and write your detail (80 characters max). There is no forced row/column slide, Ko, shear, or ejection—cards remain permanently where placed so you can play on screen or with pen and paper.</li>
+        <li><b>Table Nod Seams:</b> Whenever two cards sit orthogonally adjacent, a seam (<b>+</b>) appears between them. The arbiter clicks a seam (<b>●</b>) only on a table nod, judged on <b>"did that step tell us something?"</b> (not "earned").</li>
+        <li><b>Completing the Shift:</b> As soon as nodded seams (<b>●</b>) form a continuous orthogonal path from North to South or West to East, the shift is complete and the full chain of memories is printed below.</li>
+      </ol>
+    </details>
+  </div>
+</div>
+
+<script>
+(function(){
+'use strict';
+var GAME_ID = 'paradigmshift';
+var DETAIL_MAX = 80;
+var STORAGE_KEY = 'ps_custom_pole_pairs_v2';
+
+// Starter Recipes for the Workshop Coach & Initial Hand-Written Loader Deck (Zero Seed Cards!)
+var RECIPES = [
+  {
+    name: 'Money & Shared Life',
+    top: 'Keeping Score in Your Head',
+    bot: 'Not Checking the Receipt',
+    left: 'Saying Nothing at the Table',
+    right: 'Bringing It Up Before Bed'
+  },
+  {
+    name: 'Work & Competence',
+    top: 'Following the Rules to the Letter',
+    bot: 'Doing It the Way That Actually Works',
+    left: 'When No One Is Watching',
+    right: 'With Everyone Looking On'
+  },
+  {
+    name: 'Old Hurts & Reckoning',
+    top: 'Rehearsing Your Case',
+    bot: 'Dropping the Subject for Good',
+    left: 'Kept Entirely to Yourself',
+    right: 'Said Out Loud to Their Face'
+  }
+];
+
+// Dictionary of abstract buzzwords that cause players to invent vignettes instead of remembering real events
+var BUZZWORDS = {
+  'authenticity': 'Try a physical habit, like "Wearing what you wore on the couch" or "Using your normal voice".',
+  'authentic': 'Try "Not rehearsing what you are about to say".',
+  'vulnerability': 'Try "Admitting you do not know how to fix it" or "Asking for help before it breaks".',
+  'vulnerable': 'Try "Saying what scared you without making a joke".',
+  'boundaries': 'Try "Saying no without adding a three-sentence excuse" or "Turning the phone off at 9 PM".',
+  'boundary': 'Try "Leaving when you said you would leave".',
+  'synergy': 'Try "Finishing each other\'s chores without a list".',
+  'trauma': 'Try naming the specific flinch, like "Checking the locks twice".',
+  'alignment': 'Try "Agreeing on the plan in the parking lot".',
+  'closure': 'Try "Deleting the draft message" or "Boxing up their books".',
+  'mindfulness': 'Try "Sitting on the porch without your phone".',
+  'healing': 'Try "Talking about that year without your stomach knotting".',
+  'toxic': 'Try "Waiting for the other shoe to drop".',
+  'intimacy': 'Try "Being in the same room without needing to talk".',
+  'communication': 'Try "Saying it while washing the dishes".',
+  'validation': 'Try "Waiting to hear them say you were right".',
+  'accountability': 'Try "Cleaning up the mess you made without blaming traffic".',
+  'resilience': 'Try "Starting over the next morning".',
+  'codependency': 'Try "Checking their mood before you decide how your day went".',
+  'empowerment': 'Try "Making the call yourself".',
+  'transparency': 'Try "Leaving the numbers open on the table".',
+  'closure': 'Try "Stopping the argument in your head".'
+};
+
+function $(id){ return document.getElementById(id); }
+function el(tag, cls, text){ var n = document.createElement(tag); if (cls) n.className = cls; if (text != null) n.textContent = text; return n; }
+function clear(n){ while (n.firstChild) n.removeChild(n.firstChild); }
+
+// ---------- Custom Pole Pair Deck State ----------
+var customDeck = loadDeckFromStorage();
+var activeView = 'ws'; // 'ws' | 'play'
+
+// Workshop builder state
+var wsCornerNotes = { nw: '', ne: '', sw: '', se: '' };
+var wsCornerStatus = { nw: 'ok', ne: 'ok', sw: 'ok', se: 'ok' }; // 'ok' | 'bad'
+
+function loadDeckFromStorage(){
+  try {
+    var raw = localStorage.getItem(STORAGE_KEY);
+    if (raw){
+      var parsed = JSON.parse(raw);
+      if (Array.isArray(parsed) && parsed.length){
+        return parsed.map(sanitizeAxis).filter(Boolean);
+      }
+    }
+  } catch(e){}
+  return RECIPES.map(function(r){ return sanitizeAxis(r); });
+}
+
+function saveDeckToStorage(){
+  try {
+    localStorage.setItem(STORAGE_KEY, JSON.stringify(customDeck));
+  } catch(e){}
+}
+
+function sanitizeAxis(obj){
+  if (!obj) return null;
+  var top = String(obj.top || '').trim();
+  var bot = String(obj.bot || '').trim();
+  var left = String(obj.left || '').trim();
+  var right = String(obj.right || '').trim();
+  if (!top || !bot || !left || !right) return null;
+  var name = String(obj.name || (top + ' / ' + left)).trim();
+  return { name: name, top: top, bot: bot, left: left, right: right };
+}
+
+function deckToRawText(list){
+  return (list || customDeck).map(function(a){
+    return a.name + ' | ' + a.top + ' | ' + a.bot + ' | ' + a.left + ' | ' + a.right;
+  }).join('\n');
+}
+
+function parseRawTextToDeck(raw){
+  var lines = String(raw || '').split(/\r?\n/);
+  var out = [];
+  for (var i = 0; i < lines.length; i++){
+    var line = lines[i].trim();
+    if (!line || line.charAt(0) === '#') continue;
+    var parts = line.split('|').map(function(s){ return s.trim(); }).filter(Boolean);
+    if (parts.length === 4){
+      out.push({
+        name: parts[0] + ' × ' + parts[2],
+        top: parts[0], bot: parts[1], left: parts[2], right: parts[3]
+      });
+    } else if (parts.length >= 5){
+      out.push({
+        name: parts[0],
+        top: parts[1], bot: parts[2], left: parts[3], right: parts[4]
+      });
+    }
+  }
+  return out;
+}
+
+// ---------- Hub Bridge ----------
+var Hub = {
+  me: null, roster: [], room: '',
+  up: function(k, p){ try { window.parent.postMessage({ t: 'gu', game: GAME_ID, k: k, p: p }, '*'); } catch(e) {} },
+  init: function(){
+    window.addEventListener('message', onDown);
+    this.up('hello');
+    var topLevel = (window.parent === window);
+    setTimeout(function(){ if (!Hub.me) goLocal(); }, topLevel ? 50 : 1200);
+  }
+};
+var heightT = null;
+function reportHeight(){
+  clearTimeout(heightT);
+  heightT = setTimeout(function(){
+    var h = Math.ceil($('ps').getBoundingClientRect().height);
+    Hub.up('height', h);
+  }, 60);
+}
+function onDown(e){
+  var m = e.data;
+  if (!m || m.t !== 'gd' || m.game !== GAME_ID) return;
+  if (m.k === 'roster'){
+    Hub.me = m.p.you; Hub.roster = m.p.roster || []; Hub.room = m.p.room;
+    mode = 'hub';
+    onRoster();
+    return;
+  }
+  if (m.k === 'state'){ onState(m.p); return; }
+  if (m.k === 'intent'){ onIntent(m.p, m.from); return; }
+  if (m.k === 'denied'){ toast(m.p && m.p.text); return; }
+  if (m.k === 'reset'){ doReset(); return; }
+}
+
+// ---------- Game State (Updated for Rules 1, 2, 3, 4) ----------
+var S = null;
+var mode = 'wait';
+var soloOn = false;
+var selCell = null;      // { r, c }
+var toastText = '', noteT = null;
+
+// Cadence reveal timers
+var TYPE_MS = 45;
+var cerPhase = 'done', typedChars = 0, typeTimer = null, lastCerKey = '';
+
+function myId(){ return soloOn ? (S && S.order[S.turnPos % S.order.length]) || 'solo' : (Hub.me && Hub.me.id); }
+function isHost(){ return soloOn || !!(Hub.me && Hub.me.isHost); }
+function rawName(id){ return (S && S.names && S.names[id]) || id; }
+function nm(id){ return rawName(id); }
+function activePlayerId(){ return S && S.order.length ? S.order[S.turnPos % S.order.length] : null; }
+function arbiterId(){
+  if (!S || !S.order.length) return null;
+  if (S.order.length === 1) return S.order[0];
+  return S.order[(S.turnPos + 1) % S.order.length];
+}
+function iAmActive(){ return soloOn || (!!S && !!myId() && activePlayerId() === myId()); }
+function iAmArbiter(){ return soloOn || (!!S && !!myId() && arbiterId() === myId()); }
+
+function pairKey(idA, idB){
+  return idA < idB ? (idA + '|' + idB) : (idB + '|' + idA);
+}
+
+function makeEmptyGrid(){
+  var g = [];
+  for (var r = 0; r < 4; r++){
+    g.push([null, null, null, null]);
+  }
+  return g;
+}
+
+function getAxisAt(idx){
+  if (!customDeck.length){
+    customDeck = RECIPES.map(sanitizeAxis);
+  }
+  return customDeck[idx % customDeck.length];
+}
+
+// Rule 1 & 3: No Seed cards, no ko, no outgrown ejection list, no forced slide.
+function createBoardState(axisIdx, order, names, completedCount, customAxisObj){
+  var ax = customAxisObj ? sanitizeAxis(customAxisObj) : getAxisAt(axisIdx);
+  var grid = makeEmptyGrid();
+  return {
+    inst: Date.now() + '-' + Math.floor(Math.random() * 1e5),
+    axisIdx: axisIdx % Math.max(1, customDeck.length),
+    axis: ax,
+    seq: 1,
+    turn: 1,
+    turnPos: 0,
+    phase: 'place', // 'place' | 'judge' | 'finale'
+    order: order,
+    names: names,
+    grid: grid,
+    bridges: {},    // 'idA|idB': true (nodded seams on "did that step tell us something?")
+    lastMove: null, // { cardId, by, txt, coordStr, key }
+    win: null,      // { dir: 'V'|'H', fromPole, toPole, cards: [] }
+    shiftsCompleted: completedCount || 0
+  };
+}
+
+function startHubGame(nextAxis, explicitAxis){
+  if (!isHost()) return;
+  var names = {};
+  Hub.roster.forEach(function(m){ names[m.id] = m.name; });
+  var order = Hub.roster.map(function(m){ return m.id; });
+  if (!order.length) order = ['host'];
+  var idx = (S && nextAxis) ? (S.axisIdx + 1) % Math.max(1, customDeck.length) : (S ? S.axisIdx : 0);
+  var done = S ? S.shiftsCompleted : 0;
+  S = createBoardState(idx, order, names, done, explicitAxis);
+  selCell = null;
+  broadcast();
+}
+
+function startSolo(nextAxis, explicitAxis){
+  soloOn = true;
+  var idx = (S && nextAxis) ? (S.axisIdx + 1) % Math.max(1, customDeck.length) : (S ? S.axisIdx : 0);
+  var done = S ? S.shiftsCompleted : 0;
+  S = createBoardState(idx, ['p1', 'p2'], { p1: 'Seat 1', p2: 'Seat 2' }, done, explicitAxis);
+  selCell = null;
+  render();
+}
+
+function endSolo(){
+  if (!soloOn) return;
+  soloOn = false; S = null; selCell = null;
+  clearRevealTimers();
+  render();
+}
+
+function doReset(){
+  soloOn = false; S = null; selCell = null;
+  clearRevealTimers();
+  render();
+}
+
+function broadcast(){
+  render();
+  if (!S || !isHost() || soloOn) return;
+  Hub.up('state', S);
+}
+
+// ---------- Core Mechanics (Rule 2, 3, 4: True detail, Permanent placement, Table Nod Seams) ----------
+function cleanDetail(raw){
+  var s = String(raw == null ? '' : raw).replace(/\s+/g, ' ').trim();
+  if (!s) return { err: 'Write a true detail that happened to someone at the table.' };
+  if (s.length < 4) return { err: 'Give a slightly clearer detail.' };
+  if (s.length > DETAIL_MAX) s = s.slice(0, DETAIL_MAX);
+  return { txt: s };
+}
+
+function countAdjacentNeighbors(state, r, c){
+  var dirs = [[-1,0],[1,0],[0,-1],[0,1]];
+  var count = 0;
+  for (var i = 0; i < dirs.length; i++){
+    var nr = r + dirs[i][0], nc = c + dirs[i][1];
+    if (nr >= 0 && nr < 4 && nc >= 0 && nc < 4 && state.grid[nr][nc]) count++;
+  }
+  return count;
+}
+
+function applyPlaceDetail(state, r, c, txt, authorName){
+  if (state.phase !== 'place') return 'Finish inspecting the current seams first.';
+  if (r < 0 || r > 3 || c < 0 || c > 3 || state.grid[r][c]) return 'Pick an empty cell.';
+  var card = { id: 'c' + (state.seq++), txt: txt, by: authorName };
+  state.grid[r][c] = card;
+  var coordStr = String.fromCharCode(65 + r) + (c + 1);
+
+  state.lastMove = {
+    cardId: card.id,
+    by: authorName,
+    txt: txt,
+    coordStr: coordStr,
+    key: state.inst + ':' + state.turn
+  };
+
+  // Enter judge phase so the table can nod on any orthogonal seams
+  state.phase = 'judge';
+  return null;
+}
+
+// BFS for a continuous orthogonal path of nodded seams from North->South or West->East
+function checkWinPath(state){
+  var g = state.grid, b = state.bridges;
+  var dirs = [[-1,0],[1,0],[0,-1],[0,1]];
+
+  function bfs(starts, isGoal){
+    var q = [], prev = {}, vis = {};
+    starts.forEach(function(rc){
+      var k = rc[0] + ',' + rc[1];
+      q.push(rc); vis[k] = true;
+    });
+    while (q.length){
+      var cur = q.shift(), r = cur[0], c = cur[1], ck = r + ',' + c;
+      if (isGoal(r, c)){
+        var path = [];
+        var step = ck;
+        while (step){
+          var parts = step.split(','), pr = +parts[0], pc = +parts[1];
+          path.unshift({ r: pr, c: pc, card: g[pr][pc] });
+          step = prev[step];
+        }
+        return path;
+      }
+      var cardA = g[r][c];
+      for (var i = 0; i < dirs.length; i++){
+        var nr = r + dirs[i][0], nc = c + dirs[i][1], nk = nr + ',' + nc;
+        if (nr < 0 || nr > 3 || nc < 0 || nc > 3 || vis[nk] || !g[nr][nc]) continue;
+        var kEdge = pairKey(cardA.id, g[nr][nc].id);
+        if (b[kEdge]){
+          vis[nk] = true;
+          prev[nk] = ck;
+          q.push([nr, nc]);
+        }
+      }
+    }
+    return null;
+  }
+
+  // Check North (row 0) -> South (row 3)
+  var vStarts = [];
+  for (var c = 0; c < 4; c++) if (g[0][c]) vStarts.push([0, c]);
+  var vPath = bfs(vStarts, function(r){ return r === 3; });
+  if (vPath){
+    return { dir: 'V', fromPole: state.axis.top, toPole: state.axis.bot, cards: vPath };
+  }
+
+  // Check West (col 0) -> East (col 3)
+  var hStarts = [];
+  for (var r = 0; r < 4; r++) if (g[r][0]) hStarts.push([r, 0]);
+  var hPath = bfs(hStarts, function(r, c){ return c === 3; });
+  if (hPath){
+    return { dir: 'H', fromPole: state.axis.left, toPole: state.axis.right, cards: hPath };
+  }
+  return null;
+}
+
+// ---------- Cadence Pacing ----------
+function clearRevealTimers(){
+  if (typeTimer){ clearTimeout(typeTimer); typeTimer = null; }
+}
+function ensureCeremony(){
+  if (!S || !S.lastMove) return;
+  if (lastCerKey === S.lastMove.key) return;
+  clearRevealTimers();
+  lastCerKey = S.lastMove.key;
+  cerPhase = 'typing'; typedChars = 0;
+  stepType();
+}
+function stepType(){
+  if (!S || !S.lastMove || cerPhase !== 'typing') return;
+  var full = S.lastMove.txt || '';
+  if (typedChars < full.length){
+    typedChars++;
+    renderCeremonyBox();
+    var ch = full.charAt(typedChars - 1);
+    var delay = (ch === ',' || ch === ';' || ch === '—') ? 220 : (ch === '.' || ch === '?') ? 340 : TYPE_MS;
+    typeTimer = setTimeout(stepType, delay);
+  } else {
+    cerPhase = 'done';
+    renderCeremonyBox();
+    reportHeight();
+  }
+}
+
+// ---------- Intents & Multiplayer Sync ----------
+function onRoster(){
+  if (soloOn){ render(); return; }
+  if (isHost()){
+    if (S){
+      Hub.roster.forEach(function(m){
+        S.names[m.id] = m.name;
+        if (S.order.indexOf(m.id) === -1) S.order.push(m.id);
+      });
+    }
+    broadcast();
+  } else {
+    render();
+    Hub.up('intent', { a: 'hello' });
+  }
+}
+function onState(state){
+  if (!state || isHost()) return;
+  soloOn = false;
+  S = state;
+  mode = 'hub';
+  render();
+}
+function onIntent(d, from){
+  if (!isHost() || !d || !from || !S) return;
+  if (d.a === 'hello'){ broadcast(); return; }
+  if (d.a === 'move'){
+    if (from.id !== activePlayerId()){ Hub.up('denied', { to: from.id, text: 'Not your turn to place.' }); return; }
+    var err = applyPlaceDetail(S, d.r, d.c, d.txt, nm(from.id));
+    if (err) Hub.up('denied', { to: from.id, text: err });
+    else broadcast();
+    return;
+  }
+  if (d.a === 'seam'){
+    if (from.id !== arbiterId() && S.order.length > 1){
+      Hub.up('denied', { to: from.id, text: 'Only this turn\'s arbiter clicks a seam on a table nod.' });
+      return;
+    }
+    toggleSeamKey(d.k);
+    broadcast();
+    return;
+  }
+  if (d.a === 'nextTurn'){
+    advanceTurn();
+    broadcast();
+    return;
+  }
+}
+
+function toggleSeamKey(k){
+  if (!S || S.phase === 'finale') return;
+  if (S.bridges[k]) delete S.bridges[k];
+  else S.bridges[k] = true;
+  var w = checkWinPath(S);
+  if (w){
+    S.win = w;
+    S.phase = 'finale';
+    S.shiftsCompleted = (S.shiftsCompleted || 0) + 1;
+  }
+}
+
+function advanceTurn(){
+  if (!S) return;
+  var w = checkWinPath(S);
+  if (w){
+    S.win = w;
+    S.phase = 'finale';
+    S.shiftsCompleted = (S.shiftsCompleted || 0) + 1;
+    return;
+  }
+  S.turn++;
+  S.turnPos = (S.turnPos + 1) % Math.max(1, S.order.length);
+  S.phase = 'place';
+  selCell = null;
+}
+
+// ---------- UI Actions (Play Mode) ----------
+function actSelectCell(r, c){
+  if (!S || S.phase !== 'place') return;
+  if (!iAmActive()){ toast('Waiting for ' + nm(activePlayerId()) + ' to place a detail.'); return; }
+  if (S.grid[r][c]) return;
+  selCell = { r: r, c: c };
+  render();
+  try { $('in-detail').focus(); } catch(e) {}
+}
+
+function actLockMove(){
+  if (!S || !selCell) return;
+  var c = cleanDetail($('in-detail').value);
+  if (c.err){ toast(c.err); return; }
+  if (isHost()){
+    var author = nm(activePlayerId());
+    var err = applyPlaceDetail(S, selCell.r, selCell.c, c.txt, author);
+    if (err){ toast(err); return; }
+    $('in-detail').value = '';
+    selCell = null;
+    broadcast();
+  } else {
+    Hub.up('intent', { a: 'move', r: selCell.r, c: selCell.c, txt: c.txt });
+    $('in-detail').value = '';
+    selCell = null;
+  }
+}
+
+function actToggleSeam(k){
+  if (!S || S.phase === 'finale') return;
+  if (!iAmArbiter()){ toast('The arbiter (' + nm(arbiterId()) + ') clicks a seam on a table nod.'); return; }
+  if (isHost()){
+    toggleSeamKey(k);
+    broadcast();
+  } else {
+    Hub.up('intent', { a: 'seam', k: k });
+  }
+}
+
+function actFinishTurn(){
+  if (!S) return;
+  if (isHost()){
+    advanceTurn();
+    broadcast();
+  } else {
+    Hub.up('intent', { a: 'nextTurn' });
+  }
+}
+
+// ---------- Rendering Play Mode ----------
+function toast(t){
+  if (!t) return;
+  toastText = t;
+  render();
+  clearTimeout(noteT);
+  noteT = setTimeout(function(){ toastText = ''; noteT = null; render(); }, 2800);
+}
+
+function goLocal(){
+  if (Hub.me) return;
+  mode = 'local';
+  // Automatically start a clean solo/pass-and-play board so the 4x4 sheet is ready immediately when switching to Play view
+  if (!S) startSolo(false);
+  render();
+}
+
+function renderCeremonyBox(){
+  var box = $('ceremony');
+  if (!S || !S.lastMove){ box.classList.add('hidden'); return; }
+  box.classList.remove('hidden');
+  clear(box);
+  var m = S.lastMove;
+  var line = el('div', 'whyline');
+  line.appendChild(el('span', 'wn', m.by + ' remembered (' + m.coordStr + '):'));
+  var shown = cerPhase === 'typing' ? m.txt.slice(0, typedChars) : m.txt;
+  line.appendChild(document.createTextNode('"' + shown + '"'));
+  if (cerPhase === 'typing') line.appendChild(el('span', 'caret'));
+  box.appendChild(line);
+}
+
+function collectAdjacentPairs(){
+  var list = [];
+  if (!S) return list;
+  var g = S.grid;
+  for (var r = 0; r < 4; r++){
+    for (var c = 0; c < 4; c++){
+      var a = g[r][c];
+      if (!a) continue;
+      if (r + 1 < 4 && g[r + 1][c]){
+        var bV = g[r + 1][c];
+        list.push({
+          k: pairKey(a.id, bV.id),
+          dir: 'N↔S',
+          a: a, b: bV,
+          on: !!S.bridges[pairKey(a.id, bV.id)]
+        });
+      }
+      if (c + 1 < 4 && g[r][c + 1]){
+        var bH = g[r][c + 1];
+        list.push({
+          k: pairKey(a.id, bH.id),
+          dir: 'W↔E',
+          a: a, b: bH,
+          on: !!S.bridges[pairKey(a.id, bH.id)]
+        });
+      }
+    }
+  }
+  return list;
+}
+
+function renderBoard(){
+  var b = $('board');
+  clear(b);
+  var winIds = {};
+  if (S.win && S.win.cards){
+    S.win.cards.forEach(function(step){ winIds[step.card.id] = true; });
+  }
+  var lastId = S.lastMove && S.lastMove.cardId;
+
+  for (var gr = 0; gr < 7; gr++){
+    for (var gc = 0; gc < 7; gc++){
+      var isCellR = (gr % 2 === 0), isCellC = (gc % 2 === 0);
+      if (isCellR && isCellC){
+        var r = gr / 2, c = gc / 2;
+        var item = S.grid[r][c];
+        var coordStr = String.fromCharCode(65 + r) + (c + 1);
+        if (!item){
+          var isSel = selCell && selCell.r === r && selCell.c === c;
+          var locked = S.phase !== 'place' || !iAmActive();
+          var emptyCell = el('div', 'cell empty' + (isSel ? ' sel' : '') + (locked ? ' locked' : ''));
+          emptyCell.textContent = isSel ? ('[' + coordStr + ' selected]') : ('+ ' + coordStr);
+          if (!locked){
+            (function(rr, cc){
+              emptyCell.addEventListener('click', function(){ actSelectCell(rr, cc); });
+            })(r, c);
+          }
+          b.appendChild(emptyCell);
+        } else {
+          var cls = 'cell';
+          if (winIds[item.id]) cls += ' win';
+          else if (item.id === lastId) cls += ' just';
+          var cardEl = el('div', cls);
+          var topRow = el('div', 'c-coord');
+          topRow.appendChild(el('span', null, coordStr));
+          cardEl.appendChild(topRow);
+          cardEl.appendChild(el('div', 'c-txt', item.txt));
+          cardEl.appendChild(el('div', 'c-who', '— ' + item.by));
+          b.appendChild(cardEl);
+        }
+      } else if (isCellR && !isCellC){
+        // Horizontal seam between (r, cLeft) and (r, cLeft+1)
+        var rh = gr / 2, ch = (gc - 1) / 2;
+        var leftCard = S.grid[rh][ch], rightCard = S.grid[rh][ch + 1];
+        var sWrapH = el('div', 'seam h');
+        sWrapH.appendChild(el('span', 'seam-print-dot', '○'));
+        if (leftCard && rightCard){
+          var kh = pairKey(leftCard.id, rightCard.id);
+          var onH = !!S.bridges[kh];
+          var btnH = el('button', onH ? 'on' : '', onH ? '●' : '+');
+          btnH.type = 'button';
+          btnH.title = onH ? 'Nodded seam (click to unmark)' : 'Table nod: Did that step tell us something?';
+          btnH.disabled = !iAmArbiter() || S.phase === 'finale';
+          (function(key){
+            btnH.addEventListener('click', function(){ actToggleSeam(key); });
+          })(kh);
+          sWrapH.appendChild(btnH);
+        }
+        b.appendChild(sWrapH);
+      } else if (!isCellR && isCellC){
+        // Vertical seam between (rTop, c) and (rTop+1, c)
+        var rv = (gr - 1) / 2, cv = gc / 2;
+        var topCard = S.grid[rv][cv], botCard = S.grid[rv + 1][cv];
+        var sWrapV = el('div', 'seam v');
+        sWrapV.appendChild(el('span', 'seam-print-dot', '○'));
+        if (topCard && botCard){
+          var kv = pairKey(topCard.id, botCard.id);
+          var onV = !!S.bridges[kv];
+          var btnV = el('button', onV ? 'on' : '', onV ? '●' : '+');
+          btnV.type = 'button';
+          btnV.title = onV ? 'Nodded seam (click to unmark)' : 'Table nod: Did that step tell us something?';
+          btnV.disabled = !iAmArbiter() || S.phase === 'finale';
+          (function(key){
+            btnV.addEventListener('click', function(){ actToggleSeam(key); });
+          })(kv);
+          sWrapV.appendChild(btnV);
+        }
+        b.appendChild(sWrapV);
+      } else {
+        b.appendChild(el('div'));
+      }
+    }
+  }
+}
+
+function renderComposer(){
+  var comp = $('composer');
+  if (!S || S.phase !== 'place' || !selCell || !iAmActive()){
+    comp.classList.add('hidden');
+    return;
+  }
+  comp.classList.remove('hidden');
+  var coordStr = String.fromCharCode(65 + selCell.r) + (selCell.c + 1);
+  $('comp-coord').textContent = coordStr;
+}
+
+function renderJudgeBox(){
+  var jb = $('judge-box');
+  if (!S || S.phase !== 'judge'){
+    jb.classList.add('hidden');
+    return;
+  }
+  jb.classList.remove('hidden');
+  var listEl = $('pair-list');
+  clear(listEl);
+  var pairs = collectAdjacentPairs();
+  if (!pairs.length){
+    listEl.appendChild(el('p', null, 'No two cards are touching orthogonally yet. Click "Finish turn & pass" to continue.'));
+  } else {
+    pairs.forEach(function(p){
+      var row = el('div', 'pair-item' + (p.on ? ' on' : ''));
+      var txt = el('div', null, '[' + p.dir + '] "' + p.a.txt + '"  ↔  "' + p.b.txt + '"');
+      row.appendChild(txt);
+      if (iAmArbiter()){
+        var b = el('button', 'small', p.on ? '● Table Nodded' : '+ Did that step tell us something?');
+        b.type = 'button';
+        (function(k){
+          b.addEventListener('click', function(){ actToggleSeam(k); });
+        })(p.k);
+        row.appendChild(b);
+      } else {
+        row.appendChild(el('span', null, p.on ? '● Table Nodded' : 'Unmarked'));
+      }
+      listEl.appendChild(row);
+    });
+  }
+}
+
+function renderFinale(){
+  var fin = $('finale');
+  if (!S || S.phase !== 'finale' || !S.win){
+    fin.classList.add('hidden');
+    return;
+  }
+  fin.classList.remove('hidden');
+  clear(fin);
+  fin.appendChild(el('h2', null, 'The Paradigm Shift'));
+  fin.appendChild(el('p', 'sub', 'A continuous chain of true memories from ' + S.win.fromPole + ' to ' + S.win.toPole + ':'));
+
+  var chain = el('div', 'chain');
+  chain.appendChild(el('div', 'chain-pole', 'START: ' + S.win.fromPole));
+  S.win.cards.forEach(function(step, idx){
+    var item = el('div', 'chain-step', (idx + 1) + '. "' + step.card.txt + '"');
+    item.appendChild(el('small', null, 'remembered by ' + step.card.by));
+    chain.appendChild(item);
+  });
+  chain.appendChild(el('div', 'chain-pole', 'ARRIVAL: ' + S.win.toPole));
+  fin.appendChild(chain);
+
+  if (isHost()){
+    var nextBtn = el('button', 'go', 'Next Hand-Written Pole Pair');
+    nextBtn.type = 'button';
+    nextBtn.addEventListener('click', function(){
+      if (soloOn) startSolo(true);
+      else startHubGame(true);
+    });
+    fin.appendChild(nextBtn);
+  }
+}
+
+function renderPeople(){
+  var ul = $('people');
+  clear(ul);
+  if (!S) return;
+  var act = activePlayerId(), arb = arbiterId();
+  S.order.forEach(function(id){
+    var tags = [];
+    if (id === act) tags.push('placing');
+    if (id === arb) tags.push('arbiter');
+    var label = nm(id) + (tags.length ? ' [' + tags.join(', ') + ']' : '');
+    var li = el('li', id === act ? 'active' : '', label);
+    ul.appendChild(li);
+  });
+  $('tally').textContent = 'Turn ' + S.turn + ' · Paper-playable static board' + (S.shiftsCompleted ? (' · Shifts: ' + S.shiftsCompleted) : '');
+}
+
+// ---------- Workshop Logic & Live Diagnostics ----------
+function loadAxisIntoBuilder(ax){
+  if (!ax) return;
+  $('ws-name').value = ax.name || '';
+  $('ws-top').value = ax.top || '';
+  $('ws-bot').value = ax.bot || '';
+  $('ws-left').value = ax.left || '';
+  $('ws-right').value = ax.right || '';
+  wsCornerStatus = { nw: 'ok', ne: 'ok', sw: 'ok', se: 'ok' };
+  updateWorkshopLive();
+}
+
+function currentBuilderAxis(){
+  var top = $('ws-top').value.trim();
+  var bot = $('ws-bot').value.trim();
+  var left = $('ws-left').value.trim();
+  var right = $('ws-right').value.trim();
+  var name = $('ws-name').value.trim() || ((top && left) ? (top + ' × ' + left) : 'Untitled Territory');
+  return { name: name, top: top, bot: bot, left: left, right: right };
+}
+
+function detectBuzzwords(ax){
+  var hits = [];
+  var fields = [
+    { label: 'North Pole', val: ax.top },
+    { label: 'South Pole', val: ax.bot },
+    { label: 'West Pole', val: ax.left },
+    { label: 'East Pole', val: ax.right }
+  ];
+  fields.forEach(function(f){
+    if (!f.val) return;
+    var words = f.val.toLowerCase().replace(/[^a-z\s]/g, ' ').split(/\s+/);
+    words.forEach(function(w){
+      if (BUZZWORDS[w]){
+        hits.push({ pole: f.label, word: w, tip: BUZZWORDS[w] });
+      }
+    });
+    if (f.val.trim().split(/\s+/).length === 1 && f.val.length > 3){
+      hits.push({
+        pole: f.label,
+        word: f.val.trim(),
+        tip: 'Single-word nouns ("' + f.val.trim() + '") read like chapter titles. Turn it into a phrase with a verb or posture (e.g., "Keeping ___" or "Waiting for ___").'
+      });
+    }
+  });
+  return hits;
+}
+
+function updateWorkshopLive(){
+  var ax = currentBuilderAxis();
+  var buzzEl = $('buzz-box');
+  clear(buzzEl);
+
+  var hits = detectBuzzwords(ax);
+  if (hits.length){
+    buzzEl.className = 'buzz-box warn';
+    buzzEl.appendChild(el('b', null, 'Abstraction Alert — Why this might block real memories:'));
+    var ul = el('ul');
+    hits.forEach(function(h){
+      ul.appendChild(el('li', null, h.pole + ' uses "' + h.word + '": ' + h.tip));
+    });
+    buzzEl.appendChild(ul);
+  } else if (ax.top && ax.bot && ax.left && ax.right){
+    buzzEl.className = 'buzz-box';
+    buzzEl.textContent = '✓ Plain-Spoken Check Passed: No abstract therapy/corporate buzzwords detected. Your poles read like lived human postures.';
+  } else {
+    buzzEl.className = 'buzz-box';
+    buzzEl.textContent = 'Type your four poles above (or click a Recipe) to run the live Buzzword & Abstraction check.';
+  }
+
+  // Render 4-Corner Cross-Breeze Matrix
+  var cg = $('corner-grid');
+  clear(cg);
+  var nLabel = ax.top || '[North Pole]';
+  var sLabel = ax.bot || '[South Pole]';
+  var wLabel = ax.left || '[West Pole]';
+  var eLabel = ax.right || '[East Pole]';
+
+  var corners = [
+    { key: 'nw', coord: 'A1 (North-West Corner)', combo: nLabel + '  +  ' + wLabel },
+    { key: 'ne', coord: 'A4 (North-East Corner)', combo: nLabel + '  +  ' + eLabel },
+    { key: 'sw', coord: 'D1 (South-West Corner)', combo: sLabel + '  +  ' + wLabel },
+    { key: 'se', coord: 'D4 (South-East Corner)', combo: sLabel + '  +  ' + eLabel }
+  ];
+
+  corners.forEach(function(c){
+    var st = wsCornerStatus[c.key];
+    var card = el('div', 'corner-cell ' + (st === 'bad' ? 'bad' : 'good'));
+    var head = el('div', 'corner-head');
+    head.appendChild(el('span', null, c.coord));
+    head.appendChild(el('span', null, st === 'bad' ? '✗ Flagged' : '✓ Habitable'));
+    card.appendChild(head);
+    card.appendChild(el('div', 'corner-combo', c.combo));
+
+    var inp = el('input');
+    inp.type = 'text';
+    inp.maxLength = 75;
+    inp.placeholder = 'Jot a 5-word real memory that fits both poles...';
+    inp.value = wsCornerNotes[c.key] || '';
+    (function(k){
+      inp.addEventListener('input', function(e){
+        wsCornerNotes[k] = e.target.value;
+      });
+    })(c.key);
+    card.appendChild(inp);
+
+    var toggles = el('div', 'corner-toggles');
+    var bOk = el('button', st === 'ok' ? 'on' : '', '✓ Real memory works');
+    bOk.type = 'button';
+    var bBad = el('button', st === 'bad' ? 'on' : '', '✗ Feels impossible / same');
+    bBad.type = 'button';
+    (function(k){
+      bOk.addEventListener('click', function(){ wsCornerStatus[k] = 'ok'; updateWorkshopLive(); });
+      bBad.addEventListener('click', function(){ wsCornerStatus[k] = 'bad'; updateWorkshopLive(); });
+    })(c.key);
+    toggles.appendChild(bOk);
+    toggles.appendChild(bBad);
+    card.appendChild(toggles);
+    cg.appendChild(card);
+  });
+
+  // 4-Corner Diagnosis Banner
+  var diag = $('corner-diag');
+  clear(diag);
+  if (wsCornerStatus.ne === 'bad' || wsCornerStatus.sw === 'bad' || wsCornerStatus.nw === 'bad' || wsCornerStatus.se === 'bad'){
+    diag.className = 'buzz-box warn';
+    diag.appendChild(el('b', null, 'DIAGNOSIS: Your two axes are overlapping (The Diagonal Mirror Trap)!'));
+    diag.appendChild(el('p', null, 'When a corner feels impossible or contradictory, it means West↔East is measuring the exact same thing as North↔South. Fix: Keep North↔South ("' + nLabel + ' ↔ ' + sLabel + '") as your inner posture, and change West↔East to WHO is in the room ("By Yourself ↔ In Front of Everyone") or HOW it shows ("Said Only in Your Head ↔ Said Out Loud").'));
+  } else {
+    diag.className = 'buzz-box';
+    diag.textContent = '✓ All 4 corners are open. Because North↔South and West↔East measure different dimensions, players can start anywhere on the 4×4 grid.';
+  }
+
+  // Update Quiz labels and live feedback
+  $('q2-n').textContent = nLabel;
+  $('q2-s').textContent = sLabel;
+  updateQuizFeedback();
+
+  var ready = !!(ax.top && ax.bot && ax.left && ax.right);
+  $('b-save-pair').disabled = !ready;
+  $('b-play-pair').disabled = !ready;
+  $('ws-ready-badge').textContent = ready
+    ? ('Ready: "' + ax.name + '" (' + ax.top + ' ↔ ' + ax.bot + ' | ' + ax.left + ' ↔ ' + ax.right + ')')
+    : 'Fill in all four poles (North, South, West, East) to save or play.';
+  reportHeight();
+}
+
+function updateQuizFeedback(){
+  var q1 = $('q1-in').value.trim();
+  var q2 = $('q2-in').value.trim();
+  var q3 = $('q3-in').value.trim();
+
+  var fb1 = $('q1-fb');
+  if (!q1){
+    fb1.textContent = 'Write one real, lived moment (under 80 chars) to prove the board needs no Seed cards.';
+  } else if (q1.split(/\s+/).length < 4){
+    fb1.textContent = 'Make it slightly more concrete—name the room, object, or action so the table can picture it.';
+  } else {
+    fb1.textContent = '✓ Good anchor memory (' + q1.length + '/80 chars). Because it actually happened, everyone at the table immediately gets what kind of truth belongs on this board.';
+  }
+
+  var fb2 = $('q2-fb');
+  if (!q2){
+    fb2.textContent = 'Describe how a West-side path from North→South differs from an East-side path.';
+  } else if (q2.split(/\s+/).length < 4){
+    fb2.textContent = 'Add a few more words comparing the West route vs. the East route.';
+  } else {
+    fb2.textContent = '✓ Two distinct routes verified. Your West↔East axis gives the table real lateral room to maneuver.';
+  }
+
+  var fb3 = $('q3-fb');
+  if (!q3){
+    fb3.textContent = 'Describe a two-card jump that would make the table nod ("that step told us something").';
+  } else {
+    fb3.textContent = '✓ Seam check ready: the arbiter clicks a seam (●) only when the table nods that the step between two memories told them something.';
+  }
+}
+
+function renderDeckLists(){
+  var dl = $('deck-list');
+  var dr = $('drawer-deck');
+  clear(dl);
+  clear(dr);
+
+  customDeck.forEach(function(ax, idx){
+    var isCurrent = S && S.axis && S.axis.top === ax.top && S.axis.left === ax.left;
+    var row = el('div', 'deck-row' + (isCurrent ? ' active' : ''));
+    var info = el('div');
+    info.appendChild(el('b', null, (idx + 1) + '. ' + ax.name));
+    info.appendChild(el('div', 'muted', 'N↔S: ' + ax.top + ' → ' + ax.bot + '  |  W↔E: ' + ax.left + ' → ' + ax.right));
+    row.appendChild(info);
+
+    var acts = el('div', 'deck-row-actions');
+    var bEdit = el('button', 'small', 'Edit in Builder');
+    bEdit.type = 'button';
+    (function(a){
+      bEdit.addEventListener('click', function(){ loadAxisIntoBuilder(a); window.scrollTo(0, 0); });
+    })(ax);
+
+    var bPlay = el('button', 'small', 'Put on Board →');
+    bPlay.type = 'button';
+    (function(i, a){
+      bPlay.addEventListener('click', function(){
+        if (S) S.axisIdx = i;
+        if (soloOn || !Hub.me) startSolo(false, a);
+        else startHubGame(false, a);
+        switchView('play');
+      });
+    })(idx, ax);
+
+    var bDel = el('button', 'small', '×');
+    bDel.type = 'button';
+    bDel.title = 'Remove from deck';
+    bDel.disabled = customDeck.length <= 1;
+    (function(i){
+      bDel.addEventListener('click', function(){
+        if (customDeck.length <= 1) return;
+        customDeck.splice(i, 1);
+        saveDeckToStorage();
+        syncRawTextareas();
+        renderDeckLists();
+      });
+    })(idx);
+
+    acts.appendChild(bEdit);
+    acts.appendChild(bPlay);
+    acts.appendChild(bDel);
+    row.appendChild(acts);
+    dl.appendChild(row);
+
+    // Compact row for Play Mode drawer
+    var dRow = el('div', 'deck-row' + (isCurrent ? ' active' : ''));
+    dRow.appendChild(el('span', null, (idx + 1) + '. ' + ax.name + ' (' + ax.top + ' ↔ ' + ax.bot + ' / ' + ax.left + ' ↔ ' + ax.right + ')'));
+    var dUse = el('button', 'small', isCurrent ? 'Active on Board' : 'Load Pair');
+    dUse.type = 'button';
+    (function(i, a){
+      dUse.addEventListener('click', function(){
+        if (S) S.axisIdx = i;
+        if (soloOn || !Hub.me) startSolo(false, a);
+        else startHubGame(false, a);
+        $('loader-drawer').classList.add('hidden');
+        render();
+      });
+    })(idx, ax);
+    dRow.appendChild(dUse);
+    dr.appendChild(dRow);
+  });
+}
+
+function syncRawTextareas(){
+  var txt = deckToRawText(customDeck);
+  $('raw-loader').value = txt;
+  $('drawer-raw').value = txt;
+}
+
+function switchView(v){
+  activeView = v;
+  var isWs = (v === 'ws');
+  $('tab-ws').classList.toggle('on', isWs);
+  $('tab-ws').setAttribute('aria-selected', isWs ? 'true' : 'false');
+  $('tab-play').classList.toggle('on', !isWs);
+  $('tab-play').setAttribute('aria-selected', !isWs ? 'true' : 'false');
+  $('workshop-view').classList.toggle('hidden', !isWs);
+  $('play-view').classList.toggle('hidden', isWs);
+  $('menu').classList.toggle('hidden', isWs);
+  if (!isWs && !S && mode !== 'hub'){
+    startSolo(false);
+  }
+  render();
+}
+
+function render(){
+  renderDeckLists();
+  var hub = (mode === 'hub'), local = (mode === 'local');
+  var hasGame = !!S;
+  var home = !hasGame && (local || hub);
+
+  $('b-home').classList.toggle('hidden', !soloOn);
+  $('homebtns').classList.toggle('hidden', !home);
+  $('b-start').classList.toggle('hidden', !(hub && isHost() && !hasGame));
+  $('lead').classList.toggle('hidden', !home);
+  $('game-ui').classList.toggle('hidden', !hasGame);
+
+  var st = toastText;
+  if (!st){
+    if (mode === 'wait') st = 'Connecting to the table...';
+    else if (!hasGame) st = '';
+    else if (S.phase === 'place') st = nm(activePlayerId()) + '\'s turn: click any empty square to place a true detail that happened to someone at the table.';
+    else if (S.phase === 'judge') st = 'Arbiter (' + nm(arbiterId()) + '): click a seam (●) only on a table nod for "did that step tell us something?", then finish turn.';
+    else if (S.phase === 'finale') st = 'Shift complete!';
+  }
+  $('status').textContent = st;
+  $('status').classList.toggle('hidden', !st);
+
+  if (hasGame){
+    $('arbnote').textContent = soloOn
+      ? ('Placing: ' + nm(activePlayerId()) + ' · Arbiter: ' + nm(arbiterId()))
+      : (iAmArbiter() ? 'You are the Arbiter (click a seam only on a table nod)' : ('Arbiter: ' + nm(arbiterId())));
+    $('arbnote').classList.remove('hidden');
+
+    var ah = $('axes-head');
+    clear(ah);
+    var d1 = el('div');
+    d1.appendChild(el('b', null, 'North ↔ South (' + S.axis.name + ')'));
+    d1.appendChild(el('span', null, S.axis.top + '  ↔  ' + S.axis.bot));
+    var d2 = el('div');
+    d2.appendChild(el('b', null, 'West ↔ East'));
+    d2.appendChild(el('span', null, S.axis.left + '  ↔  ' + S.axis.right));
+    ah.appendChild(d1); ah.appendChild(d2);
+
+    $('p-top').innerHTML = '';
+    $('p-top').appendChild(document.createTextNode(S.axis.top));
+    $('p-top').appendChild(el('small', null, '(North)'));
+
+    $('p-bot').innerHTML = '';
+    $('p-bot').appendChild(document.createTextNode(S.axis.bot));
+    $('p-bot').appendChild(el('small', null, '(South)'));
+
+    $('p-left').textContent = S.axis.left;
+    $('p-right').textContent = S.axis.right;
+
+    renderBoard();
+    renderComposer();
+    if (S.lastMove){
+      ensureCeremony();
+      renderCeremonyBox();
+    } else {
+      $('ceremony').classList.add('hidden');
+    }
+    renderJudgeBox();
+    renderFinale();
+    renderPeople();
+  } else {
+    $('arbnote').classList.add('hidden');
+  }
+  reportHeight();
+}
+
+// ---------- Wire Up Event Listeners ----------
+$('tab-ws').addEventListener('click', function(){ switchView('ws'); });
+$('tab-play').addEventListener('click', function(){ switchView('play'); });
+$('b-go-board').addEventListener('click', function(){ switchView('play'); });
+$('b-open-ws').addEventListener('click', function(){ switchView('ws'); });
+
+// Workshop recipe & stem buttons
+document.querySelectorAll('[data-recipe]').forEach(function(btn){
+  btn.addEventListener('click', function(){
+    var idx = +btn.getAttribute('data-recipe');
+    loadAxisIntoBuilder(RECIPES[idx]);
+  });
+});
+
+document.querySelectorAll('[data-stem-ns]').forEach(function(btn){
+  btn.addEventListener('click', function(){
+    var parts = btn.getAttribute('data-stem-ns').split('|');
+    $('ws-top').value = parts[0] || '';
+    $('ws-bot').value = parts[1] || '';
+    updateWorkshopLive();
+    $('ws-top').focus();
+  });
+});
+
+document.querySelectorAll('[data-stem-we]').forEach(function(btn){
+  btn.addEventListener('click', function(){
+    var parts = btn.getAttribute('data-stem-we').split('|');
+    $('ws-left').value = parts[0] || '';
+    $('ws-right').value = parts[1] || '';
+    updateWorkshopLive();
+    $('ws-left').focus();
+  });
+});
+
+$('b-clear-builder').addEventListener('click', function(){
+  $('ws-name').value = '';
+  $('ws-top').value = '';
+  $('ws-bot').value = '';
+  $('ws-left').value = '';
+  $('ws-right').value = '';
+  wsCornerNotes = { nw: '', ne: '', sw: '', se: '' };
+  wsCornerStatus = { nw: 'ok', ne: 'ok', sw: 'ok', se: 'ok' };
+  updateWorkshopLive();
+});
+
+['ws-name', 'ws-top', 'ws-bot', 'ws-left', 'ws-right'].forEach(function(id){
+  $(id).addEventListener('input', updateWorkshopLive);
+});
+
+['q1-in', 'q2-in', 'q3-in'].forEach(function(id){
+  $(id).addEventListener('input', updateQuizFeedback);
+});
+
+function upsertBuilderPairToDeck(){
+  var ax = sanitizeAxis(currentBuilderAxis());
+  if (!ax) return null;
+  var found = -1;
+  for (var i = 0; i < customDeck.length; i++){
+    if (customDeck[i].name.toLowerCase() === ax.name.toLowerCase()){
+      found = i; break;
+    }
+  }
+  if (found >= 0) customDeck[found] = ax;
+  else customDeck.unshift(ax);
+  saveDeckToStorage();
+  syncRawTextareas();
+  renderDeckLists();
+  return ax;
+}
+
+$('b-save-pair').addEventListener('click', function(){
+  var ax = upsertBuilderPairToDeck();
+  if (ax) toast('Saved "' + ax.name + '" to your Pole Pair Loader.');
+});
+
+$('b-play-pair').addEventListener('click', function(){
+  var ax = upsertBuilderPairToDeck();
+  if (!ax) return;
+  if (soloOn || !Hub.me) startSolo(false, ax);
+  else startHubGame(false, ax);
+  switchView('play');
+});
+
+$('b-parse-replace').addEventListener('click', function(){
+  var list = parseRawTextToDeck($('raw-loader').value);
+  if (!list.length){ toast('Use format: Title | North | South | West | East'); return; }
+  customDeck = list;
+  saveDeckToStorage();
+  syncRawTextareas();
+  renderDeckLists();
+});
+
+$('b-parse-append').addEventListener('click', function(){
+  var list = parseRawTextToDeck($('raw-loader').value);
+  if (!list.length){ toast('Use format: Title | North | South | West | East'); return; }
+  customDeck = customDeck.concat(list);
+  saveDeckToStorage();
+  syncRawTextareas();
+  renderDeckLists();
+});
+
+$('b-copy-loader').addEventListener('click', function(){
+  var ta = $('raw-loader');
+  ta.select();
+  try { document.execCommand('copy'); } catch(e){}
+});
+
+// Play view controls
+$('b-drawer').addEventListener('click', function(){
+  $('loader-drawer').classList.toggle('hidden');
+  reportHeight();
+});
+$('b-close-drawer').addEventListener('click', function(){
+  $('loader-drawer').classList.add('hidden');
+  reportHeight();
+});
+$('b-drawer-to-ws').addEventListener('click', function(){
+  $('loader-drawer').classList.add('hidden');
+  switchView('ws');
+});
+$('b-drawer-apply').addEventListener('click', function(){
+  var list = parseRawTextToDeck($('drawer-raw').value);
+  if (!list.length){ toast('Format each line as: Title | North | South | West | East'); return; }
+  customDeck = list;
+  saveDeckToStorage();
+  syncRawTextareas();
+  if (soloOn || !Hub.me) startSolo(false, customDeck[0]);
+  else startHubGame(false, customDeck[0]);
+  $('loader-drawer').classList.add('hidden');
+  render();
+});
+
+$('b-print').addEventListener('click', function(){
+  window.print();
+});
+
+$('b-start').addEventListener('click', function(){ startHubGame(false); });
+$('b-solo').addEventListener('click', function(){ startSolo(false); });
+$('b-new').addEventListener('click', function(){
+  if (soloOn) startSolo(false, S && S.axis);
+  else startHubGame(false, S && S.axis);
+});
+$('b-swap').addEventListener('click', function(){
+  if (soloOn) startSolo(true);
+  else startHubGame(true);
+});
+$('b-home').addEventListener('click', endSolo);
+$('b-cancel').addEventListener('click', function(){
+  selCell = null;
+  render();
+});
+$('b-lock').addEventListener('click', actLockMove);
+$('in-detail').addEventListener('keydown', function(e){
+  if (e.key === 'Enter'){ e.preventDefault(); actLockMove(); }
+});
+$('b-next-turn').addEventListener('click', actFinishTurn);
+$('rules').addEventListener('toggle', reportHeight);
+window.addEventListener('resize', reportHeight);
+
+// Initialize Workshop with Recipe A and sync raw loader text
+loadAxisIntoBuilder(customDeck[0] || RECIPES[0]);
+syncRawTextareas();
+Hub.init();
+render();
+})();
+</script>
+</body>
+</html>
