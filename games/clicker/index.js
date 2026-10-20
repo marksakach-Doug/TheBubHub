@@ -155,21 +155,14 @@ export function mount(root, api) {
   const scoreBig = el('font-size:48px;font-weight:700;');
   const moreSmall = el('font-size:18px;opacity:.8;');
   const nextBtn = el('font:inherit;font-size:18px;padding:10px 20px;border-radius:8px;border:none;background:#4cd137;color:#111;cursor:pointer;', 'NEXT', 'button');
-  nextBtn.onclick = () => api.send({ a: 'next' });
+  nextBtn.addEventListener('click', () => api.send({ a: 'next' }));
   card.append(scoreBig, moreSmall, nextBtn);
 
   const bar = el('display:flex;align-items:center;gap:10px;margin-top:12px;');
   const reset = el('font:inherit;font-size:15px;padding:9px 14px;min-height:40px;'
     + 'border-radius:10px;border:1px solid #3a465f;background:#232c3f;color:#e8ecf4;cursor:pointer;', 'Reset run', 'button');
-  reset.onclick = () => api.send({ a: 'reset' });
-  const legend = el('font-size:13px;opacity:.7;margin-left:auto;text-align:right;');
-  [[]].forEach(([c, t]) => {
-    const bit = el('', '', 'span');
-    bit.style.color = COLOURS[c];
-    const box = el('font-size:11px;vertical-align:middle', '■');
-    bit.append(box, document.createTextNode(' ' + t));
-    legend.append(bit, document.createTextNode('  '));
-  });
+  reset.addEventListener('click', () => api.send({ a: 'reset' }));
+;
   bar.append(reset, legend);
 
   // Block page gestures (scroll/zoom/double-tap) everywhere except the reset button.
