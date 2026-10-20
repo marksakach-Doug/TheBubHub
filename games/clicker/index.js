@@ -4,6 +4,8 @@ const MAX_LEVEL = CELLS;
 const LEVEL_MS = 16000;
 const BG = '#1d2434';
 const COLOURS = { red: '#ff4d4d', yellow: '#facc15', blue: '#2f6bd8' };
+// 9-note warm pentatonic scale across two octaves for row/col interval mapping
+const SCALE = [220, 246.94, 277.18, 329.63, 369.99, 440, 493.88, 554.37, 659.25];
 
 export const meta = {
   id: 'clicker',
@@ -120,25 +122,56 @@ export function mount(root, api) {
     return e;
   };
 
-  const wrap = el('position:relative;max-width:min(460px, 65vh);margin:0 auto;padding:8px 10px 18px;'
+  let actx = null;
+  function voice(freq, pan, gainVal, dur, type = 'triangle', delay = 0) {
+    try {
+      if (!actx) actx = new (window.AudioContext || window.webkitAudioContext)();
+      if (actx.state === 'suspended') actx.resume();
+      const t = actx.currentTime + delay;
+      const osc = actx.createOscillator();
+      const g = actx.createGain();
+      osc.type = type;
+      osc.frequency.setValueAtTime(freq, t);
+      g.gain.setValueAtTime(0.0001, t);
+      g.gain.linearRampToValueAtTime(gainVal, t + 0.012);
+      g.gain.exponentialRampToValueAtTime(0.0001, t + dur);
+      if (actx.createStereoPanner) {
+        const p = actx.createStereoPanner();
+        p.pan.setValueAtTime(pan, t);
+        osc.connect(g).connect(p).connect(actx.destination);
+      } else {
+        osc.connect(g).connect(actx.destination);
+      }
+      osc.start(t);
+      osc.stop(t + dur + 0.02);
+    } catch (_) {}
+  }
+
+  function playCounterpoint(redCell, yellowCell) {
+    const r = cellAt(redCell);
+    const rFreq = SCALE[GRID - 1 - r.row] * (1 + (r.col - 4) * 0.015);
+    const rPan = ((r.col / (GRID - 1)) * 2 - 1) * 0.75;
+    voice(rFreq, rPan, 0.16, 0.19, 'triangle', 0);
+
+    if (yellowCell != null) {
+      const y = cellAt(yellowCell);
+      const yFreq = SCALE[GRID - 1 - y.row] * 1.5 * (1 + (y.col - 4) * 0.015);
+      const yPan = ((y.col / (GRID - 1)) * 2 - 1) * 0.75;
+      voice(yFreq, yPan, 0.075, 0.28, 'sine', 0.045);
+    }
+  }
+
+  const wrap = el('position:relative;max-width:min(460px, 68vh);margin:0 auto;padding:12px 10px 18px;'
     + 'font-family:system-ui,-apple-system,Segoe UI,Roboto,sans-serif;color:#e8ecf4;'
     + 'user-select:none;-webkit-user-select:none;touch-action:none;');
-  const head = el('display:flex;align-items:baseline;gap:10px;margin-bottom:4px;');
-  const scoreEl = el('font-size:26px;font-weight:700;');
-  const timerEl = el('font-size:18px;font-weight:700;font-variant-numeric:tabular-nums;margin-left:auto;');
-  const levelEl = el('font-size:15px;opacity:.75;');
-  head.append(scoreEl, timerEl, levelEl);
-
-  const track = el('width:100%;height:6px;background:' + BG + ';border-radius:3px;overflow:hidden;margin-bottom:8px;');
-  const fill = el('height:100%;width:100%;background:#4cd137;transition:width .05s linear;');
-  track.append(fill);
-  const hint = el('font-size:14px;opacity:.8;margin-bottom:10px;min-height:20px;');
+  const hint = el('font-size:14px;opacity:.8;margin-bottom:8px;min-height:20px;text-align:center;');
 
   const board = el('display:grid;grid-template-columns:repeat(' + GRID + ',1fr);'
-    + 'gap:4px;width:100%;aspect-ratio:1/1;touch-action:none;');
+    + 'gap:4px;width:100%;aspect-ratio:1/1;touch-action:none;padding:4px;border-radius:12px;'
+    + 'border:1px solid transparent;transition:border-color .3s ease;');
   const cells = Array.from({ length: CELLS }, (_, i) => {
     const b = el('border-radius:8px;background:' + BG + ';border:1px solid #2b3448;'
-      + 'cursor:pointer;touch-action:none;transition:background .12s ease,transform .08s ease;');
+      + 'cursor:pointer;touch-action:none;transition:background .1s ease,transform .08s ease;');
     b.addEventListener('pointerdown', (e) => {
       if (e.button) return;
       e.preventDefault();
@@ -150,27 +183,25 @@ export function mount(root, api) {
 
   const card = el('display:none;position:absolute;top:50%;left:50%;transform:translate(-50%,-50%);'
     + 'flex-direction:column;align-items:center;gap:10px;padding:26px;text-align:center;'
-    + 'background:rgba(29,36,52,.95);border-radius:10px;box-shadow:0 8px 24px rgba(0,0,0,.4);'
-    + 'z-index:10;');
+    + 'background:rgba(29,36,52,.95);border-radius:10px;box-shadow:0 8px 24px rgba(0,0,0,.4);z-index:10;');
   const scoreBig = el('font-size:48px;font-weight:700;');
   const moreSmall = el('font-size:18px;opacity:.8;');
   const nextBtn = el('font:inherit;font-size:18px;padding:10px 20px;border-radius:8px;border:none;background:#4cd137;color:#111;cursor:pointer;', 'NEXT', 'button');
   nextBtn.addEventListener('pointerdown', () => api.send({ a: 'next' }));
   card.append(scoreBig, moreSmall, nextBtn);
 
-  const bar = el('display:flex;align-items:center;gap:10px;margin-top:12px;');
+  const bar = el('display:flex;justify-content:center;margin-top:12px;');
   const reset = el('font:inherit;font-size:15px;padding:9px 14px;min-height:40px;'
     + 'border-radius:10px;border:1px solid #3a465f;background:#232c3f;color:#e8ecf4;cursor:pointer;', 'Reset run', 'button');
   reset.addEventListener('click', () => api.send({ a: 'reset' }));
   bar.append(reset);
 
-  // Block page gestures (scroll/zoom/double-tap) everywhere except the reset button.
   ['touchstart', 'touchend'].forEach((t) => wrap.addEventListener(t, (e) => {
     if (e.target !== reset) e.preventDefault();
   }, { passive: false }));
   wrap.addEventListener('dblclick', (e) => e.preventDefault());
 
-  wrap.append(head, track, hint, board, card, bar);
+  wrap.append(hint, board, card, bar);
   root.append(wrap);
 
   let view = null, spectating = false, destroyed = false;
@@ -179,33 +210,34 @@ export function mount(root, api) {
   function startLevelClock(limitMs) {
     const gen = ++clockGen;
     deadline = Date.now() + limitMs;
+    board.style.borderColor = 'transparent';
     function tick() {
       const now = Date.now();
       if (tick.l === now) return;
       tick.l = now;
       if (destroyed || gen !== clockGen || !view || view.timedOut || view.won) return;
       const rem = Math.max(0, deadline - now);
-      const col = rem <= 3500 ? '#ff4d4d' : rem <= 7000 ? '#facc15' : '#8ef5a0';
-      timerEl.textContent = (rem / 1000).toFixed(1) + 's';
-      timerEl.style.color = col;
-      fill.style.width = Math.min(100, (rem / limitMs) * 100) + '%';
-      fill.style.background = col;
-      if (rem > 0) api.setTimeout(tick, 50);
+      board.style.borderColor = rem <= 3500 ? 'rgba(255,77,77,.45)' : 'transparent';
+      if (rem > 0) api.setTimeout(tick, 100);
       else if (!spectating) api.send({ a: 'timeout' });
     }
     tick();
   }
 
-  function bounce(b) {
-    b.style.transform = 'scale(.92)';
-    api.setTimeout(() => { b.style.transform = ''; }, 100);
-  }
-
   function onTap(cell) {
     if (spectating || !view || view.timedOut || view.won || view.paused) return;
-    bounce(cells[cell]);
-    const c = view.cells.find((c) => c.cell === cell);
-    if (c && !c.done && c.colour !== 'red') return; // yellow/blue: ignore client-side
+    const b = cells[cell];
+    b.style.transform = 'scale(.92)';
+    api.setTimeout(() => { b.style.transform = ''; }, 90);
+
+    const c = view.cells.find((x) => x.cell === cell);
+    if (!c || c.done || c.colour !== 'red') {
+      voice(110, 0, 0.1, 0.09, 'sine', 0);
+      if (c && !c.done) say(c.colour === 'yellow' ? 'Wait—yellow is next.' : 'Only tap red.', '#ffd479');
+      return;
+    }
+    const yellow = view.cells.find((x) => !x.done && x.colour === 'yellow');
+    playCounterpoint(cell, yellow ? yellow.cell : null);
     api.send({ a: 'hit', cell });
   }
 
@@ -218,7 +250,6 @@ export function mount(root, api) {
     view = v;
     spectating = !!api.isSpectator;
     const over = v.timedOut || v.won;
-    const playing = !v.paused && !over;
 
     const key = v.run + ':' + v.level + ':' + (v.paused ? 'p' : 'c');
     if (key !== clockKey && !over) {
@@ -226,29 +257,24 @@ export function mount(root, api) {
       if (!v.paused) startLevelClock(v.levelMs || LEVEL_MS);
     }
 
-    head.style.display = 'flex';
-    track.style.display = '';
-    board.style.display = 'grid';
     card.style.display = v.paused ? 'flex' : 'none';
-    scoreEl.textContent = v.score + (v.score === 1 ? ' point' : ' points');
-    levelEl.textContent = `Level ${v.level} of ${v.maxLevel}  ·  ${v.step}/${v.total}`;
+    if (over || v.paused) {
+      clockGen++;
+      board.style.borderColor = 'transparent';
+    }
 
-    if (over || v.paused) clockGen++; // stop the clock
     if (v.paused) {
-      scoreBig.textContent = 'Score: ' + v.score;
+      scoreBig.textContent = v.score;
       moreSmall.textContent = (MAX_LEVEL - v.score) + ' more to 81';
-      say('', hint.style.color);
+      say('', '#e8ecf4');
     } else if (v.timedOut) {
-      timerEl.textContent = '0.0s';
-      timerEl.style.color = '#ff4d4d';
-      fill.style.width = '0%';
-      say(`Time ran out on level ${v.level}! Reset to try again.`, '#ff6b6b');
+      say(`Time slipped on level ${v.level} (${v.step}/${v.total}).`, '#ff6b6b');
     } else if (v.won) {
-      say('Sub-superhuman! All 81 levels cleared!', '#8ef5a0');
+      say('All 81 levels held steady.', '#8ef5a0');
     } else if (spectating) {
-      say('👁 watching. Nobody is playing at this table.', '#ffd479');
+      say('👁 watching.', '#ffd479');
     } else {
-      say('Click only the red button.', '#e8ecf4');
+      say('', '#e8ecf4');
     }
 
     const byCell = new Map(v.cells.map((c) => [c.cell, c]));
@@ -256,7 +282,7 @@ export function mount(root, api) {
       const c = byCell.get(i);
       b.style.background = c && !c.done ? COLOURS[c.colour] : BG;
     });
-    reset.style.display = v.score > 0 || over ? '' : 'none';
+    reset.style.display = (v.paused || over) && (v.score > 0 || over) ? '' : 'none';
   }
 
   return {
@@ -266,6 +292,7 @@ export function mount(root, api) {
       destroyed = true;
       clockGen++;
       view = null;
+      if (actx) actx.close().catch(() => {});
       cells.forEach((b) => b.replaceWith(b.cloneNode(true)));
     }
   };
