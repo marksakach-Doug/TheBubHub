@@ -162,7 +162,6 @@ export function mount(root, api) {
   const reset = el('font:inherit;font-size:15px;padding:9px 14px;min-height:40px;'
     + 'border-radius:10px;border:1px solid #3a465f;background:#232c3f;color:#e8ecf4;cursor:pointer;', 'Reset run', 'button');
   reset.addEventListener('click', () => api.send({ a: 'reset' }));
-;
   bar.append(reset);
 
   // Block page gestures (scroll/zoom/double-tap) everywhere except the reset button.
@@ -197,8 +196,14 @@ export function mount(root, api) {
     tick();
   }
 
+  function bounce(b) {
+    b.style.transform = 'scale(.92)';
+    api.setTimeout(() => { b.style.transform = ''; }, 100);
+  }
+
   function onTap(cell) {
     if (spectating || !view || view.timedOut || view.won || view.paused) return;
+    bounce(cells[cell]);
     const c = view.cells.find((c) => c.cell === cell);
     if (c && !c.done && c.colour !== 'red') return; // yellow/blue: ignore client-side
     api.send({ a: 'hit', cell });
@@ -224,7 +229,7 @@ export function mount(root, api) {
     head.style.display = 'flex';
     track.style.display = '';
     board.style.display = 'grid';
-    card.style.display = v.paused ? '' : 'none';
+    card.style.display = v.paused ? 'flex' : 'none';
     scoreEl.textContent = v.score + (v.score === 1 ? ' point' : ' points');
     levelEl.textContent = `Level ${v.level} of ${v.maxLevel}  ·  ${v.step}/${v.total}`;
 
