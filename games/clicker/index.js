@@ -2,6 +2,7 @@ const GRID = 9;
 const CELLS = GRID * GRID;
 const MAX_LEVEL = CELLS;
 const LEVEL_MS = 16000;
+const WARN_MS = 3500;
 const BG = '#1d2434';
 const COLOURS = { red: '#ff4d4d', yellow: '#facc15', blue: '#2f6bd8' };
 // A Mixolydian from bottom row (A3) to top row (B4)
@@ -21,9 +22,34 @@ const PATTERNS = [
   [50, 52, 43, 33, 11, 28, 48, 41, 32, 22, 30, 39],
   [22, 14, 8, 7, 25, 33, 43, 32, 35, 50, 11],
   [14, 32, 8, 27, 45, 20, 30, 48, 23, 64, 71, 68],
-  [77, 50, 71, 43, 66, 59, 52, 41, 58, 62, 44, 33]
+  [77, 50, 71, 43, 66, 59, 52, 41, 58, 62, 44, 33],
+  [28, 11, 35],
+  [1, 11, 28, 65, 64, 38, 48, 41, 33, 27, 13, 21, 8, 14, 22, 39, 50],
+  [18, 11, 28, 22, 39, 32, 50, 8],
+  [55, 74, 72, 60, 50, 39, 68, 71, 43, 16, 23, 28],
+  [14, 11, 30, 27, 45, 32, 28, 72, 64, 47, 0, 3, 5, 8, 25],
+  [38, 39, 64, 55, 50, 32, 58, 52, 20, 5, 13, 36, 11, 19],
+  [60, 43, 35, 3, 7, 20, 72, 76, 79, 36, 29, 32, 74],
+  [64, 65, 66, 67, 68, 69, 70, 71, 43, 14, 8, 7, 16, 3, 5, 11, 1, 18],
+  [55, 39, 43, 12, 5, 7, 8, 15, 14, 23, 32, 29, 50, 60, 71],
+  [39, 22, 14, 32, 45, 27, 9, 38, 62, 34, 16, 24, 5, 19, 11, 40],
+  [55, 11, 3, 8, 14, 25, 64, 20, 12, 17, 23, 33, 45, 27, 9, 66, 39, 22, 35],
+  [55, 39, 22, 32, 11, 54, 38, 41, 30, 20, 45, 49, 29, 28, 18, 37, 47, 46, 65, 73],
+  [39, 32, 48, 41, 28, 11, 37, 20, 50, 43, 58, 52, 60, 22, 69, 62, 18, 3, 80, 30, 71, 0, 6, 9, 8],
+  [39, 30, 22, 50, 33, 43, 60, 52, 18, 9, 11, 28, 38, 71, 62, 55, 14, 8, 7, 5, 3, 1, 0, 23, 25, 35, 40],
+  [39, 40, 22, 23, 48, 49, 30, 31, 25, 26, 7, 8, 33, 34, 16, 17, 28, 29, 10, 11, 37, 38, 1, 2],
+  [39, 22, 14, 8, 80, 52, 33, 6, 75, 57, 50, 23, 10, 3, 58, 42],
+  [0, 11, 22, 14, 18, 39, 50, 32, 45, 38, 30, 3, 64, 47, 60, 57, 43, 63, 74, 25, 28, 71],
+  [32, 39, 59, 66, 13, 20, 29, 47, 26, 43, 7, 15, 74, 67, 49, 22, 4, 64, 57, 40, 65, 58, 19, 37, 55, 38, 9, 3, 30, 25, 8, 50],
+  [55, 37, 47, 39, 49, 50, 32, 14, 57, 48, 30, 12, 74, 75, 68, 60, 70, 71, 43, 8, 35, 22, 28],
+  [28, 20, 11, 39, 50, 41, 32, 60, 22, 33, 25, 0, 12, 3, 14, 5, 35, 23, 43, 18, 77, 79, 45, 74, 72, 8],
+  [28, 12, 11, 39, 5, 23, 8, 45, 27, 52, 25, 64, 55, 47, 38, 50, 66, 60, 43, 14, 1, 0, 9, 33, 16, 3, 22],
+  [50, 43, 28, 35, 66, 49, 45, 41, 72, 76, 73, 68, 36, 19, 0, 51, 74, 56, 38, 67, 78, 39, 21, 60, 55, 32, 11, 14, 8],
+  [8, 74, 0, 50, 6, 64, 1, 48, 5, 57, 68, 3, 11, 28, 39, 17, 25, 32, 33, 43, 60, 52, 22, 14, 15, 23, 24, 31, 40, 18, 71],
+  [39, 32, 30, 23, 48, 41, 28, 11, 50, 43, 52, 33, 58, 62, 60, 55, 47, 0, 18, 66, 37, 20, 64, 57, 71, 74, 8, 22],
+  [8, 5, 1, 17, 14, 10, 12, 16, 3, 6, 9, 23, 35, 32, 28, 44, 41, 37, 39, 43, 30, 33, 36, 50, 62, 59, 55, 71, 68, 64, 66, 70, 57, 61, 63],
+  [18, 0, 11, 3, 14, 7, 41, 35, 30, 13, 5, 16, 36, 47, 32, 51, 74, 56, 38, 67, 27, 10, 2, 31, 49, 42, 65, 59]
 ];
-
 export const meta = {
   id: 'clicker',
   title: 'Clicker',
@@ -43,35 +69,60 @@ function cellFreq(cell) {
   return SCALE[GRID - 1 - p.row] * Math.pow(2, p.col / 12);
 }
 
-function deal(rng, level, mode, patIdx = 0) {
-  const count = Math.min(level, MAX_LEVEL);
-  if (mode === 'patterns' && PATTERNS.length > 0) {
-    const p = PATTERNS[patIdx % PATTERNS.length];
-    if (Array.isArray(p) && p.length > 0) {
-      return Array.from({ length: count }, (_, i) => p[i % p.length]);
-    }
-  }
-  const free = Array.from({ length: CELLS }, (_, i) => i);
-  for (let i = CELLS - 1; i > 0; i--) {
+function shuffle(arr, rng) {
+  const a = arr.slice();
+  for (let i = a.length - 1; i > 0; i--) {
     const j = Math.floor(rng() * (i + 1));
-    [free[i], free[j]] = [free[j], free[i]];
+    [a[i], a[j]] = [a[j], a[i]];
   }
-  return free.slice(0, count);
+  return a;
 }
 
-const freshRun = (rng, mode = null) => {
-  const patIdx = PATTERNS.length > 0 ? Math.floor(rng() * PATTERNS.length) : 0;
-  return {
-    mode, patIdx, score: 0,
-    queue: mode ? deal(rng, 1, mode, patIdx) : [],
-    step: 0, paused: false, timedOut: false, won: false, last: null, run: 1
-  };
-};
+// Level N plays a pattern with N entries.
+//  1. Prefer a pattern with exactly N entries (random pick if several).
+//  2. If none exists, take the shortest pattern longer than N and use its first N entries.
+//  3. If N is longer than every pattern, chain patterns together (no repeated cells),
+//     then pad with random unused cells if still short.
+function deal(rng, level) {
+  const count = Math.min(level, MAX_LEVEL);
+  const valid = PATTERNS.filter((p) => Array.isArray(p) && p.length > 0);
+  const pick = (list) => list[Math.floor(rng() * list.length)];
+
+  const exact = valid.filter((p) => p.length === count);
+  if (exact.length) return pick(exact).slice();
+
+  const longer = valid.filter((p) => p.length > count);
+  if (longer.length) {
+    const minLen = Math.min(...longer.map((p) => p.length));
+    return pick(longer.filter((p) => p.length === minLen)).slice(0, count);
+  }
+
+  const out = [];
+  const used = new Set();
+  for (const p of shuffle(valid, rng)) {
+    for (const cell of p) {
+      if (out.length >= count) break;
+      if (!used.has(cell)) { used.add(cell); out.push(cell); }
+    }
+    if (out.length >= count) break;
+  }
+  if (out.length < count) {
+    const free = shuffle(Array.from({ length: CELLS }, (_, i) => i).filter((i) => !used.has(i)), rng);
+    out.push(...free.slice(0, count - out.length));
+  }
+  return out;
+}
+
+const freshRun = (rng) => ({
+  score: 0,
+  queue: deal(rng, 1),
+  step: 0, paused: false, timedOut: false, won: false, last: null, run: 1
+});
 
 export function init(ctx) {
   const c = ctx || {};
   const seat = (c.atTable || c.seats || []).find((m) => m && m.id && !m.spectator);
-  return { ...freshRun(c.rng || Math.random, null), players: seat ? [seat.id] : [] };
+  return { ...freshRun(c.rng || Math.random), players: seat ? [seat.id] : [] };
 }
 
 export function reduce(state, action, ctx) {
@@ -85,51 +136,36 @@ export function reduce(state, action, ctx) {
   if (!id) return { error: 'No identity. Reopen the game.' };
   if (!state.players.includes(id)) return { error: 'You are watching. Not seated.' };
 
-  if (kind === 'mode') {
-    const m = ['tempo', 'fork', 'patterns'].includes(action.mode) ? action.mode : 'tempo';
-    return { ...freshRun(rng, m), players: state.players, run: state.run + 1 };
-  }
-  if (kind === 'menu') {
-    return { ...freshRun(rng, null), players: state.players, run: state.run + 1 };
-  }
   if (kind === 'reset') {
     return {
-      ...freshRun(rng, state.mode || 'tempo'), players: state.players, run: state.run + 1,
+      ...freshRun(rng), players: state.players, run: state.run + 1,
       last: over ? state.last : { score: state.score }
     };
   }
   if (kind === 'timeout') return over ? state : same({ timedOut: true, last: { score: state.score } });
   if (kind === 'next') {
     return state.paused
-      ? same({ paused: false, queue: deal(rng, state.score + 1, state.mode, state.patIdx || 0), step: 0 })
+      ? same({ paused: false, queue: deal(rng, state.score + 1), step: 0 })
       : state;
   }
   if (kind !== 'hit') return { error: 'Unknown action: ' + kind };
-  if (!state.mode || state.timedOut || state.won) return state;
+  if (over) return state;
 
-  const queue = state.queue.slice();
   const cell = Number(action.cell);
-  if (!(cell >= 0 && cell < CELLS) || state.step >= queue.length) return state;
-
-  const isForkChoice = state.mode === 'fork' && state.step + 1 < queue.length && queue[state.step + 1] === cell;
-  if (queue[state.step] !== cell && !isForkChoice) return state;
-  if (isForkChoice) {
-    [queue[state.step], queue[state.step + 1]] = [queue[state.step + 1], queue[state.step]];
-  }
+  if (!(cell >= 0 && cell < CELLS) || state.step >= state.queue.length) return state;
+  if (state.queue[state.step] !== cell) return state;
 
   const step = state.step + 1;
-  if (step < queue.length) return same({ queue, step, last: null });
+  if (step < state.queue.length) return same({ step, last: null });
   const score = state.score + 1;
   const won = score >= MAX_LEVEL;
-  return same({ queue, score, step, won, paused: !won, last: won ? { score } : null });
+  return same({ score, step, won, paused: !won, last: won ? { score } : null });
 }
 
 export function project(state, playerId, api) {
-  const { queue, step, score, paused, mode } = state;
-  const fork = mode === 'fork';
+  const { queue, step, score, paused } = state;
   return {
     you: playerId || '',
-    mode: mode || null,
     level: Math.min(score + 1, MAX_LEVEL),
     score, step, paused,
     total: queue.length,
@@ -138,11 +174,11 @@ export function project(state, playerId, api) {
     levelMs: LEVEL_MS,
     run: state.run,
     last: state.last,
-    cells: (paused || !mode) ? [] : queue.map((cell, i) => {
+    cells: paused ? [] : queue.map((cell, i) => {
       const p = cellAt(cell);
       let colour = 'blue';
-      if (i === step || (fork && i === step + 1)) colour = 'red';
-      else if (i === step + 1 || (fork && (i === step + 2 || i === step + 3))) colour = 'yellow';
+      if (i === step) colour = 'red';
+      else if (i === step + 1) colour = 'yellow';
       return { cell, col: p.col, row: p.row, done: i < step, colour };
     }),
     maxLevel: MAX_LEVEL,
@@ -204,22 +240,22 @@ export function mount(root, api) {
     + 'font-family:system-ui,-apple-system,Segoe UI,Roboto,sans-serif;color:#e8ecf4;'
     + 'user-select:none;-webkit-user-select:none;touch-action:none;');
 
-  const menu = el('display:flex;flex-direction:column;gap:10px;padding:24px 16px;background:rgba(29,36,52,.95);'
-    + 'border-radius:12px;border:1px solid #2b3448;');
-  [['tempo', 'Tempo'], ['fork', 'Fork'], ['patterns', 'Patterns']].forEach(([m, label]) => {
-    const btn = el('font:inherit;font-size:18px;font-weight:600;padding:14px;border-radius:8px;'
-      + 'border:1px solid #3a465f;background:#232c3f;color:#e8ecf4;cursor:pointer;', label, 'button');
-    btn.addEventListener('pointerdown', (e) => {
-      e.preventDefault();
-      unlockAudio();
-      api.send({ a: 'mode', mode: m });
-    });
-    menu.append(btn);
-  });
+  // Decreasing timer bar
+  const timer = el('width:100%;height:12px;margin-bottom:10px;border-radius:6px;background:#232c3f;'
+    + 'border:1px solid #2b3448;box-sizing:border-box;overflow:hidden;');
+  const timerFill = el('height:100%;width:100%;border-radius:5px;background:#4cd137;');
+  timer.append(timerFill);
 
-  const board = el('display:none;grid-template-columns:repeat(' + GRID + ',1fr);'
-    + 'gap:4px;width:100%;aspect-ratio:1/1;touch-action:none;padding:4px;border-radius:12px;'
-    + 'border:2px solid transparent;transition:border-color .12s ease;');
+  function setTimerFill(frac) {
+    const f = Math.max(0, Math.min(1, frac));
+    timerFill.style.width = (f * 100).toFixed(2) + '%';
+  }
+  function setTimerWarn(warn) {
+    timerFill.style.background = warn ? '#ff4d4d' : '#4cd137';
+  }
+
+  const board = el('display:grid;grid-template-columns:repeat(' + GRID + ',1fr);'
+    + 'gap:4px;width:100%;aspect-ratio:1/1;touch-action:none;padding:4px;border-radius:12px;');
   const cells = Array.from({ length: CELLS }, (_, i) => {
     const b = el('border-radius:8px;background:' + BG + ';border:1px solid #2b3448;'
       + 'cursor:pointer;touch-action:none;transition:background .1s ease,transform .08s ease;');
@@ -250,39 +286,26 @@ export function mount(root, api) {
   const reset = el('font:inherit;font-size:15px;padding:9px 14px;min-height:40px;'
     + 'border-radius:10px;border:1px solid #3a465f;background:#232c3f;color:#e8ecf4;cursor:pointer;', 'Reset', 'button');
   reset.addEventListener('pointerdown', (e) => { e.preventDefault(); unlockAudio(); api.send({ a: 'reset' }); });
-  const modeBtn = el('font:inherit;font-size:15px;padding:9px 14px;min-height:40px;'
-    + 'border-radius:10px;border:1px solid #3a465f;background:#232c3f;color:#e8ecf4;cursor:pointer;', 'Modes', 'button');
-  modeBtn.addEventListener('pointerdown', (e) => { e.preventDefault(); unlockAudio(); api.send({ a: 'menu' }); });
-  bar.append(reset, modeBtn);
+  bar.append(reset);
 
   wrap.addEventListener('touchstart', () => unlockAudio(), { passive: true });
   wrap.addEventListener('dblclick', (e) => e.preventDefault());
-  wrap.append(menu, board, card, bar);
+  wrap.append(timer, board, card, bar);
   root.append(wrap);
 
   let view = null, spectating = false, destroyed = false;
   let clockKey = '', clockGen = 0, deadline = 0;
-  let lastTapAt = 0, beatMs = 0;
 
   function startLevelClock(limitMs) {
     const gen = ++clockGen;
     deadline = Date.now() + limitMs;
-    lastTapAt = 0;
-    beatMs = 0;
-    board.style.borderColor = 'transparent';
+    setTimerFill(1);
+    setTimerWarn(false);
     function tick() {
-      const now = Date.now();
-      if (destroyed || gen !== clockGen || !view || view.timedOut || view.won || !view.mode) return;
-      const rem = Math.max(0, deadline - now);
-      if (rem <= 3500) {
-        board.style.borderColor = 'rgba(255,77,77,.6)';
-      } else if (view.mode === 'tempo' && beatMs > 0 && lastTapAt > 0) {
-        const phase = (now - lastTapAt) % beatMs;
-        const onBeat = phase < beatMs * 0.22 || phase > beatMs * 0.78;
-        board.style.borderColor = onBeat ? 'rgba(76,209,55,.75)' : 'transparent';
-      } else {
-        board.style.borderColor = 'transparent';
-      }
+      if (destroyed || gen !== clockGen || !view || view.timedOut || view.won) return;
+      const rem = Math.max(0, deadline - Date.now());
+      setTimerFill(rem / limitMs);
+      setTimerWarn(rem <= WARN_MS);
       if (rem > 0) api.setTimeout(tick, 40);
       else if (!spectating) api.send({ a: 'timeout' });
     }
@@ -290,7 +313,7 @@ export function mount(root, api) {
   }
 
   function onTap(cell) {
-    if (spectating || !view || !view.mode || view.timedOut || view.won || view.paused) return;
+    if (spectating || !view || view.timedOut || view.won || view.paused) return;
     const b = cells[cell];
     b.style.transform = 'scale(.92)';
     api.setTimeout(() => { b.style.transform = ''; }, 90);
@@ -299,22 +322,6 @@ export function mount(root, api) {
     if (!c || c.colour !== 'red') {
       voice(110, 0.16, 0.09, 'sine', 0);
       return;
-    }
-
-    const now = Date.now();
-    if (view.mode === 'tempo') {
-      if (view.step === 1 && lastTapAt > 0) {
-        beatMs = Math.max(160, Math.min(2000, now - lastTapAt));
-      } else if (view.step > 1 && beatMs > 0) {
-        const dt = now - lastTapAt;
-        if (dt < beatMs * 0.45 || dt > beatMs * 1.85) {
-          voice(110, 0.16, 0.09, 'sine', 0);
-          board.style.borderColor = '#facc15';
-          lastTapAt = now;
-          return;
-        }
-      }
-      lastTapAt = now;
     }
 
     const next = view.cells.find((x) => !x.done && x.cell !== cell && (x.colour === 'red' || x.colour === 'yellow'));
@@ -326,25 +333,18 @@ export function mount(root, api) {
     view = v;
     spectating = !!api.isSpectator;
     const over = v.timedOut || v.won;
-    const inMenu = !v.mode;
 
-    menu.style.display = inMenu ? 'flex' : 'none';
-    board.style.display = inMenu ? 'none' : 'grid';
-    bar.style.display = inMenu ? 'none' : 'flex';
-
-    const key = v.run + ':' + (v.mode || '') + ':' + v.level + ':' + (v.paused ? 'p' : 'c');
-    if (key !== clockKey && !over && !inMenu) {
+    const key = v.run + ':' + v.level + ':' + (v.paused ? 'p' : 'c');
+    if (key !== clockKey && !over) {
       clockKey = key;
       if (!v.paused) startLevelClock(v.levelMs || LEVEL_MS);
     }
 
-    const showCard = !inMenu && (v.paused || over);
+    const showCard = v.paused || over;
     card.style.display = showCard ? 'flex' : 'none';
-    if (showCard || inMenu) {
-      clockGen++;
-      board.style.borderColor = 'transparent';
-    }
     if (showCard) {
+      clockGen++; // stop the countdown; the bar stays where it stopped
+      if (v.timedOut) setTimerFill(0);
       scoreBig.textContent = v.score;
       actionBtn.textContent = over ? 'AGAIN' : 'NEXT';
     }
