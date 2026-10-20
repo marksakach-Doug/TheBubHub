@@ -4,22 +4,24 @@ const MAX_LEVEL = CELLS;
 const LEVEL_MS = 16000;
 const BG = '#1d2434';
 const COLOURS = { red: '#ff4d4d', yellow: '#facc15', blue: '#2f6bd8' };
-const SCALE = [220, 246.94, 277.18, 329.63, 369.99, 440, 493.88, 554.37, 659.25];
+// A Mixolydian from bottom row (A3) to top row (B4)
+const SCALE = [220.00, 246.94, 277.18, 293.66, 329.63, 369.99, 392.00, 440.00, 493.88];
 
 // Paste exported array from pattern-builder.html here:
 const PATTERNS = [
-  [72, 54, 27, 9, 19, 29, 37, 47, 39, 31, 32, 42, 52, 62], // Melody 1
-  [80, 0], // Melody 2
-  [72, 8, 15, 23, 31, 50, 42, 34, 51, 43, 35, 60, 52, 44, 69, 61, 53], // Melody 3
-  [72, 0, 10, 20, 12, 4, 14, 24, 16, 8], // Melody 4
-  [72, 56, 46, 37, 2, 21, 4, 31, 39, 47], // Melody 5
-  [0, 9, 10, 2, 11, 3, 12, 13, 14, 15, 16, 8, 7, 6, 17, 24, 26, 34, 25, 33, 35], // Melody 6
-  [72, 8, 64, 16, 56, 24, 48], // Melody 7
-  [39, 41], // Melody 8
-  [40], // Melody 9
-  [72, 36, 56], // Melody 10
-  [36, 56, 39, 46], // Melody 11
-  [14, 24, 34, 41, 33, 25, 15] // Melody 12
+  [39],
+  [50, 11],
+  [28, 32, 37, 41],
+  [14, 25, 16, 35, 12],
+  [44, 43, 33, 32, 14, 25],
+  [35, 25, 14, 5, 3, 1, 0],
+  [12, 11, 23, 22, 39, 32, 58, 41],
+  [39, 32, 14, 6, 16, 23, 28, 11, 58, 41],
+  [18, 11, 3, 55, 38, 30, 72, 54, 36],
+  [50, 52, 43, 33, 11, 28, 48, 41, 32, 22, 30, 39],
+  [22, 14, 8, 7, 25, 33, 43, 32, 35, 50, 11],
+  [14, 32, 8, 27, 45, 20, 30, 48, 23, 64, 71, 68],
+  [77, 50, 71, 43, 66, 59, 52, 41, 58, 62, 44, 33]
 ];
 
 export const meta = {
@@ -32,23 +34,39 @@ export const meta = {
   solo: true
 };
 
-function deal(rng, level, mode) {
+function cellAt(cell) {
+  return { col: cell % GRID, row: Math.floor(cell / GRID) };
+}
+
+function cellFreq(cell) {
+  const p = cellAt(cell);
+  return SCALE[GRID - 1 - p.row] * Math.pow(2, p.col / 12);
+}
+
+function deal(rng, level, mode, patIdx = 0) {
+  const count = Math.min(level, MAX_LEVEL);
   if (mode === 'patterns' && PATTERNS.length > 0) {
-    const p = PATTERNS[(level - 1) % PATTERNS.length];
-    if (Array.isArray(p) && p.length > 0) return p.slice(0, MAX_LEVEL);
+    const p = PATTERNS[patIdx % PATTERNS.length];
+    if (Array.isArray(p) && p.length > 0) {
+      return Array.from({ length: count }, (_, i) => p[i % p.length]);
+    }
   }
   const free = Array.from({ length: CELLS }, (_, i) => i);
   for (let i = CELLS - 1; i > 0; i--) {
     const j = Math.floor(rng() * (i + 1));
     [free[i], free[j]] = [free[j], free[i]];
   }
-  return free.slice(0, Math.min(level, MAX_LEVEL));
+  return free.slice(0, count);
 }
 
-const freshRun = (rng, mode = null) => ({
-  mode, score: 0, queue: mode ? deal(rng, 1, mode) : [], step: 0,
-  paused: false, timedOut: false, won: false, last: null, run: 1
-});
+const freshRun = (rng, mode = null) => {
+  const patIdx = PATTERNS.length > 0 ? Math.floor(rng() * PATTERNS.length) : 0;
+  return {
+    mode, patIdx, score: 0,
+    queue: mode ? deal(rng, 1, mode, patIdx) : [],
+    step: 0, paused: false, timedOut: false, won: false, last: null, run: 1
+  };
+};
 
 export function init(ctx) {
   const c = ctx || {};
@@ -83,7 +101,7 @@ export function reduce(state, action, ctx) {
   if (kind === 'timeout') return over ? state : same({ timedOut: true, last: { score: state.score } });
   if (kind === 'next') {
     return state.paused
-      ? same({ paused: false, queue: deal(rng, state.score + 1, state.mode), step: 0 })
+      ? same({ paused: false, queue: deal(rng, state.score + 1, state.mode, state.patIdx || 0), step: 0 })
       : state;
   }
   if (kind !== 'hit') return { error: 'Unknown action: ' + kind };
@@ -132,10 +150,6 @@ export function project(state, playerId, api) {
   };
 }
 
-function cellAt(cell) {
-  return { col: cell % GRID, row: Math.floor(cell / GRID) };
-}
-
 export const roundId = (state) => 'run' + ((state && state.run) || 1);
 
 export function summarize(state, nameOf) {
@@ -180,13 +194,9 @@ export function mount(root, api) {
   }
 
   function playCounterpoint(hitCell, nextCell) {
-    const r = cellAt(hitCell);
-    const rFreq = SCALE[GRID - 1 - r.row] * (1 + (r.col - 4) * 0.015);
-    voice(rFreq, 0.24, 0.18, 'triangle', 0);
+    voice(cellFreq(hitCell), 0.24, 0.18, 'triangle', 0);
     if (nextCell != null) {
-      const y = cellAt(nextCell);
-      const yFreq = SCALE[GRID - 1 - y.row] * 1.5 * (1 + (y.col - 4) * 0.015);
-      voice(yFreq, 0.12, 0.26, 'sine', 0.045);
+      voice(cellFreq(nextCell), 0.14, 0.26, 'sine', 0.045);
     }
   }
 
