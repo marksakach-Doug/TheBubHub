@@ -90,13 +90,18 @@ export function project(state, playerId, api) {
     levelMs: LEVEL_MS,
     run: state.run,
     last: state.last,
-    cells: paused ? [] : queue.map((cell, i) => ({
-      cell, done: i < step,
-      colour: i === step ? 'red' : i === step + 1 ? 'yellow' : 'blue'
-    })),
+    cells: paused ? [] : queue.map((cell, i) => {
+      const p = cellAt(cell);
+      return { cell, col: p.col, row: p.row, done: i < step,
+        colour: i === step ? 'red' : i === step + 1 ? 'yellow' : 'blue' };
+    }),
     maxLevel: MAX_LEVEL,
     roster: (api && api.roster) || null
   };
+}
+
+function cellAt(cell) {
+  return { col: cell % GRID, row: Math.floor(cell / GRID) };
 }
 
 export const roundId = (state) => 'run' + ((state && state.run) || 1);
@@ -155,9 +160,13 @@ export function mount(root, api) {
     + 'border-radius:10px;border:1px solid #3a465f;background:#232c3f;color:#e8ecf4;cursor:pointer;', 'Reset run', 'button');
   reset.onclick = () => api.send({ a: 'reset' });
   const legend = el('font-size:13px;opacity:.7;margin-left:auto;text-align:right;');
-  legend.innerHTML = [['red', 'click now'], ['yellow', 'red next'], ['blue', 'queued']]
-    .map(([c, t]) => `<span style="color:${COLOURS[c]}"><span style="font-size:11px;vertical-align:middle">■</span> ${t}</span>`)
-    .join('  ');
+  [['red', 'click now'], ['yellow', 'red next'], ['blue', 'queued']].forEach(([c, t]) => {
+    const bit = el('', '', 'span');
+    bit.style.color = COLOURS[c];
+    const box = el('font-size:11px;vertical-align:middle', '■');
+    bit.append(box, document.createTextNode(' ' + t));
+    legend.append(bit, document.createTextNode('  '));
+  });
   bar.append(reset, legend);
 
   // Block page gestures (scroll/zoom/double-tap) everywhere except the reset button.
@@ -216,7 +225,9 @@ export function mount(root, api) {
       if (!v.paused) startLevelClock(v.levelMs || LEVEL_MS);
     }
 
-    head.style.display = track.style.display = board.style.display = playing ? '' : 'none';
+    head.style.display = playing ? 'flex' : 'none';
+    track.style.display = playing ? '' : 'none';
+    board.style.display = playing ? 'grid' : 'none';
     card.style.display = v.paused ? '' : 'none';
     scoreEl.textContent = v.score + (v.score === 1 ? ' point' : ' points');
     levelEl.textContent = `Level ${v.level} of ${v.maxLevel}  ·  ${v.step}/${v.total}`;
