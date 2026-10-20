@@ -11,7 +11,7 @@ export const meta = {
   players: 'solo',
   color: '#ff6b6b',
   icon: '🎯',
-  desc: 'Always click the red button. Yellow shows which cell turns red next; blue cells wait their turn. Clear each level inside 16 seconds.',
+  desc: 'Always click the red button. Yellow shows which cell turns red next. Blue cells wait their turn. Clear each level inside 16 seconds.',
   solo: true
 };
 
@@ -44,8 +44,8 @@ export function reduce(state, action, ctx) {
   const same = (extra) => ({ ...state, ...extra });
   const over = state.timedOut || state.won;
 
-  if (!id) return { error: 'No identity — reopen the game.' };
-  if (!state.players.includes(id)) return { error: 'You are watching — not seated.' };
+  if (!id) return { error: 'No identity. Reopen the game.' };
+  if (!state.players.includes(id)) return { error: 'You are watching. Not seated.' };
 
   if (kind === 'reset') {
     return {
@@ -58,8 +58,8 @@ export function reduce(state, action, ctx) {
     return state.paused ? same({ paused: false, queue: deal(rng, state.score + 1), step: 0 }) : state;
   }
   if (kind !== 'hit') return { error: 'Unknown action: ' + kind };
-  if (state.timedOut) return { error: 'Time ran out — reset the run to play again.' };
-  if (state.won) return { error: 'You beat all 81 levels — reset to play again.' };
+  if (state.timedOut) return { error: 'Time ran out. Reset the run to play again.' };
+  if (state.won) return { error: 'You beat all 81 levels. Reset to play again.' };
 
   const { queue } = state;
   const cell = Number(action.cell);
@@ -67,7 +67,7 @@ export function reduce(state, action, ctx) {
   if (state.step >= queue.length) return { error: 'Level already cleared.' };
   if (queue[state.step] !== cell) {
     return { error: queue[state.step + 1] === cell
-      ? 'Not yet — yellow just shows which one turns red next.'
+      ? 'Do not click yellow.'
       : 'Only click the red button.' };
   }
 
@@ -120,7 +120,7 @@ export function mount(root, api) {
     return e;
   };
 
-  const wrap = el('max-width:min(460px, 65vh);margin:0 auto;padding:8px 10px 18px;'
+  const wrap = el('position:relative;max-width:min(460px, 65vh);margin:0 auto;padding:8px 10px 18px;'
     + 'font-family:system-ui,-apple-system,Segoe UI,Roboto,sans-serif;color:#e8ecf4;'
     + 'user-select:none;-webkit-user-select:none;touch-action:none;');
   const head = el('display:flex;align-items:baseline;gap:10px;margin-bottom:4px;');
@@ -148,7 +148,10 @@ export function mount(root, api) {
   });
   board.append(...cells);
 
-  const card = el('display:none;flex-direction:column;align-items:center;gap:10px;padding:20px;text-align:center;');
+  const card = el('display:none;position:absolute;top:50%;left:50%;transform:translate(-50%,-50%);'
+    + 'flex-direction:column;align-items:center;gap:10px;padding:26px;text-align:center;'
+    + 'background:rgba(29,36,52,.95);border-radius:10px;box-shadow:0 8px 24px rgba(0,0,0,.4);'
+    + 'z-index:10;');
   const scoreBig = el('font-size:48px;font-weight:700;');
   const moreSmall = el('font-size:18px;opacity:.8;');
   const nextBtn = el('font:inherit;font-size:18px;padding:10px 20px;border-radius:8px;border:none;background:#4cd137;color:#111;cursor:pointer;', 'NEXT', 'button');
@@ -160,7 +163,7 @@ export function mount(root, api) {
     + 'border-radius:10px;border:1px solid #3a465f;background:#232c3f;color:#e8ecf4;cursor:pointer;', 'Reset run', 'button');
   reset.onclick = () => api.send({ a: 'reset' });
   const legend = el('font-size:13px;opacity:.7;margin-left:auto;text-align:right;');
-  [['red', 'click now'], ['yellow', 'red next'], ['blue', 'queued']].forEach(([c, t]) => {
+  [[]].forEach(([c, t]) => {
     const bit = el('', '', 'span');
     bit.style.color = COLOURS[c];
     const box = el('font-size:11px;vertical-align:middle', '■');
@@ -202,7 +205,7 @@ export function mount(root, api) {
   }
 
   function onTap(cell) {
-    if (spectating || !view || view.timedOut || view.won) return;
+    if (spectating || !view || view.timedOut || view.won || view.paused) return;
     const c = view.cells.find((c) => c.cell === cell);
     if (c && !c.done && c.colour !== 'red') return; // yellow/blue: ignore client-side
     api.send({ a: 'hit', cell });
@@ -225,9 +228,9 @@ export function mount(root, api) {
       if (!v.paused) startLevelClock(v.levelMs || LEVEL_MS);
     }
 
-    head.style.display = playing ? 'flex' : 'none';
-    track.style.display = playing ? '' : 'none';
-    board.style.display = playing ? 'grid' : 'none';
+    head.style.display = 'flex';
+    track.style.display = '';
+    board.style.display = 'grid';
     card.style.display = v.paused ? '' : 'none';
     scoreEl.textContent = v.score + (v.score === 1 ? ' point' : ' points');
     levelEl.textContent = `Level ${v.level} of ${v.maxLevel}  ·  ${v.step}/${v.total}`;
@@ -245,9 +248,9 @@ export function mount(root, api) {
     } else if (v.won) {
       say('Sub-superhuman! All 81 levels cleared!', '#8ef5a0');
     } else if (spectating) {
-      say('👁 watching — nobody is playing at this table.', '#ffd479');
+      say('👁 watching. Nobody is playing at this table.', '#ffd479');
     } else {
-      say('Click only the red button — yellow shows which one turns red next.', '#e8ecf4');
+      say('Click only the red button.', '#e8ecf4');
     }
 
     const byCell = new Map(v.cells.map((c) => [c.cell, c]));
