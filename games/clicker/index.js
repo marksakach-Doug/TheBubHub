@@ -37,7 +37,7 @@ const SCALES = [
 // The mapping the PATTERNS were composed on: rows climb A Mixolydian from A3, columns bend up in semitones.
 // The Game always uses this. Instrument and Sequencer can change it.
 const DEFAULT_CFG = { row: 'mixolydian', col: 'chromatic', root: 0 };
-const START_CFG = { row: 'minpent', col: 'whole', root: 0 };
+const START_CFG = { row: 'major', col: 'major', root: 0 };
 
 // Paste exported array from pattern-builder.html (or the Sequencer's Export button) here:
 const PATTERNS = [
@@ -357,8 +357,8 @@ export function mount(root, api) {
   let table = buildTable(cfg);          // used by Instrument + Sequencer
   let splitTbl = buildSplitTable(cfg);  // role/name per cell for Split mode
   let uiMode = 'instrument';                  // 'game' | 'instrument' | 'sequencer'
-  let counterpointMode = true;          // counterpoint enabled in Instrument + Sequencer
-  let splitMode = false;                // Instrument: row = low voice, column = high voice
+  let counterpointMode = false;          // counterpoint enabled in Instrument + Sequencer
+  let splitMode = true;                // Instrument: row = low voice, column = high voice
   let canonMode = false;                // Sequencer: a follower plays the pattern lagging behind the leader
   let splitHeld = null, splitGen = 0;   // currently ringing split voices {row, col, lo, hi}
   let canonIdx = -1;                    // index of the canon follower's current step (-1 = silent)
