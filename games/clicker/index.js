@@ -245,7 +245,7 @@ export function mount(root, api) {
   let seqPositions = new Map();
 
   // ---------- layout ----------
-  const wrap = el('position:relative;max-width:min(460px, 68vh);margin:0 auto;padding:12px 10px 18px;touch-action:pan-x pan-y;'
+  const wrap = el('position:relative;max-width:min(460px, 68vh);margin:0 auto;padding:12px 10px 18px;touch-action:none;'
     + 'font-family:system-ui,-apple-system,Segoe UI,Roboto,sans-serif;color:#e8ecf4;color-scheme:dark;'
     + 'user-select:none;-webkit-user-select:none;touch-action:manipulation;');
 
@@ -349,10 +349,17 @@ export function mount(root, api) {
 
   // one pointer handler for the whole board: multi-touch, and drag across cells to glide in Instrument
   const down = new Map();
-  function cellFromEvent(e) {
-    const t = document.elementFromPoint(e.clientX, e.clientY);
-    const i = t && t.dataset ? t.dataset.i : undefined;
+function cellFromEvent(e) {
+  // Check closest element with [data-i] first for pointerdown (mobile taps)
+  if (e.type === 'pointerdown') {
+    const t = e.target.closest('[data-i]');
+    const i = t ? t.dataset.i : undefined;
     return i === undefined ? -1 : Number(i);
+  }
+  // Use elementFromPoint for pointermove (gliding)
+  const t = document.elementFromPoint(e.clientX, e.clientY);
+  const i = t && t.dataset ? t.dataset.i : undefined;
+  return i === undefined ? -1 : Number(i);
   }
   board.addEventListener('pointerdown', (e) => {
     if (e.button) return;
@@ -400,7 +407,9 @@ export function mount(root, api) {
   wrap.addEventListener('touchstart', () => unlockAudio(), { passive: true });
   wrap.addEventListener('dblclick', (e) => e.preventDefault());
   wrap.append(tabs, tune, seqBar, timer, board, card, bar, exportBox);
-  root.append(wrap);
+  root.style.touchAction = 'pan-x pan-y';
+wrap.addEventListener('gesturestart', (e) => e.preventDefault());
+root.append(wrap);
 
   // ---------- painting ----------
   function computePositions() {
