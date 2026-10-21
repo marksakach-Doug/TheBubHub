@@ -7,7 +7,9 @@ const SEQ_MAX = 32;
 const SEQ_SLOTS = 8;
 const A3 = 220;
 const BG = '#1d2434';
-const COLOURS = { red: '#ff4d4d', yellow: '#facc15', blue: '#2f6bd8' };
+const COLOURS = { red: '#ff4d4d', yellow: '#facc15', blue: '#2f6bd8', green: '#4cd137' };
+const CANON_SEMI = 7;         // canon follower sounds this many semitones above the leader (7 = a fifth, 12 = octave)
+const SPLIT_HI = 12;          // split mode: the column (x) voice sits this many semitones above the row (y) voice
 const NAMES = ['A', 'A#', 'B', 'C', 'C#', 'D', 'D#', 'E', 'F', 'F#', 'G', 'G#'];
 
 // Subtle harmonic reference tints for Instrument & Sequencer (Tonic = red, 3rd = yellow, 5th = blue)
@@ -129,6 +131,29 @@ function buildTable(cfg) {
 }
 
 const GAME_TABLE = buildTable(DEFAULT_CFG);
+
+// Split mode (Instrument): the row (y) is the low voice and the column (x) is the high voice,
+// instead of summing the two axes into one pitch. Cells are tinted by the interval BETWEEN the voices.
+function splitSemis(cfg, cell) {
+  const p = cellAt(cell);
+  const rd = degrees(cfg.row, GRID), cd = degrees(cfg.col, GRID);
+  return { lo: cfg.root + rd[GRID - 1 - p.row], hi: cfg.root + SPLIT_HI + cd[p.col] };
+}
+
+function buildSplitTable(cfg) {
+  const name = [], role = [];
+  const pc = (n) => NAMES[((n % 12) + 12) % 12];
+  for (let cell = 0; cell < CELLS; cell++) {
+    const v = splitSemis(cfg, cell);
+    const iv = (((v.hi - v.lo) % 12) + 12) % 12;
+    if (iv === 0) role.push('root');                                  // unison / octave
+    else if (iv === 3 || iv === 4 || iv === 8 || iv === 9) role.push('third'); // thirds and sixths
+    else if (iv === 7) role.push('fifth');
+    else role.push('other');
+    name.push(pc(v.lo) + '\u00b7' + pc(v.hi));
+  }
+  return { name, role };
+}
 
 function deal(rng, level) {
   const len = LENGTHS[Math.min(level, LAST_LEVEL) - 1];
@@ -288,6 +313,38 @@ export function mount(root, api) {
     } catch (_) {}
   }
 
+  // A sustained voice for Split mode: rings until release() is called.
+  function holdVoice(freq, gainVal, type = 'triangle') {
+    try {
+      unlockAudio();
+      if (!actx) return null;
+      const t = actx.currentTime;
+      const osc = actx.createOscillator();
+      const g = actx.createGain();
+      osc.type = type;
+      osc.frequency.setValueAtTime(freq, t);
+      g.gain.setValueAtTime(0.0001, t);
+      g.gain.linearRampToValueAtTime(gainVal, t + 0.02);
+      osc.connect(g);
+      g.connect(actx.destination);
+      osc.start(t);
+      let done = false;
+      return {
+        release(fade = 0.25) {
+          if (done) return;
+          done = true;
+          try {
+            const n = actx.currentTime;
+            g.gain.cancelScheduledValues(n);
+            g.gain.setValueAtTime(Math.max(g.gain.value, 0.0001), n);
+            g.gain.exponentialRampToValueAtTime(0.0001, n + fade);
+            osc.stop(n + fade + 0.02);
+          } catch (_) {}
+        }
+      };
+    } catch (_) { return null; }
+  }
+
   function playCounterpoint(hitCell, nextCell, tbl = GAME_TABLE) {
     voice(tbl.freq[hitCell], 0.24, 0.18, 'triangle', 0);
     if (nextCell != null) {
@@ -298,8 +355,13 @@ export function mount(root, api) {
   // ---------- state ----------
   const cfg = { ...START_CFG };
   let table = buildTable(cfg);          // used by Instrument + Sequencer
+  let splitTbl = buildSplitTable(cfg);  // role/name per cell for Split mode
   let uiMode = 'instrument';                  // 'game' | 'instrument' | 'sequencer'
   let counterpointMode = true;          // counterpoint enabled in Instrument + Sequencer
+  let splitMode = false;                // Instrument: row = low voice, column = high voice
+  let canonMode = false;                // Sequencer: a follower plays the pattern lagging behind the leader
+  let splitHeld = null, splitGen = 0;   // currently ringing split voices {row, col, lo, hi}
+  let canonIdx = -1;                    // index of the canon follower's current step (-1 = silent)
   let lastInstCell = null;              // previous note for Instrument counterpoint
   let view = null, spectating = false, destroyed = false;
   let clockKey = '', clockGen = 0, deadline = 0;
@@ -358,7 +420,35 @@ export function mount(root, api) {
   press(cpBtn, () => {
     counterpointMode = !counterpointMode;
     lastInstCell = null;
+    if (counterpointMode) { splitMode = false; canonMode = false; releaseSplit(); syncSplitBtn(); syncCanonBtn(); paintAll(); }
     syncCpBtn();
+  });
+
+  const styleToggle = (btn, on) => {
+    btn.style.borderColor = on ? '#facc15' : '#3a465f';
+    btn.style.color = on ? '#facc15' : '#8f9bb5';
+    btn.style.background = on ? '#332e22' : '#232c3f';
+  };
+  const splitBtn = el(SMALL_BTN + 'padding:4px 7px;', 'Split', 'button');
+  const canonBtn = el(SMALL_BTN + 'padding:4px 7px;', 'Canon', 'button');
+  const syncSplitBtn = () => styleToggle(splitBtn, splitMode);
+  const syncCanonBtn = () => styleToggle(canonBtn, canonMode);
+  syncSplitBtn();
+  syncCanonBtn();
+  press(splitBtn, () => {
+    splitMode = !splitMode;
+    if (splitMode) { counterpointMode = false; canonMode = false; syncCpBtn(); syncCanonBtn(); }
+    lastInstCell = null;
+    releaseSplit();
+    syncSplitBtn();
+    paintAll();
+  });
+  press(canonBtn, () => {
+    canonMode = !canonMode;
+    if (canonMode) { counterpointMode = false; splitMode = false; syncCpBtn(); syncSplitBtn(); releaseSplit(); }
+    else canonIdx = -1;
+    syncCanonBtn();
+    paintAll();
   });
 
   const gameScaleBtn = el(SMALL_BTN + 'padding:4px 7px;', '↺', 'button');
@@ -372,7 +462,7 @@ export function mount(root, api) {
   });
 
   const tune = el('display:none;gap:4px;margin-bottom:6px;align-items:center;');
-  tune.append(rootSel, rowSel, colSel, cpBtn, gameScaleBtn);
+  tune.append(rootSel, rowSel, colSel, cpBtn, splitBtn, canonBtn, gameScaleBtn);
 
   // compact sequencer controls (2 slim rows)
   const patSel = makeSelect(Array.from({ length: SEQ_SLOTS }, (_, i) => [String(i), '']), '0', (v) => {
@@ -570,11 +660,12 @@ export function mount(root, api) {
       const c = byCell.get(i);
       if (c) bg = COLOURS[c.colour];
     } else {
-      const rs = ROLE_STYLE[table.role[i]] || ROLE_STYLE.other;
+      const useSplit = splitMode && uiMode === 'instrument';
+      const rs = ROLE_STYLE[(useSplit ? splitTbl : table).role[i]] || ROLE_STYLE.other;
       bg = rs.bg;
       fg = rs.fg;
       border = rs.border;
-      text = table.name[i];
+      text = (useSplit ? splitTbl : table).name[i];
 
       if (uiMode === 'sequencer') {
         const pos = seqPositions.get(i);
@@ -590,7 +681,11 @@ export function mount(root, api) {
             bg = COLOURS.red;
             fg = '#fff';
             border = '#fff';
-          } else if (s.length > 1 && s[(seqIdx + 1) % s.length] === i) {
+          } else if (canonMode && canonIdx >= 0 && s[canonIdx] === i) {
+            bg = COLOURS.green;
+            fg = '#111';
+            border = '#fff';
+          } else if (!canonMode && s.length > 1 && s[(seqIdx + 1) % s.length] === i) {
             bg = COLOURS.yellow;
             fg = '#111';
             border = '#fff';
@@ -619,6 +714,8 @@ export function mount(root, api) {
   function layout() {
     const g = uiMode === 'game', s = uiMode === 'sequencer';
     tune.style.display = g ? 'none' : 'flex';
+    splitBtn.style.display = uiMode === 'instrument' ? '' : 'none';
+    canonBtn.style.display = s ? '' : 'none';
     seqBar.style.display = s ? 'flex' : 'none';
     timer.style.display = g ? 'block' : 'none';
     bar.style.display = g ? 'flex' : 'none';
@@ -636,6 +733,8 @@ export function mount(root, api) {
     if (m === uiMode) return;
     uiMode = m;
     seqStop();
+    releaseSplit();
+    canonIdx = -1;
     clockGen++;
     replayGen++;
     down.clear();
@@ -651,6 +750,7 @@ export function mount(root, api) {
 
   function retune() {
     table = buildTable(cfg);
+    splitTbl = buildSplitTable(cfg);
     paintAll();
   }
 
@@ -663,6 +763,7 @@ export function mount(root, api) {
 
   function onTap(cell) {
     if (uiMode === 'instrument') {
+      if (splitMode) { splitTap(cell); flash(cell, COLOURS.yellow); return; }
       if (counterpointMode) {
         playCounterpoint(cell, lastInstCell !== cell ? lastInstCell : null, table);
         if (lastInstCell !== null && lastInstCell !== cell) flash(lastInstCell, COLOURS.blue);
@@ -675,6 +776,42 @@ export function mount(root, api) {
     }
     if (uiMode === 'sequencer') { seqTap(cell); return; }
     gameTap(cell);
+  }
+
+  // ---------- split mode ----------
+  function releaseSplit() {
+    splitGen++;
+    if (splitHeld) {
+      if (splitHeld.lo) splitHeld.lo.release();
+      if (splitHeld.hi) splitHeld.hi.release();
+      splitHeld = null;
+    }
+  }
+
+  // Vertical move changes only the low voice, horizontal only the high voice, diagonal changes both.
+  // A voice whose coordinate did not change keeps ringing.
+  function splitTap(cell) {
+    const p = cellAt(cell);
+    const v = splitSemis(cfg, cell);
+    const flo = A3 * Math.pow(2, v.lo / 12);
+    const fhi = A3 * Math.pow(2, v.hi / 12);
+    const prev = splitHeld;
+    const rowSame = !!prev && prev.row === p.row;
+    const colSame = !!prev && prev.col === p.col;
+    let lo, hi;
+    if (!prev || (rowSame && colSame)) {
+      releaseSplit();
+      lo = holdVoice(flo, 0.2, 'triangle');
+      hi = holdVoice(fhi, 0.12, 'sine');
+    } else {
+      if (rowSame) lo = prev.lo;
+      else { if (prev.lo) prev.lo.release(); lo = holdVoice(flo, 0.2, 'triangle'); }
+      if (colSame) hi = prev.hi;
+      else { if (prev.hi) prev.hi.release(); hi = holdVoice(fhi, 0.12, 'sine'); }
+    }
+    const gen = ++splitGen;
+    splitHeld = { row: p.row, col: p.col, lo, hi };
+    api.setTimeout(() => { if (gen === splitGen) releaseSplit(); }, 1500);
   }
 
   // ---------- sequencer ----------
@@ -708,6 +845,7 @@ export function mount(root, api) {
     seqGen++;
     playing = false;
     seqIdx = -1;
+    canonIdx = -1;
     playBtn.textContent = '▶ Play';
     if (uiMode === 'sequencer') paintAll();
   }
@@ -717,13 +855,19 @@ export function mount(root, api) {
     const gen = ++seqGen;
     playing = true;
     playBtn.textContent = '■ Stop';
-    let i = 0, due = Date.now();
+    let i = 0, n = 0, due = Date.now();
     const tick = () => {
       if (destroyed || gen !== seqGen || uiMode !== 'sequencer') return;
       const s = seqs[seqSlot];
       if (!s.length) { seqStop(); return; }
       seqIdx = i % s.length;
       const nextIdx = s.length > 1 ? (seqIdx + 1) % s.length : null;
+      if (canonMode) {
+        // follower replays the pattern `lag` steps behind, a fifth up, in a sine voice
+        const lag = Math.max(1, Math.floor(s.length / 2));
+        canonIdx = n >= lag ? (n - lag) % s.length : -1;
+        if (canonIdx >= 0) voice(table.freq[s[canonIdx]] * Math.pow(2, CANON_SEMI / 12), 0.14, 0.5, 'sine', 0);
+      } else canonIdx = -1;
       if (counterpointMode) {
         playCounterpoint(s[seqIdx], nextIdx !== null ? s[nextIdx] : null, table);
       } else {
@@ -731,6 +875,7 @@ export function mount(root, api) {
       }
       paintAll();
       i = seqIdx + 1;
+      n++;
       due += 30000 / bpm;
       api.setTimeout(tick, Math.max(0, due - Date.now()));
     };
@@ -865,6 +1010,7 @@ export function mount(root, api) {
     denied: () => {},
     destroy() {
       destroyed = true;
+      releaseSplit();
       clockGen++;
       seqGen++;
       replayGen++;
