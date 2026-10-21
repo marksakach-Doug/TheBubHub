@@ -208,24 +208,23 @@ export function mount(root, api) {
     return e;
   };
 
-  // Intercept both touchstart and pointerdown on buttons so iOS never triggers double-tap zoom
+  // Debounced press handler: fires immediately on pointerdown, while touchstart/touchend prevent mobile zoom
   const press = (node, fn) => {
-    let touched = false;
-    node.addEventListener('touchstart', (e) => {
+    let last = 0;
+    const run = (e) => {
       e.preventDefault();
-      touched = true;
+      const now = Date.now();
+      if (now - last < 80) return;
+      last = now;
       unlockAudio();
       fn(e);
-    }, { passive: false });
-    node.addEventListener('pointerdown', (e) => {
-      if (e.pointerType === 'touch' && touched) return;
-      e.preventDefault();
-      unlockAudio();
-      fn(e);
-    });
+    };
+    node.addEventListener('pointerdown', run);
+    node.addEventListener('touchstart', run, { passive: false });
+    node.addEventListener('touchend', (e) => e.preventDefault(), { passive: false });
   };
 
-  // font-size:16px on <select> is required so iOS Safari does not auto-zoom when opening dropdowns
+  // font-size:16px on <select> prevents iOS Safari from auto-zooming when opening dropdowns
   const SMALL_BTN = 'font:inherit;font-size:13px;padding:4px 9px;min-height:30px;border-radius:8px;'
     + 'border:1px solid #3a465f;background:#232c3f;color:#e8ecf4;cursor:pointer;white-space:nowrap;touch-action:none;';
   const SELECT_CSS = 'font:inherit;font-size:16px;padding:2px 4px;height:30px;border-radius:8px;border:1px solid #3a465f;'
@@ -402,22 +401,66 @@ export function mount(root, api) {
   });
   board.append(...cells);
 
-  // Unified touch + mouse handling on the board:
-  // Canceling touchstart directly on the board prevents 100% of iOS/Android double-tap zoom on cells
+  // ---------- board input (works inside Shadow DOM + prevents mobile zoom) ----------
   const down = new Map();
-  function cellAtPoint(x, y) {
-    const elAt = document.elementFromPoint(x, y);
-    const cellEl = elAt && elAt.closest ? elAt.closest('[data-i]') : null;
-    return cellEl ? Number(cellEl.dataset.i) : -1;
+  let lastPointerMs = 0;
+
+  // Calculate cell from bounding box coordinates (never fails in Shadow DOM)
+  function cellFromCoords(clientX, clientY) {
+    const r = board.getBoundingClientRect();
+    if (r.width <= 0 || r.height <= 0) return -1;
+    if (clientX < r.left || clientX > r.right || clientY < r.top || clientY > r.bottom) return -1;
+    const col = Math.min(GRID - 1, Math.max(0, Math.floor(((clientX - r.left) / r.width) * GRID)));
+    const row = Math.min(GRID - 1, Math.max(0, Math.floor(((clientY - r.top) / r.height) * GRID)));
+    return row * GRID + col;
   }
 
+  function cellFromEvent(e) {
+    // 1. Direct DOM target lookup (fastest & most reliable for taps)
+    if (e.target && e.target.closest) {
+      const t = e.target.closest('[data-i]');
+      if (t && t.dataset.i !== undefined) return Number(t.dataset.i);
+    }
+    // 2. Fallback to bounding-box math (for gliding or tapping the 4px gap between cells)
+    const pt = (e.changedTouches && e.changedTouches[0]) || (e.touches && e.touches[0]) || e;
+    if (pt && typeof pt.clientX === 'number') {
+      return cellFromCoords(pt.clientX, pt.clientY);
+    }
+    return -1;
+  }
+
+  board.addEventListener('pointerdown', (e) => {
+    if (e.button) return;
+    e.preventDefault();
+    unlockAudio();
+    const c = cellFromEvent(e);
+    if (c < 0) return;
+    lastPointerMs = Date.now();
+    down.set(e.pointerId, c);
+    onTap(c);
+  });
+
+  board.addEventListener('pointermove', (e) => {
+    if (uiMode !== 'instrument' || !down.has(e.pointerId)) return;
+    if (e.pointerType === 'mouse' && e.buttons === 0) { down.delete(e.pointerId); return; }
+    const c = cellFromCoords(e.clientX, e.clientY);
+    if (c < 0 || c === down.get(e.pointerId)) return;
+    down.set(e.pointerId, c);
+    onTap(c);
+  });
+
+  const lift = (e) => down.delete(e.pointerId);
+  board.addEventListener('pointerup', lift);
+  board.addEventListener('pointercancel', lift);
+
+  // Suppress mobile double-tap zoom on the board while providing touch fallback if pointerdown was skipped
   board.addEventListener('touchstart', (e) => {
     e.preventDefault();
     unlockAudio();
-    for (const t of e.changedTouches) {
-      const c = cellAtPoint(t.clientX, t.clientY);
+    if (Date.now() - lastPointerMs > 80) {
+      const c = cellFromEvent(e);
       if (c >= 0) {
-        down.set(t.identifier, c);
+        lastPointerMs = Date.now();
         onTap(c);
       }
     }
@@ -426,45 +469,19 @@ export function mount(root, api) {
   board.addEventListener('touchmove', (e) => {
     e.preventDefault();
     if (uiMode !== 'instrument') return;
-    for (const t of e.changedTouches) {
-      if (!down.has(t.identifier)) continue;
-      const c = cellAtPoint(t.clientX, t.clientY);
-      if (c >= 0 && c !== down.get(t.identifier)) {
-        down.set(t.identifier, c);
-        onTap(c);
-      }
+    const pt = e.changedTouches && e.changedTouches[0];
+    if (!pt) return;
+    const c = cellFromCoords(pt.clientX, pt.clientY);
+    if (c >= 0 && c !== down.get('touch')) {
+      down.set('touch', c);
+      onTap(c);
     }
   }, { passive: false });
 
-  const liftTouch = (e) => {
-    for (const t of e.changedTouches) down.delete(t.identifier);
-  };
-  board.addEventListener('touchend', liftTouch);
-  board.addEventListener('touchcancel', liftTouch);
-
-  // Desktop mouse/pen fallback (ignores touch since touchstart handles it)
-  board.addEventListener('pointerdown', (e) => {
-    if (e.pointerType === 'touch' || e.button) return;
+  board.addEventListener('touchend', (e) => {
     e.preventDefault();
-    unlockAudio();
-    const c = cellAtPoint(e.clientX, e.clientY);
-    if (c < 0) return;
-    down.set(e.pointerId, c);
-    onTap(c);
-  });
-  board.addEventListener('pointermove', (e) => {
-    if (e.pointerType === 'touch' || uiMode !== 'instrument' || !down.has(e.pointerId)) return;
-    if (e.buttons === 0) { down.delete(e.pointerId); return; }
-    const c = cellAtPoint(e.clientX, e.clientY);
-    if (c < 0 || c === down.get(e.pointerId)) return;
-    down.set(e.pointerId, c);
-    onTap(c);
-  });
-  const liftPointer = (e) => {
-    if (e.pointerType !== 'touch') down.delete(e.pointerId);
-  };
-  board.addEventListener('pointerup', liftPointer);
-  board.addEventListener('pointercancel', liftPointer);
+    down.delete('touch');
+  }, { passive: false });
 
   // level-cleared card (Game)
   const card = el('display:none;position:absolute;top:50%;left:50%;transform:translate(-50%,-50%);'
@@ -486,13 +503,17 @@ export function mount(root, api) {
   press(reset, () => api.send({ a: 'reset' }));
   bar.append(reset);
 
-  // Block double-tap and pinch zoom anywhere inside wrap except native <select> and <textarea>
-  wrap.addEventListener('touchstart', (e) => {
-    unlockAudio();
+  // Prevent double-tap zoom on empty areas of wrap while leaving <select> and <textarea> native
+  let lastWrapTouchEnd = 0;
+  wrap.addEventListener('touchstart', () => unlockAudio(), { passive: true });
+  wrap.addEventListener('touchend', (e) => {
     const tag = e.target && e.target.tagName;
-    if (tag !== 'SELECT' && tag !== 'TEXTAREA' && tag !== 'OPTION') {
+    if (tag === 'SELECT' || tag === 'TEXTAREA' || tag === 'OPTION') return;
+    const now = Date.now();
+    if (now - lastWrapTouchEnd <= 400) {
       e.preventDefault();
     }
+    lastWrapTouchEnd = now;
   }, { passive: false });
   wrap.addEventListener('dblclick', (e) => e.preventDefault());
   wrap.addEventListener('gesturestart', (e) => e.preventDefault());
@@ -716,7 +737,6 @@ export function mount(root, api) {
     exportNote.textContent = msg;
   }
   press(exportBtn, doExport);
-  exportBtn.addEventListener('click', doExport);
 
   // ---------- game ----------
   function startLevelClock(limitMs) {
