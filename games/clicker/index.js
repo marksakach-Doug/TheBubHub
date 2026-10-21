@@ -34,7 +34,8 @@ const SCALES = [
 
 // The mapping the PATTERNS were composed on: rows climb A Mixolydian from A3, columns bend up in semitones.
 // The Game always uses this. Instrument and Sequencer can change it.
-const DEFAULT_CFG = { row: 'minpent', col: 'whole', root: 0 };
+const DEFAULT_CFG = { row: 'mixolydian', col: 'chromatic', root: 0 };
+const START_CFG = { row: 'minpent', col: 'whole', root: 0 };
 
 // Paste exported array from pattern-builder.html (or the Sequencer's Export button) here:
 const PATTERNS = [
@@ -295,7 +296,7 @@ export function mount(root, api) {
   }
 
   // ---------- state ----------
-  const cfg = { ...DEFAULT_CFG };
+  const cfg = { ...START_CFG };
   let table = buildTable(cfg);          // used by Instrument + Sequencer
   let uiMode = 'instrument';                  // 'game' | 'instrument' | 'sequencer'
   let counterpointMode = true;          // counterpoint enabled in Instrument + Sequencer
@@ -852,7 +853,7 @@ export function mount(root, api) {
   }
 
 
-rootSel.value = String(cfg.root);
+  rootSel.value = String(cfg.root);
   rowSel.value = cfg.row;
   colSel.value = cfg.col;
   retune();
