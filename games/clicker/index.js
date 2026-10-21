@@ -407,7 +407,17 @@ function cellFromEvent(e) {
   wrap.addEventListener('touchstart', () => unlockAudio(), { passive: true });
   wrap.addEventListener('dblclick', (e) => e.preventDefault());
   wrap.append(tabs, tune, seqBar, timer, board, card, bar, exportBox);
+  if (root && root.style) {
   root.style.touchAction = 'pan-x pan-y';
+}
+wrap.addEventListener('gesturestart', (e) => e.preventDefault());
+if (root && root.style) {
+  root.style.touchAction = 'pan-x pan-y';
+}
+wrap.addEventListener('gesturestart', (e) => e.preventDefault());
+if (root && root.style) {
+  root.style.touchAction = 'pan-x pan-y';
+}
 wrap.addEventListener('gesturestart', (e) => e.preventDefault());
 root.append(wrap);
 
