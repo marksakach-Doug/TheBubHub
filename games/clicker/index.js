@@ -37,7 +37,7 @@ const SCALES = [
 // The mapping the PATTERNS were composed on: rows climb A Mixolydian from A3, columns bend up in semitones.
 // The Game always uses this. Instrument and Sequencer can change it.
 const DEFAULT_CFG = { row: 'mixolydian', col: 'chromatic', root: 0 };
-const START_CFG = { row: 'major', col: 'major', root: 0 };
+const START_CFG = { row: 'major', col: 'major', root: 4 };
 
 // Paste exported array from pattern-builder.html (or the Sequencer's Export button) here:
 const PATTERNS = [
@@ -80,9 +80,9 @@ const PATTERNS = [
   [39, 32, 30, 23, 48, 41, 28, 11, 50, 43, 52, 33, 58, 62, 60, 55, 47, 0, 18, 66, 37, 20, 64, 57, 71, 74, 8, 22],
   [8, 5, 1, 17, 14, 10, 12, 16, 3, 6, 9, 23, 35, 32, 28, 44, 41, 37, 39, 43, 30, 33, 36, 50, 62, 59, 55, 71, 68, 64, 66, 70, 57, 61, 63],
   [18, 0, 11, 3, 14, 7, 41, 35, 30, 13, 5, 16, 36, 47, 32, 51, 74, 56, 38, 67, 27, 10, 2, 31, 49, 42, 65, 59],
-  [72, 73, 74, 75, 72, 73, 74, 75, 63, 64, 65, 66, 63, 64, 65, 66, 54, 55, 56, 57, 54, 55, 56, 57, 45, 46, 47, 48, 45, 46, 47, 48],
-  [30, 13, 41, 34, 16, 24, 30, 13, 41, 34, 16, 24, 47, 29, 57, 51, 43, 32, 36, 19, 11, 22, 5, 68, 55, 38, 66, 49, 72, 77, 3, 7],
-  [18, 11, 3, 12, 20, 30, 14, 5, 25, 32, 43, 50, 33, 16, 8, 7, 35, 55, 39, 22, 9, 72, 71]
+  [18, 11, 3, 12, 20, 30, 14, 5, 25, 32, 43, 50, 33, 16, 8, 7, 35, 55, 39, 22, 9, 72, 71],
+  [72, 56, 40, 24, 8, 6, 14, 22, 30, 39, 32, 25, 17, 35, 43, 60, 77, 18, 11, 12, 3, 28, 38, 50, 55, 71, 66, 74, 45, 63],
+  [40, 48, 41, 49, 42, 32, 25, 22, 28, 30, 12, 20, 37, 45, 39, 14, 50, 77, 70, 68, 61, 59, 53, 60, 43, 35, 17, 66, 38, 55, 18, 3, 8]
 ];
 
 const VALID = PATTERNS.filter((p) => Array.isArray(p) && p.length > 0
