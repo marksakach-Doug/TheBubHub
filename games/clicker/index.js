@@ -8,6 +8,15 @@ const SEQ_SLOTS = 8;
 const A3 = 220;
 const BG = '#1d2434';
 const COLOURS = { red: '#ff4d4d', yellow: '#facc15', blue: '#2f6bd8' };
+// Reference notes in Instrument + Sequencer: tonic = red, third = yellow, fifth = blue.
+// bg is the game colour mixed about 42% into the board colour, so the full-strength red/yellow/blue
+// stay free for the sequencer's playback and step markers. hue is the full colour, used as a ring.
+const REF = {
+  r: { hue: '#ff4d4d', bg: '#7c353e' },
+  t: { hue: '#facc15', bg: '#7a6b27' },
+  f: { hue: '#2f6bd8', bg: '#254279' }
+};
+const FLASH = '#e8ecf4';
 const NAMES = ['A', 'A#', 'B', 'C', 'C#', 'D', 'D#', 'E', 'F', 'F#', 'G', 'G#'];
 
 // Scales available in the Instrument / Sequencer dropdowns: [id, label, semitone steps]
@@ -17,11 +26,11 @@ const SCALES = [
   ['minor', 'Minor', [0, 2, 3, 5, 7, 8, 10]],
   ['mixolydian', 'Mixolydian', [0, 2, 4, 5, 7, 9, 10]],
   ['dorian', 'Dorian', [0, 2, 3, 5, 7, 9, 10]],
-  ['majpent', 'Maj pentatonic', [0, 2, 4, 7, 9]],
-  ['minpent', 'Min pentatonic', [0, 3, 5, 7, 10]],
+  ['majpent', 'Maj pent', [0, 2, 4, 7, 9]],
+  ['minpent', 'Min pent', [0, 3, 5, 7, 10]],
   ['blues', 'Blues', [0, 3, 5, 6, 7, 10]],
   ['whole', 'Whole tone', [0, 2, 4, 6, 8, 10]],
-  ['harmonic', 'Harmonic minor', [0, 2, 3, 5, 7, 8, 11]]
+  ['harmonic', 'Harm minor', [0, 2, 3, 5, 7, 8, 11]]
 ];
 
 // The mapping the PATTERNS were composed on: rows climb A Mixolydian from A3, columns bend up in semitones.
@@ -77,16 +86,18 @@ function degrees(id, n) {
 function buildTable(cfg) {
   const rd = degrees(cfg.row, GRID);
   const cd = degrees(cfg.col, GRID);
-  const freq = [], name = [], isRoot = [];
+  const freq = [], name = [], ref = [];
   for (let cell = 0; cell < CELLS; cell++) {
     const p = cellAt(cell);
-    const s = cfg.root + rd[GRID - 1 - p.row] + cd[p.col];
+    const step = rd[GRID - 1 - p.row] + cd[p.col];   // semitones above the key
+    const s = cfg.root + step;
     const pc = ((s % 12) + 12) % 12;
+    const rel = step % 12;
     freq.push(A3 * Math.pow(2, s / 12));
     name.push(NAMES[pc]);
-    isRoot.push(pc === cfg.root % 12);
+    ref.push(rel === 0 ? 'r' : (rel === 3 || rel === 4) ? 't' : rel === 7 ? 'f' : '');
   }
-  return { freq, name, isRoot };
+  return { freq, name, ref };
 }
 
 const GAME_TABLE = buildTable(DEFAULT_CFG);
@@ -194,8 +205,13 @@ export function mount(root, api) {
 
   const SMALL_BTN = 'font:inherit;font-size:15px;padding:8px 12px;min-height:40px;border-radius:10px;'
     + 'border:1px solid #3a465f;background:#232c3f;color:#e8ecf4;cursor:pointer;';
-  const SELECT_CSS = 'font:inherit;font-size:16px;padding:7px 8px;border-radius:8px;border:1px solid #3a465f;'
-    + 'background:#232c3f;color:#e8ecf4;width:100%;min-width:0;';
+  // compact row controls (16px text so iOS never zooms in on them)
+  const CHEVRON = "url(\"data:image/svg+xml,<svg xmlns='http://www.w3.org/2000/svg' width='10' height='6'><path d='M1 1l4 4 4-4' fill='none' stroke='%238f9bb5' stroke-width='1.6'/></svg>\")";
+  const SELECT_CSS = 'font:inherit;font-size:16px;line-height:1.2;height:38px;box-sizing:border-box;padding:0 16px 0 6px;'
+    + 'border-radius:8px;border:1px solid #3a465f;background:#232c3f ' + CHEVRON + ' no-repeat right 5px center;'
+    + 'color:#e8ecf4;width:100%;min-width:0;-webkit-appearance:none;appearance:none;text-overflow:ellipsis;';
+  const CBTN = 'font:inherit;font-size:16px;height:38px;box-sizing:border-box;padding:0 10px;border-radius:8px;'
+    + 'border:1px solid #3a465f;background:#232c3f;color:#e8ecf4;cursor:pointer;flex:none;';
 
   // ---------- audio ----------
   let actx = null;
@@ -245,25 +261,27 @@ export function mount(root, api) {
   let seqPositions = new Map();
 
   // ---------- layout ----------
-  const wrap = el('position:relative;max-width:min(460px, 68vh);margin:0 auto;padding:12px 10px 18px;'
+  const wrap = el('position:relative;max-width:min(460px, 68vh);margin:0 auto;padding:8px 10px 14px;'
     + 'font-family:system-ui,-apple-system,Segoe UI,Roboto,sans-serif;color:#e8ecf4;color-scheme:dark;'
-    + 'user-select:none;-webkit-user-select:none;touch-action:manipulation;');
+    + 'user-select:none;-webkit-user-select:none;-webkit-touch-callout:none;touch-action:pan-x pan-y;');
 
   // mode tabs
-  const tabs = el('display:flex;gap:6px;margin-bottom:10px;');
+  const tabs = el('display:flex;gap:6px;margin-bottom:8px;');
   const tabBtns = {};
   [['game', 'Game'], ['instrument', 'Instrument'], ['sequencer', 'Sequencer']].forEach(([id, label]) => {
-    const b = el('flex:1;font:inherit;font-size:15px;padding:9px 6px;border-radius:10px;'
+    const b = el('flex:1;font:inherit;font-size:14px;padding:7px 6px;border-radius:10px;'
       + 'border:1px solid #3a465f;background:#232c3f;color:#e8ecf4;cursor:pointer;', label, 'button');
     press(b, () => setMode(id));
     tabBtns[id] = b;
     tabs.append(b);
   });
 
-  // pitch controls (Instrument + Sequencer)
-  function makeSelect(options, value, onChange) {
+  // pitch controls (Instrument + Sequencer): one slim row, no labels (arrows say which axis)
+  function makeSelect(options, value, onChange, title) {
     const s = document.createElement('select');
     s.style.cssText = SELECT_CSS;
+    s.title = title || '';
+    s.setAttribute('aria-label', title || 'choose');
     options.forEach(([v, label]) => {
       const o = document.createElement('option');
       o.value = v;
@@ -274,16 +292,13 @@ export function mount(root, api) {
     s.addEventListener('change', () => onChange(s.value));
     return s;
   }
-  const labelled = (text, node) => {
-    const d = el('flex:1 1 110px;min-width:0;display:flex;flex-direction:column;gap:3px;');
-    d.append(el('font-size:11px;color:#8f9bb5;letter-spacing:.04em;text-transform:uppercase;', text), node);
-    return d;
-  };
-  const scaleOptions = SCALES.map(([id, label]) => [id, label]);
-  const rootSel = makeSelect(NAMES.map((n, i) => [String(i), n]), String(cfg.root), (v) => { cfg.root = Number(v); retune(); });
-  const rowSel = makeSelect(scaleOptions, cfg.row, (v) => { cfg.row = v; retune(); });
-  const colSel = makeSelect(scaleOptions, cfg.col, (v) => { cfg.col = v; retune(); });
-  const gameScaleBtn = el(SMALL_BTN + 'flex:0 0 auto;align-self:flex-end;padding:7px 10px;font-size:14px;', '↺ Game scale', 'button');
+  const slot = (css, node) => { const d = el(css); d.append(node); return d; };
+  const rootSel = makeSelect(NAMES.map((n, i) => [String(i), '♪' + n]), String(cfg.root), (v) => { cfg.root = Number(v); retune(); }, 'Key');
+  const rowSel = makeSelect(SCALES.map(([id, label]) => [id, '↑ ' + label]), cfg.row, (v) => { cfg.row = v; retune(); }, 'Scale going up');
+  const colSel = makeSelect(SCALES.map(([id, label]) => [id, '→ ' + label]), cfg.col, (v) => { cfg.col = v; retune(); }, 'Scale going across');
+  const gameScaleBtn = el(CBTN + 'width:38px;padding:0;', '↺', 'button');
+  gameScaleBtn.title = 'Back to the Game scale';
+  gameScaleBtn.setAttribute('aria-label', 'Back to the Game scale');
   press(gameScaleBtn, () => {
     Object.assign(cfg, DEFAULT_CFG);
     rootSel.value = String(cfg.root);
@@ -291,35 +306,39 @@ export function mount(root, api) {
     colSel.value = cfg.col;
     retune();
   });
-  const tune = el('display:none;flex-wrap:wrap;gap:8px;margin-bottom:10px;');
-  tune.append(labelled('Key', rootSel), labelled('Up scale', rowSel), labelled('Across scale', colSel), gameScaleBtn);
+  const tune = el('display:none;gap:6px;margin-bottom:8px;');
+  tune.append(slot('flex:0 0 60px;min-width:0;', rootSel), slot('flex:1 1 0;min-width:0;', rowSel),
+    slot('flex:1 1 0;min-width:0;', colSel), gameScaleBtn);
 
-  // sequencer controls
+  // sequencer controls: one slim row
   const patSel = makeSelect(Array.from({ length: SEQ_SLOTS }, (_, i) => [String(i), '']), '0', (v) => {
     seqSlot = Number(v);
     seqStop();
     refreshPatternLabels();
     paintAll();
-  });
-  const tempoSel = makeSelect([60, 80, 100, 120, 140, 160, 200].map((v) => [String(v), v + ' bpm']), String(bpm), (v) => { bpm = Number(v); });
-  const playBtn = el(SMALL_BTN + 'background:#4cd137;color:#111;border:none;font-weight:600;', '▶ Play', 'button');
-  const undoBtn = el(SMALL_BTN, 'Undo', 'button');
-  const clearBtn = el(SMALL_BTN, 'Clear', 'button');
-  const exportBtn = el(SMALL_BTN, 'Export', 'button');
-  const seqBar = el('display:none;flex-direction:column;gap:8px;margin-bottom:10px;');
-  const seqRow1 = el('display:flex;gap:8px;align-items:flex-end;');
-  const seqRow2 = el('display:flex;gap:8px;');
-  seqRow1.append(labelled('Pattern', patSel), labelled('Tempo', tempoSel), playBtn);
-  seqRow2.append(undoBtn, clearBtn, exportBtn);
-  seqBar.append(seqRow1, seqRow2);
+  }, 'Pattern');
+  const tempoSel = makeSelect([60, 80, 100, 120, 140, 160, 200].map((v) => [String(v), '♩' + v]), String(bpm), (v) => { bpm = Number(v); }, 'Tempo (bpm)');
+  const playBtn = el(CBTN + 'width:42px;padding:0;background:#4cd137;color:#111;border:none;font-weight:700;', '▶', 'button');
+  const undoBtn = el(CBTN + 'width:38px;padding:0;', '↶', 'button');
+  const clearBtn = el(CBTN + 'width:38px;padding:0;', '✕', 'button');
+  const exportBtn = el(CBTN, 'Copy', 'button');
+  playBtn.title = 'Play / stop'; undoBtn.title = 'Undo last note'; clearBtn.title = 'Clear pattern'; exportBtn.title = 'Copy patterns as code';
+  [playBtn, undoBtn, clearBtn, exportBtn].forEach((b) => b.setAttribute('aria-label', b.title));
+  const seqBar = el('display:none;gap:5px;margin-bottom:8px;');
+  seqBar.append(slot('flex:1.5 1 0;min-width:0;', patSel), slot('flex:1 1 0;min-width:0;', tempoSel),
+    playBtn, undoBtn, clearBtn, exportBtn);
 
-  const exportBox = el('display:none;margin-top:12px;');
+  // export sheet floats over the board so the page never grows
+  const exportBox = el('display:none;position:absolute;top:50%;left:10px;right:10px;transform:translateY(-50%);z-index:11;'
+    + 'padding:12px;background:rgba(29,36,52,.98);border:1px solid #3a465f;border-radius:10px;box-shadow:0 8px 24px rgba(0,0,0,.5);');
   const exportNote = el('font-size:13px;color:#8f9bb5;margin-bottom:6px;line-height:1.35;');
   const exportArea = document.createElement('textarea');
   exportArea.readOnly = true;
   exportArea.style.cssText = 'width:100%;box-sizing:border-box;height:120px;font:16px ui-monospace,Menlo,Consolas,monospace;'
     + 'background:#232c3f;color:#e8ecf4;border:1px solid #3a465f;border-radius:8px;padding:8px;user-select:text;-webkit-user-select:text;';
-  exportBox.append(exportNote, exportArea);
+  const exportClose = el(SMALL_BTN + 'margin-top:8px;width:100%;', 'Close', 'button');
+  press(exportClose, () => { exportBox.style.display = 'none'; });
+  exportBox.append(exportNote, exportArea, exportClose);
 
   // decreasing timer bar (Game)
   const timer = el('width:100%;height:12px;margin-bottom:10px;border-radius:6px;background:#232c3f;'
@@ -347,18 +366,26 @@ export function mount(root, api) {
   });
   board.append(...cells);
 
-  // one pointer handler for the whole board: multi-touch, and drag across cells to glide in Instrument
+  // one pointer handler for the whole board: multi-touch, and drag across cells to glide in Instrument.
+  // A tap uses the element that was actually touched (works inside iframes and shadow roots);
+  // gliding has to use coordinates, because touch pointers stay locked to the first cell.
   const down = new Map();
-  function cellFromEvent(e) {
-    const t = document.elementFromPoint(e.clientX, e.clientY);
-    const i = t && t.dataset ? t.dataset.i : undefined;
-    return i === undefined ? -1 : Number(i);
+  function cellFromEvent(e, byPoint) {
+    if (!byPoint) {
+      const hit = e.target && e.target.closest ? e.target.closest('[data-i]') : null;
+      if (hit) return Number(hit.dataset.i);
+    }
+    const rn = wrap.getRootNode ? wrap.getRootNode() : document;
+    const finder = rn && rn.elementFromPoint ? rn : document;
+    const t = finder.elementFromPoint(e.clientX, e.clientY);
+    const c = t && t.closest ? t.closest('[data-i]') : null;
+    return c ? Number(c.dataset.i) : -1;
   }
   board.addEventListener('pointerdown', (e) => {
     if (e.button) return;
     e.preventDefault();
     unlockAudio();
-    const c = cellFromEvent(e);
+    const c = cellFromEvent(e, false);
     if (c < 0) return;
     down.set(e.pointerId, c);
     onTap(c);
@@ -366,7 +393,7 @@ export function mount(root, api) {
   board.addEventListener('pointermove', (e) => {
     if (uiMode !== 'instrument' || !down.has(e.pointerId)) return;
     if (e.buttons === 0) { down.delete(e.pointerId); return; }
-    const c = cellFromEvent(e);
+    const c = cellFromEvent(e, true);
     if (c < 0 || c === down.get(e.pointerId)) return;
     down.set(e.pointerId, c);
     onTap(c);
@@ -397,6 +424,9 @@ export function mount(root, api) {
   press(reset, () => api.send({ a: 'reset' }));
   bar.append(reset);
 
+  const prevTouchAction = root.style.touchAction;
+  root.style.touchAction = 'pan-x pan-y';             // scroll yes, pinch / double-tap zoom no
+  wrap.addEventListener('gesturestart', (e) => e.preventDefault());   // Safari pinch
   wrap.addEventListener('touchstart', () => unlockAudio(), { passive: true });
   wrap.addEventListener('dblclick', (e) => e.preventDefault());
   wrap.append(tabs, tune, seqBar, timer, board, card, bar, exportBox);
@@ -413,14 +443,15 @@ export function mount(root, api) {
 
   function paintCell(i) {
     const b = cells[i];
-    let bg = BG, text = '', fg = '#8f9bb5';
+    let bg = BG, text = '', fg = '#8f9bb5', ring = '';
     if (uiMode === 'game') {
       const c = byCell.get(i);
       if (c) bg = COLOURS[c.colour];
     } else {
+      const ref = table.ref[i];
       text = table.name[i];
-      fg = table.isRoot[i] ? '#cfd8ee' : '#6f7c99';
-      if (table.isRoot[i]) bg = '#26324a';
+      fg = ref ? '#f1f4fa' : '#6f7c99';
+      if (ref) { bg = REF[ref].bg; ring = 'inset 0 0 0 2px ' + REF[ref].hue; }
       if (uiMode === 'sequencer') {
         const pos = seqPositions.get(i);
         if (pos) {
@@ -428,15 +459,16 @@ export function mount(root, api) {
           fg = '#fff';
           text = pos.length > 3 ? pos.slice(0, 3).join('·') + '…' : pos.join('·');
         }
-        const s = seqs[seqSlot];
-        if (playing && seqIdx >= 0 && s.length) {
-          if (s[seqIdx] === i) { bg = COLOURS.red; fg = '#fff'; }
-          else if (s.length > 1 && s[(seqIdx + 1) % s.length] === i) { bg = COLOURS.yellow; fg = '#111'; }
+        const sq = seqs[seqSlot];
+        if (playing && seqIdx >= 0 && sq.length) {
+          if (sq[seqIdx] === i) { bg = COLOURS.red; fg = '#fff'; }
+          else if (sq.length > 1 && sq[(seqIdx + 1) % sq.length] === i) { bg = COLOURS.yellow; fg = '#111'; }
         }
       }
     }
     b.style.background = bg;
     b.style.color = fg;
+    b.style.boxShadow = ring;
     if (b.textContent !== text) b.textContent = text;
   }
 
@@ -497,7 +529,7 @@ export function mount(root, api) {
   }
 
   function onTap(cell) {
-    if (uiMode === 'instrument') { playNote(cell); flash(cell, COLOURS.yellow); return; }
+    if (uiMode === 'instrument') { playNote(cell); flash(cell, FLASH); return; }
     if (uiMode === 'sequencer') { seqTap(cell); return; }
     gameTap(cell);
   }
@@ -506,7 +538,7 @@ export function mount(root, api) {
   function refreshPatternLabels() {
     [...patSel.options].forEach((o, i) => {
       const n = seqs[i].length;
-      o.textContent = 'Pattern ' + (i + 1) + ' · ' + n + (n === 1 ? ' note' : ' notes');
+      o.textContent = '#' + (i + 1) + ' · ' + n + '♪';
     });
   }
 
@@ -515,7 +547,7 @@ export function mount(root, api) {
     if (s.length >= SEQ_MAX) { voice(110, 0.16, 0.09, 'sine', 0); return; }
     s.push(cell);
     playNote(cell, 0.5);
-    flash(cell, COLOURS.yellow);
+    flash(cell, FLASH);
     afterSeqEdit();
   }
 
@@ -528,7 +560,7 @@ export function mount(root, api) {
     seqGen++;
     playing = false;
     seqIdx = -1;
-    playBtn.textContent = '▶ Play';
+    playBtn.textContent = '▶';
     if (uiMode === 'sequencer') paintAll();
   }
 
@@ -536,7 +568,7 @@ export function mount(root, api) {
     if (!seqs[seqSlot].length) { voice(110, 0.16, 0.09, 'sine', 0); return; }
     const gen = ++seqGen;
     playing = true;
-    playBtn.textContent = '■ Stop';
+    playBtn.textContent = '■';
     let i = 0, due = Date.now();
     const tick = () => {
       if (destroyed || gen !== seqGen || uiMode !== 'sequencer') return;
@@ -577,7 +609,7 @@ export function mount(root, api) {
       msg = (ok ? 'Copied. ' : 'Select and copy the text. ') + msg;
     }
     if (!isDefaultCfg()) {
-      msg += 'These cell numbers only sound like this under the Game scale (Mixolydian up, Chromatic across, key A). Tap "Game scale" to hear them as the Game will.';
+      msg += 'These cell numbers only sound like this under the Game scale (Mixolydian up, Chromatic across, key A). Tap ↺ to hear them as the Game will.';
     }
     exportNote.textContent = msg;
   });
@@ -679,6 +711,7 @@ export function mount(root, api) {
       seqGen++;
       replayGen++;
       view = null;
+      root.style.touchAction = prevTouchAction;
       if (actx) actx.close().catch(() => {});
       cells.forEach((b) => b.replaceWith(b.cloneNode(true)));
     }
