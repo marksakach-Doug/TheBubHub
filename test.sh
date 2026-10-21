@@ -167,6 +167,13 @@ OFFLINE_SUITES=(
   # One shared suite for every game with a card, so adding a game never means
   # editing this file.
   "game scenarios|game_scenarios.mjs"
+  # The samples Clicker plays have to be in tune. They are extracted from a
+  # SoundFont and committed, so nothing else would notice if one of them
+  # ended up in the wrong key.
+  "clicker samples|clicker_samples_test.py"
+  # And the sampler that plays them has to pick the right sample, play it at
+  # the right rate, and stay quiet instead of failing when it is not ready.
+  "clicker sound|clicker_sound_test.mjs"
 )
 
 SERVE_PORT="${SERVE_PORT:-5180}"
@@ -201,6 +208,9 @@ BROWSER_SUITES=(
   # update() the raw state instead of calling project(), and a game that shapes
   # its view showed a permanently empty board while logging nothing.
   "game smoke (built)|game_smoke.py"
+  # The samples Clicker plays have to survive the build: hashed, fetched,
+  # decoded, and actually played - a piano note, not a tone.
+  "clicker sound (built)|clicker_sound_play.py"
   # A node harness, not python: minigo_test.mjs drives the shipped module and
   # the MCTS bot with no browser. It was in this table being run by python3,
   # which could only ever SyntaxError — a suite that has never once passed.
@@ -218,7 +228,7 @@ for entry in "${OFFLINE_SUITES[@]}"; do
 done
 for entry in "${BROWSER_SUITES[@]}"; do
   case "$entry" in
-    "hub shell (built)|"*|"game smoke (built)|"*)
+    "hub shell (built)|"*|"game smoke (built)|"*|"clicker sound (built)|"*)
       [ "$BROWSER_OK" = "1" ] || { skip "${entry##*|} ($BROWSER_WHY)"; continue; }
       if ensure_dist; then
         run_browser "${entry%%|*}" "${entry##*|} $SERVE_PORT"

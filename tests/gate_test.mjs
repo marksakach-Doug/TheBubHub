@@ -60,11 +60,23 @@ for (const [id, wantCheck, wantWord] of CASES) {
 }
 
 // The real thing must still pass, or the six fixtures prove nothing.
+// The reference starter used to live at games/nim. When it is not there,
+// any game with a card will do: the point of this check is that a REAL game
+// passes the gate, not that one particular folder does.
 console.log('');
 console.log('=== the reference starter must still pass ===');
-const nim = await checkOne('nim', GATE_ROOT);
-ok('nim passes the gate', !nim.fatal && nim.failures.length === 0,
-  nim.fatal || nim.failures.map((f) => `${f.id}: ${f.fix.split('\n')[0]}`).join('\n'));
+const gamesDir = path.join(GATE_ROOT, 'games');
+const hasNim = fs.existsSync(path.join(gamesDir, 'nim', 'index.js'));
+const ref = hasNim ? 'nim' : fs.readdirSync(gamesDir).find((d) =>
+  fs.existsSync(path.join(gamesDir, d, 'scenarios.json')) &&
+  fs.existsSync(path.join(gamesDir, d, 'index.js')));
+if (!ref) {
+  ok('a real game passes the gate', false, 'there is no game with a card to check');
+} else {
+  const real = await checkOne(ref, GATE_ROOT);
+  ok(`${ref} passes the gate`, !real.fatal && real.failures.length === 0,
+    real.fatal || real.failures.map((f) => `${f.id}: ${f.fix.split('\n')[0]}`).join('\n'));
+}
 
 // And a game that is not a game at all must fail, not crash the gate.
 console.log('');

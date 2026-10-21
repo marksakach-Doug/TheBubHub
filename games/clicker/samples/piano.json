@@ -1,0 +1,168 @@
+{
+  "name": "piano",
+  "preset": "Warm Grand",
+  "samples": [
+    {
+      "cents": 3,
+      "dur": 2.06,
+      "file": "0g086-r-5.wav",
+      "gain": 1.0,
+      "keyHi": 87,
+      "keyLo": 84,
+      "keys": [
+        84,
+        85,
+        86,
+        87
+      ],
+      "loopEnd": 0.0,
+      "loopStart": 0.0,
+      "rate": 22050,
+      "rootKey": 86,
+      "velHi": 114,
+      "velLo": 48
+    },
+    {
+      "cents": 2,
+      "dur": 2.08,
+      "file": "0g082-r-7.wav",
+      "gain": 1.0,
+      "keyHi": 83,
+      "keyLo": 80,
+      "keys": [
+        80,
+        81,
+        82,
+        83
+      ],
+      "loopEnd": 0.0,
+      "loopStart": 0.0,
+      "rate": 22050,
+      "rootKey": 82,
+      "velHi": 114,
+      "velLo": 48
+    },
+    {
+      "cents": 4,
+      "dur": 3.0,
+      "file": "0g077-l-9.wav",
+      "gain": 1.0,
+      "keyHi": 79,
+      "keyLo": 75,
+      "keys": [
+        75,
+        76,
+        77,
+        78,
+        79
+      ],
+      "loopEnd": 0.0,
+      "loopStart": 0.0,
+      "rate": 32000,
+      "rootKey": 77,
+      "velHi": 114,
+      "velLo": 48
+    },
+    {
+      "cents": 3,
+      "dur": 3.0,
+      "file": "0g073-l-10.wav",
+      "gain": 1.0,
+      "keyHi": 74,
+      "keyLo": 72,
+      "keys": [
+        72,
+        73,
+        74
+      ],
+      "loopEnd": 0.0,
+      "loopStart": 0.0,
+      "rate": 32000,
+      "rootKey": 73,
+      "velHi": 114,
+      "velLo": 48
+    },
+    {
+      "cents": 2,
+      "dur": 3.0,
+      "file": "0g070-r-11.wav",
+      "gain": 1.0,
+      "keyHi": 71,
+      "keyLo": 68,
+      "keys": [
+        68,
+        69,
+        70,
+        71
+      ],
+      "loopEnd": 0.0,
+      "loopStart": 0.0,
+      "rate": 32000,
+      "rootKey": 70,
+      "velHi": 114,
+      "velLo": 48
+    },
+    {
+      "cents": 1,
+      "dur": 3.0,
+      "file": "0g066-r-13.wav",
+      "gain": 1.0,
+      "keyHi": 67,
+      "keyLo": 64,
+      "keys": [
+        64,
+        65,
+        66,
+        67
+      ],
+      "loopEnd": 0.0,
+      "loopStart": 0.0,
+      "rate": 32000,
+      "rootKey": 66,
+      "velHi": 114,
+      "velLo": 48
+    },
+    {
+      "cents": 2,
+      "dur": 3.0,
+      "file": "0g061-r-15.wav",
+      "gain": 1.0,
+      "keyHi": 63,
+      "keyLo": 59,
+      "keys": [
+        59,
+        60,
+        61,
+        62,
+        63
+      ],
+      "loopEnd": 0.0,
+      "loopStart": 0.0,
+      "rate": 32000,
+      "rootKey": 61,
+      "velHi": 114,
+      "velLo": 48
+    },
+    {
+      "cents": -2,
+      "dur": 3.0,
+      "file": "0g056-r-25.wav",
+      "gain": 1.0,
+      "keyHi": 58,
+      "keyLo": 55,
+      "keys": [
+        55,
+        56,
+        57,
+        58
+      ],
+      "loopEnd": 0.0,
+      "loopStart": 0.0,
+      "rate": 32000,
+      "rootKey": 56,
+      "velHi": 114,
+      "velLo": 48
+    }
+  ],
+  "source": "Full Grand Piano.sf2"
+}

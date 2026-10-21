@@ -1,0 +1,136 @@
+{
+  "name": "rhodes",
+  "preset": "Straight Rhodes",
+  "samples": [
+    {
+      "cents": 5,
+      "dur": 0.986,
+      "file": "rhodes-c3-1-2.wav",
+      "gain": 1.0,
+      "keyHi": 63,
+      "keyLo": 57,
+      "keys": [
+        57,
+        58,
+        59,
+        60,
+        61,
+        62,
+        63
+      ],
+      "loopEnd": 0.9853,
+      "loopStart": 0.0002,
+      "rate": 44100,
+      "rootKey": 60,
+      "velHi": 126,
+      "velLo": 0
+    },
+    {
+      "cents": 3,
+      "dur": 1.28,
+      "file": "rhodes-c4-1-3.wav",
+      "gain": 1.0,
+      "keyHi": 74,
+      "keyLo": 69,
+      "keys": [
+        69,
+        70,
+        71,
+        72,
+        73,
+        74
+      ],
+      "loopEnd": 1.2798,
+      "loopStart": 0.0002,
+      "rate": 44100,
+      "rootKey": 71,
+      "velHi": 126,
+      "velLo": 0
+    },
+    {
+      "cents": 1,
+      "dur": 1.138,
+      "file": "rhodes-c5-1-4.wav",
+      "gain": 1.0,
+      "keyHi": 87,
+      "keyLo": 81,
+      "keys": [
+        81,
+        82,
+        83,
+        84,
+        85,
+        86,
+        87
+      ],
+      "loopEnd": 1.1376,
+      "loopStart": 0.0002,
+      "rate": 44100,
+      "rootKey": 84,
+      "velHi": 126,
+      "velLo": 0
+    },
+    {
+      "cents": 1,
+      "dur": 1.216,
+      "file": "rhodes-f-2-1-8.wav",
+      "gain": 1.0,
+      "keyHi": 56,
+      "keyLo": 55,
+      "keys": [
+        55,
+        56
+      ],
+      "loopEnd": 1.2157,
+      "loopStart": 0.0002,
+      "rate": 44100,
+      "rootKey": 54,
+      "velHi": 126,
+      "velLo": 0
+    },
+    {
+      "cents": 2,
+      "dur": 1.164,
+      "file": "rhodes-f-3-1-9.wav",
+      "gain": 1.0,
+      "keyHi": 68,
+      "keyLo": 64,
+      "keys": [
+        64,
+        65,
+        66,
+        67,
+        68
+      ],
+      "loopEnd": 1.1637,
+      "loopStart": 0.0002,
+      "rate": 44100,
+      "rootKey": 66,
+      "velHi": 126,
+      "velLo": 0
+    },
+    {
+      "cents": 2,
+      "dur": 1.463,
+      "file": "rhodes-f-4-1-10.wav",
+      "gain": 1.0,
+      "keyHi": 80,
+      "keyLo": 75,
+      "keys": [
+        75,
+        76,
+        77,
+        78,
+        79,
+        80
+      ],
+      "loopEnd": 1.4627,
+      "loopStart": 0.0002,
+      "rate": 44100,
+      "rootKey": 78,
+      "velHi": 126,
+      "velLo": 0
+    }
+  ],
+  "source": "Rhodes EPs Plus-JN1.5.sf2"
+}

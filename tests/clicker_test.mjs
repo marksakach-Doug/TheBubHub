@@ -158,16 +158,31 @@ check('an unseated player is refused', () => {
   assert.ok(/watching|seated/i.test(out.error), 'the refusal has to say why: ' + out.error);
 });
 
-check('the board fills at level 81 and stays legal', () => {
+check('the board fills to the last level and stays legal', () => {
+  // The pattern bank holds one length per level, so the game runs 33 levels
+  // and the last board is 35 cells — the 9x9 grid has 81, and this game never
+  // fills it. What has to hold is that the board stays legal all the way to
+  // the last level: no duplicates, nothing off the grid, and a level that
+  // has been cleared cannot grow.
   let st = clicker.init(ctx);
-  while (st.score < 80) st = playLevel(st);
-  assert.equal(st.score, 80);
-  assert.equal(st.queue.length, 81);
-  assert.equal(new Set(st.queue).size, 81, 'all 81 cells, no duplicates');
+  let levels = 0;
+  while (!st.won) {
+    assert.ok(levels < 100, 'the game has to end');
+    st = playLevel(st);
+    levels++;
+  }
+  assert.ok(st.queue.length > 0, 'the last level has buttons on it');
+  assert.equal(new Set(st.queue).size, st.queue.length, 'no duplicates');
+  assert.ok(st.queue.length <= 81, 'the board fits the grid');
+  st.queue.forEach((cell) => {
+    assert.ok(cell >= 0 && cell < 81, 'cell in range: ' + cell);
+  });
+
+  const score = st.score;
+  const qlen = st.queue.length;
   st = clicker.reduce(st, { a: 'hit', cell: st.queue[0] }, act);
-  assert.equal(st.score, 80, 'a full board cannot grow');
-  assert.equal(st.queue.length, 81);
-  assert.equal(st.score, 80);
+  assert.equal(st.score, score, 'a finished level cannot grow');
+  assert.equal(st.queue.length, qlen, 'the queue is untouched');
 });
 
 // ------------------------------------------------------------- project ----

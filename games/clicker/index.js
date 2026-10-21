@@ -1,3 +1,7 @@
+// The real instrument: samples taken out of a SoundFont and played back like
+// a small sampler. The Game mode does not use it - see the audio section.
+import { createSampler } from './soundfont.js';
+
 const GRID = 9;
 const CELLS = GRID * GRID;
 const LEVEL_MS = 16000;
@@ -200,8 +204,9 @@ export function reduce(state, action, ctx) {
   if (over) return state;
 
   const cell = Number(action.cell);
-  if (!(cell >= 0 && cell < CELLS) || state.step >= state.queue.length) return state;
-  if (state.queue[state.step] !== cell) return state;
+  if (!(cell >= 0 && cell < CELLS)) return { error: 'There is no cell ' + cell + ' on the board.' };
+  if (state.step >= state.queue.length) return state;
+  if (state.queue[state.step] !== cell) return { error: 'That is not the button you owe.' };
 
   const step = state.step + 1;
   if (step < state.queue.length) return same({ step, last: null });
@@ -286,22 +291,40 @@ export function mount(root, api) {
     + 'background:#232c3f;color:#e8ecf4;width:100%;min-width:0;touch-action:manipulation;';
 
   // ---------- audio ----------
+  // Two sets of voices. The Game mode keeps its oscillators: a memory game
+  // wants a click you can hear over the next one, and the samples are a
+  // megabyte and a half of download. Instrument and Sequencer are where a
+  // player goes to listen to the grid, so those play the real samples -
+  // a piano for the note you struck, an electric piano for the note coming
+  // up, and a Wurlitzer for the two voices Split mode holds.
+  const sampler = createSampler();
+  let sampled = false;         // true in the modes that use the samples
   let actx = null;
   function unlockAudio() {
     try {
       if (!actx) actx = new (window.AudioContext || window.webkitAudioContext)({ latencyHint: 'interactive' });
       if (actx.state === 'suspended') actx.resume();
+      sampler.attach(actx);
     } catch (_) {}
   }
 
+  // type: 'triangle' the piano, 'sine' the electric piano, 'beep' the wrong-
+  // click thud (which stays an oscillator - it is a mistake, not a note).
   function voice(freq, gainVal, dur, type = 'triangle', delay = 0) {
     try {
       unlockAudio();
       if (!actx) return;
+      if (sampled && type !== 'beep') {
+        const played = sampler.play(freq, {
+          gain: gainVal, dur: dur, delay: delay,
+          voice: type === 'sine' ? 'rhodes' : 'piano'
+        });
+        if (played) return;
+      }
       const t = actx.currentTime + delay;
       const osc = actx.createOscillator();
       const g = actx.createGain();
-      osc.type = type;
+      osc.type = type === 'beep' ? 'sine' : type;
       osc.frequency.setValueAtTime(freq, t);
       g.gain.setValueAtTime(0.0001, t);
       g.gain.linearRampToValueAtTime(gainVal, t + 0.01);
@@ -314,10 +337,16 @@ export function mount(root, api) {
   }
 
   // A sustained voice for Split mode: rings until release() is called.
+  // The samples carry a sustain loop, so a held note keeps sounding; the
+  // oscillator is still there for when they have not arrived yet.
   function holdVoice(freq, gainVal, type = 'triangle') {
     try {
       unlockAudio();
       if (!actx) return null;
+      if (sampled) {
+        const held = sampler.hold(freq, { gain: gainVal, voice: 'wurly' });
+        if (held) return held;
+      }
       const t = actx.currentTime;
       const osc = actx.createOscillator();
       const g = actx.createGain();
@@ -388,15 +417,21 @@ export function mount(root, api) {
   });
 
   // compact pitch + counterpoint controls (Instrument + Sequencer)
+  // The option elements are kept on the select as `optEls`: a real <select>
+  // has an `options` collection, but the little DOM the gate runs mount() in
+  // does not, and reading it there throws. Our own list works in both.
   function makeSelect(options, value, onChange) {
     const s = document.createElement('select');
     s.style.cssText = SELECT_CSS;
+    const optEls = [];
     options.forEach(([v, label]) => {
       const o = document.createElement('option');
       o.value = v;
       o.textContent = label;
       s.append(o);
+      optEls.push(o);
     });
+    s.optEls = optEls;
     s.value = value;
     s.addEventListener('change', () => onChange(s.value));
     return s;
@@ -437,7 +472,10 @@ export function mount(root, api) {
   syncCanonBtn();
   press(splitBtn, () => {
     splitMode = !splitMode;
-    if (splitMode) { counterpointMode = false; canonMode = false; syncCpBtn(); syncCanonBtn(); }
+    if (splitMode) {
+      counterpointMode = false; canonMode = false; syncCpBtn(); syncCanonBtn();
+      sampler.loadVoice('wurly');   // the voice Split mode holds
+    }
     lastInstCell = null;
     releaseSplit();
     syncSplitBtn();
@@ -744,8 +782,22 @@ export function mount(root, api) {
       prevDone = false;
       if (!api.isSpectator) api.send({ a: 'reset' });
     }
+    useSamples(m);
     layout();
     if (m === 'game' && api.isSpectator && view) renderGame();
+  }
+
+  // The samples are a download, so they are fetched when the player goes to
+  // a mode that plays them - not when Clicker opens. Until they arrive the
+  // oscillators do the job, so nothing is ever silent.
+  function useSamples(m) {
+    sampled = (m === 'instrument' || m === 'sequencer');
+    if (!sampled) return;
+    sampler.loadVoice('piano');
+    sampler.loadVoice('rhodes');
+    // Split mode is on by default, and it is the mode that holds the
+    // Wurlitzer - so that one is wanted from the start.
+    if (m === 'instrument' && splitMode) sampler.loadVoice('wurly');
   }
 
   function retune() {
@@ -816,7 +868,7 @@ export function mount(root, api) {
 
   // ---------- sequencer ----------
   function refreshPatternLabels() {
-    [...patSel.options].forEach((o, i) => {
+    patSel.optEls.forEach((o, i) => {
       const n = seqs[i].length;
       o.textContent = 'Pat ' + (i + 1) + ' (' + n + ')';
     });
@@ -824,7 +876,7 @@ export function mount(root, api) {
 
   function seqTap(cell) {
     const s = seqs[seqSlot];
-    if (s.length >= SEQ_MAX) { voice(110, 0.16, 0.09, 'sine', 0); return; }
+    if (s.length >= SEQ_MAX) { voice(110, 0.16, 0.09, 'beep', 0); return; }
     const prev = s.length ? s[s.length - 1] : null;
     s.push(cell);
     if (counterpointMode) {
@@ -851,7 +903,7 @@ export function mount(root, api) {
   }
 
   function seqStart() {
-    if (!seqs[seqSlot].length) { voice(110, 0.16, 0.09, 'sine', 0); return; }
+    if (!seqs[seqSlot].length) { voice(110, 0.16, 0.09, 'beep', 0); return; }
     const gen = ++seqGen;
     playing = true;
     playBtn.textContent = '■ Stop';
@@ -937,7 +989,7 @@ export function mount(root, api) {
     flash(cell, null);
     const c = byCell.get(cell);
     if (!c || c.colour !== 'red') {
-      voice(110, 0.16, 0.09, 'sine', 0);
+      voice(110, 0.16, 0.09, 'beep', 0);
       return;
     }
     const next = view.cells.find((x) => !x.done && x.cell !== cell && (x.colour === 'red' || x.colour === 'yellow'));
@@ -1004,6 +1056,7 @@ export function mount(root, api) {
   retune();
   layout();
   refreshPatternLabels();
+  useSamples(uiMode);
   
   return {
     update,
@@ -1011,6 +1064,7 @@ export function mount(root, api) {
     destroy() {
       destroyed = true;
       releaseSplit();
+      sampler.dispose();
       clockGen++;
       seqGen++;
       replayGen++;

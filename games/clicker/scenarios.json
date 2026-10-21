@@ -5,8 +5,8 @@
   "note": "Hand-written card, not generated. Clicker is a solo game whose layout comes from ctx.rng, so the cell numbers below are only true for seed 12345 — which is why the seed is pinned here. A scenario file does not have to come from scripts/new-game.mjs; it only has to be a spec a stranger can check.",
 
   "players": "solo",
-  "maxLines": 400,
-  "maxLinesNote": "Higher than a builder card. The 250 cap is there to stop a small model writing an essay; Clicker is hand-written and heavily commented, in the house style.",
+  "maxLines": 1150,
+  "maxLinesNote": "Higher than a builder card. The 250 cap is there to stop a small model writing an essay; Clicker is hand-written and heavily commented, in the house style. It also carries three modes (Game, Instrument, Sequencer) in one file, so it is genuinely long.",
   "summarizeMaxChars": 120,
   "seed": 12345,
   "hidden": ["queue"],
@@ -16,17 +16,19 @@
   ],
 
   "rules": "A 9x9 grid with a 16-second clock per level. Level 1 lights one button. Every level adds one more button in a random free cell. You only ever click the red button; the yellow button shows which cell will turn red next, and the rest are blue. Clear the whole queue before time runs out to score a point.",
-  "cellNote": "cell = col + row * 9 on the 9x9 board. These numbers depend on the seed AND on the gate giving each reduce() a fresh ctx.rng — which is what makes a replay reproducible. Change the seed and they all change.",
+
+  "cellNote": "cell = col + row * 9 on the 9x9 board. These numbers depend on the seed AND on the gate giving each reduce() a fresh ctx.rng — which is what makes a replay reproducible. Change the seed and they all change. At seed 12345 the levels run 39, then 50+11, then 28+11+35, then 28+32+37+41.",
+  "rulesNote": "A click that is not the button you owe is refused, not ignored: reduce() answers { error }. The board still plays its own wrong-click sound locally, so the player sees nothing but a thud.",
 
   "scenarios": [
     {
       "name": "level 1 is a single button",
-      "steps": [{ "as": "p1", "action": { "a": "hit", "cell": 9 } }],
+      "steps": [{ "as": "p1", "action": { "a": "hit", "cell": 39 } }],
       "expect": { "summarize": null }
     },
     {
       "name": "one click scores a point and the grid grows by one",
-      "steps": [{ "as": "p1", "action": { "a": "hit", "cell": 9 } }],
+      "steps": [{ "as": "p1", "action": { "a": "hit", "cell": 39 } }],
       "expect": { "summarize": null }
     },
     {
@@ -42,14 +44,14 @@
     {
       "name": "three levels in a row, then the run is reported",
       "steps": [
-        { "as": "p1", "action": { "a": "hit", "cell": 9 } },
+        { "as": "p1", "action": { "a": "hit", "cell": 39 } },
         { "as": "p1", "action": { "a": "next" } },
-        { "as": "p1", "action": { "a": "hit", "cell": 9 } },
-        { "as": "p1", "action": { "a": "hit", "cell": 45 } },
+        { "as": "p1", "action": { "a": "hit", "cell": 50 } },
+        { "as": "p1", "action": { "a": "hit", "cell": 11 } },
         { "as": "p1", "action": { "a": "next" } },
-        { "as": "p1", "action": { "a": "hit", "cell": 9 } },
-        { "as": "p1", "action": { "a": "hit", "cell": 45 } },
-        { "as": "p1", "action": { "a": "hit", "cell": 41 } },
+        { "as": "p1", "action": { "a": "hit", "cell": 28 } },
+        { "as": "p1", "action": { "a": "hit", "cell": 11 } },
+        { "as": "p1", "action": { "a": "hit", "cell": 35 } },
         { "as": "p1", "action": { "a": "reset" } }
       ],
       "expect": { "summarize": "Alice scored 3 points in Clicker, reaching level 4" }
@@ -57,10 +59,10 @@
     {
       "name": "timing out ends and reports the run immediately",
       "steps": [
-        { "as": "p1", "action": { "a": "hit", "cell": 9 } },
+        { "as": "p1", "action": { "a": "hit", "cell": 39 } },
         { "as": "p1", "action": { "a": "next" } },
-        { "as": "p1", "action": { "a": "hit", "cell": 9 } },
-        { "as": "p1", "action": { "a": "hit", "cell": 45 } },
+        { "as": "p1", "action": { "a": "hit", "cell": 50 } },
+        { "as": "p1", "action": { "a": "hit", "cell": 11 } },
         { "as": "p1", "action": { "a": "timeout" } }
       ],
       "expect": { "summarize": "Alice scored 2 points in Clicker, reaching level 3" }
