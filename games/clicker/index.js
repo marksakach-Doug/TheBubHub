@@ -10,6 +10,14 @@ const BG = '#1d2434';
 const COLOURS = { red: '#ff4d4d', yellow: '#facc15', blue: '#2f6bd8' };
 const NAMES = ['A', 'A#', 'B', 'C', 'C#', 'D', 'D#', 'E', 'F', 'F#', 'G', 'G#'];
 
+// Subtle harmonic reference tints for Instrument & Sequencer (Tonic = red, 3rd = yellow, 5th = blue)
+const ROLE_STYLE = {
+  root:  { bg: '#38202c', border: '#8c3545', fg: '#ffb3b3' },
+  third: { bg: '#332e22', border: '#806d28', fg: '#fde07b' },
+  fifth: { bg: '#1e2d4a', border: '#2f589e', fg: '#9ec2ff' },
+  other: { bg: BG,        border: '#2b3448', fg: '#6f7c99' }
+};
+
 // Scales available in the Instrument / Sequencer dropdowns: [id, label, semitone steps]
 const SCALES = [
   ['chromatic', 'Chromatic', [0, 1, 2, 3, 4, 5, 6, 7, 8, 9, 10, 11]],
@@ -17,11 +25,11 @@ const SCALES = [
   ['minor', 'Minor', [0, 2, 3, 5, 7, 8, 10]],
   ['mixolydian', 'Mixolydian', [0, 2, 4, 5, 7, 9, 10]],
   ['dorian', 'Dorian', [0, 2, 3, 5, 7, 9, 10]],
-  ['majpent', 'Maj pentatonic', [0, 2, 4, 7, 9]],
-  ['minpent', 'Min pentatonic', [0, 3, 5, 7, 10]],
+  ['majpent', 'Maj pent', [0, 2, 4, 7, 9]],
+  ['minpent', 'Min pent', [0, 3, 5, 7, 10]],
   ['blues', 'Blues', [0, 3, 5, 6, 7, 10]],
   ['whole', 'Whole tone', [0, 2, 4, 6, 8, 10]],
-  ['harmonic', 'Harmonic minor', [0, 2, 3, 5, 7, 8, 11]]
+  ['harmonic', 'Harm minor', [0, 2, 3, 5, 7, 8, 11]]
 ];
 
 // The mapping the PATTERNS were composed on: rows climb A Mixolydian from A3, columns bend up in semitones.
@@ -45,9 +53,6 @@ const PATTERNS = [
   [77, 50, 71, 43, 66, 59, 52, 41, 58, 62, 44, 33]
 ];
 
-// Levels come only from your patterns: one level per distinct pattern length, shortest first.
-// With a 1, 2, 3, 4... run of lengths, level N is the pattern with N entries.
-// A missing length is skipped (no 3-note pattern yet, so level 3 is the 4-note one). Nothing is made up.
 const VALID = PATTERNS.filter((p) => Array.isArray(p) && p.length > 0
   && p.every((c) => Number.isInteger(c) && c >= 0 && c < CELLS));
 const LENGTHS = [...new Set(VALID.map((p) => p.length))].sort((a, b) => a - b);
@@ -77,21 +82,24 @@ function degrees(id, n) {
 function buildTable(cfg) {
   const rd = degrees(cfg.row, GRID);
   const cd = degrees(cfg.col, GRID);
-  const freq = [], name = [], isRoot = [];
+  const freq = [], name = [], role = [];
   for (let cell = 0; cell < CELLS; cell++) {
     const p = cellAt(cell);
     const s = cfg.root + rd[GRID - 1 - p.row] + cd[p.col];
     const pc = ((s % 12) + 12) % 12;
+    const rel = ((s - cfg.root) % 12 + 12) % 12;
     freq.push(A3 * Math.pow(2, s / 12));
     name.push(NAMES[pc]);
-    isRoot.push(pc === cfg.root % 12);
+    if (rel === 0) role.push('root');
+    else if (rel === 3 || rel === 4) role.push('third');
+    else if (rel === 7) role.push('fifth');
+    else role.push('other');
   }
-  return { freq, name, isRoot };
+  return { freq, name, role };
 }
 
 const GAME_TABLE = buildTable(DEFAULT_CFG);
 
-// Level N plays one of your patterns of the Nth distinct length. No filling, no truncating.
 function deal(rng, level) {
   const len = LENGTHS[Math.min(level, LAST_LEVEL) - 1];
   const options = VALID.filter((p) => p.length === len);
@@ -192,9 +200,9 @@ export function mount(root, api) {
     fn(e);
   });
 
-  const SMALL_BTN = 'font:inherit;font-size:15px;padding:8px 12px;min-height:40px;border-radius:10px;'
-    + 'border:1px solid #3a465f;background:#232c3f;color:#e8ecf4;cursor:pointer;';
-  const SELECT_CSS = 'font:inherit;font-size:16px;padding:7px 8px;border-radius:8px;border:1px solid #3a465f;'
+  const SMALL_BTN = 'font:inherit;font-size:13px;padding:4px 9px;min-height:32px;border-radius:8px;'
+    + 'border:1px solid #3a465f;background:#232c3f;color:#e8ecf4;cursor:pointer;white-space:nowrap;';
+  const SELECT_CSS = 'font:inherit;font-size:13px;padding:4px 6px;min-height:32px;border-radius:8px;border:1px solid #3a465f;'
     + 'background:#232c3f;color:#e8ecf4;width:100%;min-width:0;';
 
   // ---------- audio ----------
@@ -225,10 +233,10 @@ export function mount(root, api) {
     } catch (_) {}
   }
 
-  function playCounterpoint(hitCell, nextCell) {
-    voice(GAME_TABLE.freq[hitCell], 0.24, 0.18, 'triangle', 0);
+  function playCounterpoint(hitCell, nextCell, tbl = GAME_TABLE) {
+    voice(tbl.freq[hitCell], 0.24, 0.18, 'triangle', 0);
     if (nextCell != null) {
-      voice(GAME_TABLE.freq[nextCell], 0.14, 0.26, 'sine', 0.045);
+      voice(tbl.freq[nextCell], 0.14, 0.26, 'sine', 0.045);
     }
   }
 
@@ -236,6 +244,8 @@ export function mount(root, api) {
   const cfg = { ...DEFAULT_CFG };
   let table = buildTable(cfg);          // used by Instrument + Sequencer
   let uiMode = 'game';                  // 'game' | 'instrument' | 'sequencer'
+  let counterpointMode = true;          // counterpoint enabled in Instrument + Sequencer
+  let lastInstCell = null;              // previous note for Instrument counterpoint
   let view = null, spectating = false, destroyed = false;
   let clockKey = '', clockGen = 0, deadline = 0;
   let byCell = new Map();               // game: cell -> its current (first not-done) entry
@@ -245,22 +255,22 @@ export function mount(root, api) {
   let seqPositions = new Map();
 
   // ---------- layout ----------
-  const wrap = el('position:relative;max-width:min(460px, 68vh);margin:0 auto;padding:12px 10px 18px;touch-action:none;'
+  const wrap = el('position:relative;max-width:min(440px, 56vh);margin:0 auto;padding:6px 8px 10px;touch-action:none;'
     + 'font-family:system-ui,-apple-system,Segoe UI,Roboto,sans-serif;color:#e8ecf4;color-scheme:dark;'
-    + 'user-select:none;-webkit-user-select:none;touch-action:manipulation;');
+    + 'user-select:none;-webkit-user-select:none;');
 
   // mode tabs
-  const tabs = el('display:flex;gap:6px;margin-bottom:10px;');
+  const tabs = el('display:flex;gap:5px;margin-bottom:6px;');
   const tabBtns = {};
   [['game', 'Game'], ['instrument', 'Instrument'], ['sequencer', 'Sequencer']].forEach(([id, label]) => {
-    const b = el('flex:1;font:inherit;font-size:15px;padding:9px 6px;border-radius:10px;'
+    const b = el('flex:1;font:inherit;font-size:14px;padding:6px 4px;border-radius:8px;'
       + 'border:1px solid #3a465f;background:#232c3f;color:#e8ecf4;cursor:pointer;', label, 'button');
     press(b, () => setMode(id));
     tabBtns[id] = b;
     tabs.append(b);
   });
 
-  // pitch controls (Instrument + Sequencer)
+  // compact pitch + counterpoint controls (Instrument + Sequencer)
   function makeSelect(options, value, onChange) {
     const s = document.createElement('select');
     s.style.cssText = SELECT_CSS;
@@ -274,16 +284,30 @@ export function mount(root, api) {
     s.addEventListener('change', () => onChange(s.value));
     return s;
   }
-  const labelled = (text, node) => {
-    const d = el('flex:1 1 110px;min-width:0;display:flex;flex-direction:column;gap:3px;');
-    d.append(el('font-size:11px;color:#8f9bb5;letter-spacing:.04em;text-transform:uppercase;', text), node);
-    return d;
-  };
+
   const scaleOptions = SCALES.map(([id, label]) => [id, label]);
-  const rootSel = makeSelect(NAMES.map((n, i) => [String(i), n]), String(cfg.root), (v) => { cfg.root = Number(v); retune(); });
-  const rowSel = makeSelect(scaleOptions, cfg.row, (v) => { cfg.row = v; retune(); });
-  const colSel = makeSelect(scaleOptions, cfg.col, (v) => { cfg.col = v; retune(); });
-  const gameScaleBtn = el(SMALL_BTN + 'flex:0 0 auto;align-self:flex-end;padding:7px 10px;font-size:14px;', '↺ Game scale', 'button');
+  const rootSel = makeSelect(NAMES.map((n, i) => [String(i), 'Key ' + n]), String(cfg.root), (v) => { cfg.root = Number(v); retune(); });
+  const rowSel = makeSelect(scaleOptions.map(([id, l]) => [id, '↑ ' + l]), cfg.row, (v) => { cfg.row = v; retune(); });
+  const colSel = makeSelect(scaleOptions.map(([id, l]) => [id, '→ ' + l]), cfg.col, (v) => { cfg.col = v; retune(); });
+  rootSel.style.flex = '0 0 68px';
+  rowSel.style.flex = '1 1 0';
+  colSel.style.flex = '1 1 0';
+
+  const cpBtn = el(SMALL_BTN + 'padding:4px 7px;', '♪ CP', 'button');
+  const syncCpBtn = () => {
+    cpBtn.style.borderColor = counterpointMode ? '#facc15' : '#3a465f';
+    cpBtn.style.color = counterpointMode ? '#facc15' : '#8f9bb5';
+    cpBtn.style.background = counterpointMode ? '#332e22' : '#232c3f';
+  };
+  syncCpBtn();
+  press(cpBtn, () => {
+    counterpointMode = !counterpointMode;
+    lastInstCell = null;
+    syncCpBtn();
+  });
+
+  const gameScaleBtn = el(SMALL_BTN + 'padding:4px 7px;', '↺', 'button');
+  gameScaleBtn.title = 'Reset to Game scale';
   press(gameScaleBtn, () => {
     Object.assign(cfg, DEFAULT_CFG);
     rootSel.value = String(cfg.root);
@@ -291,10 +315,11 @@ export function mount(root, api) {
     colSel.value = cfg.col;
     retune();
   });
-  const tune = el('display:none;flex-wrap:wrap;gap:8px;margin-bottom:10px;');
-  tune.append(labelled('Key', rootSel), labelled('Up scale', rowSel), labelled('Across scale', colSel), gameScaleBtn);
 
-  // sequencer controls
+  const tune = el('display:none;gap:4px;margin-bottom:6px;align-items:center;');
+  tune.append(rootSel, rowSel, colSel, cpBtn, gameScaleBtn);
+
+  // compact sequencer controls (2 slim rows)
   const patSel = makeSelect(Array.from({ length: SEQ_SLOTS }, (_, i) => [String(i), '']), '0', (v) => {
     seqSlot = Number(v);
     seqStop();
@@ -302,29 +327,33 @@ export function mount(root, api) {
     paintAll();
   });
   const tempoSel = makeSelect([60, 80, 100, 120, 140, 160, 200].map((v) => [String(v), v + ' bpm']), String(bpm), (v) => { bpm = Number(v); });
-  const playBtn = el(SMALL_BTN + 'background:#4cd137;color:#111;border:none;font-weight:600;', '▶ Play', 'button');
-  const undoBtn = el(SMALL_BTN, 'Undo', 'button');
-  const clearBtn = el(SMALL_BTN, 'Clear', 'button');
-  const exportBtn = el(SMALL_BTN, 'Export', 'button');
-  const seqBar = el('display:none;flex-direction:column;gap:8px;margin-bottom:10px;');
-  const seqRow1 = el('display:flex;gap:8px;align-items:flex-end;');
-  const seqRow2 = el('display:flex;gap:8px;');
-  seqRow1.append(labelled('Pattern', patSel), labelled('Tempo', tempoSel), playBtn);
+  patSel.style.flex = '1.3 1 0';
+  tempoSel.style.flex = '0.9 1 0';
+
+  const playBtn = el(SMALL_BTN + 'background:#4cd137;color:#111;border:none;font-weight:600;flex:0.8 1 0;', '▶ Play', 'button');
+  const undoBtn = el(SMALL_BTN + 'flex:1;', 'Undo', 'button');
+  const clearBtn = el(SMALL_BTN + 'flex:1;', 'Clear', 'button');
+  const exportBtn = el(SMALL_BTN + 'flex:1;', 'Export', 'button');
+
+  const seqBar = el('display:none;flex-direction:column;gap:4px;margin-bottom:6px;');
+  const seqRow1 = el('display:flex;gap:4px;align-items:center;');
+  const seqRow2 = el('display:flex;gap:4px;');
+  seqRow1.append(patSel, tempoSel, playBtn);
   seqRow2.append(undoBtn, clearBtn, exportBtn);
   seqBar.append(seqRow1, seqRow2);
 
-  const exportBox = el('display:none;margin-top:12px;');
-  const exportNote = el('font-size:13px;color:#8f9bb5;margin-bottom:6px;line-height:1.35;');
+  const exportBox = el('display:none;margin-top:8px;');
+  const exportNote = el('font-size:12px;color:#8f9bb5;margin-bottom:4px;line-height:1.3;');
   const exportArea = document.createElement('textarea');
   exportArea.readOnly = true;
-  exportArea.style.cssText = 'width:100%;box-sizing:border-box;height:120px;font:16px ui-monospace,Menlo,Consolas,monospace;'
-    + 'background:#232c3f;color:#e8ecf4;border:1px solid #3a465f;border-radius:8px;padding:8px;user-select:text;-webkit-user-select:text;';
+  exportArea.style.cssText = 'width:100%;box-sizing:border-box;height:80px;font:13px ui-monospace,Menlo,Consolas,monospace;'
+    + 'background:#232c3f;color:#e8ecf4;border:1px solid #3a465f;border-radius:8px;padding:6px;user-select:text;-webkit-user-select:text;';
   exportBox.append(exportNote, exportArea);
 
   // decreasing timer bar (Game)
-  const timer = el('width:100%;height:12px;margin-bottom:10px;border-radius:6px;background:#232c3f;'
+  const timer = el('width:100%;height:10px;margin-bottom:6px;border-radius:5px;background:#232c3f;'
     + 'border:1px solid #2b3448;box-sizing:border-box;overflow:hidden;');
-  const timerFill = el('height:100%;width:100%;border-radius:5px;background:#4cd137;');
+  const timerFill = el('height:100%;width:100%;border-radius:4px;background:#4cd137;');
   timer.append(timerFill);
   function setTimerFill(frac) {
     const f = Math.max(0, Math.min(1, frac));
@@ -336,9 +365,9 @@ export function mount(root, api) {
 
   // the grid
   const board = el('display:grid;grid-template-columns:repeat(' + GRID + ',1fr);'
-    + 'gap:4px;width:100%;aspect-ratio:1/1;touch-action:none;padding:4px;border-radius:12px;');
+    + 'gap:4px;width:100%;aspect-ratio:1/1;touch-action:none;padding:2px;border-radius:10px;box-sizing:border-box;');
   const CELL_CSS = 'display:flex;align-items:center;justify-content:center;font-size:10px;font-weight:600;'
-    + 'line-height:1;overflow:hidden;border-radius:8px;background:' + BG + ';border:1px solid #2b3448;'
+    + 'line-height:1;overflow:hidden;border-radius:7px;background:' + BG + ';border:1.5px solid #2b3448;'
     + 'cursor:pointer;touch-action:none;transition:background .1s ease,transform .08s ease;';
   const cells = Array.from({ length: CELLS }, (_, i) => {
     const b = el(CELL_CSS);
@@ -349,17 +378,15 @@ export function mount(root, api) {
 
   // one pointer handler for the whole board: multi-touch, and drag across cells to glide in Instrument
   const down = new Map();
-function cellFromEvent(e) {
-  // Check closest element with [data-i] first for pointerdown (mobile taps)
-  if (e.type === 'pointerdown') {
-    const t = e.target.closest('[data-i]');
-    const i = t ? t.dataset.i : undefined;
+  function cellFromEvent(e) {
+    if (e.type === 'pointerdown') {
+      const t = e.target.closest('[data-i]');
+      const i = t ? t.dataset.i : undefined;
+      return i === undefined ? -1 : Number(i);
+    }
+    const t = document.elementFromPoint(e.clientX, e.clientY);
+    const i = t && t.dataset ? t.dataset.i : undefined;
     return i === undefined ? -1 : Number(i);
-  }
-  // Use elementFromPoint for pointermove (gliding)
-  const t = document.elementFromPoint(e.clientX, e.clientY);
-  const i = t && t.dataset ? t.dataset.i : undefined;
-  return i === undefined ? -1 : Number(i);
   }
   board.addEventListener('pointerdown', (e) => {
     if (e.button) return;
@@ -381,14 +408,13 @@ function cellFromEvent(e) {
   const lift = (e) => down.delete(e.pointerId);
   board.addEventListener('pointerup', lift);
   board.addEventListener('pointercancel', lift);
-board.addEventListener('touchstart', (e) => e.preventDefault(), { passive: false });
 
   // level-cleared card (Game)
   const card = el('display:none;position:absolute;top:50%;left:50%;transform:translate(-50%,-50%);'
-    + 'flex-direction:column;align-items:center;gap:12px;padding:26px;text-align:center;'
+    + 'flex-direction:column;align-items:center;gap:12px;padding:24px;text-align:center;'
     + 'background:rgba(29,36,52,.95);border-radius:10px;box-shadow:0 8px 24px rgba(0,0,0,.4);z-index:10;');
-  const scoreBig = el('font-size:48px;font-weight:700;');
-  const actionBtn = el('font:inherit;font-size:18px;padding:10px 20px;border-radius:8px;border:none;background:#4cd137;color:#111;cursor:pointer;', 'NEXT', 'button');
+  const scoreBig = el('font-size:44px;font-weight:700;');
+  const actionBtn = el('font:inherit;font-size:17px;padding:9px 18px;border-radius:8px;border:none;background:#4cd137;color:#111;cursor:pointer;', 'NEXT', 'button');
   actionBtn.addEventListener('pointerdown', (e) => {
     e.preventDefault();
     unlockAudio();
@@ -400,34 +426,29 @@ board.addEventListener('touchstart', (e) => e.preventDefault(), { passive: false
   press(replayBtn, () => playReplay());
   card.append(scoreBig, actionBtn, replayBtn);
 
-  const bar = el('display:flex;justify-content:center;gap:10px;margin-top:12px;');
+  const bar = el('display:flex;justify-content:center;gap:10px;margin-top:8px;');
   const reset = el(SMALL_BTN, 'Reset', 'button');
   press(reset, () => api.send({ a: 'reset' }));
   bar.append(reset);
 
+  // Prevent mobile double-tap zoom without blocking pointerdown/gliding or <select> menus
   let lastTouchEnd = 0;
-wrap.addEventListener('touchstart', () => unlockAudio(), { passive: true });
+  wrap.addEventListener('touchstart', () => unlockAudio(), { passive: true });
+  wrap.addEventListener('touchend', (e) => {
+    const now = Date.now();
+    if (now - lastTouchEnd <= 350) {
+      e.preventDefault();
+    }
+    lastTouchEnd = now;
+  }, { passive: false });
   wrap.addEventListener('dblclick', (e) => e.preventDefault());
-wrap.append(tabs, tune, seqBar, timer, board, card, bar, exportBox);
-if (root && root.style) {
-  root.style.touchAction = 'manipulation';
-}
-wrap.addEventListener('gesturestart', (e) => e.preventDefault());
-if (root && root.style) {
-  root.style.touchAction = 'pan-x pan-y';
-}
-wrap.addEventListener('gesturestart', (e) => e.preventDefault());
-if (root && root.style) {
-  root.style.touchAction = 'pan-x pan-y';
-}
-wrap.addEventListener('gesturestart', (e) => e.preventDefault());
-wrap.addEventListener('touchend', (e) => {
-  const now = Date.now();
-  if (now - lastTouchEnd <= 350) {
-    e.preventDefault();
+  wrap.addEventListener('gesturestart', (e) => e.preventDefault());
+
+  if (root && root.style) {
+    root.style.touchAction = 'manipulation';
   }
-  lastTouchEnd = now;
-}, { passive: false });
+  wrap.append(tabs, tune, seqBar, timer, board, card, bar, exportBox);
+  root.append(wrap);
 
   // ---------- painting ----------
   function computePositions() {
@@ -440,30 +461,43 @@ wrap.addEventListener('touchend', (e) => {
 
   function paintCell(i) {
     const b = cells[i];
-    let bg = BG, text = '', fg = '#8f9bb5';
+    let bg = BG, text = '', fg = '#8f9bb5', border = '#2b3448';
     if (uiMode === 'game') {
       const c = byCell.get(i);
       if (c) bg = COLOURS[c.colour];
     } else {
+      const rs = ROLE_STYLE[table.role[i]] || ROLE_STYLE.other;
+      bg = rs.bg;
+      fg = rs.fg;
+      border = rs.border;
       text = table.name[i];
-      fg = table.isRoot[i] ? '#cfd8ee' : '#6f7c99';
-      if (table.isRoot[i]) bg = '#26324a';
+
       if (uiMode === 'sequencer') {
         const pos = seqPositions.get(i);
         if (pos) {
+          // Solid blue fill for sequenced notes, keeping harmonic role border if any
           bg = COLOURS.blue;
           fg = '#fff';
+          border = table.role[i] === 'other' ? '#6ea2ff' : rs.fg;
           text = pos.length > 3 ? pos.slice(0, 3).join('·') + '…' : pos.join('·');
         }
         const s = seqs[seqSlot];
         if (playing && seqIdx >= 0 && s.length) {
-          if (s[seqIdx] === i) { bg = COLOURS.red; fg = '#fff'; }
-          else if (s.length > 1 && s[(seqIdx + 1) % s.length] === i) { bg = COLOURS.yellow; fg = '#111'; }
+          if (s[seqIdx] === i) {
+            bg = COLOURS.red;
+            fg = '#fff';
+            border = '#fff';
+          } else if (s.length > 1 && s[(seqIdx + 1) % s.length] === i) {
+            bg = COLOURS.yellow;
+            fg = '#111';
+            border = '#fff';
+          }
         }
       }
     }
     b.style.background = bg;
     b.style.color = fg;
+    b.style.borderColor = border;
     if (b.textContent !== text) b.textContent = text;
   }
 
@@ -502,10 +536,11 @@ wrap.addEventListener('touchend', (e) => {
     clockGen++;
     replayGen++;
     down.clear();
+    lastInstCell = null;
     if (m === 'game') {
       clockKey = '';
       prevDone = false;
-      if (!api.isSpectator) api.send({ a: 'reset' });   // coming back starts a fresh run
+      if (!api.isSpectator) api.send({ a: 'reset' });
     }
     layout();
     if (m === 'game' && api.isSpectator && view) renderGame();
@@ -524,7 +559,17 @@ wrap.addEventListener('touchend', (e) => {
   }
 
   function onTap(cell) {
-    if (uiMode === 'instrument') { playNote(cell); flash(cell, COLOURS.yellow); return; }
+    if (uiMode === 'instrument') {
+      if (counterpointMode) {
+        playCounterpoint(cell, lastInstCell !== cell ? lastInstCell : null, table);
+        if (lastInstCell !== null && lastInstCell !== cell) flash(lastInstCell, COLOURS.blue);
+        lastInstCell = cell;
+      } else {
+        playNote(cell);
+      }
+      flash(cell, COLOURS.yellow);
+      return;
+    }
     if (uiMode === 'sequencer') { seqTap(cell); return; }
     gameTap(cell);
   }
@@ -533,15 +578,20 @@ wrap.addEventListener('touchend', (e) => {
   function refreshPatternLabels() {
     [...patSel.options].forEach((o, i) => {
       const n = seqs[i].length;
-      o.textContent = 'Pattern ' + (i + 1) + ' · ' + n + (n === 1 ? ' note' : ' notes');
+      o.textContent = 'Pat ' + (i + 1) + ' (' + n + ')';
     });
   }
 
   function seqTap(cell) {
     const s = seqs[seqSlot];
     if (s.length >= SEQ_MAX) { voice(110, 0.16, 0.09, 'sine', 0); return; }
+    const prev = s.length ? s[s.length - 1] : null;
     s.push(cell);
-    playNote(cell, 0.5);
+    if (counterpointMode) {
+      playCounterpoint(cell, prev, table);
+    } else {
+      playNote(cell, 0.5);
+    }
     flash(cell, COLOURS.yellow);
     afterSeqEdit();
   }
@@ -570,10 +620,15 @@ wrap.addEventListener('touchend', (e) => {
       const s = seqs[seqSlot];
       if (!s.length) { seqStop(); return; }
       seqIdx = i % s.length;
-      playNote(s[seqIdx], 0.5);
+      const nextIdx = s.length > 1 ? (seqIdx + 1) % s.length : null;
+      if (counterpointMode) {
+        playCounterpoint(s[seqIdx], nextIdx !== null ? s[nextIdx] : null, table);
+      } else {
+        playNote(s[seqIdx], 0.5);
+      }
       paintAll();
       i = seqIdx + 1;
-      due += 30000 / bpm;                       // each step is an eighth note
+      due += 30000 / bpm;
       api.setTimeout(tick, Math.max(0, due - Date.now()));
     };
     tick();
@@ -586,7 +641,7 @@ wrap.addEventListener('touchend', (e) => {
   function isDefaultCfg() {
     return cfg.row === DEFAULT_CFG.row && cfg.col === DEFAULT_CFG.col && cfg.root === DEFAULT_CFG.root;
   }
-  // 'click' (not pointerdown) so the browser lets us touch the clipboard
+
   exportBtn.addEventListener('click', () => {
     const rows = seqs.filter((s) => s.length).map((s) => '  [' + s.join(', ') + ']');
     const text = rows.length ? '[\n' + rows.join(',\n') + '\n]' : '';
@@ -604,7 +659,7 @@ wrap.addEventListener('touchend', (e) => {
       msg = (ok ? 'Copied. ' : 'Select and copy the text. ') + msg;
     }
     if (!isDefaultCfg()) {
-      msg += 'These cell numbers only sound like this under the Game scale (Mixolydian up, Chromatic across, key A). Tap "Game scale" to hear them as the Game will.';
+      msg += 'Tap ↺ to hear them in the Game scale.';
     }
     exportNote.textContent = msg;
   });
@@ -638,11 +693,10 @@ wrap.addEventListener('touchend', (e) => {
     }
     const next = view.cells.find((x) => !x.done && x.cell !== cell && (x.colour === 'red' || x.colour === 'yellow'));
     levelHits.push({ cell, t: Date.now() });
-    playCounterpoint(cell, next ? next.cell : null);
+    playCounterpoint(cell, next ? next.cell : null, GAME_TABLE);
     api.send({ a: 'hit', cell });
   }
 
-  // After a level clears, play it back with the gaps the player actually left.
   function playReplay() {
     const hits = levelHits.slice();
     if (!hits.length) return;
@@ -672,7 +726,7 @@ wrap.addEventListener('touchend', (e) => {
     const showCard = v.paused || over;
     card.style.display = showCard ? 'flex' : 'none';
     if (showCard) {
-      clockGen++; // stop the countdown; the bar stays where it stopped
+      clockGen++;
       if (v.timedOut) setTimerFill(0);
       scoreBig.textContent = v.score;
       actionBtn.textContent = over ? 'AGAIN' : 'NEXT';
