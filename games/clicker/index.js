@@ -37,7 +37,7 @@ const SCALES = [
 // The mapping the PATTERNS were composed on: rows climb A Mixolydian from A3, columns bend up in semitones.
 // The Game always uses this. Instrument and Sequencer can change it.
 const DEFAULT_CFG = { row: 'mixolydian', col: 'chromatic', root: 0 };
-const START_CFG = { row: 'major', col: 'major', root: 4 };
+const START_CFG = { row: 'major', col: 'major', root: 3 };
 
 // Paste exported array from pattern-builder.html (or the Sequencer's Export button) here:
 const PATTERNS = [
