@@ -336,10 +336,10 @@ export function mount(root, api) {
 
   // the grid
   const board = el('display:grid;grid-template-columns:repeat(' + GRID + ',1fr);'
-    + 'gap:4px;width:100%;aspect-ratio:1/1;touch-action:pan-x pan-y;padding:4px;border-radius:12px;');
+    + 'gap:4px;width:100%;aspect-ratio:1/1;touch-action:none;padding:4px;border-radius:12px;');
   const CELL_CSS = 'display:flex;align-items:center;justify-content:center;font-size:10px;font-weight:600;'
     + 'line-height:1;overflow:hidden;border-radius:8px;background:' + BG + ';border:1px solid #2b3448;'
-    + 'cursor:pointer;touch-action:pan-x pan-y;transition:background .1s ease,transform .08s ease;';
+    + 'cursor:pointer;touch-action:none;transition:background .1s ease,transform .08s ease;';
   const cells = Array.from({ length: CELLS }, (_, i) => {
     const b = el(CELL_CSS);
     b.dataset.i = String(i);
@@ -381,6 +381,7 @@ function cellFromEvent(e) {
   const lift = (e) => down.delete(e.pointerId);
   board.addEventListener('pointerup', lift);
   board.addEventListener('pointercancel', lift);
+board.addEventListener('touchstart', (e) => e.preventDefault(), { passive: false });
 
   // level-cleared card (Game)
   const card = el('display:none;position:absolute;top:50%;left:50%;transform:translate(-50%,-50%);'
@@ -404,11 +405,12 @@ function cellFromEvent(e) {
   press(reset, () => api.send({ a: 'reset' }));
   bar.append(reset);
 
-  wrap.addEventListener('touchstart', () => unlockAudio(), { passive: true });
+  let lastTouchEnd = 0;
+wrap.addEventListener('touchstart', () => unlockAudio(), { passive: true });
   wrap.addEventListener('dblclick', (e) => e.preventDefault());
-  wrap.append(tabs, tune, seqBar, timer, board, card, bar, exportBox);
-  if (root && root.style) {
-  root.style.touchAction = 'pan-x pan-y';
+wrap.append(tabs, tune, seqBar, timer, board, card, bar, exportBox);
+if (root && root.style) {
+  root.style.touchAction = 'manipulation';
 }
 wrap.addEventListener('gesturestart', (e) => e.preventDefault());
 if (root && root.style) {
@@ -419,7 +421,13 @@ if (root && root.style) {
   root.style.touchAction = 'pan-x pan-y';
 }
 wrap.addEventListener('gesturestart', (e) => e.preventDefault());
-root.append(wrap);
+wrap.addEventListener('touchend', (e) => {
+  const now = Date.now();
+  if (now - lastTouchEnd <= 350) {
+    e.preventDefault();
+  }
+  lastTouchEnd = now;
+}, { passive: false });
 
   // ---------- painting ----------
   function computePositions() {
