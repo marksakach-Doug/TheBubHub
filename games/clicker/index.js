@@ -188,22 +188,48 @@ export function summarize(state, nameOf) {
 }
 
 export function mount(root, api) {
+  // Lock viewport scaling on mobile browsers so rapid taps and <select> menus never zoom
+  try {
+    let vp = document.querySelector('meta[name="viewport"]');
+    if (!vp) {
+      vp = document.createElement('meta');
+      vp.name = 'viewport';
+      document.head.appendChild(vp);
+    }
+    vp.content = 'width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no';
+    document.documentElement.style.touchAction = 'manipulation';
+    document.body.style.touchAction = 'manipulation';
+  } catch (_) {}
+
   const el = (css, text = '', tag = 'div') => {
     const e = document.createElement(tag);
     e.style.cssText = css;
     e.textContent = text;
     return e;
   };
-  const press = (node, fn) => node.addEventListener('pointerdown', (e) => {
-    e.preventDefault();
-    unlockAudio();
-    fn(e);
-  });
 
-  const SMALL_BTN = 'font:inherit;font-size:13px;padding:4px 9px;min-height:32px;border-radius:8px;'
-    + 'border:1px solid #3a465f;background:#232c3f;color:#e8ecf4;cursor:pointer;white-space:nowrap;';
-  const SELECT_CSS = 'font:inherit;font-size:13px;padding:4px 6px;min-height:32px;border-radius:8px;border:1px solid #3a465f;'
-    + 'background:#232c3f;color:#e8ecf4;width:100%;min-width:0;';
+  // Intercept both touchstart and pointerdown on buttons so iOS never triggers double-tap zoom
+  const press = (node, fn) => {
+    let touched = false;
+    node.addEventListener('touchstart', (e) => {
+      e.preventDefault();
+      touched = true;
+      unlockAudio();
+      fn(e);
+    }, { passive: false });
+    node.addEventListener('pointerdown', (e) => {
+      if (e.pointerType === 'touch' && touched) return;
+      e.preventDefault();
+      unlockAudio();
+      fn(e);
+    });
+  };
+
+  // font-size:16px on <select> is required so iOS Safari does not auto-zoom when opening dropdowns
+  const SMALL_BTN = 'font:inherit;font-size:13px;padding:4px 9px;min-height:30px;border-radius:8px;'
+    + 'border:1px solid #3a465f;background:#232c3f;color:#e8ecf4;cursor:pointer;white-space:nowrap;touch-action:none;';
+  const SELECT_CSS = 'font:inherit;font-size:16px;padding:2px 4px;height:30px;border-radius:8px;border:1px solid #3a465f;'
+    + 'background:#232c3f;color:#e8ecf4;width:100%;min-width:0;touch-action:manipulation;';
 
   // ---------- audio ----------
   let actx = null;
@@ -255,16 +281,16 @@ export function mount(root, api) {
   let seqPositions = new Map();
 
   // ---------- layout ----------
-  const wrap = el('position:relative;max-width:min(440px, 56vh);margin:0 auto;padding:6px 8px 10px;touch-action:none;'
+  const wrap = el('position:relative;max-width:min(440px, 55vh);margin:0 auto;padding:6px 8px 10px;touch-action:none;'
     + 'font-family:system-ui,-apple-system,Segoe UI,Roboto,sans-serif;color:#e8ecf4;color-scheme:dark;'
-    + 'user-select:none;-webkit-user-select:none;');
+    + 'user-select:none;-webkit-user-select:none;-webkit-touch-callout:none;');
 
   // mode tabs
   const tabs = el('display:flex;gap:5px;margin-bottom:6px;');
   const tabBtns = {};
   [['game', 'Game'], ['instrument', 'Instrument'], ['sequencer', 'Sequencer']].forEach(([id, label]) => {
     const b = el('flex:1;font:inherit;font-size:14px;padding:6px 4px;border-radius:8px;'
-      + 'border:1px solid #3a465f;background:#232c3f;color:#e8ecf4;cursor:pointer;', label, 'button');
+      + 'border:1px solid #3a465f;background:#232c3f;color:#e8ecf4;cursor:pointer;touch-action:none;', label, 'button');
     press(b, () => setMode(id));
     tabBtns[id] = b;
     tabs.append(b);
@@ -286,10 +312,10 @@ export function mount(root, api) {
   }
 
   const scaleOptions = SCALES.map(([id, label]) => [id, label]);
-  const rootSel = makeSelect(NAMES.map((n, i) => [String(i), 'Key ' + n]), String(cfg.root), (v) => { cfg.root = Number(v); retune(); });
-  const rowSel = makeSelect(scaleOptions.map(([id, l]) => [id, '↑ ' + l]), cfg.row, (v) => { cfg.row = v; retune(); });
-  const colSel = makeSelect(scaleOptions.map(([id, l]) => [id, '→ ' + l]), cfg.col, (v) => { cfg.col = v; retune(); });
-  rootSel.style.flex = '0 0 68px';
+  const rootSel = makeSelect(NAMES.map((n, i) => [String(i), n]), String(cfg.root), (v) => { cfg.root = Number(v); retune(); });
+  const rowSel = makeSelect(scaleOptions.map(([id, l]) => [id, '↑' + l]), cfg.row, (v) => { cfg.row = v; retune(); });
+  const colSel = makeSelect(scaleOptions.map(([id, l]) => [id, '→' + l]), cfg.col, (v) => { cfg.col = v; retune(); });
+  rootSel.style.flex = '0 0 54px';
   rowSel.style.flex = '1 1 0';
   colSel.style.flex = '1 1 0';
 
@@ -327,8 +353,8 @@ export function mount(root, api) {
     paintAll();
   });
   const tempoSel = makeSelect([60, 80, 100, 120, 140, 160, 200].map((v) => [String(v), v + ' bpm']), String(bpm), (v) => { bpm = Number(v); });
-  patSel.style.flex = '1.3 1 0';
-  tempoSel.style.flex = '0.9 1 0';
+  patSel.style.flex = '1.2 1 0';
+  tempoSel.style.flex = '1 1 0';
 
   const playBtn = el(SMALL_BTN + 'background:#4cd137;color:#111;border:none;font-weight:600;flex:0.8 1 0;', '▶ Play', 'button');
   const undoBtn = el(SMALL_BTN + 'flex:1;', 'Undo', 'button');
@@ -346,7 +372,7 @@ export function mount(root, api) {
   const exportNote = el('font-size:12px;color:#8f9bb5;margin-bottom:4px;line-height:1.3;');
   const exportArea = document.createElement('textarea');
   exportArea.readOnly = true;
-  exportArea.style.cssText = 'width:100%;box-sizing:border-box;height:80px;font:13px ui-monospace,Menlo,Consolas,monospace;'
+  exportArea.style.cssText = 'width:100%;box-sizing:border-box;height:80px;font:16px ui-monospace,Menlo,Consolas,monospace;'
     + 'background:#232c3f;color:#e8ecf4;border:1px solid #3a465f;border-radius:8px;padding:6px;user-select:text;-webkit-user-select:text;';
   exportBox.append(exportNote, exportArea);
 
@@ -376,48 +402,77 @@ export function mount(root, api) {
   });
   board.append(...cells);
 
-  // one pointer handler for the whole board: multi-touch, and drag across cells to glide in Instrument
+  // Unified touch + mouse handling on the board:
+  // Canceling touchstart directly on the board prevents 100% of iOS/Android double-tap zoom on cells
   const down = new Map();
-  function cellFromEvent(e) {
-    if (e.type === 'pointerdown') {
-      const t = e.target.closest('[data-i]');
-      const i = t ? t.dataset.i : undefined;
-      return i === undefined ? -1 : Number(i);
-    }
-    const t = document.elementFromPoint(e.clientX, e.clientY);
-    const i = t && t.dataset ? t.dataset.i : undefined;
-    return i === undefined ? -1 : Number(i);
+  function cellAtPoint(x, y) {
+    const elAt = document.elementFromPoint(x, y);
+    const cellEl = elAt && elAt.closest ? elAt.closest('[data-i]') : null;
+    return cellEl ? Number(cellEl.dataset.i) : -1;
   }
-  board.addEventListener('pointerdown', (e) => {
-    if (e.button) return;
+
+  board.addEventListener('touchstart', (e) => {
     e.preventDefault();
     unlockAudio();
-    const c = cellFromEvent(e);
+    for (const t of e.changedTouches) {
+      const c = cellAtPoint(t.clientX, t.clientY);
+      if (c >= 0) {
+        down.set(t.identifier, c);
+        onTap(c);
+      }
+    }
+  }, { passive: false });
+
+  board.addEventListener('touchmove', (e) => {
+    e.preventDefault();
+    if (uiMode !== 'instrument') return;
+    for (const t of e.changedTouches) {
+      if (!down.has(t.identifier)) continue;
+      const c = cellAtPoint(t.clientX, t.clientY);
+      if (c >= 0 && c !== down.get(t.identifier)) {
+        down.set(t.identifier, c);
+        onTap(c);
+      }
+    }
+  }, { passive: false });
+
+  const liftTouch = (e) => {
+    for (const t of e.changedTouches) down.delete(t.identifier);
+  };
+  board.addEventListener('touchend', liftTouch);
+  board.addEventListener('touchcancel', liftTouch);
+
+  // Desktop mouse/pen fallback (ignores touch since touchstart handles it)
+  board.addEventListener('pointerdown', (e) => {
+    if (e.pointerType === 'touch' || e.button) return;
+    e.preventDefault();
+    unlockAudio();
+    const c = cellAtPoint(e.clientX, e.clientY);
     if (c < 0) return;
     down.set(e.pointerId, c);
     onTap(c);
   });
   board.addEventListener('pointermove', (e) => {
-    if (uiMode !== 'instrument' || !down.has(e.pointerId)) return;
+    if (e.pointerType === 'touch' || uiMode !== 'instrument' || !down.has(e.pointerId)) return;
     if (e.buttons === 0) { down.delete(e.pointerId); return; }
-    const c = cellFromEvent(e);
+    const c = cellAtPoint(e.clientX, e.clientY);
     if (c < 0 || c === down.get(e.pointerId)) return;
     down.set(e.pointerId, c);
     onTap(c);
   });
-  const lift = (e) => down.delete(e.pointerId);
-  board.addEventListener('pointerup', lift);
-  board.addEventListener('pointercancel', lift);
+  const liftPointer = (e) => {
+    if (e.pointerType !== 'touch') down.delete(e.pointerId);
+  };
+  board.addEventListener('pointerup', liftPointer);
+  board.addEventListener('pointercancel', liftPointer);
 
   // level-cleared card (Game)
   const card = el('display:none;position:absolute;top:50%;left:50%;transform:translate(-50%,-50%);'
     + 'flex-direction:column;align-items:center;gap:12px;padding:24px;text-align:center;'
-    + 'background:rgba(29,36,52,.95);border-radius:10px;box-shadow:0 8px 24px rgba(0,0,0,.4);z-index:10;');
+    + 'background:rgba(29,36,52,.95);border-radius:10px;box-shadow:0 8px 24px rgba(0,0,0,.4);z-index:10;touch-action:none;');
   const scoreBig = el('font-size:44px;font-weight:700;');
-  const actionBtn = el('font:inherit;font-size:17px;padding:9px 18px;border-radius:8px;border:none;background:#4cd137;color:#111;cursor:pointer;', 'NEXT', 'button');
-  actionBtn.addEventListener('pointerdown', (e) => {
-    e.preventDefault();
-    unlockAudio();
+  const actionBtn = el('font:inherit;font-size:17px;padding:9px 18px;border-radius:8px;border:none;background:#4cd137;color:#111;cursor:pointer;touch-action:none;', 'NEXT', 'button');
+  press(actionBtn, () => {
     replayGen++;
     if (view && (view.timedOut || view.won)) api.send({ a: 'reset' });
     else api.send({ a: 'next' });
@@ -431,21 +486,19 @@ export function mount(root, api) {
   press(reset, () => api.send({ a: 'reset' }));
   bar.append(reset);
 
-  // Prevent mobile double-tap zoom without blocking pointerdown/gliding or <select> menus
-  let lastTouchEnd = 0;
-  wrap.addEventListener('touchstart', () => unlockAudio(), { passive: true });
-  wrap.addEventListener('touchend', (e) => {
-    const now = Date.now();
-    if (now - lastTouchEnd <= 350) {
+  // Block double-tap and pinch zoom anywhere inside wrap except native <select> and <textarea>
+  wrap.addEventListener('touchstart', (e) => {
+    unlockAudio();
+    const tag = e.target && e.target.tagName;
+    if (tag !== 'SELECT' && tag !== 'TEXTAREA' && tag !== 'OPTION') {
       e.preventDefault();
     }
-    lastTouchEnd = now;
   }, { passive: false });
   wrap.addEventListener('dblclick', (e) => e.preventDefault());
   wrap.addEventListener('gesturestart', (e) => e.preventDefault());
 
   if (root && root.style) {
-    root.style.touchAction = 'manipulation';
+    root.style.touchAction = 'none';
   }
   wrap.append(tabs, tune, seqBar, timer, board, card, bar, exportBox);
   root.append(wrap);
@@ -475,7 +528,6 @@ export function mount(root, api) {
       if (uiMode === 'sequencer') {
         const pos = seqPositions.get(i);
         if (pos) {
-          // Solid blue fill for sequenced notes, keeping harmonic role border if any
           bg = COLOURS.blue;
           fg = '#fff';
           border = table.role[i] === 'other' ? '#6ea2ff' : rs.fg;
@@ -642,7 +694,7 @@ export function mount(root, api) {
     return cfg.row === DEFAULT_CFG.row && cfg.col === DEFAULT_CFG.col && cfg.root === DEFAULT_CFG.root;
   }
 
-  exportBtn.addEventListener('click', () => {
+  function doExport() {
     const rows = seqs.filter((s) => s.length).map((s) => '  [' + s.join(', ') + ']');
     const text = rows.length ? '[\n' + rows.join(',\n') + '\n]' : '';
     exportArea.value = text || '(no notes yet)';
@@ -662,7 +714,9 @@ export function mount(root, api) {
       msg += 'Tap ↺ to hear them in the Game scale.';
     }
     exportNote.textContent = msg;
-  });
+  }
+  press(exportBtn, doExport);
+  exportBtn.addEventListener('click', doExport);
 
   // ---------- game ----------
   function startLevelClock(limitMs) {
