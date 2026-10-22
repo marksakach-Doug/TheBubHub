@@ -5,7 +5,7 @@
   "note": "Hand-written card, not generated. Clicker is a solo game whose layout comes from ctx.rng, so the cell numbers below are only true for seed 12345 — which is why the seed is pinned here. A scenario file does not have to come from scripts/new-game.mjs; it only has to be a spec a stranger can check.",
 
   "players": "solo",
-  "maxLines": 1150,
+  "maxLines": 1250,
   "maxLinesNote": "Higher than a builder card. The 250 cap is there to stop a small model writing an essay; Clicker is hand-written and heavily commented, in the house style. It also carries three modes (Game, Instrument, Sequencer) in one file, so it is genuinely long.",
   "summarizeMaxChars": 120,
   "seed": 12345,

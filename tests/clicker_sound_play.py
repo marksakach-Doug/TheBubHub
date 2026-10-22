@@ -45,7 +45,7 @@ PROBE = """(() => {
   if (!Real) return;
   const probe = {
     contexts: 0, decoded: 0, samples: 0, oscillators: 0,
-    rates: [], files: [], decodedFiles: []
+    rates: [], files: [], decodedFiles: [], loops: []
   };
   window.__audio = probe;
 
@@ -77,7 +77,15 @@ PROBE = """(() => {
       s.start = (t) => {
         probe.samples++;
         probe.rates.push(s.playbackRate.value);
-        probe.files.push(bufferUrl.get(s.buffer) || '');
+        const file = bufferUrl.get(s.buffer) || '';
+        probe.files.push(file);
+        probe.loops.push({
+          file: file,
+          loop: !!s.loop,
+          start: s.loopStart,
+          end: s.loopEnd,
+          duration: s.buffer ? s.buffer.duration : 0
+        });
         return start(t);
       };
       return s;
@@ -188,6 +196,36 @@ def tap_cell(pg, index=40):
     }}""", index)
 
 
+def mark(pg):
+    """How many samples have been played so far."""
+    return pg.evaluate("() => ((window.__audio || {}).rates || []).length")
+
+
+def rates_since(pg, n):
+    """The playback rates of everything played since the mark."""
+    return pg.evaluate("(n) => ((window.__audio || {}).rates || []).slice(n)", n)
+
+
+def cell_text(pg, index=0):
+    """What a cell says."""
+    return pg.evaluate(f"""(i) => {{
+      const r = {SHADOW};
+      if (!r) return '';
+      const c = r.querySelector('[data-i="' + i + '"]');
+      return c ? c.textContent : '';
+    }}""", index)
+
+
+def split_button_on(pg):
+    """Is the Split button showing as pressed?"""
+    return pg.evaluate(f"""() => {{
+      const r = {SHADOW};
+      if (!r) return False;
+      const b = [...r.querySelectorAll('button')].find((e) => e.textContent.trim() === 'Split');
+      return !!b && b.style.borderColor === 'rgb(250, 204, 21)';
+    }}""")
+
+
 def main():
     global PORT
     for a in sys.argv[1:]:
@@ -279,6 +317,91 @@ def main():
                 fails += check(any("wurly-" in f for f in files),
                                "the Wurlitzer holds",
                                "no Wurlitzer sample was played")
+                # The held voice has to LOOP, and the loop has to be a region
+                # of the note - a loop point outside the sample plays nothing
+                # and a loop that does not join itself is a buzz.
+                held = [l for l in probe.get("loops", []) if l["loop"]]
+                fails += check(bool(held), "the held voice loops",
+                               "no sample was played with a loop")
+                for l in held:
+                    if not (0 < l["start"] < l["end"] <= l["duration"] + 0.001):
+                        fails += check(False, "the loop is inside the note",
+                                       "%s loops %.3f-%.3f in a %.3fs note"
+                                       % (l["file"].split("/")[-1], l["start"], l["end"], l["duration"]))
+                        break
+                else:
+                    fails += check(True, "the loop is inside the note")
+
+                # ---- the Sequencer can split too ----
+                # The Sequencer keeps its own split, because its default has
+                # to stay a plain melody: a player who presses Play expecting
+                # to hear their melody must not get two voices instead.
+                press(pg, "Sequencer")
+                pg.wait_for_timeout(600)
+                fails += check(not split_button_on(pg),
+                               "the Sequencer starts as a melody",
+                               "the split is already on in the Sequencer")
+                plain_label = cell_text(pg, 0)
+                press(pg, "Split")
+                pg.wait_for_timeout(300)
+                fails += check(split_button_on(pg), "the Sequencer can be split")
+                # In split the grid is a two-voice score: every cell says the
+                # two notes it will sound, not one.
+                split_label = cell_text(pg, 0)
+                fails += check("·" in split_label,
+                               "the grid shows both voices in the Sequencer",
+                               "the cell says %r" % split_label)
+                fails += check("·" not in plain_label,
+                               "the grid shows one note in the plain Sequencer",
+                               "the cell says %r" % plain_label)
+
+                # The same cell has to sound the same two notes in both modes:
+                # the low voice is the row, the high voice is the column.
+                # The Instrument's own split was switched off earlier in this
+                # test, so put it back before measuring. The counterpoint is
+                # shared by both modes, and the split was switched on above,
+                # which switched the counterpoint off - so it is left alone.
+                press(pg, "Instrument")
+                pg.wait_for_timeout(400)
+                press(pg, "Split")            # the Instrument's split on again
+                pg.wait_for_timeout(400)
+                fails += check(split_button_on(pg), "the Instrument's split is back on")
+                tap_cell(pg, 40)
+                pg.wait_for_timeout(700)
+                n = mark(pg)
+                tap_cell(pg, 8)          # a different row AND column: both voices move
+                pg.wait_for_timeout(800)
+                inst_rates = rates_since(pg, n)
+
+                press(pg, "Sequencer")
+                pg.wait_for_timeout(500)
+                fails += check(split_button_on(pg),
+                               "each mode keeps its own split",
+                               "the Sequencer lost its split when the Instrument was used")
+                tap_cell(pg, 8)          # one cell in the pattern
+                pg.wait_for_timeout(700)
+                n = mark(pg)
+                press(pg, "▶ Play")
+                pg.wait_for_timeout(1400)
+                seq_rates = rates_since(pg, n)
+                press(pg, "■ Stop")
+                pg.wait_for_timeout(300)
+
+                fails += check(len(inst_rates) == 2,
+                               "the Instrument's split sounds two voices",
+                               "it sounded %d: %s" % (len(inst_rates), inst_rates))
+                fails += check(len(seq_rates) == 2,
+                               "the Sequencer's split sounds two voices",
+                               "it sounded %d: %s" % (len(seq_rates), seq_rates))
+                if len(inst_rates) == 2 and len(seq_rates) == 2:
+                    same = all(abs(a - b) < 1e-9 for a, b in
+                               zip(sorted(inst_rates), sorted(seq_rates)))
+                    fails += check(same, "both modes play a cell the same way",
+                                   "the Instrument played %s and the Sequencer %s"
+                                   % (sorted(inst_rates), sorted(seq_rates)))
+                    fails += check(len(set(round(r, 6) for r in inst_rates)) == 2,
+                                   "the two voices are two different notes",
+                                   "both voices played the same note")
                 if files:
                     print("        played: " + ", ".join(f.split("/")[-1] for f in files[:8]))
                 if rates:

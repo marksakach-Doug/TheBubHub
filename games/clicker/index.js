@@ -387,7 +387,8 @@ export function mount(root, api) {
   let splitTbl = buildSplitTable(cfg);  // role/name per cell for Split mode
   let uiMode = 'instrument';                  // 'game' | 'instrument' | 'sequencer'
   let counterpointMode = false;          // counterpoint enabled in Instrument + Sequencer
-  let splitMode = true;                // Instrument: row = low voice, column = high voice
+  let instSplitMode = true;              // Instrument: row = low voice, column = high voice
+  let seqSplitMode = false;              // Sequencer: the same two voices, read off a pattern
   let canonMode = false;                // Sequencer: a follower plays the pattern lagging behind the leader
   let splitHeld = null, splitGen = 0;   // currently ringing split voices {row, col, lo, hi}
   let canonIdx = -1;                    // index of the canon follower's current step (-1 = silent)
@@ -399,6 +400,15 @@ export function mount(root, api) {
   const seqs = Array.from({ length: SEQ_SLOTS }, () => []);
   let seqSlot = 0, bpm = 100, playing = false, seqGen = 0, seqIdx = -1;
   let seqPositions = new Map();
+
+  // Each mode keeps its own split. The Instrument IS a split instrument, so
+  // its split is on from the start; the Sequencer is a melody builder first,
+  // and a player who presses Play expecting to hear their melody must not get
+  // two voices instead. So the two remember separately, and the same button
+  // shows whichever belongs to the mode on screen.
+  const splitOn = () => (uiMode === 'sequencer' ? seqSplitMode : instSplitMode);
+  const setSplit = (on) => { if (uiMode === 'sequencer') seqSplitMode = on; else instSplitMode = on; };
+  const clearSplits = () => { instSplitMode = false; seqSplitMode = false; };
 
   // ---------- layout ----------
   const wrap = el('position:relative;max-width:min(440px, 55vh);margin:0 auto;padding:6px 8px 10px;touch-action:none;'
@@ -455,7 +465,9 @@ export function mount(root, api) {
   press(cpBtn, () => {
     counterpointMode = !counterpointMode;
     lastInstCell = null;
-    if (counterpointMode) { splitMode = false; canonMode = false; releaseSplit(); syncSplitBtn(); syncCanonBtn(); paintAll(); }
+    // The counterpoint is shared by both modes, so it cannot live beside a
+    // split in either of them.
+    if (counterpointMode) { clearSplits(); canonMode = false; releaseSplit(); syncSplitBtn(); syncCanonBtn(); paintAll(); }
     syncCpBtn();
   });
 
@@ -466,13 +478,13 @@ export function mount(root, api) {
   };
   const splitBtn = el(SMALL_BTN + 'padding:4px 7px;', 'Split', 'button');
   const canonBtn = el(SMALL_BTN + 'padding:4px 7px;', 'Canon', 'button');
-  const syncSplitBtn = () => styleToggle(splitBtn, splitMode);
+  const syncSplitBtn = () => styleToggle(splitBtn, splitOn());
   const syncCanonBtn = () => styleToggle(canonBtn, canonMode);
   syncSplitBtn();
   syncCanonBtn();
   press(splitBtn, () => {
-    splitMode = !splitMode;
-    if (splitMode) {
+    setSplit(!splitOn());
+    if (splitOn()) {
       counterpointMode = false; canonMode = false; syncCpBtn(); syncCanonBtn();
       sampler.loadVoice('wurly');   // the voice Split mode holds
     }
@@ -483,7 +495,7 @@ export function mount(root, api) {
   });
   press(canonBtn, () => {
     canonMode = !canonMode;
-    if (canonMode) { counterpointMode = false; splitMode = false; syncCpBtn(); syncSplitBtn(); releaseSplit(); }
+    if (canonMode) { counterpointMode = false; clearSplits(); syncCpBtn(); syncSplitBtn(); releaseSplit(); }
     else canonIdx = -1;
     syncCanonBtn();
     paintAll();
@@ -698,7 +710,7 @@ export function mount(root, api) {
       const c = byCell.get(i);
       if (c) bg = COLOURS[c.colour];
     } else {
-      const useSplit = splitMode && uiMode === 'instrument';
+      const useSplit = splitOn();
       const rs = ROLE_STYLE[(useSplit ? splitTbl : table).role[i]] || ROLE_STYLE.other;
       bg = rs.bg;
       fg = rs.fg;
@@ -752,7 +764,7 @@ export function mount(root, api) {
   function layout() {
     const g = uiMode === 'game', s = uiMode === 'sequencer';
     tune.style.display = g ? 'none' : 'flex';
-    splitBtn.style.display = uiMode === 'instrument' ? '' : 'none';
+    splitBtn.style.display = (uiMode === 'instrument' || uiMode === 'sequencer') ? '' : 'none';
     canonBtn.style.display = s ? '' : 'none';
     seqBar.style.display = s ? 'flex' : 'none';
     timer.style.display = g ? 'block' : 'none';
@@ -783,6 +795,7 @@ export function mount(root, api) {
       if (!api.isSpectator) api.send({ a: 'reset' });
     }
     useSamples(m);
+    syncSplitBtn();
     layout();
     if (m === 'game' && api.isSpectator && view) renderGame();
   }
@@ -795,9 +808,9 @@ export function mount(root, api) {
     if (!sampled) return;
     sampler.loadVoice('piano');
     sampler.loadVoice('rhodes');
-    // Split mode is on by default, and it is the mode that holds the
-    // Wurlitzer - so that one is wanted from the start.
-    if (m === 'instrument' && splitMode) sampler.loadVoice('wurly');
+    // The split holds the Wurlitzer, so that voice is wanted whenever the
+    // split is on - and the Instrument's split is on by default.
+    if (splitOn()) sampler.loadVoice('wurly');
   }
 
   function retune() {
@@ -815,7 +828,7 @@ export function mount(root, api) {
 
   function onTap(cell) {
     if (uiMode === 'instrument') {
-      if (splitMode) { splitTap(cell); flash(cell, COLOURS.yellow); return; }
+      if (instSplitMode) { splitTap(cell); flash(cell, COLOURS.yellow); return; }
       if (counterpointMode) {
         playCounterpoint(cell, lastInstCell !== cell ? lastInstCell : null, table);
         if (lastInstCell !== null && lastInstCell !== cell) flash(lastInstCell, COLOURS.blue);
@@ -842,7 +855,17 @@ export function mount(root, api) {
 
   // Vertical move changes only the low voice, horizontal only the high voice, diagonal changes both.
   // A voice whose coordinate did not change keeps ringing.
-  function splitTap(cell) {
+  //
+  // This is the whole of Split mode, and it does not care where the cell came
+  // from: a tap in the Instrument and a step of a playing pattern in the
+  // Sequencer both mean "the low voice is the row, the high voice is the
+  // column". So the Instrument and the Sequencer play a cell the same way.
+  //
+  // `strike` says whether the cell is being struck again. A tap always is -
+  // you hit the key, and hitting it twice hits it twice. A step of a pattern
+  // is not a tap: a pattern that comes back to the same cell means the pedal
+  // holds, not that the note is struck again.
+  function splitVoice(cell, strike) {
     const p = cellAt(cell);
     const v = splitSemis(cfg, cell);
     const flo = A3 * Math.pow(2, v.lo / 12);
@@ -851,19 +874,39 @@ export function mount(root, api) {
     const rowSame = !!prev && prev.row === p.row;
     const colSame = !!prev && prev.col === p.col;
     let lo, hi;
-    if (!prev || (rowSame && colSame)) {
+    if (!prev) {
       releaseSplit();
       lo = holdVoice(flo, 0.2, 'triangle');
       hi = holdVoice(fhi, 0.12, 'sine');
+    } else if (rowSame && colSame) {
+      if (strike) {
+        releaseSplit();
+        lo = holdVoice(flo, 0.2, 'triangle');
+        hi = holdVoice(fhi, 0.12, 'sine');
+      } else {
+        lo = prev.lo;
+        hi = prev.hi;
+      }
     } else {
       if (rowSame) lo = prev.lo;
       else { if (prev.lo) prev.lo.release(); lo = holdVoice(flo, 0.2, 'triangle'); }
       if (colSame) hi = prev.hi;
       else { if (prev.hi) prev.hi.release(); hi = holdVoice(fhi, 0.12, 'sine'); }
     }
-    const gen = ++splitGen;
     splitHeld = { row: p.row, col: p.col, lo, hi };
+  }
+
+  // A held voice that nobody touched for a while lets go. The Sequencer arms
+  // this too, so a preview fades when you stop building the pattern; during
+  // playback the pattern itself keeps the voices alive.
+  function armSplitRelease() {
+    const gen = ++splitGen;
     api.setTimeout(() => { if (gen === splitGen) releaseSplit(); }, 1500);
+  }
+
+  function splitTap(cell) {
+    splitVoice(cell, true);
+    armSplitRelease();
   }
 
   // ---------- sequencer ----------
@@ -879,7 +922,12 @@ export function mount(root, api) {
     if (s.length >= SEQ_MAX) { voice(110, 0.16, 0.09, 'beep', 0); return; }
     const prev = s.length ? s[s.length - 1] : null;
     s.push(cell);
-    if (counterpointMode) {
+    if (seqSplitMode) {
+      // Hear the two voices while you build the pattern, so you hear what it
+      // is going to sound like.
+      splitVoice(cell, true);
+      armSplitRelease();
+    } else if (counterpointMode) {
       playCounterpoint(cell, prev, table);
     } else {
       playNote(cell, 0.5);
@@ -899,6 +947,7 @@ export function mount(root, api) {
     seqIdx = -1;
     canonIdx = -1;
     playBtn.textContent = '▶ Play';
+    releaseSplit();
     if (uiMode === 'sequencer') paintAll();
   }
 
@@ -907,6 +956,9 @@ export function mount(root, api) {
     const gen = ++seqGen;
     playing = true;
     playBtn.textContent = '■ Stop';
+    // A run starts on a clean pedal: whatever was ringing from the last
+    // preview stops, and the pattern's own voices take over.
+    releaseSplit();
     let i = 0, n = 0, due = Date.now();
     const tick = () => {
       if (destroyed || gen !== seqGen || uiMode !== 'sequencer') return;
@@ -920,7 +972,11 @@ export function mount(root, api) {
         canonIdx = n >= lag ? (n - lag) % s.length : -1;
         if (canonIdx >= 0) voice(table.freq[s[canonIdx]] * Math.pow(2, CANON_SEMI / 12), 0.14, 0.5, 'sine', 0);
       } else canonIdx = -1;
-      if (counterpointMode) {
+      if (seqSplitMode) {
+        // The pattern read as two voices: the low one is the row, the high
+        // one is the column, and each holds until its own coordinate moves.
+        splitVoice(s[seqIdx], false);
+      } else if (counterpointMode) {
         playCounterpoint(s[seqIdx], nextIdx !== null ? s[nextIdx] : null, table);
       } else {
         playNote(s[seqIdx], 0.5);
