@@ -60,6 +60,24 @@ def glyph(frame, sq):
     return el.inner_text() if el else None
 
 
+# The board draws the chess-block glyphs with the text-presentation selector
+# (U+FE0E), not letters. What the capture checks are about is WHICH PIECE
+# landed, not how it is drawn - the drawing is covered by the one-piece-set
+# checks at the end of this file.
+_KIND = {
+    '\u2654': 'K', '\u2655': 'Q', '\u2656': 'R', '\u2657': 'B', '\u2658': 'N', '\u2659': 'P',
+    '\u265a': 'K', '\u265b': 'Q', '\u265c': 'R', '\u265d': 'B', '\u265e': 'N', '\u265f': 'P',
+    'K': 'K', 'Q': 'Q', 'R': 'R', 'B': 'B', 'N': 'N', 'P': 'P',
+}
+
+
+def kind_of(text):
+    """The piece kind a square shows, whatever it is drawn with."""
+    if not text:
+        return None
+    return _KIND.get(text.replace('\ufe0e', '')[:1])
+
+
 def main():
     fails = []
     oks = []
@@ -91,7 +109,7 @@ def main():
               pg.evaluate(f"()=>!!document.querySelector(\"#board .sq[data-sq='{D6}'] .ring\")"), True)
         pg.click(f"#board .sq[data-sq='{D6}']")
         pg.wait_for_timeout(300)
-        check("knight_click_capture_lands", glyph(pg, str(D6)), "N")
+        check("knight_click_capture_lands", kind_of(glyph(pg, str(D6))), "N")
         check("knight_origin_empty", glyph(pg, str(E4)), None)
 
         # ---- king click-capture ----
@@ -104,7 +122,7 @@ def main():
               pg.evaluate(f"()=>!!document.querySelector(\"#board .sq[data-sq='{D5}'] .ring\")"), True)
         pg.click(f"#board .sq[data-sq='{D5}']")
         pg.wait_for_timeout(300)
-        check("king_click_capture_lands", glyph(pg, str(D5)), "K")
+        check("king_click_capture_lands", kind_of(glyph(pg, str(D5))), "K")
 
         # ---- queen drag-capture ----
         D1, D7 = sq_index("d1"), sq_index("d7")
@@ -117,7 +135,7 @@ def main():
         pg.mouse.move(dst["x"] + dst["width"] / 2, dst["y"] + dst["height"] / 2, steps=8)
         pg.mouse.up()
         pg.wait_for_timeout(300)
-        check("queen_drag_capture_lands", glyph(pg, str(D7)), "Q")
+        check("queen_drag_capture_lands", kind_of(glyph(pg, str(D7))), "Q")
 
         # ---- en passant via clicks (white e5 takes d6, victim off d5) ----
         E5B, D6B = sq_index("e5"), sq_index("d6")
@@ -135,7 +153,7 @@ def main():
               pg.evaluate(f"()=>!!document.querySelector(\"#board .sq[data-sq='{D6B}'] .ring\")"), True)
         pg.click(f"#board .sq[data-sq='{D6B}']")
         pg.wait_for_timeout(300)
-        check("ep_click_capture_lands", glyph(pg, str(D6B)), "P")
+        check("ep_click_capture_lands", kind_of(glyph(pg, str(D6B))), "P")
         check("ep_victim_removed",
               pg.evaluate("()=>!document.querySelector(\"#board .sq[data-sq='27'] .pc\")"), True)
 
@@ -162,8 +180,10 @@ def main():
         # White used to be hollow chess glyphs (U+2654-5) and Black solid ones
         # (U+2656-7). A phone whose font lacks that block fell back to emoji for
         # one side and not the other, so Black's pieces looked like a different
-        # game. Letters render the same everywhere, so both sides must now use
-        # the same character and differ only by colour.
+        # game. Now both sides use the SAME character per piece kind and differ
+        # only by colour - and every glyph carries the text-presentation
+        # selector (U+FE0E), so a phone renders it as a character rather than
+        # falling back to emoji.
         distinct = pg.evaluate("""() => {
             const cells = [...document.querySelectorAll('#board .sq')];
             const letter = (c) => (c ? c.textContent : '');
@@ -174,16 +194,30 @@ def main():
             });
             return [...kinds].sort();
         }""")
-        check("white and black share one letter per piece kind",
-              all(len(k.split(':')[1]) == 1 for k in distinct), True)
-        check("no chess-block glyphs are left on the board",
+        # The text-presentation selector is a second code unit, so the
+        # character itself is what is compared.
+        check("white and black share one character per piece kind",
+              all(len(k.split(':')[1].replace('\ufe0e', '')) == 1 for k in distinct), True)
+        # A chess-block glyph WITHOUT the text-presentation selector is the one
+        # that turns into an emoji on a phone - that is the bug this guards.
+        check("no chess glyph is left in emoji form",
               pg.evaluate("""() => [...document.querySelectorAll('#board .pc')]
-                  .some((p) => /[\\u2654-\\u265F]/.test(p.textContent))"""), False)
-        # The white pawn on e2 and a black pawn must be the same character.
-        check("white and black pawns are the same character",
-              pg.evaluate(f"""() => {{
-                  const w = document.querySelector("#board .sq[data-sq='{sq_index('d2')}'] .pc");
-                  return w ? w.textContent : null; }}"""), "P")
+                  .some((p) => /[\\u2654-\\u265F]/.test(p.textContent)
+                                && !p.textContent.includes('\ufe0e'))"""), False)
+        # The white pawn and a black pawn must be the same character. Which
+        # squares they stand on is not fixed - the bot has replied by now, so
+        # a pawn may have moved - so compare every kind the board has.
+        chars = {}
+        for k in distinct:
+            cls, ch = k.split(':', 1)
+            side = cls[-1]          # 'pcw' or 'pcb'
+            kind = kind_of(ch)
+            if kind:
+                chars.setdefault(kind, {})[side] = ch
+        check("both sides had a pawn to compare",
+              'w' in chars.get('P', {}) and 'b' in chars.get('P', {}), True)
+        check("white and black use the same character for every piece kind",
+              all(v['w'] == v['b'] for v in chars.values() if 'w' in v and 'b' in v), True)
 
         if errs:
             print("PAGE ERRORS:", errs, file=sys.stderr)

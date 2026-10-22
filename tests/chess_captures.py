@@ -255,7 +255,11 @@ for (let g = 0; g < 40; g++){
   const seen = {};
   seen[posKey(b)] = 1;
   let done = false;
-  for (let ply = 0; ply < 500; ply++){
+  // The backstop is generous on purpose: a random game usually decides
+  // within a few hundred plies (a repetition, a mate, a stalemate), but
+  // "usually" is not "always", and a tight cap made this suite fail at
+  // random. 2000 plies is far past any game that is going to decide.
+  for (let ply = 0; ply < 2000; ply++){
     if (outcome(b)){ done = true; break; }
     const m = botMove(b, b.turn);
     if (!m) break;
