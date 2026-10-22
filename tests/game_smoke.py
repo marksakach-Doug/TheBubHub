@@ -91,10 +91,26 @@ def serve(port):
 
 
 def shadow_snapshot(pg):
+    """What the player can actually see in the shadow root.
+
+    The VISIBLE text, not textContent: a game that keeps a hidden dropdown
+    full of options would otherwise look like it painted a wall of words, and
+    a change nobody can see would count as the screen changing. A text node
+    counts as visible when the box it sits in has a size.
+    """
     return pg.evaluate(f"""() => {{
       const r = {SHADOW};
       if (!r) return {{ ok: false, why: 'no shadow root' }};
-      const text = (r.textContent || '').replace(/\\s+/g, ' ').trim();
+      const walker = document.createTreeWalker(r, NodeFilter.SHOW_TEXT);
+      const parts = [];
+      let node;
+      while ((node = walker.nextNode())) {{
+        const box = node.parentElement;
+        if (!box) continue;
+        const rect = box.getBoundingClientRect();
+        if (rect.width > 0 && rect.height > 0) parts.push(node.textContent);
+      }}
+      const text = parts.join(' ').replace(/\\s+/g, ' ').trim();
       return {{
         ok: true,
         text: text.slice(0, 120),

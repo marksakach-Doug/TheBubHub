@@ -385,7 +385,10 @@ export function mount(root, api) {
   const cfg = { ...START_CFG };
   let table = buildTable(cfg);          // used by Instrument + Sequencer
   let splitTbl = buildSplitTable(cfg);  // role/name per cell for Split mode
-  let uiMode = 'instrument';                  // 'game' | 'instrument' | 'sequencer'
+  // The Game mode is the game: click the red button. Instrument and
+  // Sequencer are what you switch to when you want to play the grid or
+  // build a pattern, so the game opens on the red button.
+  let uiMode = 'game';                           // 'game' | 'instrument' | 'sequencer'
   let counterpointMode = false;          // counterpoint enabled in Instrument + Sequencer
   let instSplitMode = true;              // Instrument: row = low voice, column = high voice
   let seqSplitMode = false;              // Sequencer: the same two voices, read off a pattern
