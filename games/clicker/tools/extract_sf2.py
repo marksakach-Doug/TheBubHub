@@ -610,6 +610,77 @@ def resolve_root(bank_root, measured):
     return (root, int(round((measured - root) * 100)))
 
 
+def clean_loop(audio, rate, start, end, f0, search_ms=25.0, seam_limit=0.02):
+    """Find a loop point that joins itself without a click.
+
+    A soundfont's sustain loop is a region of the sample that repeats while
+    the key is held. The bank's loop points are not always where they should
+    be: in the Wurlitzer the waveform steps up to 28% of full scale at the
+    loop point, and the region repeats every 27 to 170 ms. A step that big,
+    that often, is not a note - it is a buzz, and it is why the held voice
+    sounded like a saw.
+
+    So the loop is rebuilt here:
+
+      * the length is snapped to a whole number of periods of the note, which
+        is what keeps the pitch of the looped tone exact;
+      * the start is searched for the place where the waveform lands closest
+        to where it began - a value match, with the slope as a tiebreak;
+      * if the seam is still audible, one whole period is crossfaded into
+        the head. A crossfade of a whole number of periods keeps the length
+        a whole number of periods; crossfading an arbitrary slice would
+        detune the loop.
+
+    Returns (loop_start, loop_end, seam_fraction) in frames, or None.
+    """
+    region = end - start
+    if region <= 0 or f0 <= 0:
+        return None
+    period = rate / f0
+    if period < 2:
+        return None
+    periods = max(2, int(round(region / period)))
+    length = int(round(periods * period))
+    if length <= 2 or start + length > len(audio):
+        return None
+
+    lo = max(0, start - int(rate * search_ms / 1000.0))
+    hi = min(start, len(audio) - length)
+    best = None
+    stride = max(1, int(period / 16.0))
+    for s in range(lo, hi + 1, stride):
+        e = s + length
+        jump = abs(audio[e - 1] - audio[s])
+        if s > 0 and e < len(audio):
+            slope = abs((audio[e - 1] - audio[e - 2]) - (audio[s + 1] - audio[s]))
+        else:
+            slope = 0
+        score = jump + 0.5 * slope
+        if best is None or score < best[0]:
+            best = (score, s, e)
+
+    if best is None:
+        return None
+    _, s, e = best
+    seam = abs(audio[e - 1] - audio[s]) / 32768.0
+
+    if seam > seam_limit:
+        # Crossfade one whole period of the tail into the head.
+        k = max(1, int(round(period)))
+        if k < (e - s) - 1:
+            blended = array.array('h', audio[s:e])
+            for i in range(k):
+                w = i / float(k - 1) if k > 1 else 1.0
+                blended[len(blended) - k + i] = _clip(
+                    audio[e - k + i] * math.cos(w * math.pi / 2) +
+                    audio[s + i] * math.sin(w * math.pi / 2))
+            audio[s:e] = blended
+            e = e - k
+            seam = abs(audio[e - 1] - audio[s]) / 32768.0
+
+    return (s, e, seam)
+
+
 def extract(sf, preset, keys, velocity, out_dir, args):
     """Extract one voice. Returns the manifest for it."""
     if not os.path.isdir(out_dir):
@@ -706,11 +777,10 @@ def extract(sf, preset, keys, velocity, out_dir, args):
     for s in samples:
         p = peak_of(s['audio']) or 1
         scale = min(boost_cap, target / p)
-        audio = array.array('h', [max(-32768, min(32767, int(v * scale))) for v in s['audio']])
+        audio = array.array('h', [_clip(v * scale) for v in s['audio']])
         name = _safe_name(s['sh']['name'])
         fname = '%s-%d.wav' % (name, s['id'])
         path = os.path.join(out_dir, fname)
-        write_wav(path, audio, s['sh']['rate'])
 
         found = measure_pitch(audio, s['sh']['rate'], s['root'])
         expect = s['root'] + s['cents'] / 100.0
@@ -723,14 +793,34 @@ def extract(sf, preset, keys, velocity, out_dir, args):
         else:
             note = 'pitch not detected'
 
+        # The loop is worked out BEFORE the file is written: fixing a loop
+        # can rewrite the audio around the loop point, and the file has to
+        # be the audio that was fixed.
         loop_start = loop_end = 0.0
+        loop_frames = (0, 0)
         if s['loop']:
             ls, le = s['loop']
             if 0 <= ls < le <= s['length']:
-                loop_start = ls / float(s['sh']['rate'])
-                loop_end = le / float(s['sh']['rate'])
+                if (le - ls) > 0.8 * s['length']:
+                    # The bank loops the whole note, attack included. Looping
+                    # that would re-strike the note every cycle, so this
+                    # sample is a one-shot and gets no loop at all.
+                    note += '  (the bank loops the whole note: played as a one-shot)'
+                else:
+                    f0 = 440.0 * (2 ** ((s['root'] + s['cents'] / 100.0 - 69.0) / 12.0))
+                    clean = clean_loop(audio, s['sh']['rate'], ls, le, f0)
+                    if clean:
+                        cs, ce, seam = clean
+                        loop_frames = (cs, ce)
+                        loop_start = cs / float(s['sh']['rate'])
+                        loop_end = ce / float(s['sh']['rate'])
+                        note += '  (loop seam %.1f%% of full scale)' % (100.0 * seam)
+                    else:
+                        note += '  (no clean loop found: played as a one-shot)'
             else:
                 note += '  (loop region trimmed away)'
+
+        write_wav(path, audio, s['sh']['rate'])
 
         manifest.append({
             'file': fname,
@@ -743,8 +833,10 @@ def extract(sf, preset, keys, velocity, out_dir, args):
             'velHi': s['vel'][1],
             'gain': 1.0,
             'dur': round(len(audio) / float(s['sh']['rate']), 3),
-            'loopStart': round(loop_start, 4),
-            'loopEnd': round(loop_end, 4),
+            'loopStart': round(loop_start, 6),
+            'loopEnd': round(loop_end, 6),
+            'loopStartFrame': loop_frames[0],
+            'loopEndFrame': loop_frames[1],
             'cents': s['cents'],
         })
         print('  %-28s root %3d  keys %3d-%3d (%2d)  vel %3d-%3d  %5.2fs  %6.1fkB  x%.2f  %s'
@@ -775,7 +867,8 @@ def write_manifest(out_dir, voice, preset, manifest):
         lines.append('    {')
         lines.append("      file: '%s'," % m['file'])
         lines.append("      url: new URL('./%s/%s', import.meta.url).href," % (voice, m['file']))
-        for key in ('rootKey', 'rate', 'keyLo', 'keyHi', 'keys', 'velLo', 'velHi', 'gain', 'dur', 'loopStart', 'loopEnd', 'cents'):
+        for key in ('rootKey', 'rate', 'keyLo', 'keyHi', 'keys', 'velLo', 'velHi', 'gain', 'dur',
+                    'loopStart', 'loopEnd', 'loopStartFrame', 'loopEndFrame', 'cents'):
             lines.append('      %s: %s,' % (key, json.dumps(m[key])))
         lines.append('    },')
     lines.append('  ]')
@@ -854,6 +947,38 @@ def check_bank(out_dir, key_lo=55, key_hi=87, tol=0.35):
                 if not (0 < s['loopStart'] < s['loopEnd'] <= dur):
                     problems.append('%s/%s: the loop (%.3f-%.3f) is not inside the note'
                                     % (voice, s['file'], s['loopStart'], s['loopEnd']))
+                else:
+                    # A loop that does not join itself is a click every time
+                    # round, and a click every 30 ms is a buzz. This is the
+                    # check that keeps the held voice from sounding like a saw.
+                    # The frames are exact: a loop point rounded to a
+                    # microsecond is a frame or two out, and at these rates
+                    # the waveform moves 15% of full scale in a frame.
+                    i0 = s.get('loopStartFrame', int(s['loopStart'] * rate))
+                    i1 = s.get('loopEndFrame', int(s['loopEnd'] * rate))
+                    seam = abs(audio[i1 - 1] - audio[i0]) / 32768.0
+                    if seam > 0.02:
+                        problems.append('%s/%s: the loop does not join itself '
+                                        '(%.1f%% of full scale at the seam)'
+                                        % (voice, s['file'], 100.0 * seam))
+                    # And the note the player HOLDS has to be the note the
+                    # sample claims. A loop that is not a whole number of
+                    # periods turns the held tone into a buzz at the rate the
+                    # loop repeats, which is how it sounded like a saw.
+                    region = audio[i0:i1]
+                    if len(region) >= 512:
+                        reps = max(4, int(8000 / len(region)) + 1)
+                        held = array.array('h', region * reps)
+                        heard = measure_pitch(held, rate, s['rootKey'])
+                        expect = s['rootKey'] + s['cents'] / 100.0
+                        if heard is None:
+                            problems.append('%s/%s: the held note has no pitch'
+                                            % (voice, s['file']))
+                        elif abs(heard - expect) > 0.5:
+                            problems.append('%s/%s: the held note sounds like %.2f, '
+                                            'not %.2f - the loop is not a whole '
+                                            'number of periods'
+                                            % (voice, s['file'], heard, expect))
             covered.update(s['keys'])
         missing = [k for k in range(key_lo, key_hi + 1) if k not in covered]
         if missing:

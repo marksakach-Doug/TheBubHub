@@ -185,8 +185,15 @@ export function createSampler() {
     src.playbackRate.value = rateFor(midi, sample);
     if (sample.loopEnd > sample.loopStart) {
       src.loop = true;
-      src.loopStart = sample.loopStart;
-      src.loopEnd = sample.loopEnd;
+      // The frames are exact; the seconds in the manifest are rounded for
+      // humans. A loop point a frame or two out is a click every time round.
+      if (sample.loopEndFrame) {
+        src.loopStart = sample.loopStartFrame / sample.rate;
+        src.loopEnd = sample.loopEndFrame / sample.rate;
+      } else {
+        src.loopStart = sample.loopStart;
+        src.loopEnd = sample.loopEnd;
+      }
     }
     const g = ac.createGain();
     const peak = (o.gain == null ? 0.2 : o.gain) * (TRIM[voice] || 1);
