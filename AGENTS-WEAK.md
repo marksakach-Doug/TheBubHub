@@ -41,8 +41,8 @@ ls games/                  # copy the name EXACTLY, casing included
 ```
 
 - Copy **`games/dotreturn/`** as your template. It is a complete working game.
-- This filesystem is **case-sensitive**. `games/TRAFFIC` and `games/traffic` are
-  different folders, and an import with the wrong case fails with
+- This filesystem is **case-sensitive**. `games/dotreturn` and `games/DotReturn`
+  are different folders, and an import with the wrong case fails with
   `ERR_MODULE_NOT_FOUND`.
 
 ## 2. What this project is

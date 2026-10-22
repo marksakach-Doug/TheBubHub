@@ -215,11 +215,6 @@ BROWSER_SUITES=(
   # the MCTS bot with no browser. It was in this table being run by python3,
   # which could only ever SyntaxError — a suite that has never once passed.
   "minigo|minigo_test.mjs"
-  # Same shape as minigo: a node harness driving the shipped module and its
-  # solver, no browser. It earns its place because delivery-mode routing may
-  # revisit a tile — a rule that is easy to break and invisible until a map
-  # makes it matter.
-  "traffic|traffic_test.mjs"
   "clicker|clicker_test.mjs"
 )
 

@@ -57,9 +57,6 @@ MENU_ORDER = [
     "chess", "minigo", "goldberg", "warp",
     # the 2-8 crowd
     "eggs", "hook", "dotreturn", "the96game",
-    # trailing: TRAFFIC is registered by the stub below (its folder is
-    # games/TRAFFIC) but has no entry in the LEGACY stand-ins, so it sorts last.
-    "TRAFFIC",
 ]
 
 
@@ -67,7 +64,7 @@ MENU_ORDER = [
 PINNED_FOR_MENU = [
     "chess", "minigo", "goldberg", "warp",
     "eggs", "hook", "dotreturn", "the96game",
-    "lotr", "wordbridge", "blastoff", "grammar", "TRAFFIC",
+    "lotr", "wordbridge", "blastoff", "grammar",
 ]
 
 
@@ -152,9 +149,10 @@ def source_checks():
             solo_ids.add(g.parent.name)
     real_ids = ({g.parent.name for g in GAMES} | set(LEGACY_IDS)) - solo_ids
     mo = re.search(r"const MENU_ORDER = \[(.*?)\];", src, re.S)
-    # Ids may be upper case (TRAFFIC is), so this cannot assume [a-z0-9] only —
-    # an all-caps id written here would be invisible to the parser and the
-    # "names every game that exists" check would fail for the wrong reason.
+    # Ids are not all lower case, so this cannot assume [a-z0-9] only — an
+    # id with a capital letter written here would be invisible to the parser
+    # and the "names every game that exists" check would fail for the wrong
+    # reason.
     declared = re.findall(r"'([A-Za-z0-9]+)'", mo.group(1)) if mo else []
     # The pinned prefix: the people who chose these positions. Everything after
     # them is a game added later, which is exactly what sorting to the end means.
