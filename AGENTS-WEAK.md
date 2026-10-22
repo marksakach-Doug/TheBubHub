@@ -52,6 +52,9 @@ seating, networking and the record sheet.
 
 **A game is only rules and pixels.** Your game must never touch any of that.
 
+**`public/vietgames/` is separate.** It is the standalone Vietnamese mini-site
+served at `/vietgames`, not a hub game. Never add it to `public/games.js`.
+
 ## 3. The loop
 
 ```bash

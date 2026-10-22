@@ -566,6 +566,7 @@ same commit as its code; an unwired test is a test nobody runs.
 | `games/<id>/index.js` | ✅ to add a game | A module game. Auto-registered; the only file you create. |
 | `public/games.js` | ✅ for legacy games | The legacy registry — one line per iframe game. |
 | `public/*.html` | ✅ for legacy games | The legacy games. Copied verbatim to the site root. |
+| `public/vietgames/` | ✅ for the Vietnamese site | Standalone VietGames mini-site, served at `/vietgames`. Not a hub game — never add it to `public/games.js`. |
 | `index.html` | Rarely | Hub shell markup + the few CSS rules that own the stage frame. |
 | `src/main.js` | Rarely | Orchestrator: identity → lobby/room → net → stage → plugins. |
 | `src/registry.js` | Rarely | Loads `games/*/index.js` via `import.meta.glob`, merges in `window.BUB_GAMES`. |

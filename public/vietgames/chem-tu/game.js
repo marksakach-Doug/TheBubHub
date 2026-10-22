@@ -1,11 +1,8 @@
-// Blade & Word — a module game for Bub Hub.
+// Chém Từ — trò chơi tiếng Việt độc lập cho VietGames.
 //
-// The contract has no tick: state only moves through reduce()[cite: 1, 2, 3]. The host owns
-// the deck order, the current prompt (pic, left, right, correctSide), the
-// score, lives, missed cards list, and endsAt for the current word's fuse bar.
-// The client runs a 60fps api.raf loop[cite: 1, 3] to drain the timer bar smoothly, render
-// the canvas sword trail and sparks, play the Web Audio slash / steel-clang /
-// custom "hyah!" sound, and power the interactive Target Dojo flashcard mode.
+// Bản gốc là game module của Bub Hub. Ở đây chỉ còn một người chơi cục bộ:
+// harness.js gọi init(), reduce(), project() và mount(), không có phòng,
+// không có mạng. Luật chơi, bộ từ và giao diện được giữ nguyên.
 
 const MAX_PLAYERS = 8;
 const START_LIVES = 3;
@@ -14,15 +11,15 @@ const MIN_TIME_MS = 1100;
 const SPEEDUP_MS = 85;
 const TIMEOUT_GRACE_MS = 150;
 const TIMEOUT_RETRY_MS = 800;
-const BEST_KEY = 'bladeslash.best.v1';
+const BEST_KEY = 'vietgames.chem-tu.best.v1';
 
 export const meta = {
-  id: 'bladeslash',
-  title: 'Blade & Word',
-  players: { min: 1, max: MAX_PLAYERS },
+  id: 'chem-tu',
+  title: 'Chém Từ',
+  players: { min: 1, max: 1 },
   color: '#ef4444',
   icon: '⚔️',
-  desc: 'Swipe to slash the word that matches the picture — slice the wrong one and your sword clangs off steel.',
+  desc: 'Vuốt đúng từ khớp với hình. Chọn sai thì lưỡi kiếm kêu keng!',
   soloable: true
 };
 
@@ -33,7 +30,7 @@ export const WORD_LIST = [
   { pic: '🐴', match: 'ngựa', decoy: ['ngứa'] },        // horse vs. itchy[cite: 4]
   { pic: '🐉', match: 'rồng', decoy: ['rộng'] },        // dragon vs. wide[cite: 4]
   { pic: '🩴', match: 'dép', decoy: ['đẹp'] },          // sandal vs. beautiful[cite: 4]
-  { pic: '😴', match: 'ngủ', decoy: ['ngu'] },          // sleep vs. stupid[cite: 4]
+  { pic: '😴', match: 'ngủ', decoy: ['ngũ'] },          // sleep vs. five (ngũ cốc)[cite: 4]
   { pic: '👟', match: 'giầy', decoy: ['dây'] },         // shoe vs. rope/wire[cite: 4]
   { pic: '🧵', match: 'dây', decoy: ['giầy'] },         // string/wire vs. shoe[cite: 4]
   { pic: '👂', match: 'tai', decoy: ['tay'] },          // ear vs. hand[cite: 4]
@@ -86,7 +83,7 @@ export const WORD_LIST = [
   { pic: '🤕', match: 'đau', decoy: ['đâu'] },          //[cite: 4]
   { pic: '🟩', match: 'xanh', decoy: ['sanh'] },        //[cite: 4]
   { pic: '🐇', match: 'thỏ', decoy: ['to', 'tỏ'] },      // rabbit vs. big / clear[cite: 4]
-  { pic: '💊', match: 'thuốc', decoy: ['tuộc'] },        // medicine vs. octopus[cite: 4]
+  { pic: '💊', match: 'thuốc', decoy: ['thuộc'] },       // medicine vs. belong/memorise[cite: 4]
   { pic: '🌉', match: 'cầu', decoy: ['khâu'] },          // bridge vs. sew[cite: 4]
   { pic: '🐒', match: 'khỉ', decoy: ['kí', 'chỉ'] },     // monkey vs. kilo / thread[cite: 4]
   { pic: '🍜', match: 'phở', decoy: ['phố'] },           //[cite: 4]
@@ -204,26 +201,26 @@ export function reduce(state, action, ctx) {
   const kind = (action && action.a) || '';
   const now = Date.now();
 
-  if (!id) return { error: 'No identity — reopen the game.' };
+  if (!id) return { error: 'Không tìm thấy người chơi — hãy mở lại trò chơi.' };
 
   const players = state.players.slice();
   const same = function (extra) { return Object.assign({}, state, extra); };
 
   if (kind === 'join') {
     if (players.indexOf(id) >= 0) return same({});
-    if (players.length >= MAX_PLAYERS) return { error: 'Table is full.' };
+    if (players.length >= MAX_PLAYERS) return { error: 'Bàn đã đủ người.' };
     players.push(id);
     const hostId = state.hostId || id;
     return same({ players: players, hostId: hostId });
   }
 
-  if (players.indexOf(id) < 0) return { error: 'You are watching — not seated.' };
+  if (players.indexOf(id) < 0) return { error: 'Bạn đang xem chứ chưa vào bàn.' };
 
   if (kind === 'start') {
-    if (state.phase === 'play') return { error: 'A round is already running.' };
+    if (state.phase === 'play') return { error: 'Ván chơi đang diễn ra.' };
     const alone = players.length < 2;
     if (state.hostId && state.hostId !== id && !from.host && !alone) {
-      return { error: 'Waiting for the host to start the round.' };
+      return { error: 'Hãy chờ chủ bàn bắt đầu ván.' };
     }
     const prompt = dealPrompt(rng, -1, 0);
     return same({
@@ -243,13 +240,13 @@ export function reduce(state, action, ctx) {
   }
 
   if (state.phase !== 'play' || !state.prompt) {
-    return { error: 'Wait for the next round.' };
+    return { error: 'Hãy chờ ván tiếp theo.' };
   }
 
   if (kind === 'slash') {
     const side = action.side;
     if (side !== 'left' && side !== 'right') {
-      return { error: 'Swipe left or right to slash a word.' };
+      return { error: 'Vuốt sang trái hoặc phải để chém một từ.' };
     }
     const p = state.prompt;
     const hit = side === p.correctSide;
@@ -325,7 +322,7 @@ export function reduce(state, action, ctx) {
   if (kind === 'timeout') {
     const p = state.prompt;
     if (now < p.endsAt - TIMEOUT_GRACE_MS) {
-      return { error: 'The fuse is still burning.' };
+      return { error: 'Dây cháy vẫn còn cháy.' };
     }
     const nextLives = state.lives - 1;
     const nextStep = state.step + 1;
@@ -370,21 +367,7 @@ export function reduce(state, action, ctx) {
     });
   }
 
-  return { error: 'Unknown action: ' + kind };
-}
-
-// ---------------------------------------------------------------- prune ----
-
-export function prune(state, goneId) {
-  if (!state || !state.players || state.players.indexOf(goneId) < 0) return state;
-  const players = state.players.filter(function (id) { return id !== goneId; });
-  const table = (state.table || []).filter(function (id) { return id !== goneId; });
-  const hostId = state.hostId === goneId ? (players[0] || '') : state.hostId;
-  return Object.assign({}, state, {
-    players: players,
-    table: table,
-    hostId: hostId
-  });
+  return { error: 'Hành động không hợp lệ: ' + kind };
 }
 
 // -------------------------------------------------------------- project ----
@@ -405,23 +388,6 @@ export function project(state, playerId, api) {
     prompt: prompt,
     roster: (api && api.roster) || null
   });
-}
-
-// ------------------------------------------------------------ summarize ----
-
-export function roundId(state) {
-  return 'e' + ((state && state.epoch) || 0);
-}
-
-export function summarize(state, nameOf) {
-  if (state.phase !== 'over' || !state.over) return null;
-  const ids = (state.table && state.table.length) ? state.table : state.players;
-  const who = (ids || []).map(function (id) { return nameOf(id); }).filter(Boolean);
-  const names = who.length === 2 ? who[0] + ' and ' + who[1]
-    : (who.length > 2 ? who.slice(0, -1).join(', ') + ' and ' + who[who.length - 1]
-      : (who[0] || 'Someone'));
-  const s = Number(state.over.score || 0);
-  return names + ' sliced ' + s + (s === 1 ? ' word' : ' words') + ' in ' + meta.title;
 }
 
 // ----------------------------------------------------------------- mount ----
@@ -527,7 +493,7 @@ const CSS = [
   '.bs-btn.ghost{background:rgba(255,255,255,0.08);color:#fde68a;border:1px solid rgba(250,204,21,0.35);box-shadow:none}',
   '.bs-btn:disabled{opacity:0.45;cursor:default;box-shadow:none}',
   '.bs-note{font-size:0.84rem;color:#94a3b8;margin:0}',
-  // ---- Target Dojo (Flashcard Mode) ----
+  // ---- Thẻ từ vựng (chế độ luyện thẻ) ----
   '.bs-dojo{position:absolute;inset:0;z-index:12;display:flex;flex-direction:column;align-items:center;justify-content:space-between;',
   'padding:16px 18px 22px;background:radial-gradient(circle at 50% 30%,#1e293b 0%,#0f172a 78%);touch-action:none}',
   '.bs-dojo[hidden]{display:none}',
@@ -592,7 +558,7 @@ export function mount(root, api) {
       '<div class="bs-hud-row">' +
         '<div class="bs-score-box"><span class="bs-score">0</span><span class="bs-streak"></span></div>' +
         '<div class="bs-hud-right">' +
-          '<button class="bs-dojo-pill" type="button">🎴 Target Dojo</button>' +
+          '<button class="bs-dojo-pill" type="button">🎴 Thẻ từ vựng</button>' +
           '<div class="bs-lives">' +
             '<span class="bs-life">⚔️</span><span class="bs-life">⚔️</span><span class="bs-life">⚔️</span>' +
           '</div>' +
@@ -605,7 +571,7 @@ export function mount(root, api) {
       '<canvas class="bs-canvas"></canvas>' +
       '<div class="bs-pic-card">' +
         '<div class="bs-pic">🐉</div>' +
-        '<div class="bs-hint">Swipe the matching word</div>' +
+        '<div class="bs-hint">Vuốt từ đúng</div>' +
       '</div>' +
       '<div class="bs-arena">' +
         '<div class="bs-word-slot" data-side="left"><div class="bs-word" data-side="left">rồng</div></div>' +
@@ -639,20 +605,20 @@ export function mount(root, api) {
         '</div>' +
         '<div class="bs-word-slot" data-side="right"><div class="bs-word" data-side="right">rộng</div></div>' +
       '</div>' +
-      '<!-- Target Dojo Flashcard Overlay -->' +
+      '<!-- Thẻ từ vựng -->' +
       '<div class="bs-dojo" hidden>' +
         '<div class="bs-dojo-top">' +
-          '<span class="bs-dojo-badge">🎴 TARGET DOJO</span>' +
+          '<span class="bs-dojo-badge">🎴 THẺ TỪ VỰNG</span>' +
           '<div class="bs-dojo-tabs">' +
-            '<button class="bs-tab active" data-deck="all" type="button">All (80)</button>' +
-            '<button class="bs-tab" data-deck="missed" type="button" hidden>Missed (0)</button>' +
+            '<button class="bs-tab active" data-deck="all" type="button">Tất cả (80)</button>' +
+            '<button class="bs-tab" data-deck="missed" type="button" hidden>Đã bỏ lỡ (0)</button>' +
           '</div>' +
-          '<button class="bs-dojo-close" type="button">Back to Arena</button>' +
+          '<button class="bs-dojo-close" type="button">Quay lại</button>' +
         '</div>' +
         '<div class="bs-dojo-stage">' +
           '<div class="bs-fcard">' +
             '<div class="bs-fcard-pic">🐷</div>' +
-            '<div class="bs-fcard-front-msg">Tap target to reveal · Swipe to slash!</div>' +
+            '<div class="bs-fcard-front-msg">Chạm để lật thẻ · Vuốt để chém!</div>' +
             '<div class="bs-fcard-back">' +
               '<div class="bs-fcard-match">lợn</div>' +
               '<div class="bs-fcard-decoys"></div>' +
@@ -661,27 +627,27 @@ export function mount(root, api) {
         '</div>' +
         '<div class="bs-dojo-footer">' +
           '<div class="bs-dojo-actions">' +
-            '<button class="bs-dojo-act clang" type="button">🛡️ Still Tricky</button>' +
-            '<button class="bs-dojo-act flip" type="button">🔄 Flip</button>' +
-            '<button class="bs-dojo-act slice" type="button">⚔️ Got It!</button>' +
+            '<button class="bs-dojo-act clang" type="button">🛡️ Còn khó</button>' +
+            '<button class="bs-dojo-act flip" type="button">🔄 Lật thẻ</button>' +
+            '<button class="bs-dojo-act slice" type="button">⚔️ Đã hiểu!</button>' +
           '</div>' +
           '<p class="bs-dojo-sub"></p>' +
         '</div>' +
       '</div>' +
     '</div>' +
     '<div class="bs-overlay">' +
-      '<h1 class="bs-title">Blade &amp; Word</h1>' +
+      '<h1 class="bs-title">Chém Từ</h1>' +
       '<div class="bs-stat" hidden></div>' +
       '<div class="bs-callout" hidden></div>' +
       '<div class="bs-missed-wrap" hidden>' +
-        '<div class="bs-missed-hdr">Cards You Missed This Run</div>' +
+        '<div class="bs-missed-hdr">Những từ bạn đã bỏ lỡ</div>' +
         '<div class="bs-missed-grid"></div>' +
       '</div>' +
       '<p class="bs-sub"></p>' +
       '<div class="bs-btn-row">' +
-        '<button class="bs-btn" data-act="start" type="button">Draw Sword</button>' +
-        '<button class="bs-btn secondary" data-act="dojo-missed" type="button" hidden>Practice Missed in Dojo</button>' +
-        '<button class="bs-btn ghost" data-act="dojo-all" type="button">🎴 Flashcard Dojo</button>' +
+        '<button class="bs-btn" data-act="start" type="button">Bắt đầu</button>' +
+        '<button class="bs-btn secondary" data-act="dojo-missed" type="button" hidden>Luyện từ đã bỏ lỡ</button>' +
+        '<button class="bs-btn ghost" data-act="dojo-all" type="button">🎴 Thẻ từ vựng</button>' +
       '</div>' +
       '<p class="bs-note"></p>' +
     '</div>';
@@ -716,7 +682,7 @@ export function mount(root, api) {
   const dojoAllBtn = wrap.querySelector('.bs-btn[data-act="dojo-all"]');
   const ovNote = wrap.querySelector('.bs-note');
 
-  // Dojo Flashcard elements
+  // Các phần tử của Thẻ từ vựng
   const dojoEl = wrap.querySelector('.bs-dojo');
   const tabAllBtn = wrap.querySelector('.bs-tab[data-deck="all"]');
   const tabMissedBtn = wrap.querySelector('.bs-tab[data-deck="missed"]');
@@ -741,7 +707,7 @@ export function mount(root, api) {
   let lastTimeoutReq = 0;
   let toastTimer = null;
 
-  // ---- Flashcard Dojo State (Client-local interactive study mode) ----
+  // ---- Trạng thái Thẻ từ vựng (luyện tập ngay trên máy) ----
   const dojo = {
     open: false,
     mode: 'all', // 'all' | 'missed'
@@ -794,11 +760,11 @@ export function mount(root, api) {
 
   function renderDojoCard() {
     const missedIdxs = getMissedIndices();
-    tabAllBtn.textContent = 'All (' + WORD_LIST.length + ')';
+    tabAllBtn.textContent = 'Tất cả (' + WORD_LIST.length + ')';
     tabAllBtn.classList.toggle('active', dojo.mode === 'all');
     if (missedIdxs.length > 0) {
       tabMissedBtn.hidden = false;
-      tabMissedBtn.textContent = 'Missed (' + missedIdxs.length + ')';
+      tabMissedBtn.textContent = 'Đã bỏ lỡ (' + missedIdxs.length + ')';
       tabMissedBtn.classList.toggle('active', dojo.mode === 'missed');
     } else {
       tabMissedBtn.hidden = true;
@@ -806,10 +772,10 @@ export function mount(root, api) {
 
     if (!dojo.deck.length) {
       fcardPic.textContent = '🏆';
-      fcardMatch.textContent = 'All Targets Sliced!';
+      fcardMatch.textContent = 'Đã thuộc hết!';
       fcardDecoys.innerHTML = '';
       fcardEl.classList.add('flipped');
-      dojoSubEl.textContent = 'Deck complete! Tap a tab above to reshuffle.';
+      dojoSubEl.textContent = 'Đã hết thẻ! Chạm vào tab ở trên để xào lại.';
       return;
     }
 
@@ -821,11 +787,11 @@ export function mount(root, api) {
     fcardPic.textContent = item.pic;
     fcardMatch.textContent = '✅ ' + item.match;
     fcardDecoys.innerHTML = item.decoy.map(function (d) {
-      return '<span class="bs-fcard-decoy-pill">🛡️ Steel Trap: ' + escHtml(d) + '</span>';
+      return '<span class="bs-fcard-decoy-pill">🛡️ Từ dễ lẫn: ' + escHtml(d) + '</span>';
     }).join('');
 
-    dojoSubEl.textContent = 'Card ' + (dojo.pos + 1) + ' of ' + dojo.deck.length +
-      ' · Sliced clean: ' + dojo.mastered + ' · Swipe Right = Got It, Swipe Left = Still Tricky';
+    dojoSubEl.textContent = 'Thẻ ' + (dojo.pos + 1) + '/' + dojo.deck.length +
+      ' · Đã thuộc: ' + dojo.mastered + ' · Vuốt phải = Đã hiểu, vuốt trái = Còn khó';
   }
 
   function dojoAdvance(gotIt) {
@@ -896,7 +862,7 @@ export function mount(root, api) {
   let audioCtx = null;
   let hyahAudio = null;
   try {
-    hyahAudio = new Audio('/assets/hyah.mp3');
+    hyahAudio = new Audio('../assets/hyah.mp3');
     hyahAudio.preload = 'auto';
   } catch (e) {}
 
@@ -1056,7 +1022,7 @@ export function mount(root, api) {
       playSteelClang();
       wrap.classList.add('shudder', 'flash-clang');
       heroEl.classList.add('wince');
-      showToast('Too slow! (' + ev.pic + ' = ' + ev.matchWord + ')');
+      showToast('Chậm quá! (' + ev.pic + ' = ' + ev.matchWord + ')');
       api.setTimeout(function () {
         heroEl.classList.remove('wince');
       }, 430);
@@ -1165,7 +1131,7 @@ export function mount(root, api) {
     }
   }
 
-  // ---- Input: Swiping & Tapping (Arena + Flashcard Dojo) ----
+  // ---- Nhập: vuốt và chạm (sàn đấu + Thẻ từ vựng) ----
   let pointerActive = false;
   let startX = 0;
   let startY = 0;
@@ -1189,7 +1155,7 @@ export function mount(root, api) {
 
   stageEl.addEventListener('pointerdown', function (e) {
     if (dojo.open) {
-      // Allow buttons inside Dojo to handle their own clicks cleanly
+      // Để các nút trong Thẻ từ vựng tự xử lý cú chạm
       if (e.target.closest('button')) return;
       ensureAudio();
       pointerActive = true;
@@ -1225,7 +1191,7 @@ export function mount(root, api) {
     const dx = x - startX;
     const dy = y - startY;
 
-    // Dojo Flashcard Swipe: Right = Got It (Slice), Left = Still Tricky (Clang)
+    // Vuốt thẻ: phải = Đã hiểu (chém), trái = Còn khó (keng)
     if (dojo.open) {
       if (Math.abs(dx) > 48 && Math.abs(dx) > Math.abs(dy) * 0.85) {
         slashedThisGesture = true;
@@ -1329,11 +1295,11 @@ export function mount(root, api) {
     }
     missedWrap.hidden = false;
     dojoMissedBtn.hidden = false;
-    dojoMissedBtn.textContent = '🎯 Practice Missed (' + list.length + ')';
+    dojoMissedBtn.textContent = '🎯 Luyện từ đã bỏ lỡ (' + list.length + ')';
     missedGrid.innerHTML = list.map(function (m) {
       const badLabel = m.swiped
         ? '<span class="m-bad">' + escHtml(m.swiped) + '</span>'
-        : '<span class="m-bad">⏱️ slow</span>';
+        : '<span class="m-bad">⏱️ chậm</span>';
       return '<div class="bs-missed-chip">' +
         '<span class="m-pic">' + escHtml(m.pic) + '</span>' +
         '<span class="m-good">' + escHtml(m.match) + '</span>' +
@@ -1345,9 +1311,6 @@ export function mount(root, api) {
   function renderView() {
     if (!view) return;
     const isPlaying = view.phase === 'play';
-    const atTable = seated();
-    const host = iAmHost();
-    const alone = (view.players || []).length < 2;
 
     if (isPlaying && dojo.open) {
       closeDojo();
@@ -1384,49 +1347,35 @@ export function mount(root, api) {
     overlay.hidden = isPlaying;
     if (isPlaying) return;
 
-    if (!atTable) {
-      ovTitle.textContent = 'Observing';
-      ovStat.hidden = true;
-      ovCallout.hidden = true;
-      missedWrap.hidden = true;
-      ovSub.textContent = 'You are watching this table. Seated players swipe to slash the matching Vietnamese word.';
-      startBtn.hidden = true;
-      dojoMissedBtn.hidden = true;
-      ovNote.textContent = (view.players || []).length + ' at the table.';
-      return;
-    }
-
     startBtn.hidden = false;
-    const canStart = host || alone;
-    startBtn.disabled = !canStart;
 
     if (view.phase === 'over' && view.over) {
       const o = view.over;
       saveBest(o.score || 0);
-      ovTitle.textContent = o.reason === 'clang' ? 'Blade Shattered!' : 'Out of Time!';
+      ovTitle.textContent = o.reason === 'clang' ? 'Kiếm gãy!' : 'Hết giờ!';
       ovStat.hidden = false;
-      ovStat.textContent = o.score + (o.score === 1 ? ' word' : ' words');
+      ovStat.textContent = o.score + ' từ';
       ovCallout.hidden = false;
       ovCallout.innerHTML = o.reason === 'clang'
-        ? 'Swiped <b>' + escHtml(o.lastWrong) + '</b> (solid steel!) — ' + escHtml(o.lastPic) + ' is <b>' + escHtml(o.lastMatch) + '</b>'
-        : 'Fuse ran out on ' + escHtml(o.lastPic) + ' (<b>' + escHtml(o.lastMatch) + '</b>)';
+        ? 'Bạn đã chém <b>' + escHtml(o.lastWrong) + '</b> — ' + escHtml(o.lastPic) + ' là <b>' + escHtml(o.lastMatch) + '</b>'
+        : 'Hết giờ với ' + escHtml(o.lastPic) + ' (<b>' + escHtml(o.lastMatch) + '</b>)';
       renderMissedSummary(o.missed || view.missed || []);
-      ovSub.textContent = 'Best streak this run: ' + (o.bestStreak || 0) + 'x';
-      startBtn.textContent = canStart ? 'Slash Again' : 'Waiting for host';
+      ovSub.textContent = 'Chuỗi đúng cao nhất: ' + (o.bestStreak || 0) + 'x';
+      startBtn.textContent = 'Chơi lại';
       const best = readBest();
-      ovNote.textContent = best !== null ? 'Personal best: ' + best + ' words' : '';
+      ovNote.textContent = best !== null ? 'Kỷ lục của bạn: ' + best + ' từ' : '';
     } else {
-      ovTitle.textContent = 'Blade & Word';
+      ovTitle.textContent = 'Chém Từ';
       ovStat.hidden = true;
       ovCallout.hidden = true;
       missedWrap.hidden = true;
       dojoMissedBtn.hidden = true;
-      ovSub.innerHTML = 'A picture appears in the center with two Vietnamese words.<br>' +
-        '<b>Swipe left or right</b> to slice the matching word.<br>' +
-        'Slice the wrong word and your blade clangs off solid steel!';
-      startBtn.textContent = canStart ? 'Draw Sword' : 'Waiting for host';
+      ovSub.innerHTML = 'Hình ở giữa, hai từ tiếng Việt ở hai bên.<br>' +
+        '<b>Vuốt sang trái hoặc phải</b> để chém đúng từ khớp với hình.<br>' +
+        'Chém sai thì lưỡi kiếm kêu keng!';
+      startBtn.textContent = 'Bắt đầu';
       const best = readBest();
-      ovNote.textContent = best !== null ? 'Personal best: ' + best + ' words' : 'Warm up in Flashcard Dojo or draw your sword!';
+      ovNote.textContent = best !== null ? 'Kỷ lục của bạn: ' + best + ' từ' : 'Luyện thêm trong Thẻ từ vựng nhé!';
     }
   }
 

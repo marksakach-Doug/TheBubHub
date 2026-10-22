@@ -1,0 +1,214 @@
+:root {
+  --vg-ink: #f8fafc;
+  --vg-muted: #94a3b8;
+  --vg-deep: #0b1020;
+  --vg-card: rgba(30, 41, 59, 0.78);
+  --vg-line: rgba(94, 234, 212, 0.22);
+  --vg-teal: #5eead4;
+  --vg-amber: #fbbf24;
+  --vg-red: #ef4444;
+}
+
+* { box-sizing: border-box; }
+
+html, body {
+  margin: 0;
+  min-height: 100%;
+}
+
+body.vg-page {
+  color: var(--vg-ink);
+  background:
+    radial-gradient(900px 520px at 8% -10%, rgba(20, 184, 166, 0.24), transparent 62%),
+    radial-gradient(820px 520px at 96% 4%, rgba(99, 102, 241, 0.22), transparent 58%),
+    radial-gradient(700px 500px at 50% 110%, rgba(245, 158, 11, 0.12), transparent 60%),
+    var(--vg-deep);
+  font: 16px/1.55 "Be Vietnam Pro", system-ui, -apple-system, "Segoe UI", sans-serif;
+}
+
+.vg-shell {
+  width: min(980px, 100%);
+  margin: 0 auto;
+  padding: 28px 20px 40px;
+}
+
+.vg-hero {
+  text-align: center;
+  padding: 34px 8px 26px;
+}
+
+.vg-kicker {
+  display: inline-block;
+  margin: 0 0 14px;
+  padding: 6px 14px;
+  border: 1px solid var(--vg-line);
+  border-radius: 999px;
+  color: var(--vg-teal);
+  background: rgba(20, 184, 166, 0.09);
+  font-size: 0.78rem;
+  font-weight: 800;
+  letter-spacing: 0.14em;
+  text-transform: uppercase;
+}
+
+.vg-title {
+  margin: 0;
+  font-size: clamp(2.4rem, 8vw, 4.6rem);
+  font-weight: 900;
+  line-height: 1.02;
+  letter-spacing: -0.04em;
+  background: linear-gradient(92deg, #5eead4 0%, #38bdf8 48%, #c4b5fd 100%);
+  -webkit-background-clip: text;
+  background-clip: text;
+  color: transparent;
+}
+
+.vg-lede {
+  max-width: 34rem;
+  margin: 16px auto 0;
+  color: #cbd5e1;
+  font-size: clamp(1rem, 2.4vw, 1.18rem);
+}
+
+.vg-games {
+  display: grid;
+  gap: 18px;
+  grid-template-columns: repeat(auto-fit, minmax(260px, 1fr));
+  margin-top: 18px;
+}
+
+.vg-card {
+  position: relative;
+  display: flex;
+  flex-direction: column;
+  gap: 12px;
+  min-height: 230px;
+  padding: 24px;
+  overflow: hidden;
+  color: inherit;
+  text-decoration: none;
+  background: var(--vg-card);
+  border: 1px solid var(--vg-line);
+  border-radius: 22px;
+  box-shadow: 0 18px 50px rgba(2, 6, 23, 0.45);
+  transition: transform 0.2s ease, border-color 0.2s ease, box-shadow 0.2s ease;
+}
+
+.vg-card::after {
+  content: "";
+  position: absolute;
+  inset: auto -20% -55% 35%;
+  height: 180px;
+  background: radial-gradient(circle, rgba(94, 234, 212, 0.18), transparent 65%);
+  pointer-events: none;
+}
+
+.vg-card:hover,
+.vg-card:focus-visible {
+  transform: translateY(-4px);
+  border-color: rgba(94, 234, 212, 0.6);
+  box-shadow: 0 24px 60px rgba(2, 6, 23, 0.6);
+  outline: none;
+}
+
+.vg-card-icon {
+  display: grid;
+  place-items: center;
+  width: 74px;
+  height: 74px;
+  font-size: 2.3rem;
+  border-radius: 20px;
+  background: linear-gradient(145deg, rgba(251, 191, 36, 0.2), rgba(239, 68, 68, 0.16));
+  border: 1px solid rgba(251, 191, 36, 0.3);
+}
+
+.vg-card h2 {
+  margin: 0;
+  font-size: 1.55rem;
+  font-weight: 900;
+  letter-spacing: -0.02em;
+}
+
+.vg-card p {
+  margin: 0;
+  color: #cbd5e1;
+  font-size: 0.98rem;
+}
+
+.vg-card-cta {
+  margin-top: auto;
+  display: inline-flex;
+  align-items: center;
+  gap: 8px;
+  color: var(--vg-amber);
+  font-weight: 800;
+}
+
+.vg-subtitle {
+  color: var(--vg-muted);
+  font-size: 0.78rem;
+  font-weight: 700;
+  letter-spacing: 0.1em;
+  text-transform: uppercase;
+}
+
+.vg-footer {
+  margin-top: 38px;
+  padding-top: 18px;
+  border-top: 1px solid rgba(148, 163, 184, 0.15);
+  color: var(--vg-muted);
+  font-size: 0.82rem;
+  text-align: center;
+}
+
+/* ---- Game page ---- */
+
+body.vg-game {
+  overflow: hidden;
+  background: #12131a;
+}
+
+.vg-gamebar {
+  position: fixed;
+  z-index: 50;
+  top: 0;
+  right: 0;
+  left: 0;
+  display: grid;
+  grid-template-columns: 1fr auto 1fr;
+  align-items: center;
+  gap: 12px;
+  height: 48px;
+  padding: 0 12px;
+  background: rgba(15, 23, 42, 0.97);
+  border-bottom: 1px solid #334155;
+}
+
+.vg-gamebar a {
+  justify-self: start;
+  color: var(--vg-teal);
+  font-size: 0.88rem;
+  font-weight: 800;
+  text-decoration: none;
+}
+
+.vg-gamebar a:hover { text-decoration: underline; }
+
+.vg-gamebar strong {
+  font-size: 0.95rem;
+  letter-spacing: 0.02em;
+}
+
+.vg-gamebar span { justify-self: end; color: var(--vg-muted); font-size: 0.75rem; }
+
+#vietgames-game {
+  position: fixed;
+  inset: 48px 0 0 0;
+}
+
+@media (max-width: 520px) {
+  .vg-shell { padding: 18px 14px 32px; }
+  .vg-hero { padding: 22px 4px 18px; }
+  .vg-card { padding: 20px; border-radius: 18px; }
+  .vg-gamebar span { display: none; }
+}

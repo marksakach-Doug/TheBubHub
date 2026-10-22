@@ -182,6 +182,9 @@ OFFLINE_SUITES=(
   # And the sampler that plays them has to pick the right sample, play it at
   # the right rate, and stay quiet instead of failing when it is not ready.
   "clicker sound|clicker_sound_test.mjs"
+  # The Vietnamese mini-site is standalone, not a hub game. Its resolver still
+  # has to keep the rules the hub version had.
+  "vietgames|vietgames_test.mjs"
 )
 
 SERVE_PORT="${SERVE_PORT:-5180}"
@@ -211,6 +214,10 @@ BROWSER_SUITES=(
   # the bug that shipped 15 iframe games and zero module games was invisible
   # everywhere else.
   "hub shell (built)|hub_switch_test.py"
+  # The standalone Vietnamese site is a static folder under public/. Prove the
+  # built bundle still serves /vietgames and that the moved game is gone from
+  # the hub menu.
+  "vietgames (built)|vietgames_play.py"
   # Every game with a card has to open, render, and take a tap. Needs dist/ too —
   # and this is where the first-paint regression lives: main.js once handed
   # update() the raw state instead of calling project(), and a game that shapes
@@ -231,7 +238,7 @@ for entry in "${OFFLINE_SUITES[@]}"; do
 done
 for entry in "${BROWSER_SUITES[@]}"; do
   case "$entry" in
-    "hub shell (built)|"*|"game smoke (built)|"*|"clicker sound (built)|"*)
+    "hub shell (built)|"*|"vietgames (built)|"*|"game smoke (built)|"*|"clicker sound (built)|"*)
       [ "$BROWSER_OK" = "1" ] || { skip "${entry##*|} ($BROWSER_WHY)"; continue; }
       if ensure_dist; then
         run_browser "${entry%%|*}" "${entry##*|} $SERVE_PORT"
