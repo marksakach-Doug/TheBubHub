@@ -167,7 +167,7 @@ class FakeDocument {
 // `document` is deliberately ABSENT from api — the hub never hands a game one,
 // and mount() gets its document implicitly through `root.ownerDocument`.
 export function fakeApi(me = 'p1') {
-  const timers = { timeout: 0, interval: 0, raf: 0 };
+  const timers = { timeout: 0, interval: 0, raf: 0, running: false, pending: [] };
   return {
     me: { id: me, name: me === 'p1' ? 'Alice' : 'Bo' },
     seats: { 0: me, 1: me === 'p1' ? 'p2' : 'p1' },
@@ -188,9 +188,22 @@ export function fakeApi(me = 'p1') {
     // Tracked timers, exactly as the hub provides them: synchronous, so a
     // game that schedules work gets it without a real clock and without the
     // gate hanging on an interval.
+    //
+    // EXCEPT a timer scheduled from inside a timer. A real browser never runs
+    // one before the task that scheduled it has finished, and a game with a
+    // clock - one that reschedules itself - would otherwise recurse until the
+    // stack gives out. That would be a failure of this harness, not of the
+    // game, so those callbacks wait instead of running.
     raf(fn) { timers.raf++; if (typeof fn === 'function') fn(0); return timers.raf; },
     cancelRaf() {},
-    setTimeout(fn) { timers.timeout++; if (typeof fn === 'function') fn(); return timers.timeout; },
+    setTimeout(fn) {
+      timers.timeout++;
+      if (typeof fn !== 'function') return timers.timeout;
+      if (timers.running) { timers.pending.push(fn); return timers.timeout; }
+      timers.running = true;
+      try { fn(); } finally { timers.running = false; }
+      return timers.timeout;
+    },
     clearTimeout() {},
     setInterval() { return ++timers.interval; },
     clearInterval() {}
