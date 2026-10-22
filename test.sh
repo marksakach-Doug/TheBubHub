@@ -68,14 +68,22 @@ run_offline() {
 
 # Browser suite: loud failure without Chromium, SKIP with --skip-browser.
 # A .mjs entry runs under node (it needs no browser), everything else python3.
+# The script name may carry an argument ("game_smoke.py 5180"): the argument
+# has to arrive as its own word, or python3 is handed a file called
+# "game_smoke.py 5180" and reports that it cannot open it.
 run_browser() {
   local name="$1" script="$2"
   step "$name — tests/$script"
   if [ "$BROWSER_OK" = "1" ]; then
     local rc=0
+    local file="${script%% *}"
+    local arg=""
     case "$script" in
-      *.mjs) node "tests/$script" || rc=$? ;;
-      *) python3 "tests/$script" || rc=$? ;;
+      *" "*) arg="${script#* }" ;;
+    esac
+    case "$file" in
+      *.mjs) node "tests/$file" $arg || rc=$? ;;
+      *) python3 "tests/$file" $arg || rc=$? ;;
     esac
     if [ "$rc" -eq 0 ]; then pass "$script"; else fail "$script"; bail; fi
   elif [ "$SKIP_BROWSER" = "1" ]; then
