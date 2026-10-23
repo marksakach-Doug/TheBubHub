@@ -29,7 +29,7 @@ void (() => {
   const EGGS = 'eggs.profiles';
   const HATV = [-1, -0.7142857, -0.4285714, -0.1428571, 0.1428571, 0.4285714, 0.7142857, 1];
   const CODE = { left: 'ArrowLeft', right: 'ArrowRight', up: 'ArrowUp', down: 'ArrowDown', jump: 'Space', act: 'KeyX', start: 'Enter' };
-  const LABEL = { jump: 'JUMP', act: 'ACT', start: 'START' };
+  const LABEL = { jump: 'NHẢY', act: 'HÀNH ĐỘNG', start: 'BẮT ĐẦU' };
   const SEQ = ['jump', 'act', 'start'];
 
   let wrapEl = null, wrapAt = 0;
@@ -147,7 +147,7 @@ void (() => {
     toastEl.appendChild(msg);
     if (setup) {
       const b = document.createElement('button');
-      b.textContent = 'Set up buttons';
+      b.textContent = 'Cài nút';
       b.setAttribute('style',
         'border:0;border-radius:8px;padding:6px 10px;background:#ffd23f;color:#12131a;' +
         'font:600 13px system-ui,sans-serif;cursor:pointer');
@@ -187,10 +187,10 @@ void (() => {
     card.appendChild(card._txt);
     const hint = document.createElement('p');
     hint.setAttribute('style', 'margin:0 0 14px;font-size:13px;color:#8a7a5c');
-    hint.textContent = 'Bindings are saved for this controller model, beside the ones you already made in the egg game.';
+    hint.textContent = 'Nút được lưu cho loại tay cầm này, cùng với các nút bạn đã cài trong trò chơi trứng.';
     card.appendChild(hint);
     const cancel = document.createElement('button');
-    cancel.textContent = 'Cancel';
+    cancel.textContent = 'Hủy';
     cancel.setAttribute('style',
       'border:0;border-radius:8px;padding:6px 12px;background:rgba(255,255,255,.18);color:#fff;' +
       'font:600 13px system-ui,sans-serif;cursor:pointer');
@@ -202,8 +202,8 @@ void (() => {
   function stepUI() {
     if (!wiz.el || !wiz.el.firstChild) return;
     const txt = wiz.el.firstChild._txt;
-    txt.textContent = 'Press the button for ' + LABEL[SEQ[wiz.i]];
-    const done = SEQ.slice(0, wiz.i).map(k => LABEL[k] + ': button ' + wiz.draft[k]).join('  ·  ');
+    txt.textContent = 'Nhấn nút cho ' + LABEL[SEQ[wiz.i]];
+    const done = SEQ.slice(0, wiz.i).map(k => LABEL[k] + ': nút ' + wiz.draft[k]).join('  ·  ');
     if (done) {
       let side = wiz.el.parentNode.querySelector('.vgpad-progress');
       if (!side) {
@@ -226,7 +226,7 @@ void (() => {
       ownP = null; // force a re-read
     }
     const first = firstPad();
-    if (first && !profFor(first.id)) showToast('Controller connected', true);
+    if (first && !profFor(first.id)) showToast('Đã nối tay cầm', true);
   }
   function feedWizard(gp) {
     for (let n = 0; n < gp.buttons.length; n++) {
@@ -270,7 +270,7 @@ void (() => {
         : (pads[gp.index] = { id: gp.id, mapping: gp.mapping, rest: Array.prototype.slice.call(gp.axes), cur: {}, prof: undefined });
       if (sta.prof === undefined) {
         sta.prof = profFor(gp.id);
-        if (!sta.prof && !pads._toast) showToast('Controller connected — keyboard still works', true);
+        if (!sta.prof && !pads._toast) showToast('Đã nối tay cầm — vẫn dùng được bàn phím', true);
         if (sta.prof) hideToast();
       }
       const d = decodeDir(gp, sta);
@@ -290,7 +290,7 @@ void (() => {
 
   window.addEventListener('gamepadconnected', e => {
     const p = e.gamepad && e.gamepad.id ? profFor(e.gamepad.id) : null;
-    if (!p) showToast('Controller connected — keyboard still works', true);
+    if (!p) showToast('Đã nối tay cầm — vẫn dùng được bàn phím', true);
   });
   window.addEventListener('gamepaddisconnected', () => hideToast());
 
