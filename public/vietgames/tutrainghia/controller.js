@@ -29,8 +29,8 @@ void (() => {
   const EGGS = 'eggs.profiles';
   const HATV = [-1, -0.7142857, -0.4285714, -0.1428571, 0.1428571, 0.4285714, 0.7142857, 1];
   const CODE = { left: 'ArrowLeft', right: 'ArrowRight', up: 'ArrowUp', down: 'ArrowDown', jump: 'Space', act: 'KeyX', start: 'Enter' };
-  const LABEL = { jump: 'NHẢY', act: 'HÀNH ĐỘNG', start: 'BẮT ĐẦU' };
-  const SEQ = ['jump', 'act', 'start'];
+  const LABEL = { left: 'D-PAD TRÁI', right: 'D-PAD PHẢI', up: 'D-PAD LÊN', down: 'D-PAD XUỐNG', jump: 'NHẢY', act: 'HÀNH ĐỘNG', start: 'BẮT ĐẦU' };
+  const SEQ = ['left', 'right', 'up', 'down', 'jump', 'act', 'start'];
 
   let wrapEl = null, wrapAt = 0;
   let ownP = null, ownAt = 0, eggP = null, eggAt = 0;
@@ -117,10 +117,10 @@ void (() => {
     const p = sta.prof;
     if (p && p.dir) {
       const b = gp.buttons;
-      if ((b[p.dir.l] || {}).pressed) d.l = 1;
-      if ((b[p.dir.r] || {}).pressed) d.r = 1;
-      if ((b[p.dir.u] || {}).pressed) d.u = 1;
-      if ((b[p.dir.d] || {}).pressed) d.d = 1;
+      if (p.dir.l != null && (b[p.dir.l] || {}).pressed) d.l = 1;
+      if (p.dir.r != null && (b[p.dir.r] || {}).pressed) d.r = 1;
+      if (p.dir.u != null && (b[p.dir.u] || {}).pressed) d.u = 1;
+      if (p.dir.d != null && (b[p.dir.d] || {}).pressed) d.d = 1;
     }
     return d;
   }
@@ -221,9 +221,18 @@ void (() => {
     wiz.open = false; wiz.pid = null; wiz.el = null; wiz.draft = null;
     if (save && draft) {
       const all = sget(OWN) || {};
-      all[pid] = { jump: draft.jump, dash: draft.act, item: draft.act, pause: draft.start };
+      all[pid] = {
+        jump: draft.jump,
+        dash: draft.act,
+        item: draft.act,
+        pause: draft.start,
+        dir: { l: draft.left, r: draft.right, u: draft.up, d: draft.down }
+      };
       try { localStorage.setItem(OWN, JSON.stringify(all)); } catch (e) {}
       ownP = null; // force a re-read
+      for (const i in pads) {
+        if (i !== '_toast' && pads[i]) pads[i].prof = undefined;
+      }
     }
     const first = firstPad();
     if (first && !profFor(first.id)) showToast('Đã nối tay cầm', true);
