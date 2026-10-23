@@ -68,6 +68,28 @@ Never mutate anything you rendered from.
 Files in `public/` are copied verbatim to the site root, so a game can use
 relative asset paths (`assets/music/…`) exactly as it did before.
 
+### The VietGames mini-site
+
+`public/vietgames/` is a standalone Vietnamese mini-site, served at
+`/vietgames` with its own landing page and card list. It is **not** part of
+the hub — never register its games in `public/games.js` or in `games/`.
+
+A VietGames game is a folder under `public/vietgames/<id>/` kept in three
+pieces:
+
+| File | Role |
+|---|---|
+| `game.js` | The game module. It keeps the full [module contract](#the-module-contract) (`init/reduce/project/mount`, `summarize`, …) even though nothing here networks. |
+| `harness.js` | The local one-player driver: it calls `init()`, stubs `api.send()` to run `reduce()` immediately, and feeds the result back through `update()`. |
+| `index.html` | The page the player lands on, with the way back to `../`. |
+
+Wire-up is: a card on the landing page (`public/vietgames/index.html`), audio
+served from `public/vietgames/assets/<id>/` (the module points at
+`../assets/<id>/`), and a rules suite in the offline table of `test.sh` plus
+the built-site checks in `tests/vietgames_play.py`. Chém Từ (`chem-tu/`) and
+Từ Trái Nghĩa (`tutrainghia/`) are the two resident games and the patterns to
+copy.
+
 ---
 
 ## The module contract
@@ -566,7 +588,7 @@ same commit as its code; an unwired test is a test nobody runs.
 | `games/<id>/index.js` | ✅ to add a game | A module game. Auto-registered; the only file you create. |
 | `public/games.js` | ✅ for legacy games | The legacy registry — one line per iframe game. |
 | `public/*.html` | ✅ for legacy games | The legacy games. Copied verbatim to the site root. |
-| `public/vietgames/` | ✅ for the Vietnamese site | Standalone VietGames mini-site, served at `/vietgames`. Not a hub game — never add it to `public/games.js`. |
+| `public/vietgames/` | ✅ for the Vietnamese site | Standalone VietGames mini-site, served at `/vietgames`: game module + harness + page per game (Chém Từ, Từ Trái Nghĩa). Not a hub game — never add it to `public/games.js`. |
 | `index.html` | Rarely | Hub shell markup + the few CSS rules that own the stage frame. |
 | `src/main.js` | Rarely | Orchestrator: identity → lobby/room → net → stage → plugins. |
 | `src/registry.js` | Rarely | Loads `games/*/index.js` via `import.meta.glob`, merges in `window.BUB_GAMES`. |

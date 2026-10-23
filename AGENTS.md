@@ -28,8 +28,10 @@ things, with its own test suite. The six exports every module game needs
 **`public/vietgames/` is not a hub game.** It is a standalone Vietnamese
 mini-site served at `/vietgames`, with its own landing page and its own tests.
 It is deliberately absent from `public/games.js` and from the hub menu; do not
-register it there. Chém Từ (`public/vietgames/chem-tu/`) is a solo port of the
-old Blade & Word module, driven by a local harness instead of rooms or peers.
+register it there. Chém Từ (`public/vietgames/chem-tu/`) and Từ Trái Nghĩa
+(`public/vietgames/tutrainghia/`) are solo games driven by a local harness
+instead of rooms or peers; each keeps the hub module contract in `game.js`
+and has its own offline rules suite wired into `test.sh`.
 
 **Adding a game does not mean editing `src/` or `test.sh`.** Write a card at
 `cards/<id>.md`, run `node scripts/new-game.mjs cards/<id>.md`, fill in the

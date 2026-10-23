@@ -182,9 +182,10 @@ OFFLINE_SUITES=(
   # And the sampler that plays them has to pick the right sample, play it at
   # the right rate, and stay quiet instead of failing when it is not ready.
   "clicker sound|clicker_sound_test.mjs"
-  # The Vietnamese mini-site is standalone, not a hub game. Its resolver still
-  # has to keep the rules the hub version had.
+  # The Vietnamese mini-site is standalone, not a hub game. The games keep the
+  # hub module contract but are driven by local harnesses — one rules suite each.
   "vietgames|vietgames_test.mjs"
+  "vietgames — từ trái nghĩa|vietgames_tutrainghia_test.mjs"
 )
 
 SERVE_PORT="${SERVE_PORT:-5180}"

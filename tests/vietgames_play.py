@@ -86,6 +86,8 @@ def main():
 
             results.append(check(page.locator("a.vg-card[href='./chem-tu/']").count() == 1,
                                  "the Chém Từ card links into the game folder"))
+            results.append(check(page.locator("a.vg-card[href='./tutrainghia/']").count() == 1,
+                                 "the Từ Trái Nghĩa card links into the game folder"))
 
             # No horizontal scroll on a phone.
             overflow = page.evaluate("() => document.documentElement.scrollWidth > window.innerWidth + 2")
@@ -128,6 +130,23 @@ def main():
             results.append(check(sound.status == 200,
                                  "the slash sound ships in dist/",
                                  f"status {sound.status}"))
+
+            # ---- the second vocab game, Từ Trái Nghĩa ----
+            page.goto(base + "/vietgames/tutrainghia/", wait_until="load")
+            page.wait_for_timeout(900)
+            results.append(check(page.url.rstrip("/").endswith("/vietgames/tutrainghia"),
+                                 "/vietgames/tutrainghia serves the game page", page.url))
+            results.append(check("Từ Trái Nghĩa" in page.locator("body").inner_text(),
+                                 "the game page is titled in Vietnamese"))
+            canvas = page.locator("#vietgames-game canvas")
+            results.append(check(canvas.count() == 1, "the game mounts its canvas"))
+            if canvas.count():
+                results.append(check(canvas.evaluate("c => c.width > 0"),
+                                     "the canvas is painted at a real size"))
+            water = page.request.get(base + "/vietgames/assets/tutrainghia/music/water.mp3")
+            results.append(check(water.status == 200,
+                                 "the underwater loop ships in dist/",
+                                 f"status {water.status}"))
 
             # ---- the hub must not still offer the moved game ----
             page.goto(base + "/index.html", wait_until="load")
