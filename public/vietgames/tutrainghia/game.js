@@ -3,11 +3,13 @@
 // Grab the word that helps, dodge the one that hurts: every power-up is a plain Vietnamese word, and the two words of a pair differ by a tone, a vowel mark or a letter.
 // 4 sets (City, Countryside, Seaside, Mountains) × 8 levels (ROYGBIV + rainbow finale). Each level uses exactly two word pairs.
 // Language is the difficulty: later levels/sets pick pairs that differ only by tone, and take away the hints (see HINT).
-// GATES ("needed power-ups"): levels 2, 4 and 6 of every set carry one obstacle that the base kit cannot pass. Which kind comes first; the pair that opens it is then CHOSEN BY CAPABILITY (see CAPS):
-//   chasm  500-540px wide, needs 'span'  (cầu builds a bridge, nhẹ / chim / quạ fly)      wood  full-height barricade, needs 'burn'  (hỏa, lửa, rồng: fire shots)
-//   stone  full-height cracked wall, needs 'smash' (lớn, voi, cơ, râu, tay, phở: punch / big body)
-// A signpost shows the key word's picture; on a pedestal before the obstacle stand the two words of a minimal pair, side by side. Only one opens the way. After the obstacle, an ECHO pedestal offers the same pair again
-// (the right word heals you): a second reading of the same contrast. Choosing is deliberate: stand by a word and press ▼. No English anywhere in the game: the picture is the only scaffold.
+// OBSTACLES ("needed power-ups"): every level has THREE obstacles the base kit cannot pass, all opened by the level's one gate pair (so the same minimal pair is decided three times). Each obstacle is a different
+// kind where the pair allows; the pair is CHOSEN BY CAPABILITY (see CAPS), never by hand:
+//   chasm 500-540px, needs span (cầu bridges it; nhẹ / chim / quạ fly)     wood barricade, needs burn (hỏa, lửa, rồng)     stone wall, needs smash (lớn, voi, cơ, râu, tay, sữa, phở)
+//   door  shoot the target beside it (hỏa, lửa, rồng, dừa, bơ, da, thu)    tunnel, needs crawl (trai; rắn - the bad word)   cliff, needs rise (nhẹ, chim, quạ, khỉ)
+//   wind  a 460px headwind stronger than your walk, needs fast (giầy, trai)
+// There is NO signpost and NO picture: you see the obstacle, you read the two words beside it, you know which one solves it. The last obstacle is followed by an ECHO pedestal (the right word heals).
+// Choosing is deliberate: stand by a word and press ▼.
 // Lives: LIVES_START to begin, +1 per level cleared, back to the start of the current set when they run out.
 //
 // HUB CONTRACT: the simulation runs in mount()'s closure and only *reports* to the host: start / clear / die. reduce() owns the run (set, level, lives, seed).
@@ -147,9 +149,8 @@ const SETS=[
  {n:'Bờ Biển',en:'Seaside',bg:2,g:[60,74,50,62],foes:['🐢','🦀','🦅','🦞'],deco:['🪸','🐚','🦪']},
  {n:'Vùng Núi',en:'Mountains',bg:3,g:[25,52,20,36],foes:['🐻','🐺','🦇','🦂'],deco:['🪨','🧊','🌿']}
 ];
-// What the game tells you (no English: pictures are the only scaffold, and they thin out). intro: 2 = level start lists the pairs with their pictures, 1 = the words only, 0 = nothing.
-// sign: what a gate signpost shows (1 = the key word's picture, 0 = just a ❓). tag: a picture engraved under each word you can choose.
-const HINT=[{intro:2,sign:1,tag:1},{intro:1,sign:1,tag:0},{intro:0,sign:1,tag:0},{intro:0,sign:0,tag:0}];
+// What the game tells you (text only: no English, no pictures). intro: 1 = the level start lists the level's two pairs, 0 = nothing.
+const HINT=[{intro:1},{intro:1},{intro:0},{intro:0}];
 const NP=Math.ceil(WD.length/2);
 const noTone=s=>s.normalize('NFD').replace(/[\u0300\u0301\u0303\u0309\u0323]/g,'').normalize('NFC');
 const noMarks=s=>s.normalize('NFD').replace(/[\u0300-\u036f]/g,'').replace(/đ/g,'d');
@@ -157,56 +158,75 @@ const noMarks=s=>s.normalize('NFD').replace(/[\u0300-\u036f]/g,'').replace(/đ/g
 const contrast=(a,b)=>noTone(a)===noTone(b)?3:noMarks(a)===noMarks(b)?2:1;
 const PC=[];for(let p=0;p<NP;p++)PC.push(WD[p*2+1]?contrast(WD[p*2][1],WD[p*2+1][1]):1);
 // Two pairs per level. Target difficulty t rises from 1 to 3 across all 32 levels, so each set is harder in the *language* first. No repeats inside a set; every level has something good in it.
-// ===== what a word lets you DO: derived from its spec, never listed by hand per gate =====
+// ===== what a word lets you DO: derived from its spec, never listed by hand per obstacle =====
 const MELEE=new Set(['punch','slap']);
+const UNION={great:['big','shoes','blaze','light'],awful:['wide','itch','snake']};   // giỏi / dở are bundles of other words
 function capsOf(i){const s=WD[i][5]||{},c=new Set(),a=s.at&&ATK[s.at];
-  if(s.one==='bridge'||s.fly)c.add('span');                  // cross a chasm no jump can
-  if(s.fly||(s.mj||0)>=3)c.add('rise');                      // get higher than a double jump (no gate uses it yet)
-  if(s.at==='fire')c.add('burn');                            // set a wooden barricade alight
-  if(!s.ship&&(MELEE.has(s.at)||((s.z||1)>=1.5&&s.k)))c.add('smash');   // break a cracked stone wall (never a word that takes over your movement, like tàu)
-  if(s.at==='scis'||s.at==='snip')c.add('cut');
-  if(a&&a.p)c.add('shoot');
-  if(s.z&&s.z<=.7)c.add('crawl');
+  if(s.one&&UNION[s.one]){for(const id of UNION[s.one])for(const x of capsOf(IDX[id]))c.add(x);return c}
+  if(s.one==='bridge'||s.fly)c.add('span');                                  // cross a chasm no jump can
+  if(s.fly||(s.mj||0)>=3)c.add('rise');                                      // get higher than a double jump
+  if(s.at==='fire')c.add('burn');                                            // set a wooden barricade alight
+  if(!s.ship&&(MELEE.has(s.at)||((s.z||1)>=1.5&&s.k)))c.add('smash');       // break a cracked stone wall (never tàu: it takes over your movement)
+  if(a&&a.p)c.add('shoot');                                                  // hit a far target
+  if((s.z&&s.z<=.7)||s.sn)c.add('crawl');                                    // fit under a low rock
+  if((s.s||1)>=1.7&&!s.r&&!s.ship)c.add('fast');                           // outrun a headwind (not the out-of-control words; slippery sạch is fast enough)
   return c}
 const CAPS=WD.map((_,i)=>capsOf(i));
-// Gate kinds. Adding a kind = one line here + how it looks/behaves. The generator works backwards from `need`: it only ever offers a pair where exactly one word has it.
-const KINDS={chasm:{need:'span'},wood:{need:'burn'},stone:{need:'smash'}};
-const KEYPAIRS={};for(const k in KINDS){const need=KINDS[k].need;KEYPAIRS[need]=[];
-  for(let p=0;p<NP;p++){const a=p*2,b=a+1;if(!WD[b])continue;const ca=CAPS[a].has(need),cb=CAPS[b].has(need);if(ca!==cb)KEYPAIRS[need].push({p,key:ca?a:b})}}
-const GATE_LV=[1,3,5];   // 0-based levels that carry a gate (levels 2, 4, 6)
-const GAP_MAX=472,       // the widest gap any jump clears, speed words included (measured by brute force: base 259, ngựa 379, giầy 451, trai 472)
-      WALL_W=44,         // wall thickness
-      WALL_TOP=-400;     // walls run far past the top of the screen: not even a jump from the flight ceiling (feet at y=36) clears them
-// Validator: everything a gate promises, checked on the built level (the dev harness runs it on every build).
+// Obstacle kinds. Adding one = a line here + how it is built, how it behaves, how it looks. The generator works backwards from `need`.
+const KINDS={chasm:{need:'span'},wood:{need:'burn'},stone:{need:'smash'},door:{need:'shoot'},tunnel:{need:'crawl'},cliff:{need:'rise'},wind:{need:'fast'}};
+const GAP_MAX=472,      // widest gap any jump clears, speed words included (measured by brute force: base 259, ngựa 379, giầy 451, trai 472)
+      WALL_TOP=-400,    // walls run far above the screen: not even a jump from the flight ceiling clears them
+      WALL_W=44,TUNNEL_H=26,TUNNEL_W=150,   // the opening under a rock: hero is 34 tall, trai 22, rắn 20
+      CLIFF_H=155,CLIFF_W=90,               // a double jump reaches 127, a triple jump 185 (measured)
+      WIND_V=185,WIND_L=460;                // the walk is 150: giầy 270, trai 285 win; ngựa 225 is too slow to cross before it wears off
+const OBW={wood:WALL_W,stone:WALL_W,door:WALL_W,tunnel:TUNNEL_W,cliff:CLIFF_W,wind:WIND_L};
+// every pair that can be a level's gate pair: exactly one of its words opens at least one kind that the other cannot
+const GATEPAIRS=[];
+for(let p=0;p<NP;p++){const a=p*2,b=a+1;if(!WD[b])continue;
+  const ks=i=>Object.keys(KINDS).filter(k=>CAPS[i].has(KINDS[k].need)&&!CAPS[i^1].has(KINDS[k].need));
+  const ka=ks(a),kb=ks(b);if(ka.length&&!kb.length)GATEPAIRS.push({p,key:a,kinds:ka});else if(kb.length&&!ka.length)GATEPAIRS.push({p,key:b,kinds:kb})}
+const FIN={p:IDX.great>>1,key:IDX.great,kinds:Object.keys(KINDS).filter(k=>CAPS[IDX.great].has(KINDS[k].need)&&!CAPS[IDX.awful].has(KINDS[k].need))};   // the rainbow finale: giỏi opens everything dở does not
+// Validator: everything an obstacle promises, checked on the built level (the dev harness runs it on every build).
 function gateProblems(Wd,lp){const bad=[];
-  for(const g of Wd.gates){const need=g.need,dec=g.key^1;
-    if(!CAPS[g.key].has(need))bad.push(g.kind+': key word lacks '+need);
-    if(WD[dec]&&CAPS[dec].has(need))bad.push(g.kind+': decoy also has '+need);
-    if(g.pk.length!==2||g.pk.map(k=>k.i).sort().join()!==[g.key,dec].sort().join())bad.push(g.kind+': pedestal is not the key pair');
-    if(g.echo.length!==2||g.echo.map(k=>k.i).sort().join()!==[g.key,dec].sort().join())bad.push(g.kind+': echo is not the key pair');
-    if(g.kind==='chasm'){if(g.w<=GAP_MAX+20)bad.push('chasm of '+Math.round(g.w)+'px can be jumped')}
-    else{const wl=Wd.walls.find(q=>q.gate===g.id);if(!wl||wl.top>WALL_TOP)bad.push(g.kind+': no full-height wall');else if(wl.kind!==g.kind)bad.push('wall kind mismatch')}
-    if(!(g.px<g.x0-60&&g.ex>g.x1+60))bad.push(g.kind+': pedestal/echo on the wrong side');
-    if(lp)for(const p of lp)if(p!==(g.key>>1)&&(CAPS[p*2].has(need)||(WD[p*2+1]&&CAPS[p*2+1].has(need))))bad.push(g.kind+': the level\'s other pair also opens it')}
+  if(Wd.gates.length!==3)bad.push('level has '+Wd.gates.length+' obstacles, not 3');
+  Wd.gates.forEach((g,n)=>{const nd=KINDS[g.kind].need,dec=g.key^1,at=g.kind+'#'+(n+1)+': ';
+    if(!CAPS[g.key].has(nd))bad.push(at+'key word lacks '+nd);
+    if(WD[dec]&&CAPS[dec].has(nd))bad.push(at+'decoy also has '+nd);
+    const same=l=>l.map(k=>k.i).sort().join()===[g.key,dec].sort().join();
+    if(g.pk.length!==2||!same(g.pk))bad.push(at+'pedestal is not the key pair');
+    if(g.echo.length!==(n===Wd.gates.length-1?2:0)||(g.echo.length&&!same(g.echo)))bad.push(at+'echo wrong');
+    const wl=Wd.walls.find(q=>q.gate===g.id),wz=(Wd.winds||[]).find(q=>q.gate===g.id);
+    if(g.kind==='chasm'){if(g.w<=GAP_MAX+20)bad.push(at+Math.round(g.w)+'px can be jumped')}
+    else if(g.kind==='wind'){if(!wz||wz.v<170||wz.w!==WIND_L)bad.push(at+'wind too weak')}
+    else{if(!wl||wl.kind!==g.kind||wl.gate!==g.id)bad.push(at+'no obstacle');
+      else if(g.kind==='cliff'){if(!wl.land||GY-wl.top<127+15||GY-wl.top>185-15)bad.push(at+'cliff height outside what a double jump cannot and a triple jump can')}
+      else{if(wl.top>WALL_TOP)bad.push(at+'not full height');
+        if(g.kind==='tunnel'&&!(wl.gap<34&&wl.gap>=22))bad.push(at+'tunnel opening wrong');
+        if(g.kind==='door'&&!(wl.tgt&&wl.tgt.x<wl.x&&wl.tgt.x>g.px+60))bad.push(at+'door target misplaced')}}
+    if(!(g.px<g.x0-60))bad.push(at+'pedestal not before it');
+    if(g.echo.length&&!(g.ex>g.x1+60))bad.push(at+'echo not after it');
+    if(n&&!(g.px>Wd.gates[n-1].x1+60))bad.push(at+'overlaps the previous obstacle');
+    if(lp)for(const p of lp)if(p!==(g.key>>1)&&(CAPS[p*2].has(nd)||(WD[p*2+1]&&CAPS[p*2+1].has(nd))))bad.push(at+'the level\'s other pair also opens it')});
   return bad}
 function pickPairs(seed,set){
   const r=mb(seed*977+set*131+3),R=()=>r(),gi=IDX.great>>1,used=new Set([gi]),out=[],gate={};
   const good=p=>WD[p*2][4]===1||(WD[p*2+1]&&WD[p*2+1][4]===1);
   const has=(p,need)=>CAPS[p*2].has(need)||(WD[p*2+1]&&CAPS[p*2+1].has(need));
   const wpick=(c,tot)=>{let x=R()*tot;for(const[v,w]of c){x-=w;if(x<=0)return v}return c[c.length-1][0]};
-  const draw=(t,wantGood,notNeed)=>{const c=[];let tot=0;
-    for(let p=0;p<NP;p++)if(!used.has(p)&&(!wantGood||good(p))&&!(notNeed&&has(p,notNeed))){const w=Math.exp(-Math.pow(PC[p]-t,2)*1.5)+.02;c.push([p,w]);tot+=w}
+  const GP=new Set(GATEPAIRS.map(g=>g.p));   // gate pairs are reserved for gates: an ordinary pair never uses one up
+  const draw=(t,wantGood,notNeeds)=>{let c=[],tot=0;
+    for(const strict of[1,0]){c=[];tot=0;for(let p=0;p<NP;p++)if(!used.has(p)&&!(strict&&GP.has(p))&&(!wantGood||good(p))&&!(notNeeds&&notNeeds.some(n=>has(p,n)))){const w=Math.exp(-Math.pow(PC[p]-t,2)*1.5)+.02;c.push([p,w]);tot+=w}if(c.length)break}
     const p=wpick(c,tot);used.add(p);return p};
-  // generator inversion: the obstacle comes first, then a pair that can open it, as close in difficulty to this part of the game as possible
-  const gdraw=(kind,t)=>{const need=KINDS[kind].need,c=[];let tot=0;
-    for(const kp of KEYPAIRS[need])if(!used.has(kp.p)){const w=Math.exp(-Math.pow(PC[kp.p]-t,2)*1.5)+.02;c.push([kp,w]);tot+=w}
-    const kp=wpick(c,tot);used.add(kp.p);return{kind,need,key:kp.key,pair:kp.p}};
+  // generator inversion: each level's PRIMARY obstacle kind comes first (shuffled so a set's seven levels meet all seven kinds), then a gate pair that can open it - closest in difficulty to this part of the game
+  const gdraw=(t,kind)=>{const c=[];let tot=0;for(const g of GATEPAIRS)if(!used.has(g.p)&&g.kinds.includes(kind)){const w=Math.exp(-Math.pow(PC[g.p]-t,2)*1.5)+.02;c.push([g,w]);tot+=w}const g=wpick(c,tot);used.add(g.p);return g};
+  const seqOf=(ks,first)=>{const seq=[first];let last=first;for(let i=1;i<3;i++){const pool=ks.filter(k=>k!==last),c0=pool.length?pool:ks,cnt=k=>seq.filter(x=>x===k).length,m=Math.min(...c0.map(cnt)),c=c0.filter(k=>cnt(k)===m),k=c[Math.floor(R()*c.length)];seq.push(k);last=k}return seq};   // a different kind in a row whenever the pair allows
   const tOf=lv=>1+2*(set*LEVELS+lv)/(SETS.length*LEVELS-1);
-  const kinds=Object.keys(KINDS);for(let i=kinds.length-1;i>0;i--){const j=Math.floor(R()*(i+1));[kinds[i],kinds[j]]=[kinds[j],kinds[i]]}   // every set meets every kind, in its own order
-  GATE_LV.forEach((lv,n)=>{gate[lv]=gdraw(kinds[n],tOf(lv))});
-  for(let lv=0;lv<LEVELS-1;lv++){const t=tOf(lv),g=gate[lv],a=g?g.pair:draw(t,false),b=draw(t,!good(a),g&&g.need);out.push([a,b])}   // (the other pair never opens the gate by accident)
-  out.push([gi,draw(3,false)]);   // the rainbow finale always has giỏi/dở
-  out.gate=gate;                  // lv -> {kind, need, key (word index), pair}
+  const order=Object.keys(KINDS);for(let i=order.length-1;i>0;i--){const j=Math.floor(R()*(i+1));[order[i],order[j]]=[order[j],order[i]]}
+  for(let lv=0;lv<LEVELS-1;lv++){const t=tOf(lv),prim=order[lv%order.length],g=gdraw(t,prim),kinds=seqOf(g.kinds,prim),needs=kinds.map(k=>KINDS[k].need);
+    out.push([g.p,draw(t,!good(g.p),needs)]);gate[lv]={pair:g.p,key:g.key,kinds}}   // (the level's other pair never opens an obstacle by accident)
+  const fo=FIN.kinds.slice();for(let i=fo.length-1;i>0;i--){const j=Math.floor(R()*(i+1));[fo[i],fo[j]]=[fo[j],fo[i]]}
+  const fk=seqOf(FIN.kinds,fo[0]);out.push([gi,draw(3,false,fk.map(k=>KINDS[k].need))]);gate[LEVELS-1]={pair:gi,key:FIN.key,kinds:fk};   // the rainbow finale always has giỏi/dở
+  out.gate=gate;   // lv -> {pair, key (word index), kinds: [3 obstacle kinds in order]}
   return out}
 // which of the two words goes first (left / top): no cue at all - the good one is first half the time
 function orient(a,b,R){const sc=v=>v===1?2:v===2?1:0,x=sc(WD[a][4]),y=sc(WD[b][4]);
@@ -270,6 +290,7 @@ export function mount(root,api){
   let P=null,W=null,WAT=null,pops=[],parts=[],shots=[],GN=0,dead=false;
   const queue=o=>{G.out=G.lastOut=o};   // intents are queued and sent at the END of a frame, never from inside one
   const has=k=>P.fx[k]>0;
+  function bodyH(){return any('sn')?20:34*mul('z')}   // how tall you are right now (a tunnel opening is 26)
   function capNow(c){for(const i in P.fx)if(P.fx[i]>0&&CAPS[IDX[i]].has(c))return true;return false}   // does a word you are carrying give this capability?
   function any(k){for(const i in P.fx)if(P.fx[i]>0&&SP[i][k])return SP[i][k];return 0}
   function mul(k){let m=1;for(const i in P.fx)if(P.fx[i]>0&&SP[i][k]!==undefined)m*=SP[i][k];return m}
@@ -310,7 +331,7 @@ export function mount(root,api){
     for(let i=0;i<nh;i++){const fr=free().filter(s=>s.t>=1),f=fr.length?fr:free();if(!f.length)break;const s=pick(f);s.u=1;pk.push({h:1,x:s.x,y:s.y,got:0})}
   }
   function build(set,lv,seed,lp){
-    const dd=set,S=SETS[set],r=mb(seed*31+lv*7919+set*104729+1),R=()=>r(),segs=[{x0:0,x1:440}],plats=[],en=[],spots=[],pk=[],gates=[],walls=[],GD=pairsOf(seed,set).gate[lv]||null;
+    const dd=set,S=SETS[set],r=mb(seed*31+lv*7919+set*104729+1),R=()=>r(),segs=[{x0:0,x1:440}],plats=[],en=[],spots=[],pk=[],gates=[],walls=[],winds=[],GD=pairsOf(seed,set).gate[lv]||null;
     const sp=(x,y,t)=>{const q=t?plats.find(p=>p.x+p.w/2===x&&p.y===y+24):0;spots.push({x,y,t,u:0,pw:q?q.w:0})};   // pw = width of the platform under a spot
     const plat=(x,y,w)=>{plats.push({x,y,w});return{x:x+w/2,y:y-24}};
     const walker=(e,x,v,x0,x1,y)=>en.push(E(e,x,y||GY-11,v*(1+.12*dd)*(R()<.5?-1:1),x0,x1));
@@ -329,31 +350,38 @@ export function mount(root,api){
         if(R()<.45){const p2=plat(px+pw-26,GY-108,64);sp(p2.x,p2.y,2)}}
       if(L>=300&&R()<.42+.05*dd)tower(a,b);
     };
-    let x=440,gateAt=1150+R()*350,gate=null;
-    while(x<3400+lv*500+dd*400){
-      let hw=80+R()*(95+12*dd);const isG=GD&&!gate&&x>=gateAt,chasm=isG&&GD.kind==='chasm',wallG=isG&&!chasm;
+    let x=440,nextAt=900+R()*250,gi=0;const NG=GD?GD.kinds.length:0,LEN=3400+lv*500+dd*400;
+    while(x<LEN||gi<NG){
+      let hw=80+R()*(95+12*dd);const kind=gi<NG&&x>=nextAt?GD.kinds[gi]:null,chasm=kind==='chasm';
       if(chasm){const pv=segs[segs.length-1];if(pv.x1-pv.x0<340){pv.x1=pv.x0+340;x=pv.x1}hw=500+R()*40}   // the chasm: wider than any jump
-      const a=x+hw,b=a+(chasm?360+R()*160:wallG?720:240+R()*320);
-      if(chasm){gate={id:gates.length+1,kind:'chasm',need:GD.need,key:GD.key,x0:x,x1:a,w:hw,done:0,taken:0,armed:0,px:x-150,ex:a+220,pk:[],echo:[]};gates.push(gate)}
-      else{
-        if(hw>135){const p=plat(x+hw/2-42,GY-55,84);sp(p.x,p.y,1)}
-        if(wallG){const wx=a+390;   // one long stretch: pedestal at +130, the wall at +390, the echo at +574
-          gate={id:gates.length+1,kind:GD.kind,need:GD.need,key:GD.key,x0:wx,x1:wx+WALL_W,w:WALL_W,done:0,taken:0,armed:0,px:a+130,ex:wx+WALL_W+140,pk:[],echo:[]};gates.push(gate);
-          walls.push({x:wx,w:WALL_W,top:WALL_TOP,kind:GD.kind,dead:0,gate:gate.id})}}
+      const a=x+hw,ow=kind&&!chasm?OBW[kind]:0,ox=a+330,b=chasm?a+360+R()*160:kind?ox+ow+330:a+240+R()*320;   // an obstacle stretch: pedestal at +130, obstacle at +330, 330 of ground after it
+      let g=null;
+      if(chasm)g={x0:x,x1:a,w:hw,px:x-150,ex:a+220};
+      else{if(hw>135){const p=plat(x+hw/2-42,GY-55,84);sp(p.x,p.y,1)}
+        if(kind)g={x0:ox,x1:ox+ow,w:ow,px:a+130,ex:ox+ow+140}}
+      if(g){gi++;Object.assign(g,{id:gi,kind,need:KINDS[kind].need,key:GD.key,done:0,taken:0,armed:0,pk:[],echo:[]});gates.push(g);
+        const wl={x:g.x0,w:ow,top:WALL_TOP,kind,dead:0,gate:g.id};
+        if(kind==='wood'||kind==='stone')walls.push(wl);
+        if(kind==='door'){wl.tgt={x:g.x0-70,y:GY-40};walls.push(wl)}
+        if(kind==='tunnel'){wl.gap=TUNNEL_H;walls.push(wl)}
+        if(kind==='cliff'){wl.top=GY-CLIFF_H;wl.land=1;walls.push(wl)}
+        if(kind==='wind')winds.push({x:g.x0,w:ow,v:WIND_V,gate:g.id});
+        nextAt=b+450+R()*250}
       segs.push({x0:a,x1:b});
-      if(wallG)deco(gate.x1+30,b);else deco(a,b);   // a wall stretch is calm up to the wall; foes only beyond it
+      if(kind&&!chasm)deco(g.x1+30,b);else deco(a,b);   // calm up to an obstacle; foes only beyond it
       x=b}
     const fa=x+100;segs.push({x0:fa,x1:fa+520});{const p=plat(x+8,GY-55,84);sp(p.x,p.y,1)}sp(fa+200,GY-26,0);sp(fa+330,GY-26,0);
     const calm=cx=>{for(let j=en.length-1;j>=0;j--)if(en[j].y>GY-50&&en[j].x0<=cx+170&&en[j].x1>=cx-170)en.splice(j,1);for(const s of spots)if(Math.abs(s.x-cx)<150)s.u=1};   // a quiet patch of ground around a pedestal
-    for(const g of gates){   // the pedestal before the obstacle and the echo after it: the key pair, side by side, either way round
+    gates.forEach((g,n)=>{   // a pedestal before every obstacle (the same pair, either way round); an echo after the last one
       const a=g.key&~1,b=a+1;
       for(const[cx,echo,list]of[[g.px,0,g.pk],[g.ex,1,g.echo]]){
+        if(echo&&n<gates.length-1)continue;
         const gid=++GN,w=orient(a,b,R),L={i:w[0],x:cx-38,y:GY-26,got:0,g:gid,pick:1,ped:1,gate:g.id},Rt={i:w[1],x:cx+38,y:GY-26,got:0,g:gid,pick:1,ped:1,gate:g.id};
         if(echo)L.echo=Rt.echo=1;
-        pk.push(L,Rt);list.push(L,Rt);calm(cx)}}
-    const gp=GD?GD.pair:-1,lpp=lp.filter(p=>p!==gp);   // the gate's pair lives on the pedestal and the echo only
+        pk.push(L,Rt);list.push(L,Rt);calm(cx)}});
+    const gp=GD?GD.pair:-1,lpp=lp.filter(p=>p!==gp);   // the gate pair lives on the pedestals and the echo only
     place(pk,R,lpp.length?lpp:lp,spots,Math.round(segs.length*.6+2),3,segs);
-    const out={segs,plats,en,pk,len:fa+520,flag:fa+440,gates,walls};
+    const out={segs,plats,en,pk,len:fa+520,flag:fa+440,gates,walls,winds};
     if(api.__tt){const bad=gateProblems(out,lp);if(bad.length)throw new Error('gate validator: '+bad.join('; '))}   // only in the test harness
     return out;
   }
@@ -404,6 +432,7 @@ export function mount(root,api){
   const floorAt=(x,prev,next)=>{let b=null;
     for(const s of W.segs)if(x>s.x0-8&&x<s.x1+8&&prev<=GY+2&&next>=GY){b=GY;break}
     for(const p of W.plats)if(x>p.x-6&&x<p.x+p.w+6&&prev<=p.y+2&&next>=p.y&&(b===null||p.y<b))b=p.y;
+    for(const wl of W.walls||[])if(wl.land&&!wl.dead&&x>wl.x-6&&x<wl.x+wl.w+6&&prev<=wl.top+2&&next>=wl.top&&(b===null||wl.top<b))b=wl.top;   // the top of a cliff is somewhere to stand
     return b};
   function kill(e){e.dead=1;pop('💥',e.x,e.y,26);puff(e.x,e.y,7,'#ffe27a');tone(300,.12,150,.12);G.shake=Math.max(G.shake,.12)}
   function lock(s){P.lock={t:0,d:s.L,lk:s.lk,e:s.e,end:s.end,safe:s.lk==='b'};P.vx=0;if(s.lk==='d')G.freeze=s.L}
@@ -427,7 +456,7 @@ export function mount(root,api){
   function take(i){
     const w=WD[i],s=w[5],pr=WD[i^1];if(pr&&pr[0]!==w[0])delete P.fx[pr[0]];
     if(s.f)for(const k in P.fx)if(SP[k].f)delete P.fx[k];
-    P.say=w[1];P.sayT=2.4;pop(w[3],P.x,P.y-60,28);sfx(w[0]);
+    P.say=w[1];P.sayT=2.4;sfx(w[0]);
     if(w[4]===1){tone(520,.1,780);api.setTimeout(()=>tone(780,.15,1040),90)}else{tone(400,.15,200);api.setTimeout(()=>tone(260,.2,130),110)}
     if(s.one)ONE[s.one](s,w);else if(s.L)lock(s);else{P.fx[w[0]]=s.d||8;if(s.tet)P.tx=P.x}
   }
@@ -506,7 +535,10 @@ export function mount(root,api){
     for(const s of shots){s.t+=dt;s.x+=s.vx*dt;s.vy+=s.g*dt;s.y+=s.vy*dt;
       for(const e of foes())if(!e.dead&&Math.abs(e.x-s.x)<e.r+8&&Math.abs(e.y-s.y)<e.r+8){if(s.st)e.stun=s.st;else kill(e);s.t=9;break}
       if(G.sc==='up'&&s.y>GY)s.t=9;
-      if(G.sc==='up')for(const wl of W.walls){if(wl.dead||s.x<wl.x-6||s.x>wl.x+wl.w+6)continue;if(wl.kind==='wood'&&s.e==='🔥')breakWall(wl);s.t=9;break}}   // fire burns the barricade; any shot stops at a wall
+      if(G.sc==='up')for(const wl of W.walls){if(wl.dead)continue;
+        if(wl.tgt&&Math.abs(s.x-wl.tgt.x)<22&&Math.abs(s.y-wl.tgt.y)<26){breakWall(wl);s.t=9;break}   // a shot through the target opens the door
+        if(s.x<wl.x-6||s.x>wl.x+wl.w+6||s.y<wl.top||(wl.gap&&s.y>GY-wl.gap))continue;
+        if(wl.kind==='wood'&&s.e==='🔥')breakWall(wl);s.t=9;break}}   // fire burns the barricade; any other shot stops at a wall
     shots=shots.filter(s=>s.t<1.4&&Math.abs(s.x-(G.cam+LW/2))<LW)}
   function stepWife(dt){   // follows the eggs-bot recipe: chase the nearest target, spaced jump taps, random hops, snap back if far behind
     const w=G.wife,p=P;w.t+=dt;w.jt-=dt;
@@ -515,7 +547,8 @@ export function mount(root,api){
     const gx=tg?tg.x:p.x-p.f*46,dx=gx-w.x,dir=Math.abs(dx)>14?Math.sign(dx):0;if(dir)w.f=dir;
     const sp=tg?170:(Math.abs(dx)>200?210:130);
     w.vx+=cl(dir*sp-w.vx,-1500*dt,1500*dt);w.x=cl(w.x+w.vx*dt,12,W.len-12);
-    let wb=0;for(const wl of W.walls){if(wl.dead)continue;if(w.x>wl.x-9&&w.x<wl.x+wl.w+9&&w.y>wl.top+1){w.x=w.x<wl.x+wl.w/2?wl.x-9:wl.x+wl.w+9;w.vx=0;wb=1}}   // she is stopped by walls too…
+    let wb=0;for(const z of W.winds)if(w.x>z.x&&w.x<z.x+z.w){w.x-=z.v*dt;if(!(p.x>z.x&&p.x<z.x+z.w))wb=1}   // the wind pushes her too; if you are out of it and she is still in it, she soon joins you
+    for(const wl of W.walls){if(wl.dead)continue;if(w.x>wl.x-9&&w.x<wl.x+wl.w+9&&w.y>wl.top+1&&(!wl.gap||w.y-30<GY-wl.gap)){w.x=w.x<wl.x+wl.w/2?wl.x-9:wl.x+wl.w+9;w.vx=0;wb=1}}   // she is stopped by walls too…
     w.blk=wb?(w.blk||0)+dt:0;if(w.blk>1.2){w.blk=0;w.x=p.x-p.f*40;w.y=p.y-30;w.vy=0;w.vx=0;puff(w.x,w.y,6,'#f9a')}   // …and, if stuck on the wrong side, joins you
     const hole=w.og&&floorAt(w.x+w.f*26,w.y-1,w.y+2)===null;
     if(w.og&&w.jt<=0&&(hole||(tg&&bd<80)||p.y<w.y-45||Math.random()<.006)){w.vy=-370;w.og=false;w.jt=.34+Math.random()*.2}
@@ -533,9 +566,10 @@ export function mount(root,api){
     p.vx+=cl(dir*150*mul('s')-p.vx,-acc,acc);
     p.x=cl(p.x+p.vx*dt,12,W.len-12);
     if(has('string'))p.x=cl(p.x,p.tx-90,p.tx+90);
+    for(const z of W.winds)if(p.x>z.x&&p.x<z.x+z.w)p.x-=z.v*(any('r')?1.7:1)*dt;   // a headwind pushes you back whatever you do - and tumbles anyone already out of control (ngu, gà, vội)
     for(const wl of W.walls){if(wl.dead)continue;   // walls are solid, floor to ceiling: nothing but their own weakness gets past
       const hw=9*mul('w');
-      if(p.x>wl.x-hw&&p.x<wl.x+wl.w+hw&&p.y>wl.top+1){
+      if(p.x>wl.x-hw&&p.x<wl.x+wl.w+hw&&p.y>wl.top+1&&(!wl.gap||p.y-bodyH()<GY-wl.gap)){
         if(wl.kind==='stone'&&any('k')&&sz>=1.5&&capNow('smash'))breakWall(wl);   // a big body (lớn, voi) just walks through it
         else{p.x=p.x<wl.x+wl.w/2?wl.x-hw:wl.x+wl.w+hw;p.vx=0}}}
     const jh=!L&&(K.jump||K.up),edge=jh&&!p.jp;p.jp=jh;if(edge)p.jb=.13;p.jb-=dt;p.coy=p.og?.12:p.coy-dt;
@@ -788,23 +822,31 @@ export function mount(root,api){
       ctx.font='bold 17px system-ui,sans-serif';const w=ctx.measureText(WD[k.i][1]).width+14;
       ctx.fillStyle='rgba(18,19,26,.55)';ctx.beginPath();if(ctx.roundRect)ctx.roundRect(x-w/2,y-13,w,26,8);else ctx.rect(x-w/2,y-13,w,26);ctx.fill()}
     ctx.save();ctx.shadowColor='rgba(255,236,120,.95)';ctx.shadowBlur=10;txt(WD[k.i][1],x,y,17);ctx.restore();   // words glow gold…
-    if(k.pick&&up&&HINT[G.set].tag)em(WD[k.i][3],x,k.y>=GY-30?GY-5:y+23,14);   // the picture, engraved under the word
     if(G.near===k&&up)txt('▼',x,y-26+Math.sin(G.t*8)*3,17,'center','#ffd23f')};
-  function drawGate(g,cam){const x=g.x0-cam;if(x<-90||x>LW+60)return;
-    const h=HINT[G.set].sign;
-    if(g.kind==='chasm'){ctx.save();ctx.strokeStyle='rgba(255,255,255,.35)';ctx.lineWidth=2;ctx.setLineDash([6,8]);ctx.beginPath();ctx.moveTo(x,GY-4);ctx.lineTo(g.x1-cam,GY-4);ctx.stroke();ctx.restore()}   // the span that is missing
-    ctx.fillStyle='#6b4a2b';ctx.fillRect(x-34,GY-52,4,52);
-    ctx.fillStyle='#f4ead0';ctx.strokeStyle='#6b4a2b';ctx.lineWidth=3;ctx.beginPath();if(ctx.roundRect)ctx.roundRect(x-64,GY-98,60,48,8);else ctx.rect(x-64,GY-98,60,48);ctx.fill();ctx.stroke();
-    if(h)em(WD[g.key][3],x-34,GY-74,28);else txt('❓',x-34,GY-74,28);   // the key word's picture: you still have to know which of the two words it is
-    if(g.taken&&!g.done&&g.armed)txt('↺',g.px-cam,GY-62+Math.sin(G.t*6)*3,22,'center','#ffd23f')}   // walk back to choose again
-  function drawWall(wl,cam){if(wl.dead)return;const x=wl.x-cam;if(x<-60||x>LW+40)return;const t=0,hh=GY-t;
+  function drawGate(g,cam){if(g.taken&&!g.done&&g.armed){const x=g.px-cam;if(x>-40&&x<LW+40)txt('↺',x,GY-62+Math.sin(G.t*6)*3,22,'center','#ffd23f')}}   // walk back to choose again (no signpost: the obstacle is the only clue)
+  function drawWind(z,cam){const x=z.x-cam;if(x>LW+20||x+z.w<-20)return;
+    ctx.save();ctx.fillStyle='rgba(190,225,255,.13)';ctx.fillRect(x,40,z.w,GY-40);ctx.strokeStyle='rgba(255,255,255,.55)';ctx.lineWidth=2;ctx.lineCap='round';
+    const off=(G.t*260)%90;for(let u=-off+90;u<z.w;u+=90)for(let k=0;k<5;k++){const xx=x+u+k*23,yy=GY-24-k*42,len=26+(k%2)*14;if(xx>-40&&xx<LW+40){ctx.beginPath();ctx.moveTo(xx+len,yy);ctx.lineTo(xx,yy);ctx.lineTo(xx+7,yy-5);ctx.stroke()}}   // streaks and arrows rushing left
+    ctx.restore()}
+  function drawWall(wl,cam){if(wl.dead)return;const x=wl.x-cam;if(x<-wl.w-60||x>LW+40)return;const t=wl.top<0?0:wl.top,hh=GY-t;
     if(wl.kind==='wood'){ctx.fillStyle='#7a4a22';ctx.fillRect(x,t,wl.w,hh);
       for(let u=0;u<wl.w;u+=11){ctx.fillStyle=u%22?'#a8763e':'#946236';ctx.fillRect(x+u,t,9,hh)}
       ctx.fillStyle='#4a2f16';for(let yy=t+26;yy<GY;yy+=64)ctx.fillRect(x-3,yy,wl.w+6,6);
       ctx.fillStyle='#5b8a3a';for(let yy=t+10;yy<GY;yy+=48)ctx.fillRect(x+((yy/48|0)%2?4:wl.w-9),yy,5,26)}   // planks, iron bands, dry vines
-    else{ctx.fillStyle='#74777e';ctx.fillRect(x,t,wl.w,hh);
+    else if(wl.kind==='stone'){ctx.fillStyle='#74777e';ctx.fillRect(x,t,wl.w,hh);
       for(let yy=t,r=0;yy<GY;yy+=22,r++)for(let u=(r%2)*9-9;u<wl.w;u+=18){ctx.fillStyle=(u+r)%3?'#9a9da5':'#8b8e96';ctx.fillRect(Math.max(x,x+u),yy+1,Math.min(16,x+wl.w-Math.max(x,x+u)),Math.max(0,Math.min(20,GY-yy-1)))}
-      ctx.strokeStyle='#33363d';ctx.lineWidth=2;ctx.beginPath();ctx.moveTo(x+wl.w*.2,GY-150);ctx.lineTo(x+wl.w*.6,GY-118);ctx.lineTo(x+wl.w*.35,GY-92);ctx.lineTo(x+wl.w*.8,GY-60);ctx.stroke()}}   // bricks and a crack
+      ctx.strokeStyle='#33363d';ctx.lineWidth=2;ctx.beginPath();ctx.moveTo(x+wl.w*.2,GY-150);ctx.lineTo(x+wl.w*.6,GY-118);ctx.lineTo(x+wl.w*.35,GY-92);ctx.lineTo(x+wl.w*.8,GY-60);ctx.stroke()}   // bricks and a crack
+    else if(wl.kind==='door'){ctx.fillStyle='#3b3f47';ctx.fillRect(x,t,wl.w,hh);ctx.fillStyle='#6b7280';for(let u=4;u<wl.w;u+=10)ctx.fillRect(x+u,t,5,hh);
+      ctx.fillStyle='#252830';for(let yy=40;yy<GY;yy+=70)ctx.fillRect(x-2,yy,wl.w+4,7);
+      const tx=wl.tgt.x-cam,ty=wl.tgt.y;ctx.fillStyle='#6b4a2b';ctx.fillRect(tx-3,ty,6,GY-ty);   // iron bars, and a target on a post
+      for(const[r,c]of[[26,'#fff'],[19,'#d33'],[12,'#fff'],[6,'#d33']]){ctx.fillStyle=c;ctx.beginPath();ctx.arc(tx,ty,r,0,6.3);ctx.fill()}}
+    else if(wl.kind==='tunnel'){const oh=wl.gap;ctx.fillStyle='#6a5a49';ctx.fillRect(x,t,wl.w,GY-oh-t);
+      for(let yy=t+12,r=0;yy<GY-oh;yy+=26,r++)for(let u=(r%2)*14;u<wl.w;u+=30){ctx.fillStyle=(u+r)%3?'#7d6b58':'#5f4f40';ctx.fillRect(x+u,yy,26,22)}
+      ctx.fillStyle='#2b2118';ctx.fillRect(x,GY-oh,wl.w,oh);ctx.fillStyle='#8a7560';ctx.fillRect(x-6,GY-oh-8,wl.w+12,8)}   // a long low rock: a dark gap along the ground
+    else if(wl.kind==='cliff'){ctx.fillStyle='#7b6a58';ctx.fillRect(x,t,wl.w,hh);
+      for(let yy=t+14;yy<GY;yy+=26){ctx.fillStyle=((yy/26)|0)%2?'#6a5a49':'#8a7863';ctx.fillRect(x,yy,wl.w,12)}
+      ctx.fillStyle='#4f9a3a';ctx.fillRect(x-5,t-5,wl.w+10,11)}   // a tall rock with grass on top
+  }
   function drawFoe(e,x){   // …enemies glow red, so they never blend into the background
     const pu=.5+.5*Math.sin(G.t*5+e.x*.1);
     ctx.save();ctx.fillStyle=`rgba(255,40,40,${.18+.12*pu})`;ctx.beginPath();ctx.arc(x,e.y,e.s*.72,0,7);ctx.fill();
@@ -822,6 +864,7 @@ export function mount(root,api){
       if(q.br){ctx.fillStyle='#a8763e';ctx.fillRect(a,q.y,q.w,8);ctx.fillStyle='#6b4a2b';ctx.fillRect(a,q.y-12,3,12);ctx.fillRect(a+q.w-3,q.y-12,3,12)}
       else{ctx.fillStyle=pl.pl;ctx.fillRect(a,q.y,q.w,12);ctx.fillStyle=pl.gt;ctx.fillRect(a,q.y,q.w,5)}}
     em('🏁',W.flag-cam,GY-22,44);
+    for(const z of W.winds)drawWind(z,cam);
     for(const wl of W.walls)drawWall(wl,cam);
     for(const g of W.gates)drawGate(g,cam);
     for(const k of W.pk)if(!k.got)pickup(k,cam);
@@ -876,18 +919,17 @@ export function mount(root,api){
     ctx.globalAlpha=a;ctx.fillStyle='rgba(0,0,0,.34)';ctx.fillRect(0,0,LW,LH);
     txt(LV[G.lv][0],LW/2,LH/2-58,G.lv===7?60:76);
     txt(SETS[G.set].n+' · '+(G.lv+1)+' / '+LEVELS,LW/2,LH/2-10,18);
-    if(hn)pairLines(x=>x[1]+(hn===2?'  '+x[3]:'')).forEach((s,i)=>txt(s,LW/2,LH/2+26+i*26,19));   // this level's two pairs (set 1: with pictures, set 2: words only, sets 3-4: nothing)
+    if(hn)pairLines(x=>x[1]).forEach((s,i)=>txt(s,LW/2,LH/2+26+i*26,19));   // this level's two pairs (sets 1-2: the words; sets 3-4: nothing)
     if(G.retry===2)txt('hết mạng — về đầu bộ',LW/2,LH-40,20);
     else if(G.retry===1)txt('thử lại',LW/2,LH-40,20);
     else if(G.set===0&&G.lv<2)txt('◀ ▶ đi   ▲ nhảy (hai lần!)   ⚡ / X hành động   ▼ chọn từ · bơi xuống',LW/2,LH-30,13);
-    if(G.retry!==2&&W&&W.gates.length&&HINT[G.set].sign)txt({chasm:'↔  có vực — chọn đúng từ để qua',wood:'🚧  rào gỗ chắn đường — chọn đúng từ',stone:'🧱  tường đá chắn đường — chọn đúng từ'}[W.gates[0].kind],LW/2,LH-62,14);
     ctx.globalAlpha=1}
   function drawClear(){   // recap card: what the level's words meant
     ctx.fillStyle='rgba(0,0,0,.34)';ctx.fillRect(0,0,LW,LH);
     txt('xong!',LW/2,84,64);
-    pairLines(x=>x[1]+' '+x[3]).forEach((s,i)=>txt(s,LW/2,148+i*30,22));
+    pairLines(x=>x[1]).forEach((s,i)=>txt(s,LW/2,148+i*30,22));
     txt('+1 🧒',LW/2,236,18)}
-  const EXAMPLES=['lớn 💪   ·   lợn 🐷','ngựa 🐴   ·   ngứa 🐜','mua 🛒   ·   múa 💃','cười 😂   ·   cưới 💍','vợ 👰   ·   vỡ 💔'];
+  const EXAMPLES=['lớn   ·   lợn','ngựa   ·   ngứa','mua   ·   múa','cười   ·   cưới','vợ   ·   vỡ'];
   function drawTitle(){
     const end=G.mode==='end',sv=[G.set,G.lv,G.cam];
     G.set=Math.floor(G.t/4)%SETS.length;G.lv=end?7:Math.floor(G.t/4)%LEVELS;G.cam=G.t*50;   // the backdrop tours every setting and colour
@@ -943,6 +985,6 @@ export function mount(root,api){
   }
   function destroy(){dead=true;try{if(cur){cur.pause();cur=null}}catch(e){}try{if(AC)AC.close()}catch(e){}}
   api.setTimeout(()=>{try{wrap.focus({preventScroll:true})}catch(e){}},80);
-  if(api.__tt)api.__tt({G,get P(){return P},get W(){return W},get WAT(){return WAT},take,tick,draw,build,buildWater,floorAt,WD,SETS,pairsOf,IDX,PC,K,ONE,any,has,HINT,CAPS,KINDS,KEYPAIRS,GATE_LV,GAP_MAX,WALL_TOP,WALL_W,gateProblems,breakWall,forkStep,gateStep,reoffer});   // test hook, only present in the test harness
+  if(api.__tt)api.__tt({G,get P(){return P},get W(){return W},get WAT(){return WAT},take,tick,draw,build,buildWater,floorAt,WD,SETS,pairsOf,IDX,PC,K,ONE,any,has,HINT,CAPS,KINDS,GATEPAIRS,FIN,GAP_MAX,WALL_TOP,WALL_W,TUNNEL_H,CLIFF_H,WIND_V,WIND_L,gateProblems,breakWall,forkStep,gateStep,reoffer,bodyH});   // test hook, only present in the test harness
   return{update,destroy};
   }
