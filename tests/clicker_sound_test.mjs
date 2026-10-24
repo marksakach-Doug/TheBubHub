@@ -9,6 +9,7 @@
 import assert from 'node:assert/strict';
 import { createSampler, midiOf, pickSample, rateFor } from '../games/clicker/soundfont.js';
 import { BANK } from '../games/clicker/samples/bank.js';
+import { canonSemis, makeMidiFile } from '../games/clicker/index.js';
 
 let ok = 0;
 // Awaited, because half of these checks are asynchronous: a check that is
@@ -192,6 +193,118 @@ await check('tearing the game down stops the samples', async () => {
   s.play(440, { gain: 0.2, dur: 0.3 });
   s.dispose();
   assert.ok(ctx.made.sources[0].stopped !== null, 'the note was stopped');
+});
+
+// ------------------------------------------------------------- the canon --
+// The canon follower transposes by scale degrees, so its notes always stay
+// in the leader's key. The grid is 9 rows of the row scale: row index 0 is
+// the top of the grid and the highest pitch.
+
+const GAME_CFG = { row: 'mixolydian', col: 'chromatic', root: 0 };
+const MIXO = [0, 2, 4, 5, 7, 9, 10];   // mixolydian semitone steps
+
+await check('canon unison reproduces the grid pitch exactly', () => {
+  const rd = [0, 2, 4, 5, 7, 9, 10, 12, 14]; // mixolydian degrees over 9 rows
+  for (let cell = 0; cell < 81; cell++) {
+    const row = Math.floor(cell / 9), col = cell % 9;
+    const want = rd[8 - row] + col;
+    assert.equal(canonSemis(cell, 0, GAME_CFG), want,
+      'cell ' + cell + ' is ' + want + ' semitones above A3');
+  }
+});
+
+await check('a canon fifth up is four scale degrees, still in key', () => {
+  // cell 45 is row index 5, melody degree rd[3] = 5; up four degrees of the
+  // same scale lands on rd[7] = 12.
+  assert.equal(canonSemis(45, 4, GAME_CFG), 12);
+  // the same walk from column 1 keeps its chromatic colour (column step 1)
+  assert.equal(canonSemis(1, 4, GAME_CFG), 22);
+  // every transposed melody note (column 0) is a pitch class of the scale
+  [0, 1, 2, 3, 4, 5, 6, 7, 8].forEach((row) => {
+    const rel = canonSemis(row * 9, 4, GAME_CFG) % 12;
+    assert.ok(MIXO.indexOf(rel) >= 0,
+      'row ' + row + ' a fifth up sits on a mixolydian step, not ' + rel);
+  });
+});
+
+await check('walking past the edges folds the octave the degrees spell', () => {
+  // the lowest melody step (row index 8, the bottom row) a fifth up climbs
+  // into the next octave: index 12 of the scale walk is 21 semitones.
+  assert.equal(canonSemis(0, 4, GAME_CFG), 21);
+  assert.equal(canonSemis(0, 4, GAME_CFG) % 12, 9,
+    'and it lands on the fifth, still a scale tone');
+  // the bottom melody step a fifth down falls below the ladder: index -1
+  // is a scale tone an octave lower.
+  assert.equal(canonSemis(45, -4, GAME_CFG), -2);
+  assert.equal((((canonSemis(45, -4, GAME_CFG) % 12) + 12) % 12), 10,
+    'a fifth down from the 4th is the same class an octave lower');
+});
+
+// --------------------------------------------------------- the midi file --
+
+await check('the midi file reads back as a well formed Type-1 SMF', () => {
+  // one pattern of three steps, each an eighth note at 100 bpm
+  const tracks = [{
+    name: 'Pat 1',
+    notes: [[0, 192, 60, 90], [240, 432, 62, 90], [480, 672, 64, 90]]
+  }];
+  const b = makeMidiFile(100, tracks);
+  const u = Buffer.from(b);
+
+  // header: MThd, six bytes, format 1, one track per export + the tempo track
+  assert.ok(u.subarray(0, 4).toString('ascii') === 'MThd', 'the file starts MThd');
+  assert.equal(u.readUInt32BE(4), 6, 'the header is six bytes long');
+  assert.equal(u.readUInt16BE(8), 1, 'format 1');
+  assert.equal(u.readUInt16BE(10), 2, 'two tracks: the tempo track and Pat 1');
+  assert.equal(u.readUInt16BE(12), 480, '480 ticks per quarter note');
+
+  // walk the chunks by name and length, the way a real decoder would
+  let p = 14;
+  const chunks = [];
+  while (p < u.length) {
+    const id = u.subarray(p, p + 4).toString('ascii');
+    const len = u.readUInt32BE(p + 4);
+    assert.equal(id, 'MTrk', 'every chunk is an MTrk');
+    chunks.push(u.subarray(p + 8, p + 8 + len));
+    p += 8 + len;
+  }
+  assert.equal(p, u.length, 'the chunks tile the file exactly');
+  assert.equal(chunks.length, 2);
+
+  // tempo meta: 100 bpm is 600000 microseconds per quarter note. The track
+  // names itself first, then carries the tempo.
+  const t0 = chunks[0];
+  assert.deepEqual([...t0.subarray(0, 11)], [0x00, 0xff, 0x03, 0x07,
+    0x43, 0x6c, 0x69, 0x63, 0x6b, 0x65, 0x72], 'the tempo track is called "Clicker"');
+  assert.deepEqual([...t0.subarray(11, 18)], [0x00, 0xff, 0x51, 0x03, 0x09, 0x27, 0xc0],
+    '600000 us recorded big-endian');
+
+  // track 1: name meta, note-ons in order
+  const t1 = chunks[1];
+  assert.deepEqual([...t1.subarray(0, 8)], [0x00, 0xff, 0x03, 0x05,
+    0x50, 0x61, 0x74, 0x20], 'the track is called "Pat 1"');
+  assert.deepEqual([...t1.subarray(9, 17)], [0x00, 0x90, 60, 90, 0x81, 0x40, 0x80, 60],
+    'note-on 60, then 192 ticks (a varint) later, note-off');
+});
+
+await check('a note-off is written before a note-on that shares its tick', () => {
+  const b = makeMidiFile(120, [{
+    name: 'T',
+    notes: [[0, 240, 60, 90], [240, 480, 60, 90]]
+  }]);
+  const u = Buffer.from(b);
+  // walk to track 1 the way the decoder above does
+  let p = 14 + 8 + u.readUInt32BE(18);       // past MThd + the tempo track
+  const t1 = u.subarray(p + 8, p + 8 + u.readUInt32BE(p + 4));
+  // after the name meta (00 ff 03 01 'T') comes the first note-on,
+  // then the off/on pair that both live at tick 240
+  assert.deepEqual([...t1.subarray(5, 8)], [0x00, 0x90, 60], 'the first note strikes at 0');
+  assert.deepEqual([...t1.subarray(9, 12)], [0x81, 0x70, 0x80],
+    'delta 240, then the note-off before the new strike');
+  assert.deepEqual([...t1.subarray(12, 15)], [60, 0, 0x00],
+    'the off lands (a zero velocity), then zero delta');
+  assert.deepEqual([...t1.subarray(14, 17)], [0x00, 0x90, 60],
+    'the new strike follows without further delay');
 });
 
 console.log('\nALL GREEN (' + ok + ' checks)');

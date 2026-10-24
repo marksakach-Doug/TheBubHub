@@ -29,8 +29,11 @@ void (() => {
   const EGGS = 'eggs.profiles';
   const HATV = [-1, -0.7142857, -0.4285714, -0.1428571, 0.1428571, 0.4285714, 0.7142857, 1];
   const CODE = { left: 'ArrowLeft', right: 'ArrowRight', up: 'ArrowUp', down: 'ArrowDown', jump: 'Space', act: 'KeyX', start: 'Enter' };
-  const LABEL = { left: 'D-PAD TRÁI', right: 'D-PAD PHẢI', up: 'D-PAD LÊN', down: 'D-PAD XUỐNG', jump: 'NHẢY', act: 'HÀNH ĐỘNG', start: 'BẮT ĐẦU' };
-  const SEQ = ['left', 'right', 'up', 'down', 'jump', 'act', 'start'];
+  const LABEL = { jump: 'NHẢY', act: 'HÀNH ĐỘNG', start: 'BẮT ĐẦU' };
+  // Directional input is decoded directly from d-pad buttons/hat axes/stick axes
+  // in decodeDir. Asking for it here only works for pads that expose the d-pad
+  // as ordinary buttons, and traps the wizard on “D-PAD TRÁI” for the others.
+  const SEQ = ['jump', 'act', 'start'];
 
   let wrapEl = null, wrapAt = 0;
   let ownP = null, ownAt = 0, eggP = null, eggAt = 0;
@@ -187,7 +190,7 @@ void (() => {
     card.appendChild(card._txt);
     const hint = document.createElement('p');
     hint.setAttribute('style', 'margin:0 0 14px;font-size:13px;color:#8a7a5c');
-    hint.textContent = 'Nút được lưu cho loại tay cầm này, cùng với các nút bạn đã cài trong trò chơi trứng.';
+    hint.textContent = 'Hướng được nhận tự động từ tay cầm. Các nút được lưu cho loại tay cầm này, cùng với các nút bạn đã cài trong trò chơi trứng.';
     card.appendChild(hint);
     const cancel = document.createElement('button');
     cancel.textContent = 'Hủy';
@@ -226,7 +229,7 @@ void (() => {
         dash: draft.act,
         item: draft.act,
         pause: draft.start,
-        dir: { l: draft.left, r: draft.right, u: draft.up, d: draft.down }
+        dir: (all[pid] && all[pid].dir) || undefined
       };
       try { localStorage.setItem(OWN, JSON.stringify(all)); } catch (e) {}
       ownP = null; // force a re-read

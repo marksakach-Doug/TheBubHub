@@ -12,7 +12,15 @@ const SEQ_SLOTS = 8;
 const A3 = 220;
 const BG = '#1d2434';
 const COLOURS = { red: '#ff4d4d', yellow: '#facc15', blue: '#2f6bd8', green: '#4cd137' };
-const CANON_SEMI = 7;         // canon follower sounds this many semitones above the leader (7 = a fifth, 12 = octave)
+// Canon: the follower transposes by scale degrees, not raw semitones - a
+// semitone-shifted voice leaves the leader's key and never sounds good.
+// Degrees count steps of the row scale, so every choice stays in-key.
+const CANON_DEG = 4;          // default: a fifth up (4 scale degrees)
+const CANON_OPTIONS = [
+  [0, 'Unison'], [-1, '2nd down'], [1, '2nd up'], [-2, '3rd down'],
+  [2, '3rd up'], [-3, '4th down'], [3, '4th up'], [-4, '5th down'],
+  [4, '5th up'], [5, '6th up'], [7, 'Octave up']
+];
 const SPLIT_HI = 12;          // split mode: the column (x) voice sits this many semitones above the row (y) voice
 const NAMES = ['A', 'A#', 'B', 'C', 'C#', 'D', 'D#', 'E', 'F', 'F#', 'G', 'G#'];
 
@@ -157,6 +165,62 @@ function buildSplitTable(cfg) {
     name.push(pc(v.lo) + '\u00b7' + pc(v.hi));
   }
   return { name, role };
+}
+
+// ---------- canon transposition (pure, so the tests can hold it) ----------
+// The follower keeps the leader's column and walks `deg` scale degrees up or
+// down the row scale; past the edges the walk folds its octave in-key.
+export function canonSemis(cell, deg, cfg) {
+  const p = cellAt(cell);
+  const steps = (SCALES.find((s) => s[0] === cfg.row) || SCALES[0])[2];
+  const r = (GRID - 1 - p.row) + deg;
+  const rowStep = 12 * Math.floor(r / steps.length) + steps[((r % steps.length) + steps.length) % steps.length];
+  return cfg.root + rowStep + degrees(cfg.col, GRID)[p.col];
+}
+
+// ---------- the midi file writer (pure, so the tests can hold it) ----------
+// A plain Type-1 SMF, written by hand: track 0 carries the tempo, then one
+// track per exported voice. A sequencer step is an eighth note, every note
+// sounds 80% of its step, and A3 (220 Hz) is MIDI note 57.
+const MIDI_PPQ = 480;
+const MIDI_STEP = MIDI_PPQ / 2;
+const MIDI_GATE = Math.round(MIDI_STEP * 0.8);
+const MIDI_A3 = 57;
+
+function midiVLQ(n) {
+  const out = [n & 0x7f];
+  while ((n = Math.floor(n / 128)) > 0) out.unshift((n % 128) + 128);
+  return out;
+}
+
+function midiU16(n) { return [(n >> 8) & 255, n & 255]; }
+function midiU32(n) { return [(n >> 24) & 255, (n >> 16) & 255, (n >> 8) & 255, n & 255]; }
+
+// One MTrk chunk: name meta, notes (off before on at a shared tick), end meta. Notes are [on, off, midi, vel].
+function midiTrackChunk(name, notes, extra = []) {
+  const ev = [];
+  extra.forEach((bs) => ev.push([0, 0, bs.slice()]));
+  notes.forEach(([on, off, m, vel]) => {
+    const key = Math.max(0, Math.min(127, Math.round(m))), v = Math.max(1, Math.min(127, Math.round(vel)));
+    ev.push([on, 1, [0x90, key, v]], [off, 0, [0x80, key, 0]]);
+  });
+  ev.sort((a, b) => a[0] - b[0] || a[1] - b[1]);
+  const nm = [];
+  for (let i = 0; i < name.length && i < 127; i++) nm.push(name.charCodeAt(i) & 0x7f);
+  const bytes = [0, 0xff, 0x03, nm.length, ...nm];
+  let prev = 0;
+  ev.forEach(([t, , bs]) => { bytes.push(...midiVLQ(t - prev), ...bs); prev = t; });
+  bytes.push(0, 0xff, 0x2f, 0);
+  return [0x4d, 0x54, 0x72, 0x6b, ...midiU32(bytes.length), ...bytes];
+}
+
+// tracks: [{ name, notes }] - the tempo event rides on track 0.
+export function makeMidiFile(bpm, tracks) {
+  const us = Math.round(60000000 / bpm);
+  const tempo = [0xff, 0x51, 0x03, (us >> 16) & 255, (us >> 8) & 255, us & 255];
+  const chunks = [midiTrackChunk('Clicker', [], [tempo])];
+  tracks.forEach((t) => chunks.push(midiTrackChunk(t.name, t.notes)));
+  return [0x4d, 0x54, 0x68, 0x64, ...midiU32(6), ...midiU16(1), ...midiU16(1 + tracks.length), ...midiU16(MIDI_PPQ)].concat(...chunks);
 }
 
 function deal(rng, level) {
@@ -393,6 +457,7 @@ export function mount(root, api) {
   let instSplitMode = true;              // Instrument: row = low voice, column = high voice
   let seqSplitMode = false;              // Sequencer: the same two voices, read off a pattern
   let canonMode = false;                // Sequencer: a follower plays the pattern lagging behind the leader
+  let canonDeg = CANON_DEG;             // how far the follower transposes, in scale degrees
   let splitHeld = null, splitGen = 0;   // currently ringing split voices {row, col, lo, hi}
   let canonIdx = -1;                    // index of the canon follower's current step (-1 = silent)
   let lastInstCell = null;              // previous note for Instrument counterpoint
@@ -498,6 +563,7 @@ export function mount(root, api) {
   });
   press(canonBtn, () => {
     canonMode = !canonMode;
+    canonRow.style.display = canonMode ? 'flex' : 'none';
     if (canonMode) { counterpointMode = false; clearSplits(); syncCpBtn(); syncSplitBtn(); releaseSplit(); }
     else canonIdx = -1;
     syncCanonBtn();
@@ -528,17 +594,23 @@ export function mount(root, api) {
   patSel.style.flex = '1.2 1 0';
   tempoSel.style.flex = '1 1 0';
 
+  const canonSel = makeSelect(CANON_OPTIONS.map(([v, l]) => [String(v), 'Follower: ' + l]),
+    String(canonDeg), (v) => { canonDeg = Number(v); });
+  const canonRow = el('display:none;gap:4px;margin-bottom:6px;');
+  canonRow.append(canonSel); canonSel.style.flex = '1 1 0';
+
   const playBtn = el(SMALL_BTN + 'background:#4cd137;color:#111;border:none;font-weight:600;flex:0.8 1 0;', '▶ Play', 'button');
   const undoBtn = el(SMALL_BTN + 'flex:1;', 'Undo', 'button');
   const clearBtn = el(SMALL_BTN + 'flex:1;', 'Clear', 'button');
   const exportBtn = el(SMALL_BTN + 'flex:1;', 'Export', 'button');
+  const midiBtn = el(SMALL_BTN + 'flex:1;', 'Save MIDI', 'button');
 
   const seqBar = el('display:none;flex-direction:column;gap:4px;margin-bottom:6px;');
   const seqRow1 = el('display:flex;gap:4px;align-items:center;');
   const seqRow2 = el('display:flex;gap:4px;');
   seqRow1.append(patSel, tempoSel, playBtn);
-  seqRow2.append(undoBtn, clearBtn, exportBtn);
-  seqBar.append(seqRow1, seqRow2);
+  seqRow2.append(undoBtn, clearBtn, exportBtn, midiBtn);
+  seqBar.append(seqRow1, seqRow2, canonRow);
 
   const exportBox = el('display:none;margin-top:8px;');
   const exportNote = el('font-size:12px;color:#8f9bb5;margin-bottom:4px;line-height:1.3;');
@@ -769,6 +841,7 @@ export function mount(root, api) {
     tune.style.display = g ? 'none' : 'flex';
     splitBtn.style.display = (uiMode === 'instrument' || uiMode === 'sequencer') ? '' : 'none';
     canonBtn.style.display = s ? '' : 'none';
+    canonRow.style.display = s && canonMode ? 'flex' : 'none';
     seqBar.style.display = s ? 'flex' : 'none';
     timer.style.display = g ? 'block' : 'none';
     bar.style.display = g ? 'flex' : 'none';
@@ -970,10 +1043,10 @@ export function mount(root, api) {
       seqIdx = i % s.length;
       const nextIdx = s.length > 1 ? (seqIdx + 1) % s.length : null;
       if (canonMode) {
-        // follower replays the pattern `lag` steps behind, a fifth up, in a sine voice
+        // The follower replays the pattern lag steps behind, canonDeg scale degrees away, in-key.
         const lag = Math.max(1, Math.floor(s.length / 2));
         canonIdx = n >= lag ? (n - lag) % s.length : -1;
-        if (canonIdx >= 0) voice(table.freq[s[canonIdx]] * Math.pow(2, CANON_SEMI / 12), 0.14, 0.5, 'sine', 0);
+        if (canonIdx >= 0) voice(A3 * Math.pow(2, canonSemis(s[canonIdx], canonDeg, cfg) / 12), 0.14, 0.5, 'sine', 0);
       } else canonIdx = -1;
       if (seqSplitMode) {
         // The pattern read as two voices: the low one is the row, the high
@@ -1023,6 +1096,47 @@ export function mount(root, api) {
     exportNote.textContent = msg;
   }
   press(exportBtn, doExport);
+
+  // One .mid file: a track per non-empty pattern, plus a follower track that
+  // lags half the pattern - canonDeg degrees away - when the canon is on.
+  function doMidiExport() {
+    const filled = seqs.map((s, i) => ({ s, i })).filter((x) => x.s.length);
+    const show = (note) => { exportNote.textContent = note; exportBox.style.display = 'block'; };
+    if (!filled.length) {
+      voice(110, 0.16, 0.09, 'beep', 0);
+      exportArea.value = '(no notes yet)';
+      show('Tap some cells first.');
+      return;
+    }
+    const note = (cell, n, deg) => {
+      const on = n * MIDI_STEP;
+      return [on, on + MIDI_GATE, MIDI_A3 + canonSemis(cell, deg, cfg), deg ? 64 : 90];
+    };
+    const tracks = filled.map(({ s: p, i }) => ({
+      name: 'Pat ' + (i + 1),
+      notes: p.map((cell, n) => note(cell, n, 0))
+    }));
+    if (canonMode && seqs[seqSlot].length) {
+      const s = seqs[seqSlot], lag = Math.max(1, Math.floor(s.length / 2));
+      const notes = [];
+      for (let n = lag; n < s.length + lag; n++) notes.push(note(s[(n - lag) % s.length], n, canonDeg));
+      const opt = CANON_OPTIONS.find((o) => o[0] === canonDeg);
+      tracks.push({ name: 'Canon (' + (opt ? opt[1] : canonDeg + ' deg') + ')', notes });
+    }
+    try {
+      const url = URL.createObjectURL(new Blob([new Uint8Array(makeMidiFile(bpm, tracks))], { type: 'audio/midi' }));
+      const a = document.createElement('a');
+      a.href = url; a.download = 'clicker-sequencer.mid';
+      wrap.appendChild(a); a.click(); a.remove();
+      api.setTimeout(() => URL.revokeObjectURL(url), 5000);
+      exportArea.value = tracks.map((t) => t.name).join('\n');
+      show('Saved clicker-sequencer.mid - ' + tracks.length + ' track' + (tracks.length === 1 ? '' : 's') + ', ' + bpm + ' bpm.');
+    } catch (e) {
+      exportArea.value = 'Could not save: ' + (e && e.message ? e.message : e);
+      show('Saving failed in this browser.');
+    }
+  }
+  press(midiBtn, doMidiExport);
 
   // ---------- game ----------
   function startLevelClock(limitMs) {
