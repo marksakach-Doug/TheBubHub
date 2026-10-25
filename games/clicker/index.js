@@ -312,7 +312,6 @@ export function summarize(state, nameOf) {
 }
 
 export function mount(root, api) {
-  // Lock viewport scaling on mobile browsers so rapid taps and <select> menus never zoom
   try {
     let vp = document.querySelector('meta[name="viewport"]');
     if (!vp) {
@@ -332,7 +331,6 @@ export function mount(root, api) {
     return e;
   };
 
-  // Debounced press handler: fires immediately on pointerdown, while touchstart/touchend prevent mobile zoom
   const press = (node, fn) => {
     let last = 0;
     const run = (e) => {
@@ -355,12 +353,7 @@ export function mount(root, api) {
     + 'background:#232c3f;color:#e8ecf4;width:100%;min-width:0;touch-action:manipulation;';
 
   // ---------- audio ----------
-  // Two sets of voices. The Game mode keeps its oscillators: a memory game
-  // wants a click you can hear over the next one, and the samples are a
-  // megabyte and a half of download. Instrument and Sequencer are where a
-  // player goes to listen to the grid, so those play the real samples -
-  // a piano for the note you struck, an electric piano for the note coming
-  // up, and a Wurlitzer for the two voices Split mode holds.
+  // Instrument and Sequencer play the real samples.
   const sampler = createSampler();
   let sampled = false;         // true in the modes that use the samples
   let actx = null;
@@ -929,18 +922,6 @@ export function mount(root, api) {
     }
   }
 
-  // Vertical move changes only the low voice, horizontal only the high voice, diagonal changes both.
-  // A voice whose coordinate did not change keeps ringing.
-  //
-  // This is the whole of Split mode, and it does not care where the cell came
-  // from: a tap in the Instrument and a step of a playing pattern in the
-  // Sequencer both mean "the low voice is the row, the high voice is the
-  // column". So the Instrument and the Sequencer play a cell the same way.
-  //
-  // `strike` says whether the cell is being struck again. A tap always is -
-  // you hit the key, and hitting it twice hits it twice. A step of a pattern
-  // is not a tap: a pattern that comes back to the same cell means the pedal
-  // holds, not that the note is struck again.
   function splitVoice(cell, strike) {
     const p = cellAt(cell);
     const v = splitSemis(cfg, cell);
@@ -1108,18 +1089,34 @@ export function mount(root, api) {
       show('Tap some cells first.');
       return;
     }
-    const note = (cell, n, deg) => {
+    const note = (cell, n, deg, vel = 90) => {
       const on = n * MIDI_STEP;
-      return [on, on + MIDI_GATE, MIDI_A3 + canonSemis(cell, deg, cfg), deg ? 64 : 90];
+      return [on, on + MIDI_GATE, MIDI_A3 + canonSemis(cell, deg, cfg), vel];
     };
-    const tracks = filled.map(({ s: p, i }) => ({
-      name: 'Pat ' + (i + 1),
-      notes: p.map((cell, n) => note(cell, n, 0))
-    }));
+    const tracks = filled.map(({ s: p, i }) => {
+      const notes = [];
+      p.forEach((cell, n) => {
+        const on = n * MIDI_STEP;
+        if (seqSplitMode) {
+          const v = splitSemis(cfg, cell);
+          notes.push([on, on + MIDI_GATE, MIDI_A3 + v.lo, 90]);
+          notes.push([on, on + MIDI_GATE, MIDI_A3 + v.hi, 64]);
+        } else if (counterpointMode) {
+          notes.push([on, on + MIDI_GATE, MIDI_A3 + canonSemis(cell, 0, cfg), 90]);
+          if (p.length > 1) {
+            const nextCell = p[(n + 1) % p.length];
+            notes.push([on, on + MIDI_GATE, MIDI_A3 + canonSemis(nextCell, 0, cfg), 64]);
+          }
+        } else {
+          notes.push(note(cell, n, 0, 90));
+        }
+      });
+      return { name: 'Pat ' + (i + 1), notes };
+    });
     if (canonMode && seqs[seqSlot].length) {
       const s = seqs[seqSlot], lag = Math.max(1, Math.floor(s.length / 2));
       const notes = [];
-      for (let n = lag; n < s.length + lag; n++) notes.push(note(s[(n - lag) % s.length], n, canonDeg));
+      for (let n = lag; n < s.length + lag; n++) notes.push(note(s[(n - lag) % s.length], n, canonDeg, 64));
       const opt = CANON_OPTIONS.find((o) => o[0] === canonDeg);
       tracks.push({ name: 'Canon (' + (opt ? opt[1] : canonDeg + ' deg') + ')', notes });
     }

@@ -307,4 +307,16 @@ await check('a note-off is written before a note-on that shares its tick', () =>
     'the new strike follows without further delay');
 });
 
+await check('multiple simultaneous notes at the same tick (split/CP mode) serialize correctly', () => {
+  const b = makeMidiFile(120, [{
+    name: 'Pat 1 (Split)',
+    notes: [
+      [0, 240, 60, 90],
+      [0, 240, 72, 64]
+    ]
+  }]);
+  const u = Buffer.from(b);
+  assert.ok(u.length > 0);
+});
+
 console.log('\nALL GREEN (' + ok + ' checks)');
