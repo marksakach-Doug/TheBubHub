@@ -37,31 +37,16 @@ body.vg-page {
   padding: 34px 8px 26px;
 }
 
-.vg-kicker {
-  display: inline-block;
-  margin: 0 0 14px;
-  padding: 6px 14px;
-  border: 1px solid var(--vg-line);
-  border-radius: 999px;
-  color: var(--vg-teal);
-  background: rgba(20, 184, 166, 0.09);
-  font-size: 0.78rem;
-  font-weight: 800;
-  letter-spacing: 0.14em;
-  text-transform: uppercase;
-}
 
 .vg-title {
   margin: 0;
   font-size: clamp(2.4rem, 8vw, 4.6rem);
-  font-weight: 900;
+  font-weight: 800;
   line-height: 1.02;
   letter-spacing: -0.04em;
-  background: linear-gradient(92deg, #5eead4 0%, #38bdf8 48%, #c4b5fd 100%);
-  -webkit-background-clip: text;
-  background-clip: text;
-  color: transparent;
+  color: #f5f3eb;
 }
+
 
 .vg-lede {
   max-width: 34rem;
