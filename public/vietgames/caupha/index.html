@@ -1,23 +1,28 @@
 <!doctype html>
-<html lang="vi">
+<html lang="vi" class="vg-page">
 <head>
   <meta charset="utf-8">
   <meta name="viewport" content="width=device-width,initial-scale=1,maximum-scale=1,user-scalable=no">
   <title>Câu Phá — VietGames</title>
+  <link rel="stylesheet" href="../vietgames.css">
   <style>
-    html,body{margin:0;padding:0;background:#0f172a;color:#f8fafc;font-family:system-ui,-apple-system,sans-serif}
-    .top{display:flex;align-items:center;justify-content:space-between;max-width:1000px;margin:0 auto;padding:8px 12px}
-    .back{color:#cbd5e1;text-decoration:none;font-weight:700;font-size:15px;padding:6px 12px;border-radius:8px;background:rgba(255,255,255,.08)}
-    .back:hover{background:rgba(255,255,255,.16);color:#fff}
-    .title{font-weight:800;font-size:17px;color:#ffd166}
+    html,body{margin:0;padding:0;font-family:system-ui,-apple-system,sans-serif}
+    .vg-shell { width: min(980px, 100%); margin: 0 auto; padding: 28px 20px 40px; }
+    .vg-gamebar { display: none; }
+    .top { display: flex; align-items: center; justify-content: space-between; max-width: 1000px; margin: 0 auto; padding: 8px 12px; }
+    .back { color: #cbd5e1; text-decoration: none; font-weight: 700; font-size: 15px; padding: 6px 12px; border-radius: 8px; background: rgba(255, 255, 255, .08); }
+    .back:hover { background: rgba(255, 255, 255, .16); color: #fff; }
+    .title { font-weight: 800; font-size: 17px; color: #ffd166; }
   </style>
 </head>
-<body>
-  <div class="top">
-    <a class="back" href="../">← VietGames</a>
-    <span class="title">🤪 Câu Phá</span>
+<body class="vg-page">
+  <div class="vg-shell">
+    <div class="vg-hero">
+      <a class="back" href="../">← VietGames</a>
+      <h1 class="vg-title">🤪 Câu Phá</h1>
+    </div>
+    <div id="stage" class="vg-game" style="position: fixed; inset: 48px 0 0 0;"></div>
   </div>
-  <div id="stage"></div>
   <script type="module" src="./harness.js"></script>
 </body>
 </html>
