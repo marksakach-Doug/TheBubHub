@@ -2,7 +2,7 @@
 // Keeps the Bub Hub module contract (init/reduce/project/mount/summarize/roundId/prune) and is driven by ./harness.js.
 // Zero English, zero visual cues on tiles: every tile is plain Vietnamese text.
 // Submitting a sentence produces one of three outcomes from the interpreter:
-//   1. 'goal'      (Đúng rồi!)     -> matches the mục tiêu picture, +1 star, advances the growing chain.
+//   1. 'goal'      (Đúng rồi!)     -> matches the mục tiêu picture, +1 star, moves to the next sentence of the level.
 //   2. 'absurd'    (Câu phá! +½)   -> grammatically valid Vietnamese (swapped roles or swapped adjectives), draws the absurd scene, +0.5 star bonus!
 //   3. 'gibberish' (Sai rồi! -1❤️) -> tiles turn red and shake violently, then the misplaced grammar tile WHIPS in a high arc into its valid syntactic slot.
 
@@ -61,8 +61,11 @@ const LEX={
   đang:{r:'PRE'},chưa:{r:'PRE'},rồi:{r:'POST'}
 };
 
-// ===== 4 Sets × 4 Growing Chains (4 stages per chain = 16 stages per set, 64 total) =====
-export const SETS=[
+// ===== Levels: grouped by sentence LENGTH, shuffled per run =====
+// Level 1 = every 2-word sentence, level 2 = every 3-word sentence, level 3 = 4 words, level 4 = 5 words.
+// Each level has 16 sentences, played in a random order (seeded per run, so the same run is stable).
+// HOME keeps the original authored chains (2→5 words each); bg = the backdrop each chain looks best on.
+const HOME=[
   {n:'Nhà Bếp',bg:0,chains:[
     ['mèo ngủ','mèo ăn cơm','mèo ăn cơm rồi','mèo lớn ăn cơm rồi'],
     ['chó ngủ','chó ăn phở','chó ăn phở rồi','chó lớn ăn phở rồi'],
@@ -88,6 +91,24 @@ export const SETS=[
     ['bạn múa','bạn cắt hoa','bạn cắt hoa rồi','bạn cắt hoa xanh rồi']
   ]}
 ];
+const LEVEL_NAMES=['Hai Từ','Ba Từ','Bốn Từ','Năm Từ'];
+export const SETS=LEVEL_NAMES.map((n,li)=>({n,words:li+2,pool:HOME.flatMap(h=>h.chains.map(c=>({s:c[li],bg:h.bg})))}));
+// Random order for one level. Tries many shuffles and keeps the one where neighbours share the fewest words
+// (so 'mèo ăn cơm' is not followed by 'chó ăn cơm').
+export function stageOrder(si,seed){
+  const pool=SETS[si].pool,R=mb(seed*7919+si*104729+11);
+  const nn=w=>LEX[w]&&LEX[w].r==='N';
+  const clash=(x,y)=>{const A=x.s.split(' '),B=y.s.split(' ');
+    return(A[0]===B[0]?3:0)+A.filter(w=>nn(w)&&B.includes(w)).length+(A[1]===B[1]?1:0)+(A[A.length-1]===B[B.length-1]?1:0)};
+  let best=pool,bs=1e9;
+  for(let k=0;k<80&&bs>0;k++){
+    const a=pool.slice();
+    for(let i=a.length-1;i>0;i--){const j=Math.floor(R()*(i+1));[a[i],a[j]]=[a[j],a[i]]}
+    let s=0;for(let i=0;i<a.length-1;i++)s+=clash(a[i],a[i+1]);
+    if(s<bs){bs=s;best=a}
+  }
+  return best;
+}
 const STAGES_PER_SET=16,LIVES_START=9,LIVES_MAX=15;
 
 export const meta={
@@ -265,7 +286,7 @@ export function prune(state,goneId){
 // ===== Mount & Interactive Canvas Engine =====
 export function mount(root,api){
   const G={
-    mode:'wait',set:0,lv:0,seed:0,seq:-1,resets:null,lives:LIVES_START,halfStars:0,
+    mode:'wait',set:0,bg:0,lv:0,seed:0,seq:-1,resets:null,lives:LIVES_START,halfStars:0,
     t:0,shake:0,hp:3,goalWords:[],goalParsed:null,words:[],tiles:[],
     cur:0,held:-1,dragIdx:-1,dragX:0,dragY:0,
     shownParsed:null,verdict:'',verdictCol:'#fff',verdictT:0,
@@ -331,8 +352,8 @@ export function mount(root,api){
 
   // ===== Stage Initialization =====
   function startStage(){
-    const chainIdx=Math.floor(G.lv/4),stepIdx=G.lv%4;
-    const goalStr=SETS[G.set].chains[chainIdx][stepIdx];
+    const st=stageOrder(G.set,G.seed)[G.lv];
+    const goalStr=st.s;G.bg=st.bg;
     const R=mb(G.seed*31+G.set*997+G.lv*131+7);
     G.mode='play';G.hp=3;G.goalWords=goalStr.split(' ');
     G.goalParsed=parseSentence(G.goalWords);
@@ -937,7 +958,7 @@ export function mount(root,api){
     ctx.lineWidth=3.5;ctx.strokeStyle=INK;ctx.stroke();
     ctx.save();rr(4,18,w-8,h-22,9);ctx.clip();
     ctx.translate(4,18);ctx.scale((w-8)/LW,(h-22)/LH);
-    renderSceneContent(G.goalParsed,SETS[G.set].bg);
+    renderSceneContent(G.goalParsed,G.bg);
     ctx.restore();
     txt('mục tiêu',w/2,10,12,'center','#ffd166');
     ctx.restore();
@@ -1084,9 +1105,9 @@ export function mount(root,api){
       drawTitle();return;
     }
     // Main stage shows the last-submitted sentence (or neutral waiting room before first check)
-    if(G.shownParsed)renderSceneContent(G.shownParsed,SETS[G.set].bg);
+    if(G.shownParsed)renderSceneContent(G.shownParsed,G.bg);
     else{
-      drawBackdrop(SETS[G.set].bg);
+      drawBackdrop(G.bg);
       em('❓',320,175,54,{a:.35});
     }
     for(const s of parts){ctx.globalAlpha=1-s.t/s.l;ctx.fillStyle=s.c;ctx.beginPath();ctx.arc(s.x,s.y,3,0,7);ctx.fill()}
@@ -1192,6 +1213,6 @@ export function mount(root,api){
   }
   function destroy(){dead=true;try{if(AC)AC.close()}catch(e){}}
   api.setTimeout(()=>{try{wrap.focus({preventScroll:true})}catch(e){}},80);
-  if(api.__tt)api.__tt({G,SETS,LEX,parseSentence,computeWhip,swapWords,checkSentence,tick,draw});
+  if(api.__tt)api.__tt({G,SETS,stageOrder,update,LEX,parseSentence,computeWhip,swapWords,checkSentence,tick,draw});
   return{update,destroy};
 }
