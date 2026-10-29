@@ -936,7 +936,8 @@ export function makeEngine() {
       if (playStone(nb, p, mover, st.ko) < 0) continue;
       cands.push({ m: p, b: nb, ko: outKo, passes: 0 });
     }
-    cands.push({ m: PASS, b: Int8Array.from(st.b), ko: -1, passes: st.passes + 1 });
+// in tsumegoReply, replace the unconditional push of PASS
+if (cands.length === 0) cands.push({ m: PASS, b: Int8Array.from(st.b), ko: -1, passes: st.passes + 1 });
     for (let k = 0; k < cands.length; k++) {
       const c = cands[k];
       let d = 1;
