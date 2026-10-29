@@ -57,7 +57,7 @@ def inject(frame, placements, turn="w"):
 
 def glyph(frame, sq):
     el = frame.query_selector(f"#board .sq[data-sq='{sq}'] .pc")
-    return el.inner_text() if el else None
+    return el.get_attribute('data-piece') if el else None
 
 
 # The board draws the chess-block glyphs with the text-presentation selector
@@ -177,47 +177,12 @@ def main():
               pg.evaluate("()=>document.querySelectorAll('#board .dot').length"), 3)
 
         # ---- one piece set for both sides ----
-        # White used to be hollow chess glyphs (U+2654-5) and Black solid ones
-        # (U+2656-7). A phone whose font lacks that block fell back to emoji for
-        # one side and not the other, so Black's pieces looked like a different
-        # game. Now both sides use the SAME character per piece kind and differ
-        # only by colour - and every glyph carries the text-presentation
-        # selector (U+FE0E), so a phone renders it as a character rather than
-        # falling back to emoji.
-        distinct = pg.evaluate("""() => {
-            const cells = [...document.querySelectorAll('#board .sq')];
-            const letter = (c) => (c ? c.textContent : '');
-            const kinds = new Set();
-            cells.forEach((sq) => {
-              const pc = sq.querySelector('.pc');
-              if (pc) kinds.add(pc.className.replace(/\\s+/g,'') + ':' + pc.textContent);
-            });
-            return [...kinds].sort();
-        }""")
-        # The text-presentation selector is a second code unit, so the
-        # character itself is what is compared.
-        check("white and black share one character per piece kind",
-              all(len(k.split(':')[1].replace('\ufe0e', '')) == 1 for k in distinct), True)
-        # A chess-block glyph WITHOUT the text-presentation selector is the one
-        # that turns into an emoji on a phone - that is the bug this guards.
-        check("no chess glyph is left in emoji form",
-              pg.evaluate("""() => [...document.querySelectorAll('#board .pc')]
-                  .some((p) => /[\\u2654-\\u265F]/.test(p.textContent)
-                                && !p.textContent.includes('\ufe0e'))"""), False)
-        # The white pawn and a black pawn must be the same character. Which
-        # squares they stand on is not fixed - the bot has replied by now, so
-        # a pawn may have moved - so compare every kind the board has.
-        chars = {}
-        for k in distinct:
-            cls, ch = k.split(':', 1)
-            side = cls[-1]          # 'pcw' or 'pcb'
-            kind = kind_of(ch)
-            if kind:
-                chars.setdefault(kind, {})[side] = ch
-        check("both sides had a pawn to compare",
-              'w' in chars.get('P', {}) and 'b' in chars.get('P', {}), True)
-        check("white and black use the same character for every piece kind",
-              all(v['w'] == v['b'] for v in chars.values() if 'w' in v and 'b' in v), True)
+        # Pieces are now inline SVGs using currentColor, so they render
+        # identically on every device/browser and differ only by side colour.
+        check("every piece is an svg",
+              pg.evaluate("()=>[...document.querySelectorAll('#board .pc')].every(p=>p.querySelector('svg'))"), True)
+        check("no unicode chess glyph remains",
+              pg.evaluate("()=>[...document.querySelectorAll('#board .pc')].some(p=>/[\\u2654-\\u265F]/.test(p.textContent))"), False)
 
         if errs:
             print("PAGE ERRORS:", errs, file=sys.stderr)

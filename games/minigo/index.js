@@ -256,8 +256,7 @@ const CSS = [
   'button.sel{background:#d9a05b;color:#1a1208}',
   '[hidden]{display:none!important}',
   '.lvl{font-size:13px;align-items:center}.lvl span{color:#94a3b8;flex:0 0 auto}.lvl button{min-height:36px;padding:6px}',
-  '#fb{min-height:34px;padding:6px 10px;border-radius:10px;background:#1e293b;font-size:13px;line-height:1.35;text-align:center;border-left:4px solid #64748b}',
-  '#fb b{font-size:15px}#fb.g{border-color:#3fb950}#fb.o{border-color:#d9a05b}#fb.r{border-color:#e5484d}#fb small{display:block;color:#94a3b8}'
+
 ].join('');
 
 const HTML =
@@ -271,7 +270,7 @@ const HTML =
   '<div class="row" id="ctl"><button id="b1">Pass</button><button id="b2">Resign</button></div>' +
   '<div class="row lvl" id="lvl" hidden><span>Bot level</span>' +
   '<button data-l="easy">Easy</button><button data-l="medium">Medium</button><button data-l="hard">Hard</button></div>' +
-  '<div class="row lvl" id="opts"><button id="fbBtn">Move feedback: on</button><button id="pzBtn">Tsumego puzzles</button></div>' +
+  '<div class="row lvl" id="opts"><button id="pzBtn">Tsumego puzzles</button></div>' +
   '<div id="pz" hidden>' +
   '<div class="row lvl"><span>Level</span><button data-pl="easy">Easy</button><button data-pl="medium">Medium</button><button data-pl="hard">Hard</button></div>' +
   '<div class="row"><button id="pzHint">Hint</button><button id="pzAns">Show answer</button><button id="pzNext">New puzzle</button></div>' +
@@ -287,11 +286,9 @@ export function mount(root, api) {
   let view = null, hov = -1, resArm = false;
   let level = 'medium', thinkKey = null, thinking = false;
   let worker = null, workerUrl = null, workerBad = false, inline = null;
-  let joinKey = '', destroyed = false, flashTimer = null;
-  let retryTimer = null, joinFail = '';
-  // Move feedback. Private to this screen: nothing about it is sent to the table.
-  let fbOn = true, fbCls = '', fbHtml = '', fbPoint = -1, pendingRate = null, rateTok = 0;
-  // A second worker, for rating moves and making puzzles, so the bot's own search is never held up.
+let joinKey = '', destroyed = false, flashTimer = null;
+let retryTimer = null, joinFail = '';
+// A second worker, for rating moves and making puzzles, so the bot's own search is never held up.
   let aux = null, auxUrl = null, auxBad = false, auxId = 0;
   const auxPending = {};
   // Tsumego practice, also private: it never touches the table's state.
@@ -413,7 +410,6 @@ export function mount(root, api) {
           !engine.applyMove({ b: pz.b, ko: pz.ko, hist: [] }, hov, pz.turn).err) stone(px(hov), py(hov), pz.turn, 0.5);
       return;
     }
-    if (fbOn && fbPoint >= 0 && fbPoint < AREA && !view.b[fbPoint]) ring(fbPoint, '#3fb950', true);
     if (hov >= 0 && canAct() && !engine.applyMove(view, hov, view.turn).err) stone(px(hov), py(hov), view.turn, 0.5);
   }
 
@@ -444,8 +440,6 @@ export function mount(root, api) {
     draw();
     q('#pz').hidden = !pz;
     q('#top').hidden = !!pz; q('#ctl').hidden = !!pz; q('#opts').hidden = !!pz;
-    q('#fbBtn').textContent = 'Move feedback: ' + (fbOn ? 'on' : 'off');
-    paintFb();
     if (pz) { renderPuzzle(); return; }
     if (!view) return;
     const v = view, b1 = q('#b1'), b2 = q('#b2');
@@ -569,51 +563,6 @@ export function mount(root, api) {
     else runInline(msg, cb);
   }
 
-  // ---- move feedback
-  const LABELS = [[90, 'Excellent'], [70, 'Good'], [45, 'Inaccurate'], [20, 'Mistake'], [0, 'Blunder']];
-  function paintFb() {
-    const el = q('#fb');
-    el.className = fbCls;
-    el.innerHTML = fbHtml;
-    el.hidden = !(fbOn && fbHtml) || !!pz;
-  }
-  function setFb(cls, html) { fbCls = cls; fbHtml = html; paintFb(); }
-
-  // Called the moment you play: remember the position BEFORE the move, because that is the
-  // position the move has to be judged in.
-  function noteMove(i) {
-    fbPoint = -1; rateTok++;
-    setFb('', '');
-    if (!fbOn || !view || !view.seat) { pendingRate = null; return; }
-    pendingRate = {
-      gameNo: view.gameNo, moves: view.moves, move: i,
-      pos: { b: view.b.slice(), ko: view.ko, turn: view.turn, passes: view.passes, last: view.last, komi: view.komi, hist: view.hist.slice() }
-    };
-  }
-
-  function maybeRate() {
-    const p = pendingRate;
-    if (!p || !fbOn || destroyed || !view) return;
-    if (view.gameNo !== p.gameNo) { pendingRate = null; return; }
-    if (view.moves <= p.moves) return;                  // the table has not applied the move yet
-    if (thinking) return;                               // let the bot answer first
-    pendingRate = null;
-    const tok = rateTok;
-    setFb('', 'Rating your move…');
-    askAux({ cmd: 'rate', pos: p.pos, move: p.move, cfg: {} }, function (r) {
-      if (destroyed || tok !== rateTok || !fbOn || !view || view.gameNo !== p.gameNo) return;
-      let label = 'Blunder';
-      for (let k = 0; k < LABELS.length; k++) if (r.rating >= LABELS[k][0]) { label = LABELS[k][1]; break; }
-      const cls = r.rating >= 70 ? 'g' : r.rating >= 45 ? 'o' : 'r';
-      let note = '';
-      if (r.best !== p.move && r.rating < 90) { note = 'The bot preferred ' + coord(r.best) + '. '; fbPoint = r.best; }
-      if (r.decided) note += 'The game already looks decided, so this is mostly about points. ';
-      setFb(cls, 'Your move <b>' + coord(p.move) + '</b>: <b>about ' + (Math.round(r.rating / 5) * 5) + '%</b> · ' + label +
-        '<small>' + note + 'An estimate from the bot\u2019s search, not a verdict.</small>');
-      draw();
-    });
-  }
-
   // ---- tsumego practice
   const colorName = function (c) { return c === 1 ? 'Black' : 'White'; };
   function pzState() {
@@ -715,7 +664,6 @@ export function mount(root, api) {
     const r = engine.applyMove(view, i, view.turn);
     if (r.err) return flash(r.err);
     hov = -1;
-    noteMove(i);
     api.send({ a: 'play', i: i });
   });
   cv.addEventListener('pointermove', function (e) {
@@ -727,7 +675,7 @@ export function mount(root, api) {
 
   q('#b1').addEventListener('click', function () {
     if (!view || !view.seat) return;
-    if (view.phase === 'play') { if (canAct()) { noteMove(PASS); api.send({ a: 'pass' }); } }
+    if (view.phase === 'play') { if (canAct()) { api.send({ a: 'pass' }); } }
     else if (view.phase === 'score') api.send({ a: 'accept' });
     else api.send({ a: 'new', swap: false });
   });
@@ -743,11 +691,6 @@ export function mount(root, api) {
   });
   root.querySelectorAll('#lvl button').forEach(function (btn) {
     btn.addEventListener('click', function () { level = btn.getAttribute('data-l'); render(); });
-  });
-  q('#fbBtn').addEventListener('click', function () {
-    fbOn = !fbOn;
-    if (!fbOn) { pendingRate = null; rateTok++; fbPoint = -1; setFb('', ''); }
-    render();
   });
   q('#pzBtn').addEventListener('click', function () { pzNew(); });
   q('#pzNext').addEventListener('click', function () { pzNew(); });
@@ -773,19 +716,17 @@ export function mount(root, api) {
     // talks to the host (taking a seat, the bot's moves) starts from the first update().
     update: function (v) {
       view = v;
-      maybeJoin();
-      render();
-      maybeBot();
-      maybeRate();
-    },
+       maybeJoin();
+       render();
+       maybeBot();
+     },
     // The hub routes a refusal here. MiniGo had no denied() at all, so every
     // error reduce() returned — including "the table is full" — was dropped and
     // the client just sat there watching.
     denied: function (text) {
       if (destroyed) return;
-      flash(text || 'Not allowed.');
-      pendingRate = null;                                 // a refused move is not worth rating
-      joinFail = text || 'Not allowed.';
+       flash(text || 'Not allowed.');
+       joinFail = text || 'Not allowed.';
       // A refusal means the table could not take us: ask again shortly, since
       // a seat can open up when somebody leaves.
       if (!retryTimer) retryTimer = api.setTimeout(function () {
