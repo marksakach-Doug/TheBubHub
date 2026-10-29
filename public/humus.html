@@ -1,0 +1,250 @@
+<!doctype html>
+<html lang="en"><head><meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
+<title>HUMUS</title>
+<style>
+:root{--bg:#f4efe6;--ink:#2a2620;--muted:#7a7266;--line:#cfc6b5;--card:#fffdf8;--accent:#5b6b3a;--warn:#8a3b2e}
+@media (prefers-color-scheme: dark){:root:not([data-theme="light"]){--bg:#1b1915;--ink:#ece6da;--muted:#958c7c;--line:#3d3830;--card:#24211b;--accent:#a7bb7c;--warn:#d98a74}}
+:root[data-theme="dark"]{--bg:#1b1915;--ink:#ece6da;--muted:#958c7c;--line:#3d3830;--card:#24211b;--accent:#a7bb7c;--warn:#d98a74}
+:root{box-sizing:border-box;padding-top:env(safe-area-inset-top,0px);padding-bottom:env(safe-area-inset-bottom,0px)}
+*{box-sizing:border-box}
+body{margin:0;background:var(--bg);color:var(--ink);font:16px/1.5 Georgia,"Times New Roman",serif}
+main{max-width:760px;margin:0 auto;padding:16px;display:flex;flex-direction:column;gap:18px}
+h1{font-size:22px;letter-spacing:4px;margin:0;color:var(--accent)}
+.sub{color:var(--muted);font-size:14px;margin:0}
+button{font:inherit;font-size:14px;padding:8px 14px;border:1px solid var(--line);background:var(--card);color:var(--ink);border-radius:8px;cursor:pointer}
+button.go{background:var(--accent);color:var(--bg);border-color:var(--accent)}
+textarea{width:100%;min-height:110px;font:inherit;padding:10px;border:1px solid var(--line);border-radius:8px;background:var(--card);color:var(--ink)}
+.hidden{display:none!important}
+.row{display:flex;gap:8px;flex-wrap:wrap;align-items:center;justify-content:space-between}
+.stack{display:flex;flex-direction:column;gap:14px}
+.planets{display:grid;grid-template-columns:repeat(auto-fill,minmax(210px,1fr));gap:10px}
+.planet{border:1px solid var(--line);border-radius:12px;padding:10px;background:var(--card);cursor:pointer;display:flex;flex-direction:column;gap:6px}
+.planet.target{outline:2px solid var(--accent)}
+.planet.dev{border-color:var(--accent)}
+.planet.assim{opacity:.5;cursor:default;border-style:dashed;border-color:var(--warn)}
+.n{font-size:12px;color:var(--muted);font-family:monospace}
+.feats{display:flex;gap:4px;flex-wrap:wrap}
+.feat{font-family:monospace;font-size:12px;border:1px solid var(--line);border-radius:999px;padding:1px 8px}
+.way{font-size:14px;border-left:2px solid var(--accent);padding-left:8px}
+.way.none{border-color:var(--line);color:var(--muted);font-style:italic}
+.meters{font-family:monospace;font-size:12px;color:var(--muted)}
+.last{font-size:13px}
+.tag{font-family:monospace;font-size:11px;font-weight:700;padding:0 6px;border-radius:4px;border:1px solid var(--accent);color:var(--accent);margin-right:4px}
+.tag.bot{border-color:var(--warn);color:var(--warn)}
+.hand{display:flex;flex-wrap:wrap;gap:8px}
+.chip{padding:8px 12px;border:1px solid var(--line);border-radius:999px;background:var(--card);cursor:pointer;font-size:15px}
+.chip.sel{background:var(--accent);color:var(--bg);border-color:var(--accent)}
+.prompt{border:1px dashed var(--line);border-radius:12px;padding:12px;display:flex;flex-direction:column;gap:10px}
+.draft{font-size:17px;border-left:3px solid var(--accent);padding:6px 10px}
+.warn{color:var(--warn);font-size:14px}
+.botline{color:var(--warn);font-style:italic}
+.atlas h2{font-size:16px;margin:16px 0 2px;color:var(--accent)}
+.atlas p{margin:4px 0}
+.atlas p.bot{color:var(--warn);font-style:italic}
+.result{font-size:18px}
+</style></head>
+<body>
+<main>
+ <div class="row">
+  <div><h1>HUMUS</h1><p class="sub">Six planets. Humanity answers the planet. The Bots are just bots.</p></div>
+  <button id="btn-new" class="hidden">Start over</button>
+ </div>
+
+ <section id="setup" class="prompt">
+  <p class="sub">Paste any text here. Some of its words will be used in the game. The game adds none of its own. Forty or more words makes a better game.</p>
+  <textarea id="src" placeholder="Paste text here…"></textarea>
+  <div class="row"><span id="setup-note" class="warn"></span><button id="btn-begin" class="go">Begin</button></div>
+ </section>
+
+ <section id="play" class="stack hidden">
+  <div id="planets" class="planets"></div>
+  <div class="stack" style="gap:8px"><p class="sub" id="status"></p><div id="hand" class="hand"></div></div>
+  <div id="work" class="prompt hidden"></div>
+  <div class="row"><span class="sub" id="left"></span><button id="btn-finish">Stop and read the atlas</button></div>
+ </section>
+
+ <section id="atlas" class="atlas hidden"></section>
+</main>
+<script>
+(function(){
+'use strict';
+const N = 6, HAND = 5, MIN_WORDS = 15, DEV_AT = 2, ASSIM_AT = 3, WIN_DEV = 4, LOSE_ASSIM = 2, MAX_LINE = 240;
+const FEATURES = ['rocky','wet','dry','icy','hot','dark','forested','volcanic','airless','high gravity','thin atmosphere','stormy'];
+const CONFLICT = [['wet','dry'],['hot','icy'],['airless','stormy'],['airless','thin atmosphere'],['airless','wet']];
+const $ = id => document.getElementById(id);
+const esc = s => String(s).replace(/[&<>"']/g, c => ({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;'}[c]));
+const cap = s => s.charAt(0).toUpperCase() + s.slice(1);
+const pick = a => a[Math.floor(Math.random() * a.length)];
+let S = null;
+
+function shuffle(a){ for (let i = a.length - 1; i > 0; i--){ const j = Math.floor(Math.random() * (i + 1)); [a[i], a[j]] = [a[j], a[i]]; } return a; }
+// The deck comes only from the pasted text: unique words, 3+ letters.
+function wordsFrom(text){
+  const seen = new Set(), out = [];
+  (text.match(/[A-Za-z]{3,}/g) || []).forEach(w => { const k = w.toLowerCase(); if (!seen.has(k)){ seen.add(k); out.push(k); } });
+  return shuffle(out);
+}
+const clash = (a, b) => CONFLICT.some(c => (c[0] === a && c[1] === b) || (c[0] === b && c[1] === a));
+function twoFeatures(){ let a, b; do { a = pick(FEATURES); b = pick(FEATURES); } while (a === b || clash(a, b)); return [a, b]; }
+const developed = p => !p.assim && p.prog >= DEV_AT;
+const lastLine = p => p.lines.length ? p.lines[p.lines.length - 1] : null;
+// Words recycle when the deck runs dry, so only win, loss or stopping ends a game.
+function draw(){ if (!S.pool.length) S.pool = shuffle(S.discard.splice(0)); return S.pool.pop(); }
+
+function begin(){
+  const pool = wordsFrom($('src').value);
+  if (pool.length < MIN_WORDS){ $('setup-note').textContent = `Need at least ${MIN_WORDS} different words. Found ${pool.length}.`; return; }
+  S = { pool, discard: [], hand: [], sel: null, pl: null, draft: null, keep: '', note: '', done: false, result: '',
+        planets: Array.from({length: N}, () => ({ features: twoFeatures(), lines: [], way: '', prog: 0, pressure: 0, assim: false })) };
+  while (S.hand.length < HAND) S.hand.push(draw());
+  $('setup').classList.add('hidden');
+  $('btn-new').classList.remove('hidden');
+  render();
+}
+
+// ---- the Bots: persistent, grammatical, and blind to why anything matters ----
+const BOT_PATTERNS = [
+  (w, e, f) => `The ${w} is recorded. The ${w} is recorded. The ${w} is recorded.`,                       // repetition
+  (w, e, f) => `${cap(w)} is a category of ${e}. ${cap(e)} is a category of ${w}.`,                       // flattening
+  (w, e, f) => `${cap(e)} detected. ${cap(w)} detected. Both assigned to storage.`,                       // classification
+  (w, e, f) => `The planet is ${f}. Therefore, every ${w} must ${pick(['float','be filed','repeat','expire','be counted'])}.`, // false causation
+  (w, e, f) => `${cap(e)} detected. ${cap(w)} detected. ${cap(e)} and ${w} are equivalent.`               // literal imitation
+];
+function botTurn(){
+  let best = -1, tgt = -1;
+  S.planets.forEach((p, i) => {
+    if (p.assim) return;
+    const s = (developed(p) ? 3 : 0) + p.pressure * 2 + (p.way ? 1 : 0) + Math.random() * 2.5;
+    if (s > best){ best = s; tgt = i; }
+  });
+  if (tgt < 0) return '';
+  const p = S.planets[tgt], w = draw();
+  if (!w) return '';
+  const hum = p.lines.slice().reverse().find(l => l.who === 'human');
+  const echo = hum ? (hum.text.match(/[A-Za-z]{4,}/g) || []).map(s => s.toLowerCase()).filter(s => s !== w) : [];
+  const e = echo.length ? pick(echo) : pick(p.features);
+  const text = pick(BOT_PATTERNS)(w, e, pick(p.features));
+  p.lines.push({ who: 'bot', kind: 'bot', text });
+  p.pressure++;
+  if (p.pressure >= ASSIM_AT) p.assim = true;
+  S.discard.push(w);
+  return `Bot, planet ${tgt + 1}: ${text}` + (p.assim ? ' — assimilated.' : '');
+}
+
+function checkEnd(){
+  const dev = S.planets.filter(developed).length, as = S.planets.filter(p => p.assim).length;
+  if (dev >= WIN_DEV){ S.done = true; S.result = `Humanity holds. ${dev} worlds have a way of living.`; return true; }
+  if (as >= LOSE_ASSIM){ S.done = true; S.result = `Sector lost. ${as} worlds assimilated.`; return true; }
+  return false;
+}
+
+// ---- the human turn: the ground decides whether this is an adaptation or a reaction ----
+const holds = (text, w) => new RegExp('\\b' + w.replace(/[.*+?^${}()|[\]\\]/g, '\\$&') + '\\b', 'i').test(text);
+function setLine(){
+  const text = $('line').value.trim(), w = S.hand[S.sel];
+  if (!text){ $('line-note').textContent = 'Write the line first.'; return; }
+  if (text.length > MAX_LINE){ $('line-note').textContent = `Keep it under ${MAX_LINE} characters.`; return; }
+  if (!holds(text, w)){ $('line-note').textContent = `The line has to hold “${w}”.`; return; }
+  S.draft = { text, word: S.sel, planet: S.pl };
+  render();
+}
+function land(){
+  const d = S.draft, p = S.planets[d.planet], g = lastLine(p);
+  if (g && g.who === 'bot'){            // answering a Bot line: push it back
+    p.pressure = Math.max(0, p.pressure - 1);
+    p.lines.push({ who: 'human', kind: 'react', text: d.text });
+  } else {                              // answering a human line, or bare ground: the world deepens
+    p.prog++; p.way = d.text;
+    p.lines.push({ who: 'human', kind: 'adapt', text: d.text });
+  }
+  S.discard.push(S.hand.splice(d.word, 1)[0]);
+  const w = draw(); if (w) S.hand.push(w);
+  S.draft = null; S.sel = null; S.pl = null; S.keep = ''; S.note = '';
+  if (!checkEnd()){ S.note = botTurn(); checkEnd(); }
+  render();
+}
+function notYet(){ S.keep = S.draft.text; S.draft = null; render(); }
+function pickChip(i){ S.sel = S.sel === i ? null : i; S.pl = null; S.draft = null; S.keep = ''; render(); }
+function pickPlanet(i){ if (S.sel === null || S.planets[i].assim) return; S.pl = i; S.draft = null; S.keep = ''; render(); }
+function finish(){ S.done = true; S.result = 'You stopped here.'; render(); }
+
+// ---- display ----
+function lastHTML(p){
+  const g = lastLine(p);
+  return g ? `<div class="last"><span class="tag ${g.who === 'bot' ? 'bot' : ''}">${g.who === 'bot' ? 'BOT' : 'HUMAN'}</span>${esc(g.text)}</div>` : '<div class="last sub">Bare ground.</div>';
+}
+function render(){
+  if (!S) return;
+  const playing = !S.done;
+  $('play').classList.toggle('hidden', !playing);
+  $('atlas').classList.toggle('hidden', playing);
+  if (!playing){ renderAtlas(); return; }
+
+  const pl = $('planets'); pl.innerHTML = '';
+  S.planets.forEach((p, i) => {
+    const d = document.createElement('div');
+    d.className = 'planet' + (S.pl === i ? ' target' : '') + (p.assim ? ' assim' : '') + (developed(p) ? ' dev' : '');
+    d.innerHTML = `<div class="n">planet ${i + 1}${p.assim ? ' · ASSIMILATED' : ''}${developed(p) ? ' · DEVELOPED' : ''}</div>` +
+      `<div class="feats">${p.features.map(f => `<span class="feat">${esc(f)}</span>`).join('')}</div>` +
+      `<div class="way${p.way ? '' : ' none'}">${p.way ? esc(p.way) : 'No established adaptation.'}</div>` +
+      `<div class="meters">adaptation ${Math.min(p.prog, DEV_AT)}/${DEV_AT} · Bot pressure ${p.pressure}/${ASSIM_AT}</div>` + lastHTML(p);
+    d.addEventListener('click', () => pickPlanet(i));
+    pl.appendChild(d);
+  });
+
+  const hd = $('hand'); hd.innerHTML = '';
+  S.hand.forEach((w, i) => {
+    const b = document.createElement('div');
+    b.className = 'chip' + (S.sel === i ? ' sel' : '');
+    b.textContent = w;
+    b.addEventListener('click', () => pickChip(i));
+    hd.appendChild(b);
+  });
+
+  let st = S.sel === null ? 'Pick a word from your hand.' : S.pl === null ? `“${S.hand[S.sel]}”: now pick a planet.` : '';
+  $('status').innerHTML = esc(st) + (S.note ? ` <span class="botline">${esc(S.note)}</span>` : '');
+  $('left').textContent = `Developed ${S.planets.filter(developed).length}/${WIN_DEV} · Assimilated ${S.planets.filter(p => p.assim).length}/${LOSE_ASSIM}`;
+
+  const work = $('work');
+  if (S.draft){
+    work.classList.remove('hidden');
+    work.innerHTML = `<div class="sub">The table reads it aloud:</div><div class="draft">${esc(S.draft.text)}</div>` +
+      `<div class="row"><button id="btn-not">Not yet</button><button id="btn-land" class="go">It lands</button></div>`;
+    $('btn-land').addEventListener('click', land);
+    $('btn-not').addEventListener('click', notYet);
+  } else if (S.sel !== null && S.pl !== null){
+    const p = S.planets[S.pl], g = lastLine(p), bot = g && g.who === 'bot';
+    work.classList.remove('hidden');
+    work.innerHTML = `<div class="feats">${p.features.map(f => `<span class="feat">${esc(f)}</span>`).join('')}</div>` +
+      `<div class="way${p.way ? '' : ' none'}">${p.way ? esc(p.way) : 'No established adaptation.'}</div>` + lastHTML(p) +
+      `<div class="sub">${bot ? 'The Bot spoke last. Answer it: let your word meet this ground in a way the Bot cannot. This pushes one pressure back.'
+        : g ? 'Answer the ground: let your word meet these conditions and the way people already live here. This deepens the world.'
+        : 'Bare ground. Say how people begin to live here, using your word.'}</div>` +
+      `<textarea id="line" placeholder="One line…"></textarea>` +
+      `<div class="row"><span id="line-note" class="warn"></span><button id="btn-set" class="go">Set it down</button></div>`;
+    $('line').value = S.keep || '';
+    $('btn-set').addEventListener('click', setLine);
+  } else { work.classList.add('hidden'); work.innerHTML = ''; }
+}
+function renderAtlas(){
+  let h = `<h1>ATLAS</h1><p class="result">${esc(S.result)}</p>`;
+  S.planets.forEach((p, i) => {
+    const status = p.assim ? 'Assimilated' : developed(p) ? 'Remained human, developed' : 'Remained human, still forming';
+    h += `<h2>Planet ${i + 1} · ${esc(p.features.join(', '))}</h2><p class="sub">${status}. Adaptation: ${p.way ? esc(p.way) : 'none established'}</p>`;
+    p.lines.forEach(l => { h += `<p class="${l.who === 'bot' ? 'bot' : ''}"><b>${l.who === 'bot' ? 'BOT' : 'HUMAN'}</b>${l.kind === 'react' ? ' (answered a Bot)' : l.kind === 'adapt' ? ' (deepened)' : ''} ${esc(l.text)}</p>`; });
+    if (!p.lines.length) h += '<p class="sub">Never touched.</p>';
+  });
+  $('atlas').innerHTML = h;
+}
+
+$('btn-begin').addEventListener('click', begin);
+$('btn-finish').addEventListener('click', finish);
+$('btn-new').addEventListener('click', () => {
+  S = null;
+  $('play').classList.add('hidden'); $('atlas').classList.add('hidden');
+  $('setup').classList.remove('hidden'); $('btn-new').classList.add('hidden'); $('setup-note').textContent = '';
+});
+})();
+</script>
+</body></html>
