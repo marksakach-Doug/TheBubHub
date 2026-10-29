@@ -6,17 +6,17 @@
 <title>Chess</title>
 <style>
 :root{
-  --frame-1:#8a5a2b; --frame-2:#5e3a17;
-  --light:#e8cfa0; --dark:#a9713f;
-  --ink:#2b1a0d; --panel:#3a2716; --panel-2:#2a1b0e;
-  --cream:#f4e6cd; --dim:#c3a97f;
-  --good:#8fb35e; --bad:#e0705a;
+  --frame-1:#3f6158; --frame-2:#1f3530;
+  --light:#c5d6cd; --dark:#5b7f74;
+  --ink:#16211f; --panel:#1f322d; --panel-2:#14221e;
+  --cream:#f4f1ea; --dim:#a9bdb6;
+  --good:#8fd1a0; --bad:#f08a74;
 }
 *{box-sizing:border-box;-webkit-tap-highlight-color:transparent}
 html,body{margin:0;padding:0}
 body{
   min-height:100vh; display:flex; align-items:center; justify-content:center;
-  padding:12px; background:#1d1208; color:var(--cream);
+  padding:12px; background:radial-gradient(circle at 50% 0%,#1c302a,#0c1513 70%) fixed #101a18; color:var(--cream);
   font-family:ui-sans-serif,system-ui,-apple-system,"Segoe UI",sans-serif;
   overscroll-behavior:contain;
 }
@@ -48,40 +48,43 @@ body{
 /* Letters instead of glyphs, so the two sides are the same shape and every
    device renders them identically. Weight + size carry the piece; colour alone
    carries the side. */
-.pc{position:relative; z-index:2; font-size:min(7vw,34px); line-height:1;
+.pc{position:relative; z-index:2; width:88%; height:88%; line-height:1;
   font-weight:900; font-family:ui-sans-serif,system-ui,"Segoe UI",Helvetica,Arial,sans-serif;
   cursor:grab; filter:drop-shadow(0 2px 2px rgba(0,0,0,.45)); transform:translateY(-2%)}
-.pc svg{width:90%;height:90%;display:block;margin:auto}
-.pc.w{color:#f7efe0; text-shadow:0 1px 2px rgba(0,0,0,.75), 0 0 1px rgba(0,0,0,.9)}
-.pc.b{color:#2b1c0e; text-shadow:0 0 3px #fff, 0 0 6px rgba(255,255,255,.85)}
+.pc svg,#captured svg{width:100%;height:100%;display:block}
+svg .f{fill:currentColor} svg .k{fill:var(--cut)}
+svg .c{fill:none;stroke:var(--cut);stroke-width:2;stroke-linecap:round;stroke-linejoin:round}
+.pc.w,.cw{color:#f6f2e9; --cut:#22332f; filter:drop-shadow(0 0 .7px #0a1311) drop-shadow(0 0 .7px #0a1311) drop-shadow(0 2px 2px rgba(0,0,0,.4))}
+.pc.b,.cb{color:#16211f; --cut:#dfe8e4; filter:drop-shadow(0 0 .8px #e4ede9) drop-shadow(0 2px 2px rgba(0,0,0,.4))}
 .pc.drag{opacity:.3}
-.pc.ghost{position:fixed; z-index:60; pointer-events:none; font-size:44px; transform:none}
-.dot{position:absolute; z-index:3; width:26%; height:26%; border-radius:50%; background:rgba(20,10,0,.42); pointer-events:none}
-.ring{position:absolute; z-index:3; inset:6%; border-radius:50%; border:5px solid rgba(20,10,0,.42); pointer-events:none}
-.cord{position:absolute; font-size:min(1.8vw,10px); font-weight:700; color:rgba(40,25,10,.5); pointer-events:none; z-index:1}
+.pc.ghost{position:fixed; z-index:60; pointer-events:none; width:48px; height:48px; transform:none}
+.dot{position:absolute; z-index:3; width:26%; height:26%; border-radius:50%; background:rgba(8,22,18,.4); pointer-events:none}
+.ring{position:absolute; z-index:3; inset:6%; border-radius:50%; border:5px solid rgba(8,22,18,.4); pointer-events:none}
+.cord{position:absolute; font-size:min(1.8vw,10px); font-weight:700; color:rgba(10,30,24,.6); pointer-events:none; z-index:1}
 .cord.b{right:3px; bottom:1px}
 .cord.t{left:3px; top:1px}
 
 .card{background:linear-gradient(180deg,var(--panel),var(--panel-2));
-  border:1px solid #4a3018; border-radius:12px; padding:10px 12px;
+  border:1px solid #2f4a43; border-radius:12px; padding:10px 12px;
   box-shadow:0 4px 14px rgba(0,0,0,.35), inset 0 1px 0 rgba(255,255,255,.07)}
 .bar{display:flex; align-items:center; gap:10px; flex-wrap:wrap}
 .pname{font-weight:800; font-size:14px; display:flex; align-items:center; gap:6px}
 .chip{font-size:11px; font-family:ui-monospace,monospace; padding:2px 7px; border-radius:999px;
-  background:rgba(0,0,0,.3); border:1px solid #5a3c1e; color:var(--dim)}
+  background:rgba(0,0,0,.3); border:1px solid #3d5c53; color:var(--dim)}
 .status{flex:1; text-align:center; font-weight:700; font-size:14px; min-width:130px}
 .status.good{color:var(--good)} .status.bad{color:var(--bad)}
-#captured{font-size:19px; min-height:24px; letter-spacing:1px; background: #f5f0e8; padding: 4px; border-radius: 4px;}
-#captured .cw{color:#f8f1e8; text-shadow:0 0 2px #2b1a0d; font-weight:900}
-#captured .cb{color:#4a3a2a; text-shadow:0 0 2px rgba(255,255,255,.9); font-weight:900}
-#captured .lab{font-size:10px; font-family:ui-monospace,monospace; color:var(--dim); letter-spacing:0}
-button{font:inherit; font-weight:800; cursor:pointer; color:#22160a;
-  background:linear-gradient(180deg,#d8b57c,#b78f52); border:1px solid #7a5628;
-  border-radius:9px; padding:10px 13px; box-shadow:0 2px 0 #6d4c1f,0 3px 8px rgba(0,0,0,.3)}
-button:active{transform:translateY(1px); box-shadow:0 1px 0 #6d4c1f}
+#captured{min-height:36px; background:#5f847a; padding:4px 6px; border-radius:8px; line-height:1}
+/* captured pieces: fixed-size tiles (an unsized inline SVG fills its container) */
+#captured .cw,#captured .cb{display:inline-block; width:26px; height:26px; vertical-align:middle}
+
+#captured .lab{font-size:10px; font-family:ui-monospace,monospace; color:#0f1a17; letter-spacing:0}
+button{font:inherit; font-weight:800; cursor:pointer; color:#0f1a17;
+  background:linear-gradient(180deg,#d9e7df,#a9c4b8); border:1px solid #6f9487;
+  border-radius:9px; padding:10px 13px; box-shadow:0 2px 0 #46685c,0 3px 8px rgba(0,0,0,.3)}
+button:active{transform:translateY(1px); box-shadow:0 1px 0 #46685c}
 button:disabled{opacity:.4; cursor:not-allowed; box-shadow:none}
-button.ghost{background:linear-gradient(180deg,#5b3f22,#412c15); color:var(--cream); border-color:#6d4c1f}
-button.good{background:linear-gradient(180deg,#9dc36a,#7fa650); border-color:#5d7d3a}
+button.ghost{background:linear-gradient(180deg,#34544b,#26403a); color:var(--cream); border-color:#46685c}
+button.good{background:linear-gradient(180deg,#8fd1a0,#5fae78); border-color:#3f8a5a}
 #setup{display:flex; flex-direction:column; gap:10px; align-items:center; text-align:center}
 #setup h1{margin:0; font-size:32px; letter-spacing:2px}
 #setup p{margin:0; color:var(--dim); font-size:13px; max-width:46ch; line-height:1.5}
@@ -166,14 +169,20 @@ const START = 'rnbqkbnrpppppppp................................PPPPPPPPRNBQKBNR'
 const GLYPH = {};
 const GLYPH_B = GLYPH;
 const glyphOf = (piece) => '';
-const PIECE_SVG = {
-  K: '<svg viewBox="0 0 100 100" xmlns="http://www.w3.org/2000/svg"><path d="M50 8 L56 22 L70 22 L60 32 L64 48 L50 40 L36 48 L40 32 L30 22 L44 22 Z" fill="currentColor"/><rect x="44" y="48" width="12" height="30" fill="currentColor"/><rect x="30" y="78" width="40" height="10" fill="currentColor"/></svg>',
-  Q: '<svg viewBox="0 0 100 100" xmlns="http://www.w3.org/2000/svg"><path d="M18 78 L26 40 L36 58 L50 30 L64 58 L74 40 L82 78 Z" fill="currentColor"/><rect x="18" y="78" width="64" height="10" fill="currentColor"/></svg>',
-  R: '<svg viewBox="0 0 100 100" xmlns="http://www.w3.org/2000/svg"><rect x="24" y="20" width="12" height="12" fill="currentColor"/><rect x="44" y="20" width="12" height="12" fill="currentColor"/><rect x="64" y="20" width="12" height="12" fill="currentColor"/><rect x="24" y="32" width="52" height="40" fill="currentColor"/><rect x="18" y="72" width="64" height="10" fill="currentColor"/></svg>',
-  B: '<svg viewBox="0 0 100 100" xmlns="http://www.w3.org/2000/svg"><circle cx="50" cy="30" r="12" fill="currentColor"/><path d="M50 42 L62 78 L38 78 Z" fill="currentColor"/><rect x="30" y="78" width="40" height="8" fill="currentColor"/></svg>',
-  N: '<svg viewBox="0 0 100 100" xmlns="http://www.w3.org/2000/svg"><path d="M30 80 L34 46 L24 34 L40 20 L62 26 L70 46 L62 60 L68 80 Z" fill="currentColor"/><rect x="26" y="80" width="46" height="8" fill="currentColor"/></svg>',
-  P: '<svg viewBox="0 0 100 100" xmlns="http://www.w3.org/2000/svg"><circle cx="50" cy="34" r="16" fill="currentColor"/><path d="M40 52 L60 52 L66 78 L34 78 Z" fill="currentColor"/><rect x="28" y="78" width="44" height="8" fill="currentColor"/></svg>'
-};
+const PIECE_SVG = (() => {
+  // Single-colour silhouettes. .f = body (currentColor), .c/.k = cut-out detail
+  // drawn in --cut (set per side in CSS), so detail reads on ivory and ink alike.
+  const base = '<path class="f" d="M18 94Q18 85 30 85H70Q82 85 82 94Z"/><path class="c" d="M27 89H73"/>';
+  const wrap = (b) => '<svg viewBox="0 0 100 100" xmlns="http://www.w3.org/2000/svg">' + base + b + '</svg>';
+  return {
+    K: wrap('<path class="f" d="M38 52Q50 57 62 52L72 85H28Z"/><path class="f" d="M33 54Q50 66 67 54L69 61Q50 73 31 61Z"/><path class="c" d="M42 68L38 83M58 68L62 83"/><circle class="k" cx="42" cy="61" r="1.6"/><circle class="k" cx="50" cy="64" r="1.6"/><circle class="k" cx="58" cy="61" r="1.6"/><circle class="f" cx="50" cy="44" r="10"/><circle class="k" cx="46" cy="44" r="1.6"/><circle class="k" cx="54" cy="44" r="1.6"/><path class="c" d="M45 49Q50 52 55 49"/><g transform="rotate(-13 50 34)"><path class="f" d="M32 37L30 21L40 28L50 17L60 28L70 21L68 37Z"/><circle class="f" cx="30" cy="19" r="3"/><circle class="f" cx="50" cy="15" r="3"/><circle class="f" cx="70" cy="19" r="3"/><path class="c" d="M32 33H68"/><path class="f" d="M47 2h6v4h4v5h-4v4h-6v-4h-4v-5h4z"/></g>'),
+    Q: wrap('<path class="f" d="M35 49Q50 43 65 49Q61 56 57 61Q66 72 72 85H28Q34 72 43 61Q39 56 35 49Z"/><path class="c" d="M41 50Q50 58 59 50M43 62Q50 65 57 62M31 79Q50 85 69 79"/><circle class="k" cx="50" cy="56" r="1.8"/><circle class="f" cx="50" cy="38" r="8"/><circle class="k" cx="47" cy="38" r="1.3"/><circle class="k" cx="53" cy="38" r="1.3"/><path class="f" d="M40 32L37 16L44 24L50 12L56 24L63 16L60 32Z"/><circle class="f" cx="37" cy="14" r="2.6"/><circle class="f" cx="50" cy="10" r="2.6"/><circle class="f" cx="63" cy="14" r="2.6"/><path class="c" d="M41 29H59"/>'),
+    R: wrap('<path class="f" d="M24 12h13v9h6v-9h14v9h6v-9h13v24H24z"/><path class="f" d="M31 36h38l-4 9v27l9 11H26l9-11V45z"/><path class="c" d="M24 36H76M36 54H64M36 63H64M44 45V54M56 54V63M46 63V72"/><rect class="k" x="47" y="24" width="6" height="9" rx="3"/>'),
+    B: wrap('<path class="f" d="M50 14C68 26 70 40 62 52H38C30 40 32 26 50 14Z"/><circle class="f" cx="50" cy="10" r="4.5"/><path class="c" style="stroke-width:4" d="M60 24L45 40"/><path class="c" d="M40 46h7M43.5 42.5v7"/><ellipse class="f" cx="50" cy="55" rx="16" ry="5"/><path class="f" d="M40 57Q33 72 29 85H71Q67 72 60 57Z"/><path class="c" d="M38 64Q50 70 62 64M33 78Q50 83 67 78"/>'),
+    N: wrap('<path class="f" d="M30 86C30 66 38 56 46 46C40 46 34 50 28 54L20 52C18 46 22 38 30 30L34 18L40 24C46 14 56 14 62 22C74 32 78 56 74 86Z"/><circle class="k" cx="36" cy="34" r="2.5"/><ellipse class="k" cx="24" cy="47" rx="1.8" ry="2.4"/><path class="c" d="M30 40Q40 42 44 51M24 53Q29 54 34 50M60 24Q66 30 62 36M66 38Q72 44 67 50M70 54Q75 62 71 68"/>'),
+    P: wrap('<g transform="translate(50 85) scale(0.85) translate(-50 -85)"><circle class="f" cx="50" cy="27" r="11"/><path class="c" d="M40 24Q50 21 60 24"/><rect class="k" x="43" y="28" width="14" height="3" rx="1.5"/><ellipse class="f" cx="50" cy="42" rx="14" ry="4.5"/><path class="c" d="M37 40Q50 44 63 40"/><path class="f" d="M42 46Q41 64 29 84H71Q59 64 58 46Z"/><path class="c" d="M37 64Q50 68 63 64M33 77Q50 81 67 77"/><circle class="k" cx="50" cy="67" r="2.2"/></g>')
+  };
+})();
 const VAL = { P:1, N:3, B:3, R:5, Q:9, K:200 };
 const FILES = 'abcdefgh';
 const R1 = 56, R8 = 0;
@@ -424,33 +433,65 @@ function hasMatingMaterial(st){
 }
 
 /* =====================================================================
-   BOT — 1-ply greedy. Values material swings, dodges a free capture next
-   move, likes checks, jitters so it isn't identical every game. Black.
+   BOT — looks two plies ahead (its move, then your best reply), with a
+   one-step recapture check after any capture and a light positional eval
+   (centre, development, castling, pawn advance). Sees mate-in-one both ways.
+   Cheap enough for a phone: ~30 x ~30 positions per move.
    ===================================================================== */
+function posBonus(p, sq){
+  const t = typeOf(p), r = sq >> 3, f = sq & 7;
+  const adv = isWhite(p) ? 7 - r : r;                       // rows advanced from own side
+  const cen = 3 - (Math.abs(f - 3.5) + Math.abs(r - 3.5)) / 2;
+  if (t === 'P') return 0.06 * adv + 0.02 * cen;
+  if (t === 'N') return 0.07 * cen - (adv === 0 ? 0.2 : 0);
+  if (t === 'B') return 0.04 * cen - (adv === 0 ? 0.2 : 0);
+  if (t === 'Q') return 0.01 * cen;
+  if (t === 'K') return adv === 0 ? ((f <= 2 || f >= 6) ? 0.4 : 0) : -0.5 * adv;
+  return adv === 6 ? 0.2 : 0;                               // rook on the 7th
+}
+function evalFor(st, c){
+  let v = 0;
+  for (let i = 0; i < 64; i++){
+    const p = st.b[i]; if (p === '.') continue;
+    const t = typeOf(p), x = (t === 'K' ? 0 : VAL[t]) + posBonus(p, i);
+    v += colourOf(p) === c ? x : -x;
+  }
+  return v;
+}
 function botMove(st, c){
   const ms = legal(st, c);
   if (!ms.length) return null;
+  const o = opponent(c);
   let best = null, bestSc = -Infinity;
   for (const m of ms){
     const ns = copy(st);
     applyMove(ns, m);
-    let sc = Math.random() * 0.8;
-    // Captured piece sits ON the destination, except en passant where it is
-    // one rank behind the destination on the mover's own rank.
-    const capSq = m.ep ? m.to + (c === WHITE ? 8 : -8) : m.to;
-    const capP = st.b[capSq];
-    const took = capP !== '.' && colourOf(capP) === opponent(c) && !m.castle;
-    if (took) sc += VAL[typeOf(capP)] || 0;
-    if (m.castle) sc += 1.5;
-    if (m.promo === 'Q') sc += 2;
-    if (inCheck(ns, opponent(c))) sc += 2.5;
-    // would the opponent just take this piece for free?
-    let hangs = false;
-    for (const om of legal(ns, opponent(c))){
-      if (om.to === m.to) { hangs = true; break; }
-      if (om.ep && om.to + (opponent(c) === WHITE ? 8 : -8) === m.to) { hangs = true; break; }
+    const reps = legal(ns, o);
+    let sc;
+    if (!reps.length) sc = inCheck(ns, o) ? 1000 : 0;       // mate / stalemate
+    else {
+      sc = Infinity;                                        // you answer with whatever is worst for us
+      for (const r of reps){
+        const n2 = copy(ns);
+        applyMove(n2, r);
+        let v = evalFor(n2, c);
+        if (inCheck(n2, c)){
+          const mine = legal(n2, c);
+          if (!mine.length) v = -1000;                      // we would be mated
+        }
+        if (ns.b[r.to] !== '.' || r.ep){                    // a capture: can we take back?
+          let g = 0;
+          for (const q of legal(n2, c)){
+            const cp = n2.b[q.to];
+            if (cp !== '.' && colourOf(cp) === o) g = Math.max(g, cp.toUpperCase() === 'K' ? 0 : VAL[typeOf(cp)]);
+          }
+          v += g * 0.9;
+        }
+        if (v < sc) sc = v;
+        if (sc < bestSc - 0.3) break;                       // can't beat the best so far
+      }
     }
-    if (hangs) sc -= (VAL[typeOf(st.b[m.from])] || 0);
+    sc += Math.random() * 0.2;                              // variety between games
     if (sc > bestSc){ bestSc = sc; best = m; }
   }
   return best;
@@ -846,8 +887,8 @@ $('board').addEventListener('pointerdown', (ev) => {
 });
 function dragTo(ev){
   if (!ghost) return;
-  ghost.style.left = (ev.clientX - 21) + 'px';
-  ghost.style.top = (ev.clientY - 30) + 'px';
+  ghost.style.left = (ev.clientX - 24) + 'px';
+  ghost.style.top = (ev.clientY - 34) + 'px';
 }
 $('board').addEventListener('pointermove', (ev) => { if (ghost) dragTo(ev); });
 function endDrag(){
