@@ -53,7 +53,9 @@ const REROLL_CD = 300;      // host-side floor between two rerolls for one dot
 const REROLL_RETRY = 400;  // client-side re-ask, must exceed REROLL_CD
 const FINISH_GRACE = 1000; // clock skew allowance when ending the round
 const FINISH_RETRY = 1500; // client-side re-ask floor between two `finish` intents
-const SHOW_CIRCLE = 0;     // 1 reveals the hidden circle while tuning
+const SHOW_CIRCLE_KEY = 'dotreturn.showCircle';
+let showCircle = true;     // show the circle; on by default
+try { const raw = localStorage.getItem(SHOW_CIRCLE_KEY); if (raw !== null) showCircle = raw !== '0'; } catch (e) {}
 const REVEAL_TIME = 3000;  // 3s reveal before clock starts
 
 // One dot is on screen and it is always yours, so there is nothing to
@@ -451,6 +453,7 @@ export function mount(root, api) {
     '<div class="dr-table" hidden></div>' +
     '<div class="dr-board" hidden></div>' +
     '<div class="dr-btns"><button class="dr-btn" type="button">Start</button></div>' +
+    '<label class="dr-showcircle"><input type="checkbox" class="dr-showcircle-box"> show circle</label>' +
     '<p class="dr-note"></p></div>';
   root.appendChild(wrap);
 
@@ -471,8 +474,18 @@ export function mount(root, api) {
   const ovTable = wrap.querySelector('.dr-table');
   const ovBoard = wrap.querySelector('.dr-board');
   const ovNote = wrap.querySelector('.dr-note');
-  const btns = wrap.querySelector('.dr-btns');
-  const btn = wrap.querySelector('.dr-btn');
+const btns = wrap.querySelector('.dr-btns');
+const btn = wrap.querySelector('.dr-btn');
+const showCircleBox = wrap.querySelector('.dr-showcircle-box');
+if (showCircleBox) {
+  showCircleBox.checked = showCircle;
+  showCircleBox.addEventListener('change', function () {
+    showCircle = !!showCircleBox.checked;
+    try { localStorage.setItem(SHOW_CIRCLE_KEY, showCircle ? '1' : '0'); } catch (e) {}
+    updateRings();
+    render();
+  });
+}
 
   // A second, quieter button: "Start solo" when the host is alone in a room.
   // Without it, being the first one in is a dead end, which is exactly the
@@ -517,11 +530,11 @@ export function mount(root, api) {
       centre.style.display = 'block';
       rev.style.display = 'flex';
     } else if (view.phase === 'play') {
-      ring.style.display = SHOW_CIRCLE ? 'block' : 'none';
+      ring.style.display = showCircle ? 'block' : 'none';
       centre.style.display = 'none';
       rev.style.display = 'none';
     } else {
-      ring.style.display = SHOW_CIRCLE ? 'block' : 'none';
+      ring.style.display = showCircle ? 'block' : 'none';
       centre.style.display = 'none';
       rev.style.display = 'none';
     }

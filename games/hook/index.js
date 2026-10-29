@@ -253,7 +253,7 @@ const play = (part, notes) => {
           ${playsHtml(v.subs[v.you])}</div><p>Your hook${seated ? '' : ' (watching)'}. `
         + (seated ? '<button data-a="next">Next round</button>' : '') + `</p>`
       : `<div class="box"><pre>${ends}</pre></div><p>Vote for the best hook${cands.length > 1 ? ' (not your own)' : ''}. ${voted}/${v.order.length} voted.</p>`
-        + cands.map((p) => `<p>${esc(v.names[p])}: <tt>${fmt(hookSteps(v.pair, v.subs[p]), v.scale)}</tt> <button data-part="hook" data-b="${csv(v.subs[p])}">▶</button> `
+        + cands.map((p) => `<p>${esc(v.names[p])}: <tt>${fmt(hookSteps(v.pair, v.subs[p]), v.scale)}</tt> <button data-part="hook" data-b="${csv(v.subs[p])}">▶</button> <button data-part="all" data-b="${csv(v.subs[p])}">▶ All</button> `
           + (seated && (p !== v.you || cands.length === 1) ? `<button data-a="vote" data-id="${esc(p)}">${v.votes[v.you] === p ? 'Voted ✓' : 'Vote'}</button>` : '') + '</p>').join('')
         // A table that is done voting should not have to sit out the clock.
         + (seated && voted ? '<button data-a="skip">Next round</button>' : ''));
