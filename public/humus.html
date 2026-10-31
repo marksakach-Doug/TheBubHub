@@ -1,250 +1,2562 @@
-<!doctype html>
-<html lang="en"><head><meta charset="utf-8">
-<meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
-<title>HUMUS</title>
-<style>
-:root{--bg:#f4efe6;--ink:#2a2620;--muted:#7a7266;--line:#cfc6b5;--card:#fffdf8;--accent:#5b6b3a;--warn:#8a3b2e}
-@media (prefers-color-scheme: dark){:root:not([data-theme="light"]){--bg:#1b1915;--ink:#ece6da;--muted:#958c7c;--line:#3d3830;--card:#24211b;--accent:#a7bb7c;--warn:#d98a74}}
-:root[data-theme="dark"]{--bg:#1b1915;--ink:#ece6da;--muted:#958c7c;--line:#3d3830;--card:#24211b;--accent:#a7bb7c;--warn:#d98a74}
-:root{box-sizing:border-box;padding-top:env(safe-area-inset-top,0px);padding-bottom:env(safe-area-inset-bottom,0px)}
-*{box-sizing:border-box}
-body{margin:0;background:var(--bg);color:var(--ink);font:16px/1.5 Georgia,"Times New Roman",serif}
-main{max-width:760px;margin:0 auto;padding:16px;display:flex;flex-direction:column;gap:18px}
-h1{font-size:22px;letter-spacing:4px;margin:0;color:var(--accent)}
-.sub{color:var(--muted);font-size:14px;margin:0}
-button{font:inherit;font-size:14px;padding:8px 14px;border:1px solid var(--line);background:var(--card);color:var(--ink);border-radius:8px;cursor:pointer}
-button.go{background:var(--accent);color:var(--bg);border-color:var(--accent)}
-textarea{width:100%;min-height:110px;font:inherit;padding:10px;border:1px solid var(--line);border-radius:8px;background:var(--card);color:var(--ink)}
-.hidden{display:none!important}
-.row{display:flex;gap:8px;flex-wrap:wrap;align-items:center;justify-content:space-between}
-.stack{display:flex;flex-direction:column;gap:14px}
-.planets{display:grid;grid-template-columns:repeat(auto-fill,minmax(210px,1fr));gap:10px}
-.planet{border:1px solid var(--line);border-radius:12px;padding:10px;background:var(--card);cursor:pointer;display:flex;flex-direction:column;gap:6px}
-.planet.target{outline:2px solid var(--accent)}
-.planet.dev{border-color:var(--accent)}
-.planet.assim{opacity:.5;cursor:default;border-style:dashed;border-color:var(--warn)}
-.n{font-size:12px;color:var(--muted);font-family:monospace}
-.feats{display:flex;gap:4px;flex-wrap:wrap}
-.feat{font-family:monospace;font-size:12px;border:1px solid var(--line);border-radius:999px;padding:1px 8px}
-.way{font-size:14px;border-left:2px solid var(--accent);padding-left:8px}
-.way.none{border-color:var(--line);color:var(--muted);font-style:italic}
-.meters{font-family:monospace;font-size:12px;color:var(--muted)}
-.last{font-size:13px}
-.tag{font-family:monospace;font-size:11px;font-weight:700;padding:0 6px;border-radius:4px;border:1px solid var(--accent);color:var(--accent);margin-right:4px}
-.tag.bot{border-color:var(--warn);color:var(--warn)}
-.hand{display:flex;flex-wrap:wrap;gap:8px}
-.chip{padding:8px 12px;border:1px solid var(--line);border-radius:999px;background:var(--card);cursor:pointer;font-size:15px}
-.chip.sel{background:var(--accent);color:var(--bg);border-color:var(--accent)}
-.prompt{border:1px dashed var(--line);border-radius:12px;padding:12px;display:flex;flex-direction:column;gap:10px}
-.draft{font-size:17px;border-left:3px solid var(--accent);padding:6px 10px}
-.warn{color:var(--warn);font-size:14px}
-.botline{color:var(--warn);font-style:italic}
-.atlas h2{font-size:16px;margin:16px 0 2px;color:var(--accent)}
-.atlas p{margin:4px 0}
-.atlas p.bot{color:var(--warn);font-style:italic}
-.result{font-size:18px}
-</style></head>
-<body>
-<main>
- <div class="row">
-  <div><h1>HUMUS</h1><p class="sub">Six planets. Humanity answers the planet. The Bots are just bots.</p></div>
-  <button id="btn-new" class="hidden">Start over</button>
- </div>
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no" />
+  <title>Humus — A Game of Words That Teach Each Other</title>
+  <script src="https://cdn.tailwindcss.com"></script>
+  <link rel="preconnect" href="https://fonts.googleapis.com">
+  <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+  <link href="https://fonts.googleapis.com/css2?family=Cormorant+Garamond:ital,wght@0,400;0,500;0,600;0,700;1,400;1,600&family=Inter:wght@400;500;600&family=JetBrains+Mono:wght@400;500;600&display=swap" rel="stylesheet">
+  <style>
+    :root {
+      --paper-bg: #f6f2e9;
+      --paper-sheet: #fbf9f4;
+      --paper-dark: #eae3d2;
+      --paper-border: #d8cfbe;
+      --ink-primary: #262320;
+      --ink-secondary: #5c554d;
+      --ink-muted: #8c8275;
+      --suit-red: #8f342e;
+      --suit-black: #262320;
+      --moss-accent: #3d5245;
+      --moss-light: #e6ede8;
+      --amber-warn: #8c5828;
+    }
 
- <section id="setup" class="prompt">
-  <p class="sub">Paste any text here. Some of its words will be used in the game. The game adds none of its own. Forty or more words makes a better game.</p>
-  <textarea id="src" placeholder="Paste text here…"></textarea>
-  <div class="row"><span id="setup-note" class="warn"></span><button id="btn-begin" class="go">Begin</button></div>
- </section>
+    * {
+      box-sizing: border-box;
+      -webkit-tap-highlight-color: transparent;
+    }
 
- <section id="play" class="stack hidden">
-  <div id="planets" class="planets"></div>
-  <div class="stack" style="gap:8px"><p class="sub" id="status"></p><div id="hand" class="hand"></div></div>
-  <div id="work" class="prompt hidden"></div>
-  <div class="row"><span class="sub" id="left"></span><button id="btn-finish">Stop and read the atlas</button></div>
- </section>
+    body {
+      background-color: #dfd8c8;
+      background-image: 
+        radial-gradient(at 20% 20%, rgba(255,255,255,0.35) 0%, transparent 60%),
+        radial-gradient(at 80% 80%, rgba(160,145,120,0.2) 0%, transparent 60%);
+      color: var(--ink-primary);
+      font-family: 'Inter', -apple-system, BlinkMacSystemFont, sans-serif;
+      margin: 0;
+      padding: 0;
+      overflow-x: hidden;
+    }
 
- <section id="atlas" class="atlas hidden"></section>
-</main>
-<script>
-(function(){
-'use strict';
-const N = 6, HAND = 5, MIN_WORDS = 15, DEV_AT = 2, ASSIM_AT = 3, WIN_DEV = 4, LOSE_ASSIM = 2, MAX_LINE = 240;
-const FEATURES = ['rocky','wet','dry','icy','hot','dark','forested','volcanic','airless','high gravity','thin atmosphere','stormy'];
-const CONFLICT = [['wet','dry'],['hot','icy'],['airless','stormy'],['airless','thin atmosphere'],['airless','wet']];
-const $ = id => document.getElementById(id);
-const esc = s => String(s).replace(/[&<>"']/g, c => ({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;'}[c]));
-const cap = s => s.charAt(0).toUpperCase() + s.slice(1);
-const pick = a => a[Math.floor(Math.random() * a.length)];
-let S = null;
+    .font-serif-poetic {
+      font-family: 'Cormorant Garamond', Georgia, serif;
+    }
 
-function shuffle(a){ for (let i = a.length - 1; i > 0; i--){ const j = Math.floor(Math.random() * (i + 1)); [a[i], a[j]] = [a[j], a[i]]; } return a; }
-// The deck comes only from the pasted text: unique words, 3+ letters.
-function wordsFrom(text){
-  const seen = new Set(), out = [];
-  (text.match(/[A-Za-z]{3,}/g) || []).forEach(w => { const k = w.toLowerCase(); if (!seen.has(k)){ seen.add(k); out.push(k); } });
-  return shuffle(out);
-}
-const clash = (a, b) => CONFLICT.some(c => (c[0] === a && c[1] === b) || (c[0] === b && c[1] === a));
-function twoFeatures(){ let a, b; do { a = pick(FEATURES); b = pick(FEATURES); } while (a === b || clash(a, b)); return [a, b]; }
-const developed = p => !p.assim && p.prog >= DEV_AT;
-const lastLine = p => p.lines.length ? p.lines[p.lines.length - 1] : null;
-// Words recycle when the deck runs dry, so only win, loss or stopping ends a game.
-function draw(){ if (!S.pool.length) S.pool = shuffle(S.discard.splice(0)); return S.pool.pop(); }
+    .font-mono-card {
+      font-family: 'JetBrains Mono', monospace;
+    }
 
-function begin(){
-  const pool = wordsFrom($('src').value);
-  if (pool.length < MIN_WORDS){ $('setup-note').textContent = `Need at least ${MIN_WORDS} different words. Found ${pool.length}.`; return; }
-  S = { pool, discard: [], hand: [], sel: null, pl: null, draft: null, keep: '', note: '', done: false, result: '',
-        planets: Array.from({length: N}, () => ({ features: twoFeatures(), lines: [], way: '', prog: 0, pressure: 0, assim: false })) };
-  while (S.hand.length < HAND) S.hand.push(draw());
-  $('setup').classList.add('hidden');
-  $('btn-new').classList.remove('hidden');
-  render();
-}
+    /* Subtle paper grain effect */
+    .paper-texture {
+      background-color: var(--paper-bg);
+      background-image: linear-gradient(180deg, rgba(255,255,255,0.4) 0%, rgba(234,227,210,0.2) 100%);
+    }
 
-// ---- the Bots: persistent, grammatical, and blind to why anything matters ----
-const BOT_PATTERNS = [
-  (w, e, f) => `The ${w} is recorded. The ${w} is recorded. The ${w} is recorded.`,                       // repetition
-  (w, e, f) => `${cap(w)} is a category of ${e}. ${cap(e)} is a category of ${w}.`,                       // flattening
-  (w, e, f) => `${cap(e)} detected. ${cap(w)} detected. Both assigned to storage.`,                       // classification
-  (w, e, f) => `The planet is ${f}. Therefore, every ${w} must ${pick(['float','be filed','repeat','expire','be counted'])}.`, // false causation
-  (w, e, f) => `${cap(e)} detected. ${cap(w)} detected. ${cap(e)} and ${w} are equivalent.`               // literal imitation
-];
-function botTurn(){
-  let best = -1, tgt = -1;
-  S.planets.forEach((p, i) => {
-    if (p.assim) return;
-    const s = (developed(p) ? 3 : 0) + p.pressure * 2 + (p.way ? 1 : 0) + Math.random() * 2.5;
-    if (s > best){ best = s; tgt = i; }
-  });
-  if (tgt < 0) return '';
-  const p = S.planets[tgt], w = draw();
-  if (!w) return '';
-  const hum = p.lines.slice().reverse().find(l => l.who === 'human');
-  const echo = hum ? (hum.text.match(/[A-Za-z]{4,}/g) || []).map(s => s.toLowerCase()).filter(s => s !== w) : [];
-  const e = echo.length ? pick(echo) : pick(p.features);
-  const text = pick(BOT_PATTERNS)(w, e, pick(p.features));
-  p.lines.push({ who: 'bot', kind: 'bot', text });
-  p.pressure++;
-  if (p.pressure >= ASSIM_AT) p.assim = true;
-  S.discard.push(w);
-  return `Bot, planet ${tgt + 1}: ${text}` + (p.assim ? ' — assimilated.' : '');
-}
+    .sheet-paper {
+      background-color: var(--paper-sheet);
+      box-shadow: 
+        0 1px 2px rgba(38, 35, 32, 0.06),
+        0 4px 12px rgba(38, 35, 32, 0.04),
+        inset 0 0 0 1px var(--paper-border);
+      position: relative;
+    }
 
-function checkEnd(){
-  const dev = S.planets.filter(developed).length, as = S.planets.filter(p => p.assim).length;
-  if (dev >= WIN_DEV){ S.done = true; S.result = `Humanity holds. ${dev} worlds have a way of living.`; return true; }
-  if (as >= LOSE_ASSIM){ S.done = true; S.result = `Sector lost. ${as} worlds assimilated.`; return true; }
-  return false;
-}
+    /* Playing card styling */
+    .humus-card {
+      background: #fdfcf9;
+      border: 1.5px solid #d5ccb9;
+      box-shadow: 0 2px 5px rgba(38, 35, 32, 0.07), 0 1px 1px rgba(38, 35, 32, 0.04);
+      transition: transform 0.18s cubic-bezier(0.2, 0.8, 0.2, 1), box-shadow 0.18s ease, border-color 0.18s ease, background-color 0.18s ease;
+      user-select: none;
+    }
 
-// ---- the human turn: the ground decides whether this is an adaptation or a reaction ----
-const holds = (text, w) => new RegExp('\\b' + w.replace(/[.*+?^${}()|[\]\\]/g, '\\$&') + '\\b', 'i').test(text);
-function setLine(){
-  const text = $('line').value.trim(), w = S.hand[S.sel];
-  if (!text){ $('line-note').textContent = 'Write the line first.'; return; }
-  if (text.length > MAX_LINE){ $('line-note').textContent = `Keep it under ${MAX_LINE} characters.`; return; }
-  if (!holds(text, w)){ $('line-note').textContent = `The line has to hold “${w}”.`; return; }
-  S.draft = { text, word: S.sel, planet: S.pl };
-  render();
-}
-function land(){
-  const d = S.draft, p = S.planets[d.planet], g = lastLine(p);
-  if (g && g.who === 'bot'){            // answering a Bot line: push it back
-    p.pressure = Math.max(0, p.pressure - 1);
-    p.lines.push({ who: 'human', kind: 'react', text: d.text });
-  } else {                              // answering a human line, or bare ground: the world deepens
-    p.prog++; p.way = d.text;
-    p.lines.push({ who: 'human', kind: 'adapt', text: d.text });
-  }
-  S.discard.push(S.hand.splice(d.word, 1)[0]);
-  const w = draw(); if (w) S.hand.push(w);
-  S.draft = null; S.sel = null; S.pl = null; S.keep = ''; S.note = '';
-  if (!checkEnd()){ S.note = botTurn(); checkEnd(); }
-  render();
-}
-function notYet(){ S.keep = S.draft.text; S.draft = null; render(); }
-function pickChip(i){ S.sel = S.sel === i ? null : i; S.pl = null; S.draft = null; S.keep = ''; render(); }
-function pickPlanet(i){ if (S.sel === null || S.planets[i].assim) return; S.pl = i; S.draft = null; S.keep = ''; render(); }
-function finish(){ S.done = true; S.result = 'You stopped here.'; render(); }
+    .humus-card:active:not(:disabled) {
+      transform: scale(0.97);
+    }
 
-// ---- display ----
-function lastHTML(p){
-  const g = lastLine(p);
-  return g ? `<div class="last"><span class="tag ${g.who === 'bot' ? 'bot' : ''}">${g.who === 'bot' ? 'BOT' : 'HUMAN'}</span>${esc(g.text)}</div>` : '<div class="last sub">Bare ground.</div>';
-}
-function render(){
-  if (!S) return;
-  const playing = !S.done;
-  $('play').classList.toggle('hidden', !playing);
-  $('atlas').classList.toggle('hidden', playing);
-  if (!playing){ renderAtlas(); return; }
+    .humus-card.selected-card {
+      border-color: var(--moss-accent);
+      background-color: #f3f7f4;
+      box-shadow: 0 6px 14px rgba(61, 82, 69, 0.16), 0 0 0 1.5px var(--moss-accent);
+      transform: translateY(-3px);
+    }
 
-  const pl = $('planets'); pl.innerHTML = '';
-  S.planets.forEach((p, i) => {
-    const d = document.createElement('div');
-    d.className = 'planet' + (S.pl === i ? ' target' : '') + (p.assim ? ' assim' : '') + (developed(p) ? ' dev' : '');
-    d.innerHTML = `<div class="n">planet ${i + 1}${p.assim ? ' · ASSIMILATED' : ''}${developed(p) ? ' · DEVELOPED' : ''}</div>` +
-      `<div class="feats">${p.features.map(f => `<span class="feat">${esc(f)}</span>`).join('')}</div>` +
-      `<div class="way${p.way ? '' : ' none'}">${p.way ? esc(p.way) : 'No established adaptation.'}</div>` +
-      `<div class="meters">adaptation ${Math.min(p.prog, DEV_AT)}/${DEV_AT} · Bot pressure ${p.pressure}/${ASSIM_AT}</div>` + lastHTML(p);
-    d.addEventListener('click', () => pickPlanet(i));
-    pl.appendChild(d);
-  });
+    .humus-card.secret-highlight {
+      border-color: var(--moss-accent);
+      background-color: #eef4f0;
+    }
 
-  const hd = $('hand'); hd.innerHTML = '';
-  S.hand.forEach((w, i) => {
-    const b = document.createElement('div');
-    b.className = 'chip' + (S.sel === i ? ' sel' : '');
-    b.textContent = w;
-    b.addEventListener('click', () => pickChip(i));
-    hd.appendChild(b);
-  });
+    .humus-card.struck-highlight {
+      border-color: var(--suit-red);
+      background-color: #faf0ef;
+    }
 
-  let st = S.sel === null ? 'Pick a word from your hand.' : S.pl === null ? `“${S.hand[S.sel]}”: now pick a planet.` : '';
-  $('status').innerHTML = esc(st) + (S.note ? ` <span class="botline">${esc(S.note)}</span>` : '');
-  $('left').textContent = `Developed ${S.planets.filter(developed).length}/${WIN_DEV} · Assimilated ${S.planets.filter(p => p.assim).length}/${LOSE_ASSIM}`;
+    /* Custom strikethrough like a graphite pencil stroke */
+    .pencil-strike {
+      position: relative;
+      display: inline-block;
+      color: #8c8275;
+    }
+    .pencil-strike::after {
+      content: '';
+      position: absolute;
+      left: -3px;
+      right: -3px;
+      top: 52%;
+      height: 1.5px;
+      background-color: var(--suit-red);
+      opacity: 0.85;
+      transform: rotate(-2deg);
+    }
 
-  const work = $('work');
-  if (S.draft){
-    work.classList.remove('hidden');
-    work.innerHTML = `<div class="sub">The table reads it aloud:</div><div class="draft">${esc(S.draft.text)}</div>` +
-      `<div class="row"><button id="btn-not">Not yet</button><button id="btn-land" class="go">It lands</button></div>`;
-    $('btn-land').addEventListener('click', land);
-    $('btn-not').addEventListener('click', notYet);
-  } else if (S.sel !== null && S.pl !== null){
-    const p = S.planets[S.pl], g = lastLine(p), bot = g && g.who === 'bot';
-    work.classList.remove('hidden');
-    work.innerHTML = `<div class="feats">${p.features.map(f => `<span class="feat">${esc(f)}</span>`).join('')}</div>` +
-      `<div class="way${p.way ? '' : ' none'}">${p.way ? esc(p.way) : 'No established adaptation.'}</div>` + lastHTML(p) +
-      `<div class="sub">${bot ? 'The Bot spoke last. Answer it: let your word meet this ground in a way the Bot cannot. This pushes one pressure back.'
-        : g ? 'Answer the ground: let your word meet these conditions and the way people already live here. This deepens the world.'
-        : 'Bare ground. Say how people begin to live here, using your word.'}</div>` +
-      `<textarea id="line" placeholder="One line…"></textarea>` +
-      `<div class="row"><span id="line-note" class="warn"></span><button id="btn-set" class="go">Set it down</button></div>`;
-    $('line').value = S.keep || '';
-    $('btn-set').addEventListener('click', setLine);
-  } else { work.classList.add('hidden'); work.innerHTML = ''; }
-}
-function renderAtlas(){
-  let h = `<h1>ATLAS</h1><p class="result">${esc(S.result)}</p>`;
-  S.planets.forEach((p, i) => {
-    const status = p.assim ? 'Assimilated' : developed(p) ? 'Remained human, developed' : 'Remained human, still forming';
-    h += `<h2>Planet ${i + 1} · ${esc(p.features.join(', '))}</h2><p class="sub">${status}. Adaptation: ${p.way ? esc(p.way) : 'none established'}</p>`;
-    p.lines.forEach(l => { h += `<p class="${l.who === 'bot' ? 'bot' : ''}"><b>${l.who === 'bot' ? 'BOT' : 'HUMAN'}</b>${l.kind === 'react' ? ' (answered a Bot)' : l.kind === 'adapt' ? ' (deepened)' : ''} ${esc(l.text)}</p>`; });
-    if (!p.lines.length) h += '<p class="sub">Never touched.</p>';
-  });
-  $('atlas').innerHTML = h;
-}
+    /* Hide scrollbars while keeping scroll functionality */
+    .no-scrollbar::-webkit-scrollbar {
+      display: none;
+    }
+    .no-scrollbar {
+      -ms-overflow-style: none;
+      scrollbar-width: none;
+    }
 
-$('btn-begin').addEventListener('click', begin);
-$('btn-finish').addEventListener('click', finish);
-$('btn-new').addEventListener('click', () => {
-  S = null;
-  $('play').classList.add('hidden'); $('atlas').classList.add('hidden');
-  $('setup').classList.remove('hidden'); $('btn-new').classList.add('hidden'); $('setup-note').textContent = '';
-});
-})();
-</script>
-</body></html>
+    @keyframes fadeInSlide {
+      from { opacity: 0; transform: translateY(6px); }
+      to { opacity: 1; transform: translateY(0); }
+    }
+
+    .animate-fade-slide {
+      animation: fadeInSlide 0.25s cubic-bezier(0.16, 1, 0.3, 1) forwards;
+    }
+
+    @keyframes pulseGentle {
+      0%, 100% { opacity: 0.55; }
+      50% { opacity: 1; }
+    }
+    .animate-pulse-gentle {
+      animation: pulseGentle 1.8s infinite ease-in-out;
+    }
+  </style>
+</head>
+<body class="min-h-screen flex justify-center items-start sm:py-4 sm:px-4">
+
+  <!-- Mobile Phone Container -->
+  <div id="app-shell" class="w-full max-w-[440px] min-h-screen sm:min-h-[840px] sm:max-h-[92vh] paper-texture sm:rounded-[28px] sm:shadow-2xl sm:border sm:border-[#c8beaa] flex flex-col justify-between overflow-hidden relative">
+
+    <!-- TOP BAR -->
+    <header class="px-3.5 pt-3 pb-2.5 border-b border-[#dcd3c1] bg-[#f3ede0]/90 backdrop-blur-sm sticky top-0 z-20">
+      <div class="flex items-center justify-between gap-1.5">
+        <!-- Brand & Turn Counter -->
+        <div class="flex items-center gap-2">
+          <button onclick="openRulesModal()" class="text-left group focus:outline-none" title="About Humus">
+            <h1 class="font-serif-poetic text-2xl font-bold tracking-tight text-[#262320] leading-none flex items-center gap-1">
+              Humus
+              <span id="variant-dot" class="hidden w-1.5 h-1.5 rounded-full bg-[#3d5245]" title="Variant Deck Active"></span>
+            </h1>
+          </button>
+          <span id="turn-badge" class="font-mono-card text-[11px] font-medium px-2 py-0.5 rounded-full bg-[#e6dfd0] text-[#4a433b] border border-[#d2c8b5]">
+            Turn 1 / 12
+          </span>
+          <span id="role-badge" class="text-[11px] font-medium px-2 py-0.5 rounded-full bg-[#3d5245] text-[#f6f2e9]">
+            You Speak
+          </span>
+        </div>
+
+        <!-- Action Buttons -->
+        <div class="flex items-center gap-1">
+          <button onclick="openWordKeyModal()" class="px-2 py-1 rounded-lg text-xs font-medium bg-[#fbf9f4] hover:bg-[#efe9da] text-[#3a352f] border border-[#d5ccb9] transition flex items-center gap-1 shadow-sm">
+            <span class="font-mono-card text-[10px]">♠♥</span>
+            <span>Key</span>
+          </button>
+          <button id="btn-end-early" onclick="triggerEndingCeremony()" class="px-2 py-1 rounded-lg text-xs font-medium bg-[#fbf9f4] hover:bg-[#efe9da] text-[#5c554d] border border-[#d5ccb9] transition shadow-sm" title="Read Worlds & End Game">
+            End
+          </button>
+          <button onclick="openSettingsModal()" class="p-1.5 rounded-lg text-xs font-medium bg-[#fbf9f4] hover:bg-[#efe9da] text-[#5c554d] border border-[#d5ccb9] transition shadow-sm" title="New Game & Variant Settings" aria-label="Settings">
+            <svg class="w-4 h-4" fill="none" stroke="currentColor" stroke-width="1.8" viewBox="0 0 24 24">
+              <path stroke-linecap="round" stroke-linejoin="round" d="M10.325 4.317c.426-1.756 2.924-1.756 3.35 0a1.724 1.724 0 002.573 1.066c1.543-.94 3.31.826 2.37 2.37a1.724 1.724 0 001.065 2.572c1.756.426 1.756 2.924 0 3.35a1.724 1.724 0 00-1.066 2.573c.94 1.543-.826 3.31-2.37 2.37a1.724 1.724 0 00-2.572 1.065c-.426 1.756-2.924 1.756-3.35 0a1.724 1.724 0 00-2.573-1.066c-1.543.94-3.31-.826-2.37-2.37a1.724 1.724 0 00-1.065-2.572c-1.756-.426-1.756-2.924 0-3.35a1.724 1.724 0 001.066-2.573c-.94-1.543.826-3.31 2.37-2.37.996.608 2.296.07 2.572-1.065z" />
+              <path stroke-linecap="round" stroke-linejoin="round" d="M15 12a3 3 0 11-6 0 3 3 0 016 0z" />
+            </svg>
+          </button>
+        </div>
+      </div>
+
+      <!-- Subtle Toast Notification Banner (for Decoy Replacements or Rule Info) -->
+      <div id="toast-banner" class="hidden mt-2 px-2.5 py-1.5 rounded-lg bg-[#eae3d2] border border-[#cbbba0] text-[#4a4238] text-xs flex items-center justify-between gap-2 animate-fade-slide">
+        <span id="toast-message" class="leading-snug"></span>
+        <button onclick="hideToast()" class="text-[#7a7064] hover:text-[#262320] font-mono-card text-xs px-1">✕</button>
+      </div>
+    </header>
+
+    <!-- MAIN SCROLLABLE WORKSPACE -->
+    <main id="main-content" class="flex-1 overflow-y-auto px-3.5 py-3 space-y-3.5 no-scrollbar">
+      <!-- Dynamic Content Injected by renderGame() -->
+    </main>
+
+    <!-- BOTTOM ACTION / STATUS BAR -->
+    <footer id="bottom-bar" class="px-3.5 py-2.5 border-t border-[#dcd3c1] bg-[#f3ede0]/95 backdrop-blur-sm z-10">
+      <!-- Dynamic Footer Controls Injected by renderGame() -->
+    </footer>
+
+    <!-- WORD KEY MODAL -->
+    <div id="modal-word-key" class="hidden fixed inset-0 z-50 bg-black/45 backdrop-blur-[2px] flex items-center justify-center p-3">
+      <div class="w-full max-w-[410px] max-h-[86vh] sheet-paper rounded-2xl flex flex-col overflow-hidden shadow-2xl animate-fade-slide">
+        <div class="px-4 py-3 border-b border-[#e2dac9] flex items-center justify-between bg-[#f4efe4]">
+          <div>
+            <h2 class="font-serif-poetic text-xl font-bold text-[#262320]">The Word Key</h2>
+            <p class="text-[11px] text-[#6e655c]">52 cards across 4 kinds of word · Ranks are labels only</p>
+          </div>
+          <button onclick="closeWordKeyModal()" class="w-7 h-7 rounded-full bg-[#e6dfd0] hover:bg-[#d8cfbe] text-[#3a352f] flex items-center justify-center text-sm font-mono-card">✕</button>
+        </div>
+        <div id="word-key-body" class="p-3.5 overflow-y-auto space-y-3 text-xs">
+          <!-- Populated dynamically -->
+        </div>
+      </div>
+    </div>
+
+    <!-- RULES MODAL -->
+    <div id="modal-rules" class="hidden fixed inset-0 z-50 bg-black/45 backdrop-blur-[2px] flex items-center justify-center p-3">
+      <div class="w-full max-w-[410px] max-h-[86vh] sheet-paper rounded-2xl flex flex-col overflow-hidden shadow-2xl animate-fade-slide">
+        <div class="px-4 py-3 border-b border-[#e2dac9] flex items-center justify-between bg-[#f4efe4]">
+          <div>
+            <h2 class="font-serif-poetic text-xl font-bold text-[#262320]">Humus — Rules of Play</h2>
+            <p class="text-[11px] text-[#6e655c] italic">A game of words that teach each other</p>
+          </div>
+          <button onclick="closeRulesModal()" class="w-7 h-7 rounded-full bg-[#e6dfd0] hover:bg-[#d8cfbe] text-[#3a352f] flex items-center justify-center text-sm font-mono-card">✕</button>
+        </div>
+        <div class="p-4 overflow-y-auto space-y-3 text-xs leading-relaxed text-[#3a352f]">
+          <p><strong>Worlds:</strong> A world is a sheet of paper with a growing list of words and the lines that taught them. Every world begins with four seed words drawn from the deck.</p>
+          <div class="p-2.5 rounded-xl bg-[#f4efe4] border border-[#e0d7c5] space-y-1.5">
+            <p class="font-semibold text-[#262320]">Each Turn (12 turns total):</p>
+            <ol class="list-decimal list-inside space-y-1 text-[11.5px]">
+              <li><strong>Draw 4 cards</strong> silently from the 52-card deck.</li>
+              <li><strong>Pick the Secret:</strong> Choose 1 card as the secret word; the other 3 are decoys.</li>
+              <li><strong>Pick the World:</strong> Choose an existing sheet, or start a new world (seeded with 4 fresh cards). The secret word cannot already be in or struck from that world. Any decoy already in or struck from that world is swapped for a fresh draw.</li>
+              <li><strong>Write the Line:</strong> Up to 7 words teaching the secret word. You may ONLY use words in that world (with optional <code>-s, -es, -ed, -ing, -ly</code> endings), free words (<code>the, a, of, in, and, is, to, not</code>), and <code>.</code> or <code>?</code>. You cannot use the secret word or struck words.</li>
+              <li><strong>Decode:</strong> The 4 cards are laid out face up. The decoder points to the word they think the line was teaching.</li>
+              <li><strong>The World Keeps What Was Heard:</strong> The guessed word always joins the world. If a decoy was guessed instead of the secret, the secret word is <span class="pencil-strike">struck through</span> and never learned by that world.</li>
+            </ol>
+          </div>
+          <div class="p-2.5 rounded-xl bg-[#eef3ef] border border-[#cbd9ce] space-y-1">
+            <p class="font-semibold text-[#2d3e33]">Rules That Protect the Game</p>
+            <ul class="list-disc list-inside text-[11.5px] text-[#3d5245] space-y-0.5">
+              <li>Never explain a line, even after a miss. Meaning stays in the players’ heads.</li>
+              <li>Nobody judges the poetry. A line only has to be understood.</li>
+              <li>There is no score. A miss isn’t a loss—it’s how the world grows.</li>
+            </ul>
+          </div>
+        </div>
+      </div>
+    </div>
+
+    <!-- SETTINGS / NEW GAME MODAL -->
+    <div id="modal-settings" class="hidden fixed inset-0 z-50 bg-black/45 backdrop-blur-[2px] flex items-center justify-center p-3">
+      <div class="w-full max-w-[390px] sheet-paper rounded-2xl flex flex-col overflow-hidden shadow-2xl animate-fade-slide">
+        <div class="px-4 py-3 border-b border-[#e2dac9] flex items-center justify-between bg-[#f4efe4]">
+          <h2 class="font-serif-poetic text-xl font-bold text-[#262320]">Table & Deck Settings</h2>
+          <button onclick="closeSettingsModal()" class="w-7 h-7 rounded-full bg-[#e6dfd0] hover:bg-[#d8cfbe] text-[#3a352f] flex items-center justify-center text-sm font-mono-card">✕</button>
+        </div>
+        <div class="p-4 space-y-4 text-xs text-[#3a352f]">
+          <!-- Variant Toggle -->
+          <div class="p-3 rounded-xl bg-[#f4efe4] border border-[#dfd6c4] space-y-2">
+            <div class="flex items-center justify-between">
+              <div>
+                <p class="font-semibold text-sm text-[#262320]">Variant: A deck that points somewhere</p>
+                <p class="text-[11px] text-[#6e655c]">Swap ♥Q <em>forget → release</em> and ♦K <em>dry → free</em></p>
+              </div>
+              <button id="toggle-variant-btn" onclick="toggleVariantSetting()" class="w-12 h-6 rounded-full transition-colors p-0.5 flex items-center bg-[#cfc6b4]">
+                <span id="toggle-variant-knob" class="w-5 h-5 rounded-full bg-white shadow transform transition-transform"></span>
+              </button>
+            </div>
+            <p class="text-[11px] text-[#6e655c] leading-relaxed">
+              The standard deck holds a lot of impermanence (<em>ash, tide, fall</em>) and stress (<em>hungry, bitter, hollow</em>); these two swaps give worlds a direction to drift toward.
+            </p>
+          </div>
+
+          <!-- First Speaker Selection -->
+          <div class="space-y-1.5">
+            <label class="font-semibold text-[#262320] block">Who speaks on Turn 1?</label>
+            <div class="grid grid-cols-2 gap-2">
+              <button id="first-speaker-player" onclick="setFirstSpeaker('player')" class="py-2 px-3 rounded-xl border text-xs font-medium transition">
+                You Speak First
+              </button>
+              <button id="first-speaker-bot" onclick="setFirstSpeaker('bot')" class="py-2 px-3 rounded-xl border text-xs font-medium transition">
+                Bot Speaks First
+              </button>
+            </div>
+          </div>
+
+          <!-- Start Fresh Game Button -->
+          <div class="pt-2 border-t border-[#e2dac9] flex gap-2">
+            <button onclick="startNewGameFromSettings()" class="w-full py-2.5 px-4 rounded-xl bg-[#3d5245] hover:bg-[#2f4036] text-[#f6f2e9] font-medium text-xs shadow-sm transition">
+              Shuffle Deck & Start New Game
+            </button>
+          </div>
+        </div>
+      </div>
+    </div>
+
+  </div>
+
+  <script>
+    /********************************************************************
+     * 1. THE 52-CARD WORD KEY & LINGUISTIC INFLECTION ENGINE
+     ********************************************************************/
+    const SUITS = {
+      '♠': { name: 'Spades', kind: 'Nouns', color: 'black', symbol: '♠' },
+      '♥': { name: 'Hearts', kind: 'Verbs', color: 'red', symbol: '♥' },
+      '♦': { name: 'Diamonds', kind: 'Adjectives', color: 'red', symbol: '♦' },
+      '♣': { name: 'Clubs', kind: 'Others', color: 'black', symbol: '♣' }
+    };
+
+    const RANKS = ['A', '2', '3', '4', '5', '6', '7', '8', '9', '10', 'J', 'Q', 'K'];
+
+    const BASE_WORD_KEY = {
+      '♠': {
+        'A': 'salt', '2': 'tide', '3': 'ash', '4': 'bone', '5': 'glass',
+        '6': 'root', '7': 'lamp', '8': 'door', '9': 'river', '10': 'ghost',
+        'J': 'moth', 'Q': 'stone', 'K': 'bell'
+      },
+      '♥': {
+        'A': 'burn', '2': 'drown', '3': 'wake', '4': 'carry', '5': 'fall',
+        '6': 'break', '7': 'leave', '8': 'hold', '9': 'grow', '10': 'bend',
+        'J': 'climb', 'Q': 'forget', 'K': 'bloom'
+      },
+      '♦': {
+        'A': 'quiet', '2': 'bright', '3': 'hollow', '4': 'slow', '5': 'bitter',
+        '6': 'tender', '7': 'strange', '8': 'old', '9': 'hungry', '10': 'cold',
+        'J': 'wild', 'Q': 'heavy', 'K': 'dry'
+      },
+      '♣': {
+        'A': 'we', '2': 'you', '3': 'nobody', '4': 'everything', '5': 'they',
+        '6': 'nothing', '7': 'someone', '8': 'everyone', '9': 'always', '10': 'never',
+        'J': 'again', 'Q': 'here', 'K': 'there'
+      }
+    };
+
+    const FREE_WORDS = ['the', 'a', 'of', 'in', 'and', 'is', 'to', 'not'];
+    const ALLOWED_SUFFIXES = ['s', 'es', 'ed', 'ing', 'ly'];
+    const ROMAN_NUMERALS = ['I', 'II', 'III', 'IV', 'V', 'VI', 'VII', 'VIII', 'IX', 'X', 'XI', 'XII'];
+
+    /**
+     * Generates all valid inflected forms for a base word using the allowed endings:
+     * -s, -es, -ed, -ing, -ly.
+     * Supports both standard English spelling adjustments (e.g. carry -> carries/carried,
+     * stone -> stoning/stoned, heavy -> heavily, dry -> dries/dried) AND direct concatenation
+     * so players are never penalized for natural spelling or literal suffixing.
+     */
+    function getValidFormsForWord(baseWord) {
+      const w = baseWord.toLowerCase();
+      const forms = new Set([w]);
+
+      // 1. Direct literal suffix concatenation
+      for (const suf of ALLOWED_SUFFIXES) {
+        forms.add(w + suf);
+      }
+
+      // 2. Standard English orthographic rules for -s, -es, -ed, -ing, -ly
+      // Words ending in silent 'e' (tide, bone, stone, wake, leave, strange, release, free)
+      if (w.endsWith('e') && w !== 'we' && w !== 'here' && w !== 'there') {
+        const stem = w.slice(0, -1);
+        forms.add(stem + 'ed');   // stoned, waked, leaved, released, freed
+        forms.add(stem + 'ing');  // stoning, waking, leaving, releasing, freeing
+        forms.add(stem + 'es');   // tides, stones, leaves
+        forms.add(stem + 'ly');   // strangely
+      }
+
+      // Words ending in consonant + 'y' (carry, heavy, hungry, dry)
+      if (w.endsWith('y') && !['they', 'always', 'nobody'].includes(w)) {
+        const stem = w.slice(0, -1);
+        forms.add(stem + 'ies');  // carries, dries, heavies
+        forms.add(stem + 'ied');  // carried, dried, heavied
+        forms.add(stem + 'ily');  // heavily, hungrily, drily
+      }
+
+      return forms;
+    }
+
+    /**
+     * Applies one of the allowed suffixes ('s', 'es', 'ed', 'ing', 'ly') cleanly to a word
+     * when the player taps a quick-ending pill in the Word Builder.
+     */
+    function applySuffixSmartly(word, suffix) {
+      const clean = word.replace(/[.?]+$/, '');
+      const punct = word.slice(clean.length);
+      const w = clean.toLowerCase();
+
+      // Prevent applying suffixes to free words
+      if (FREE_WORDS.includes(w)) return word;
+
+      // Find if 'w' is already an inflected form of a known base word; if so, revert to base or re-inflect
+      let base = w;
+      const allDeckWords = getAllCurrentDeckWords();
+      for (const dw of allDeckWords) {
+        const forms = getValidFormsForWord(dw);
+        if (forms.has(w)) {
+          base = dw;
+          break;
+        }
+      }
+
+      // If tapping the same suffix that's already applied, toggle back to base word
+      let target = base + suffix;
+      if (base.endsWith('e') && base !== 'we' && base !== 'here' && base !== 'there') {
+        const stem = base.slice(0, -1);
+        if (suffix === 'ing') target = stem + 'ing';
+        else if (suffix === 'ed') target = stem + 'ed';
+        else if (suffix === 'es') target = stem + 'es';
+        else if (suffix === 's') target = base + 's';
+      } else if (base === 'ash' || base === 'glass') {
+        if (suffix === 's' || suffix === 'es') target = base + 'es';
+      } else if (base.endsWith('y') && !['they', 'always', 'nobody'].includes(base)) {
+        const stem = base.slice(0, -1);
+        if (suffix === 's' || suffix === 'es') target = stem + 'ies';
+        else if (suffix === 'ed') target = stem + 'ied';
+        else if (suffix === 'ly' && (base === 'heavy' || base === 'hungry')) target = stem + 'ily';
+      }
+
+      if (w === target) {
+        return base + punct;
+      }
+      return target + punct;
+    }
+
+    function getAllCurrentDeckWords() {
+      const words = [];
+      for (const suit of Object.keys(BASE_WORD_KEY)) {
+        for (const rank of RANKS) {
+          words.push(getCardWord(suit, rank));
+        }
+      }
+      return words;
+    }
+
+    function getCardWord(suit, rank) {
+      if (gameState.useVariant) {
+        if (suit === '♥' && rank === 'Q') return 'release';
+        if (suit === '♦' && rank === 'K') return 'free';
+      }
+      return BASE_WORD_KEY[suit][rank];
+    }
+
+    function buildFullDeck() {
+      const deck = [];
+      for (const suit of ['♠', '♥', '♦', '♣']) {
+        for (const rank of RANKS) {
+          deck.push({
+            id: `${suit}${rank}`,
+            suit,
+            rank,
+            word: getCardWord(suit, rank),
+            kind: SUITS[suit].kind,
+            color: SUITS[suit].color
+          });
+        }
+      }
+      return deck;
+    }
+
+    function shuffleArray(arr) {
+      const copy = [...arr];
+      for (let i = copy.length - 1; i > 0; i--) {
+        const j = Math.floor(Math.random() * (i + 1));
+        [copy[i], copy[j]] = [copy[j], copy[i]];
+      }
+      return copy;
+    }
+
+    /********************************************************************
+     * 2. SEMANTIC KNOWLEDGE GRAPH (FOR BOT POETICS & FALLBACK ENGINE)
+     ********************************************************************/
+    // Curated semantic affinities so the Bot understands poetic metaphors, sensory links,
+    // and contrasting tensions across all 54 words in Humus.
+    const WORD_RESONANCE = {
+      // Spades (Nouns)
+      salt: ['tide', 'river', 'drown', 'bitter', 'dry', 'burn', 'stone', 'tear', 'old', 'hungry', 'cold'],
+      tide: ['salt', 'river', 'drown', 'fall', 'rise', 'slow', 'always', 'again', 'climb', 'hold', 'wild', 'moon'],
+      ash: ['burn', 'bone', 'dry', 'gray', 'quiet', 'fall', 'ghost', 'leave', 'forget', 'cold', 'nothing', 'bitter'],
+      bone: ['ash', 'stone', 'old', 'dry', 'hollow', 'break', 'carry', 'heavy', 'cold', 'root', 'ghost', 'quiet'],
+      glass: ['break', 'bright', 'clear', 'cold', 'hollow', 'lamp', 'door', 'sharp', 'fragile', 'hold', 'quiet'],
+      root: ['grow', 'bloom', 'earth', 'stone', 'river', 'hold', 'deep', 'slow', 'old', 'climb', 'bone', 'tender'],
+      lamp: ['bright', 'burn', 'wake', 'door', 'quiet', 'glass', 'hold', 'carry', 'night', 'someone', 'here'],
+      door: ['leave', 'hold', 'open', 'close', 'lamp', 'here', 'there', 'someone', 'nobody', 'ghost', 'quiet', 'hollow'],
+      river: ['tide', 'drown', 'salt', 'slow', 'cold', 'carry', 'bend', 'leave', 'always', 'never', 'root', 'stone'],
+      ghost: ['nobody', 'nothing', 'quiet', 'hollow', 'cold', 'leave', 'forget', 'again', 'ash', 'bone', 'door', 'strange'],
+      moth: ['lamp', 'burn', 'bright', 'wild', 'quiet', 'tender', 'fall', 'climb', 'ash', 'ghost', 'strange'],
+      stone: ['heavy', 'old', 'cold', 'quiet', 'hold', 'fall', 'break', 'river', 'bone', 'root', 'always', 'dry'],
+      bell: ['wake', 'hollow', 'bright', 'clear', 'climb', 'someone', 'everyone', 'here', 'there', 'again', 'old'],
+
+      // Hearts (Verbs)
+      burn: ['ash', 'lamp', 'bright', 'dry', 'moth', 'salt', 'bitter', 'wild', 'hungry', 'leave', 'nothing'],
+      drown: ['tide', 'river', 'salt', 'heavy', 'fall', 'cold', 'deep', 'hold', 'quiet', 'slow', 'nobody'],
+      wake: ['lamp', 'bright', 'bell', 'door', 'again', 'someone', 'everyone', 'here', 'bloom', 'grow'],
+      carry: ['heavy', 'stone', 'bone', 'hold', 'river', 'we', 'they', 'Always', 'slow', 'tender', 'bend'],
+      fall: ['heavy', 'stone', 'ash', 'leaf', 'break', 'drown', 'rain', 'down', 'slow', 'quiet', 'never'],
+      break: ['glass', 'bone', 'stone', 'door', 'fall', 'bend', 'bitter', 'heavy', 'wild', 'hollow'],
+      leave: ['door', 'ghost', 'there', 'forget', 'release', 'free', 'nobody', 'nothing', 'ash', 'again', 'never'],
+      hold: ['carry', 'tender', 'stone', 'root', 'door', 'lamp', 'we', 'you', 'always', 'heavy'],
+      grow: ['root', 'bloom', 'slow', 'tender', 'wild', 'climb', 'bright', 'river', 'everything'],
+      bend: ['river', 'root', 'wind', 'slow', 'carry', 'heavy', 'break', 'old', 'climb'],
+      climb: ['root', 'moth', 'bell', 'bright', 'grow', 'wild', 'high', 'stone', 'slow'],
+      forget: ['ghost', 'leave', 'ash', 'nobody', 'nothing', 'never', 'old', 'quiet', 'hollow', 'tide'],
+      release: ['free', 'leave', 'open', 'moth', 'tide', 'river', 'breath', 'hold', 'tender', 'bright'],
+      bloom: ['grow', 'root', 'tender', 'bright', 'wild', 'wake', 'again', 'here', 'spring'],
+
+      // Diamonds (Adjectives)
+      quiet: ['ghost', 'ash', 'stone', 'lamp', 'door', 'slow', 'nobody', 'nothing', 'old', 'tender'],
+      bright: ['lamp', 'burn', 'glass', 'moth', 'wake', 'bloom', 'bell', 'here', 'everyone'],
+      hollow: ['bone', 'bell', 'ghost', 'glass', 'door', 'hungry', 'nothing', 'nobody', 'dry', 'old'],
+      slow: ['tide', 'river', 'root', 'grow', 'old', 'heavy', 'stone', 'carry', 'quiet', 'always'],
+      bitter: ['salt', 'ash', 'cold', 'hungry', 'burn', 'break', 'old', 'dry', 'never'],
+      tender: ['bloom', 'grow', 'root', 'hold', 'moth', 'quiet', 'we', 'you', 'carry'],
+      strange: ['ghost', 'moth', 'wild', 'hollow', 'someone', 'there', 'door', 'glass'],
+      old: ['stone', 'bone', 'root', 'river', 'ash', 'door', 'bell', 'slow', 'always', 'forget'],
+      hungry: ['salt', 'burn', 'wild', 'hollow', 'bitter', 'cold', 'nothing', 'everything', 'moth'],
+      cold: ['stone', 'river', 'tide', 'glass', 'bone', 'ash', 'ghost', 'drown', 'winter', 'quiet'],
+      wild: ['moth', 'tide', 'river', 'bloom', 'grow', 'burn', 'hungry', 'strange', 'free', 'climb'],
+      heavy: ['stone', 'carry', 'fall', 'drown', 'bone', 'bend', 'hold', 'old', 'slow'],
+      dry: ['ash', 'bone', 'salt', 'stone', 'burn', 'hollow', 'old', 'hungry', 'bitter'],
+      free: ['release', 'wild', 'moth', 'river', 'tide', 'leave', 'door', 'open', 'bright', 'everything'],
+
+      // Clubs (Others)
+      we: ['you', 'everyone', 'carry', 'hold', 'here', 'always', 'together', 'home'],
+      you: ['we', 'someone', 'here', 'there', 'hold', 'wake', 'leave', 'forget'],
+      nobody: ['nothing', 'ghost', 'hollow', 'quiet', 'never', 'leave', 'door', 'forget'],
+      everything: ['everyone', 'always', 'grow', 'bloom', 'river', 'tide', 'fall', 'burn'],
+      they: ['we', 'everyone', 'someone', 'there', 'leave', 'carry', 'climb'],
+      nothing: ['nobody', 'ghost', 'hollow', 'ash', 'quiet', 'never', 'forget', 'cold'],
+      someone: ['nobody', 'everyone', 'door', 'lamp', 'wake', 'bell', 'here', 'hold'],
+      everyone: ['everything', 'someone', 'we', 'bell', 'wake', 'here', 'always'],
+      always: ['tide', 'river', 'stone', 'old', 'again', 'everything', 'hold', 'never'],
+      never: ['nothing', 'nobody', 'forget', 'ghost', 'ash', 'leave', 'always'],
+      again: ['wake', 'bloom', 'tide', 'bell', 'always', 'grow', 'here', 'door'],
+      here: ['there', 'lamp', 'door', 'we', 'you', 'someone', 'wake', 'hold'],
+      there: ['here', 'leave', 'door', 'ghost', 'they', 'river', 'climb', 'strange']
+    };
+
+    // Compute semantic similarity score between two base words
+    function getWordAffinity(w1, w2) {
+      if (w1 === w2) return 10;
+      const list1 = WORD_RESONANCE[w1] || [];
+      const list2 = WORD_RESONANCE[w2] || [];
+      let score = 0;
+      if (list1.includes(w2)) score += 4.5;
+      if (list2.includes(w1)) score += 4.5;
+      // Shared neighbors (2-hop resonance)
+      for (const n of list1) {
+        if (list2.includes(n)) score += 1.4;
+      }
+      return score;
+    }
+
+    /********************************************************************
+     * 3. GAME STATE & TURN STRUCTURE
+     ********************************************************************/
+    let gameState = {
+      turn: 1,
+      maxTurns: 12,
+      firstSpeaker: 'player', // 'player' or 'bot'
+      speaker: 'player',      // 'player' or 'bot'
+      phase: 'PLAYER_PICK',   // 'PLAYER_PICK' | 'PLAYER_WRITE' | 'BOT_DECODE' | 'BOT_SPEAK' | 'PLAYER_DECODE' | 'REVEAL' | 'CEREMONY'
+      useVariant: false,
+      deck: [],
+      worlds: [],             // Array of { id, title, seedWords: [], words: [], lines: [], struck: [] }
+      activeWorldIndex: 0,    // Currently viewed world tab
+      targetWorldIndex: 'NEW',// During PLAYER_PICK: index of existing world or 'NEW'
+      hand: [],               // 4 cards drawn by Speaker
+      secretCard: null,       // Card chosen as secret
+      decoyCards: [],         // 3 decoy cards
+      tableCards: [],         // 4 cards shuffled on the table for decoding
+      currentLine: '',        // Line written this turn
+      guessedCard: null,      // Card picked by decoder
+      lastSwappedDecoys: [],  // Info on decoys swapped per conflict rule
+      ceremonyWorldIndex: 0,  // World index being viewed in Ending Ceremony
+      isSpeakingTTS: false,   // Speech synthesis active flag
+      activeHighlightLine: -1 // Line index highlighted during speech synthesis
+    };
+
+    function initGame() {
+      stopSpeech();
+      gameState.turn = 1;
+      gameState.speaker = gameState.firstSpeaker;
+      gameState.deck = shuffleArray(buildFullDeck());
+      gameState.worlds = [];
+      gameState.activeWorldIndex = 0;
+      gameState.targetWorldIndex = 'NEW';
+      gameState.hand = [];
+      gameState.secretCard = null;
+      gameState.decoyCards = [];
+      gameState.tableCards = [];
+      gameState.currentLine = '';
+      gameState.guessedCard = null;
+      gameState.lastSwappedDecoys = [];
+      gameState.ceremonyWorldIndex = 0;
+
+      const dot = document.getElementById('variant-dot');
+      if (dot) dot.classList.toggle('hidden', !gameState.useVariant);
+
+      beginTurn();
+    }
+
+    function beginTurn() {
+      hideToast();
+      // Reset and shuffle full 52-card deck at the start of every turn per Step 8
+      gameState.deck = shuffleArray(buildFullDeck());
+      gameState.hand = gameState.deck.splice(0, 4);
+      gameState.secretCard = null;
+      gameState.decoyCards = [];
+      gameState.tableCards = [];
+      gameState.currentLine = '';
+      gameState.guessedCard = null;
+      gameState.lastSwappedDecoys = [];
+
+      if (gameState.worlds.length === 0) {
+        gameState.targetWorldIndex = 'NEW';
+      } else {
+        gameState.targetWorldIndex = gameState.activeWorldIndex;
+      }
+
+      if (gameState.speaker === 'player') {
+        gameState.phase = 'PLAYER_PICK';
+        // Pre-select first legal card if possible
+        autoSelectValidSecretForTargetWorld();
+        renderGame();
+      } else {
+        gameState.phase = 'BOT_SPEAK';
+        renderGame();
+        executeBotSpeakerTurn();
+      }
+    }
+
+    // Checks if a word is already in a world's learned words or struck words
+    function isWordInOrStruckFromWorld(word, world) {
+      if (!world) return false;
+      return world.words.includes(word) || world.struck.includes(word);
+    }
+
+    function autoSelectValidSecretForTargetWorld() {
+      if (gameState.targetWorldIndex === 'NEW') {
+        if (!gameState.secretCard && gameState.hand.length > 0) {
+          gameState.secretCard = gameState.hand[0];
+        }
+        return;
+      }
+      const world = gameState.worlds[gameState.targetWorldIndex];
+      if (gameState.secretCard && !isWordInOrStruckFromWorld(gameState.secretCard.word, world)) {
+        return;
+      }
+      const validCard = gameState.hand.find(c => !isWordInOrStruckFromWorld(c.word, world));
+      gameState.secretCard = validCard || null;
+    }
+
+    /**
+     * Step 3 Lock-In:
+     * - If starting a New World: draws 4 more cards from the remaining deck as the seed words.
+     * - If using an Existing World: replaces any decoy already in or struck from that world
+     *   with a fresh draw from the deck.
+     */
+    function lockSecretAndWorld() {
+      if (!gameState.secretCard) return;
+
+      let chosenWorld = null;
+      let rawDecoys = gameState.hand.filter(c => c.id !== gameState.secretCard.id);
+
+      if (gameState.targetWorldIndex === 'NEW') {
+        // Draw 4 seed cards from the remaining 48 cards in the deck
+        const seedCards = gameState.deck.splice(0, 4);
+        const seedWords = seedCards.map(c => c.word);
+        const worldNumber = ROMAN_NUMERALS[gameState.worlds.length] || (gameState.worlds.length + 1);
+        chosenWorld = {
+          id: gameState.worlds.length,
+          title: `World ${worldNumber}`,
+          seedWords: [...seedWords],
+          words: [...seedWords],
+          lines: [],
+          struck: []
+        };
+        gameState.worlds.push(chosenWorld);
+        gameState.activeWorldIndex = gameState.worlds.length - 1;
+        gameState.targetWorldIndex = gameState.activeWorldIndex;
+        // Wait: could any of the 3 decoys now conflict with the newly drawn 4 seed words?
+        // No! Because the speaker's 4 cards were already out of the deck when the 4 seed cards were drawn!
+        gameState.decoyCards = rawDecoys;
+      } else {
+        chosenWorld = gameState.worlds[gameState.targetWorldIndex];
+        gameState.activeWorldIndex = gameState.targetWorldIndex;
+
+        // Verify secret word isn't in or struck from this world
+        if (isWordInOrStruckFromWorld(gameState.secretCard.word, chosenWorld)) {
+          showToast(`"${gameState.secretCard.word}" is already in or struck from ${chosenWorld.title}. Pick another secret or world.`);
+          return;
+        }
+
+        // Check decoys and replace any that are already in or struck from chosenWorld
+        const swappedNames = [];
+        const finalDecoys = [];
+        const usedIds = new Set(gameState.hand.map(c => c.id));
+
+        for (const decoy of rawDecoys) {
+          if (isWordInOrStruckFromWorld(decoy.word, chosenWorld)) {
+            // Find a replacement from the deck that isn't in or struck from chosenWorld
+            const replacementIdx = gameState.deck.findIndex(
+              c => !usedIds.has(c.id) && !isWordInOrStruckFromWorld(c.word, chosenWorld)
+            );
+            if (replacementIdx !== -1) {
+              const replacement = gameState.deck.splice(replacementIdx, 1)[0];
+              usedIds.add(replacement.id);
+              gameState.deck.push(decoy); // Put old decoy back in deck
+              finalDecoys.push(replacement);
+              swappedNames.push(`${decoy.word} → ${replacement.word}`);
+            } else {
+              finalDecoys.push(decoy);
+            }
+          } else {
+            finalDecoys.push(decoy);
+          }
+        }
+
+        gameState.decoyCards = finalDecoys;
+        gameState.hand = [gameState.secretCard, ...finalDecoys];
+
+        if (swappedNames.length > 0) {
+          showToast(`Decoy already in ${chosenWorld.title} replaced from deck: ${swappedNames.join(', ')}`);
+        }
+      }
+
+      gameState.phase = 'PLAYER_WRITE';
+      gameState.currentLine = '';
+      renderGame();
+    }
+
+    /********************************************************************
+     * 4. STRICT LINE VALIDATOR
+     ********************************************************************/
+    /**
+     * Validates a candidate poetic line against the rules of Humus:
+     * - 1 to 7 words
+     * - Only punctuation allowed: . and ?
+     * - Every word must be either a Free word OR a World word (optionally with -s, -es, -ed, -ing, -ly)
+     * - NEVER allowed: the Secret Word or any form of it (burn, burns, burned, burning)
+     * - NEVER allowed: Struck words or words not yet in the world
+     */
+    function validateHumusLine(rawLine, world, secretWord) {
+      const trimmed = (rawLine || '').trim();
+      if (!trimmed) {
+        return {
+          isValid: false,
+          wordCount: 0,
+          tokens: [],
+          error: 'Write a line of 1 to 7 words to teach your secret word.'
+        };
+      }
+
+      // Check for illegal characters (only letters, spaces, periods, question marks allowed)
+      if (/[^a-zA-Z\s.?]/.test(trimmed)) {
+        return {
+          isValid: false,
+          wordCount: 0,
+          tokens: [],
+          error: 'Only letters, spaces, periods (.) and question marks (?) are allowed.'
+        };
+      }
+
+      const rawTokens = trimmed.split(/\s+/).filter(Boolean);
+      const secretForms = getValidFormsForWord(secretWord);
+
+      // Build map of allowed forms from this world's words
+      const allowedWorldForms = new Map(); // form -> baseWord
+      for (const ww of world.words) {
+        for (const f of getValidFormsForWord(ww)) {
+          allowedWorldForms.set(f, ww);
+        }
+      }
+
+      // Build set of struck forms for helpful error feedback
+      const struckForms = new Map();
+      for (const sw of world.struck) {
+        for (const f of getValidFormsForWord(sw)) {
+          struckForms.set(f, sw);
+        }
+      }
+
+      const analyzedTokens = [];
+      let firstError = null;
+
+      for (const token of rawTokens) {
+        // Strip trailing or internal . and ?
+        const cleanWord = token.replace(/[.?]/g, '').toLowerCase();
+        if (!cleanWord) continue;
+
+        if (secretForms.has(cleanWord)) {
+          analyzedTokens.push({ raw: token, clean: cleanWord, status: 'secret_forbidden' });
+          if (!firstError) firstError = `"${cleanWord}" is a form of the secret word (${secretWord}) and cannot be used.`;
+        } else if (FREE_WORDS.includes(cleanWord)) {
+          analyzedTokens.push({ raw: token, clean: cleanWord, status: 'free' });
+        } else if (allowedWorldForms.has(cleanWord)) {
+          analyzedTokens.push({ raw: token, clean: cleanWord, status: 'world', base: allowedWorldForms.get(cleanWord) });
+        } else if (struckForms.has(cleanWord)) {
+          analyzedTokens.push({ raw: token, clean: cleanWord, status: 'struck_forbidden' });
+          if (!firstError) firstError = `"${cleanWord}" is struck from ${world.title} and cannot be spoken.`;
+        } else {
+          analyzedTokens.push({ raw: token, clean: cleanWord, status: 'unknown' });
+          if (!firstError) firstError = `"${cleanWord}" is not yet in ${world.title}.`;
+        }
+      }
+
+      const wordCount = analyzedTokens.length;
+      if (wordCount === 0) {
+        return { isValid: false, wordCount: 0, tokens: [], error: 'Add at least 1 word.' };
+      }
+      if (wordCount > 7 && !firstError) {
+        firstError = `Line has ${wordCount} words (maximum is 7 words).`;
+      }
+
+      return {
+        isValid: !firstError && wordCount >= 1 && wordCount <= 7,
+        wordCount,
+        tokens: analyzedTokens,
+        error: firstError
+      };
+    }
+
+    /********************************************************************
+     * 5. BOT INTELLIGENCE (GEMINI API + LOCAL POETIC ENGINE FALLBACK)
+     ********************************************************************/
+    const apiKey = ""; // Canvas injects key at runtime
+
+    async function callGeminiJSON(systemPrompt, userPrompt, schema) {
+      const apiUrl = `https://generativelanguage.googleapis.com/v1beta/models/gemini-3-flash-preview:generateContent?key=${apiKey}`;
+      const payload = {
+        contents: [{ role: 'user', parts: [{ text: userPrompt }] }],
+        systemInstruction: { parts: [{ text: systemPrompt }] },
+        generationConfig: {
+          responseMimeType: "application/json",
+          responseSchema: schema,
+          temperature: 0.65
+        }
+      };
+
+      const delays = [600, 1200];
+      for (let attempt = 0; attempt <= delays.length; attempt++) {
+        try {
+          const controller = new AbortController();
+          const timer = setTimeout(() => controller.abort(), 6500);
+          const response = await fetch(apiUrl, {
+            method: 'POST',
+            headers: { 'Content-Type': 'application/json' },
+            body: JSON.stringify(payload),
+            signal: controller.signal
+          });
+          clearTimeout(timer);
+
+          if (!response.ok) throw new Error(`HTTP ${response.status}`);
+          const result = await response.json();
+          const text = result?.candidates?.[0]?.content?.parts?.[0]?.text;
+          if (text) return JSON.parse(text);
+        } catch (err) {
+          if (attempt === delays.length) return null;
+          await new Promise(r => setTimeout(r, delays[attempt]));
+        }
+      }
+      return null;
+    }
+
+    /**
+     * Local Deterministic Poetic Line Generator:
+     * Uses the chosen World's words (categorized by grammatical role) + Free words + allowed endings
+     * to generate dozens of candidate 2-to-7 word lines, then picks the candidate with the highest
+     * semantic resonance with the Secret Word and lowest confusion with the 3 Decoys.
+     */
+    function generateLocalPoeticLine(world, secretWord, decoyWords) {
+      const worldWords = world.words.filter(w => w !== secretWord);
+
+      // Classify available world words by their suit/part-of-speech
+      const nouns = [];
+      const verbs = [];
+      const adjs = [];
+      const others = [];
+
+      for (const w of worldWords) {
+        if (Object.values(BASE_WORD_KEY['♠']).includes(w)) nouns.push(w);
+        else if (Object.values(BASE_WORD_KEY['♥']).includes(w) || w === 'release') verbs.push(w);
+        else if (Object.values(BASE_WORD_KEY['♦']).includes(w) || w === 'free') adjs.push(w);
+        else others.push(w);
+      }
+
+      // Rank world words by how strongly they evoke secretWord vs decoys
+      const scoreWordForSecret = (w) => {
+        let s = getWordAffinity(w, secretWord) * 2.2;
+        for (const d of decoyWords) {
+          s -= getWordAffinity(w, d) * 0.65;
+        }
+        return s;
+      };
+
+      const sortedAll = [...worldWords].sort((a, b) => scoreWordForSecret(b) - scoreWordForSecret(a));
+      const sortedNouns = [...nouns].sort((a, b) => scoreWordForSecret(b) - scoreWordForSecret(a));
+      const sortedVerbs = [...verbs].sort((a, b) => scoreWordForSecret(b) - scoreWordForSecret(a));
+      const sortedAdjs = [...adjs].sort((a, b) => scoreWordForSecret(b) - scoreWordForSecret(a));
+      const sortedOthers = [...others].sort((a, b) => scoreWordForSecret(b) - scoreWordForSecret(a));
+
+      const candidates = [];
+
+      const n1 = sortedNouns[0] || sortedAll[0];
+      const n2 = sortedNouns[1] || sortedNouns[0] || sortedAll[1] || n1;
+      const v1 = sortedVerbs[0];
+      const v2 = sortedVerbs[1] || v1;
+      const a1 = sortedAdjs[0];
+      const a2 = sortedAdjs[1] || a1;
+      const o1 = sortedOthers[0];
+
+      // Helper for 3rd-person singular verb (-s/-es) and participle (-ing/-ed)
+      const vS = (v) => v ? applySuffixSmartly(v, 's') : '';
+      const vIng = (v) => v ? applySuffixSmartly(v, 'ing') : '';
+      const vEd = (v) => v ? applySuffixSmartly(v, 'ed') : '';
+      const nPl = (n) => n ? applySuffixSmartly(n, 's') : '';
+      const adv = (a) => a ? applySuffixSmartly(a, 'ly') : '';
+
+      // Build varied, evocative poetic templates from the available parts of speech
+      if (a1 && n1 && v1) {
+        candidates.push(`the ${a1} ${n1} ${vS(v1)}.`);
+        candidates.push(`a ${a1} ${n1} is ${vIng(v1)}.`);
+        if (n2 && n2 !== n1) {
+          candidates.push(`the ${a1} ${n1} ${vS(v1)} the ${n2}.`);
+          candidates.push(`in the ${a1} ${n2} a ${n1} ${vS(v1)}.`);
+        }
+        if (a2 && a2 !== a1) {
+          candidates.push(`the ${n1} is ${a1} and ${a2}.`);
+        }
+      }
+
+      if (n1 && v1) {
+        candidates.push(`the ${n1} is ${vIng(v1)}.`);
+        candidates.push(`not a ${n1} ${vS(v1)}.`);
+        candidates.push(`is the ${n1} ${vIng(v1)}?`);
+        if (n2 && n2 !== n1) {
+          candidates.push(`the ${n1} of the ${n2} ${vS(v1)}.`);
+          candidates.push(`${nPl(n1)} and ${nPl(n2)} ${v1}.`);
+          candidates.push(`the ${n1} ${vS(v1)} in the ${n2}.`);
+        }
+      }
+
+      if (a1 && n1) {
+        candidates.push(`the ${n1} is ${a1}.`);
+        candidates.push(`not the ${a1} ${n1}.`);
+        if (n2 && n2 !== n1) {
+          candidates.push(`the ${a1} ${n1} of the ${n2}.`);
+          candidates.push(`is the ${n1} in the ${a1} ${n2}?`);
+        }
+        if (a2 && a2 !== a1) {
+          candidates.push(`is the ${n1} ${a1} and ${a2}?`);
+        }
+      }
+
+      if (o1 && v1 && n1) {
+        if (['we', 'you', 'they'].includes(o1)) {
+          candidates.push(`${o1} ${v1} the ${a1 ? a1 + ' ' : ''}${n1}.`);
+          candidates.push(`in the ${n1} ${o1} ${v1}.`);
+        } else if (['nobody', 'someone', 'everyone', 'nothing', 'everything'].includes(o1)) {
+          candidates.push(`${o1} ${vS(v1)} the ${n1}.`);
+          candidates.push(`${o1} is in the ${a1 ? a1 + ' ' : ''}${n1}.`);
+        } else {
+          candidates.push(`the ${n1} ${vS(v1)} ${o1}.`);
+        }
+      }
+
+      if (a1 && v1) {
+        candidates.push(`${vIng(v1)} ${adv(a1)}.`);
+        candidates.push(`it is ${a1} to ${v1}.`);
+      }
+
+      // Universal fallback templates using top two resonant words of any type
+      const top1 = sortedAll[0];
+      const top2 = sortedAll[1] || sortedAll[0];
+      const top3 = sortedAll[2] || top2;
+      candidates.push(`of the ${top1} and the ${top2}.`);
+      candidates.push(`the ${top1} is in the ${top2}.`);
+      candidates.push(`${top1} and ${top2}, not ${top3}.`);
+      candidates.push(`is the ${top1} of ${top2}?`);
+
+      // Filter strictly through validateHumusLine and score each valid line
+      let bestLine = `the ${top1} and the ${top2}.`;
+      let bestScore = -999;
+
+      for (const cand of candidates) {
+        const check = validateHumusLine(cand, world, secretWord);
+        if (check.isValid) {
+          // Score the candidate by semantic closeness of its world tokens to secretWord
+          let score = 0;
+          const usedBases = new Set();
+          for (const t of check.tokens) {
+            if (t.status === 'world' && t.base) {
+              usedBases.add(t.base);
+            }
+          }
+          for (const b of usedBases) {
+            score += scoreWordForSecret(b);
+          }
+          // Slight bonus for 2-3 distinct world words
+          score += usedBases.size * 1.1;
+          if (score > bestScore) {
+            bestScore = score;
+            bestLine = cand;
+          }
+        }
+      }
+
+      return bestLine;
+    }
+
+    /**
+     * Local Semantic Decoder:
+     * Scores each of the 4 face-up cards on the table against the words used in the Speaker's line.
+     */
+    function decodeLineLocally(line, world, tableCards) {
+      const check = validateHumusLine(line, world, '__none__');
+      const lineBaseWords = [];
+      const hasNegation = check.tokens.some(t => ['not', 'never', 'nobody', 'nothing'].includes(t.clean));
+      const isQuestion = line.includes('?');
+
+      for (const t of check.tokens) {
+        if (t.status === 'world' && t.base) {
+          lineBaseWords.push(t.base);
+        }
+      }
+
+      let bestCard = tableCards[0];
+      let bestScore = -999;
+
+      for (const card of tableCards) {
+        let score = 0;
+        for (const lw of lineBaseWords) {
+          score += getWordAffinity(lw, card.word);
+        }
+        // Subtle poetic heuristics
+        if (hasNegation && ['ghost', 'nothing', 'nobody', 'never', 'hollow', 'forget', 'ash', 'cold', 'dry'].includes(card.word)) {
+          score += 1.25;
+        }
+        if (isQuestion && ['strange', 'ghost', 'someone', 'door', 'wake', 'there', 'here'].includes(card.word)) {
+          score += 0.9;
+        }
+        // Small deterministic tie-breaker with tiny jitter
+        score += Math.random() * 0.15;
+        if (score > bestScore) {
+          bestScore = score;
+          bestCard = card;
+        }
+      }
+
+      return bestCard;
+    }
+
+    /**
+     * Executes the Bot's full turn when the Bot is Speaker:
+     * 1. Evaluates existing worlds vs starting a new world
+     * 2. Picks secret card & target world
+     * 3. Resolves decoy conflicts or seeds new world
+     * 4. Generates poetic line (via Gemini API validated by rules, or local poetic fallback)
+     * 5. Lays out the 4 cards for the Player to decode
+     */
+    async function executeBotSpeakerTurn() {
+      await new Promise(r => setTimeout(r, 750));
+
+      // Decide whether to use an existing world or start a new one
+      let chosenWorldIdx = 'NEW';
+      let chosenSecret = gameState.hand[0];
+
+      if (gameState.worlds.length > 0) {
+        // Evaluate best (world, secretCard) pair based on resonance with that world's words
+        let bestPairScore = -999;
+        let bestPair = null;
+
+        for (let wIdx = 0; wIdx < gameState.worlds.length; wIdx++) {
+          const w = gameState.worlds[wIdx];
+          for (const card of gameState.hand) {
+            if (!isWordInOrStruckFromWorld(card.word, w)) {
+              let resonance = 0;
+              for (const ww of w.words) {
+                resonance += getWordAffinity(ww, card.word);
+              }
+              if (resonance > bestPairScore) {
+                bestPairScore = resonance;
+                bestPair = { wIdx, card };
+              }
+            }
+          }
+        }
+
+        // Start a new world if we have fewer than 2 worlds and resonance is weak, or if no legal secret exists
+        const shouldStartNew = !bestPair || (gameState.worlds.length < 2 && gameState.turn <= 4 && bestPairScore < 4.5);
+        if (!shouldStartNew && bestPair) {
+          chosenWorldIdx = bestPair.wIdx;
+          chosenSecret = bestPair.card;
+        }
+      }
+
+      gameState.secretCard = chosenSecret;
+      let rawDecoys = gameState.hand.filter(c => c.id !== chosenSecret.id);
+      let activeWorld = null;
+
+      if (chosenWorldIdx === 'NEW') {
+        const seedCards = gameState.deck.splice(0, 4);
+        const seedWords = seedCards.map(c => c.word);
+        const worldNumber = ROMAN_NUMERALS[gameState.worlds.length] || (gameState.worlds.length + 1);
+        activeWorld = {
+          id: gameState.worlds.length,
+          title: `World ${worldNumber}`,
+          seedWords: [...seedWords],
+          words: [...seedWords],
+          lines: [],
+          struck: []
+        };
+        gameState.worlds.push(activeWorld);
+        gameState.activeWorldIndex = gameState.worlds.length - 1;
+        gameState.decoyCards = rawDecoys;
+      } else {
+        activeWorld = gameState.worlds[chosenWorldIdx];
+        gameState.activeWorldIndex = chosenWorldIdx;
+
+        // Replace any decoys already in or struck from activeWorld
+        const finalDecoys = [];
+        const usedIds = new Set(gameState.hand.map(c => c.id));
+        const swappedNames = [];
+
+        for (const decoy of rawDecoys) {
+          if (isWordInOrStruckFromWorld(decoy.word, activeWorld)) {
+            const repIdx = gameState.deck.findIndex(
+              c => !usedIds.has(c.id) && !isWordInOrStruckFromWorld(c.word, activeWorld)
+            );
+            if (repIdx !== -1) {
+              const rep = gameState.deck.splice(repIdx, 1)[0];
+              usedIds.add(rep.id);
+              gameState.deck.push(decoy);
+              finalDecoys.push(rep);
+              swappedNames.push(`${decoy.word} → ${rep.word}`);
+            } else {
+              finalDecoys.push(decoy);
+            }
+          } else {
+            finalDecoys.push(decoy);
+          }
+        }
+        gameState.decoyCards = finalDecoys;
+        if (swappedNames.length > 0) {
+          showToast(`Bot swapped decoy already in ${activeWorld.title}: ${swappedNames.join(', ')}`);
+        }
+      }
+
+      // Compose the poetic line
+      const decoyWords = gameState.decoyCards.map(c => c.word);
+      let composedLine = null;
+
+      const systemPrompt = `You are playing "Humus (a game of words that teach each other)".
+You are the Speaker writing ONE short poetic line (1 to 7 words) that teaches the Secret Word without using the Secret Word itself.
+STRICT VOCABULARY RULES:
+1. You may ONLY use words from this exact World Words list: [${activeWorld.words.join(', ')}] (optionally with endings -s, -es, -ed, -ing, -ly) AND/OR these Free Words: [the, a, of, in, and, is, to, not].
+2. Every single word in your line MUST be from the World Words list or Free Words list. Do NOT use any other English words!
+3. Do NOT use the Secret Word ("${gameState.secretCard.word}") or any form of it.
+4. Only punctuation allowed is . and ?`;
+
+      const userPrompt = `World Words available: ${activeWorld.words.join(', ')}
+Free Words available: the, a, of, in, and, is, to, not
+Secret Word to teach: "${gameState.secretCard.word}"
+The 3 Decoy Words on the table (avoid pointing to these): ${decoyWords.join(', ')}
+Write a 2 to 6 word poetic line using ONLY the World Words (with optional -s, -es, -ed, -ing, -ly) and Free Words that helps the human player guess "${gameState.secretCard.word}".`;
+
+      const aiRes = await callGeminiJSON(systemPrompt, userPrompt, {
+        type: "OBJECT",
+        properties: {
+          line: { type: "STRING" }
+        },
+        required: ["line"]
+      });
+
+      if (aiRes && aiRes.line) {
+        const cleaned = aiRes.line.trim().replace(/["']/g, '');
+        const validation = validateHumusLine(cleaned, activeWorld, gameState.secretCard.word);
+        if (validation.isValid) {
+          composedLine = cleaned;
+        }
+      }
+
+      if (!composedLine) {
+        composedLine = generateLocalPoeticLine(activeWorld, gameState.secretCard.word, decoyWords);
+      }
+
+      gameState.currentLine = composedLine;
+      gameState.tableCards = shuffleArray([gameState.secretCard, ...gameState.decoyCards]);
+      gameState.phase = 'PLAYER_DECODE';
+      renderGame();
+    }
+
+    /**
+     * Executes the Bot's decoding step when the Player is Speaker:
+     */
+    async function submitPlayerLineForBotDecode() {
+      const world = gameState.worlds[gameState.activeWorldIndex];
+      const check = validateHumusLine(gameState.currentLine, world, gameState.secretCard.word);
+      if (!check.isValid) return;
+
+      gameState.tableCards = shuffleArray([gameState.secretCard, ...gameState.decoyCards]);
+      gameState.phase = 'BOT_DECODE';
+      renderGame();
+
+      await new Promise(r => setTimeout(r, 900));
+
+      const candidateWords = gameState.tableCards.map(c => c.word);
+      let chosenWord = null;
+
+      const systemPrompt = `You are playing "Humus (a game of words that teach each other)" as the Decoder.
+The human Speaker wrote a line using only the words available in the current World.
+Choose which of the 4 candidate cards the Speaker's line is trying to teach.`;
+
+      const userPrompt = `World Words available to the Speaker: ${world.words.join(', ')}
+Previous lines in this world: ${world.lines.map(l => l.text).join(' / ') || 'None'}
+The Speaker's new line: "${gameState.currentLine}"
+The 4 face-up candidate words are: [${candidateWords.join(', ')}]
+Which of the 4 candidate words is this line teaching?`;
+
+      const aiRes = await callGeminiJSON(systemPrompt, userPrompt, {
+        type: "OBJECT",
+        properties: {
+          guessedWord: { type: "STRING" }
+        },
+        required: ["guessedWord"]
+      });
+
+      if (aiRes && aiRes.guessedWord) {
+        const w = aiRes.guessedWord.trim().toLowerCase();
+        const found = gameState.tableCards.find(c => c.word === w);
+        if (found) chosenWord = found;
+      }
+
+      if (!chosenWord) {
+        chosenWord = decodeLineLocally(gameState.currentLine, world, gameState.tableCards);
+      }
+
+      resolveTurnReveal(chosenWord);
+    }
+
+    /********************************************************************
+     * 6. STEP 7: REVEAL & WORLD GROWTH ("The world keeps what was heard")
+     ********************************************************************/
+    function resolveTurnReveal(guessedCard) {
+      gameState.guessedCard = guessedCard;
+      const world = gameState.worlds[gameState.activeWorldIndex];
+      const secretWord = gameState.secretCard.word;
+      const heardWord = guessedCard.word;
+      const isMatch = (heardWord === secretWord);
+
+      // Rule 7:
+      // - Every word that got the most guesses joins the world.
+      // - The secret word joins only if it is among them. Otherwise it is struck through, and the world never learns it.
+      // - Either way, the line stays on the sheet.
+      if (!world.words.includes(heardWord)) {
+        world.words.push(heardWord);
+      }
+      if (!isMatch && !world.struck.includes(secretWord)) {
+        world.struck.push(secretWord);
+      }
+
+      world.lines.push({
+        turn: gameState.turn,
+        speaker: gameState.speaker,
+        text: gameState.currentLine,
+        secretWord,
+        heardWord,
+        matched: isMatch
+      });
+
+      gameState.phase = 'REVEAL';
+      renderGame();
+    }
+
+    function advanceToNextTurn() {
+      if (gameState.turn >= gameState.maxTurns) {
+        triggerEndingCeremony();
+        return;
+      }
+      gameState.turn += 1;
+      gameState.speaker = (gameState.speaker === 'player') ? 'bot' : 'player';
+      beginTurn();
+    }
+
+    function triggerEndingCeremony() {
+      stopSpeech();
+      // If no worlds exist yet, create a gentle empty state or seed one so ceremony works cleanly
+      gameState.phase = 'CEREMONY';
+      gameState.ceremonyWorldIndex = 0;
+      renderGame();
+    }
+
+    /********************************************************************
+     * 7. MOBILE WORD BUILDER & INTERACTION HELPERS
+     ********************************************************************/
+    function appendWordToLine(word) {
+      if (gameState.phase !== 'PLAYER_WRITE') return;
+      let cur = gameState.currentLine.trim();
+      // If line ends with punctuation, insert before or strip trailing punctuation first
+      const trailingMatch = cur.match(/([.?]+)$/);
+      let trailingPunct = '';
+      if (trailingMatch) {
+        trailingPunct = trailingMatch[1];
+        cur = cur.slice(0, -trailingPunct.length).trim();
+      }
+      const next = cur ? `${cur} ${word}${trailingPunct}` : `${word}${trailingPunct}`;
+      gameState.currentLine = next;
+      renderGame();
+    }
+
+    function applyEndingToLastWord(suffix) {
+      if (gameState.phase !== 'PLAYER_WRITE') return;
+      const trimmed = gameState.currentLine.trim();
+      if (!trimmed) return;
+      const parts = trimmed.split(/\s+/);
+      const last = parts[parts.length - 1];
+      parts[parts.length - 1] = applySuffixSmartly(last, suffix);
+      gameState.currentLine = parts.join(' ');
+      renderGame();
+    }
+
+    function togglePunctuationOnLine(punct) {
+      if (gameState.phase !== 'PLAYER_WRITE') return;
+      let trimmed = gameState.currentLine.trim();
+      if (!trimmed) return;
+      if (trimmed.endsWith(punct)) {
+        gameState.currentLine = trimmed.slice(0, -1);
+      } else {
+        trimmed = trimmed.replace(/[.?]+$/, '');
+        gameState.currentLine = trimmed + punct;
+      }
+      renderGame();
+    }
+
+    function backspaceWordInLine() {
+      if (gameState.phase !== 'PLAYER_WRITE') return;
+      const trimmed = gameState.currentLine.trim();
+      if (!trimmed) return;
+      const parts = trimmed.split(/\s+/);
+      parts.pop();
+      gameState.currentLine = parts.join(' ');
+      renderGame();
+    }
+
+    function clearLineInput() {
+      if (gameState.phase !== 'PLAYER_WRITE') return;
+      gameState.currentLine = '';
+      renderGame();
+    }
+
+    function handleDirectLineInput(val) {
+      gameState.currentLine = val;
+      updateValidationPreviewOnly();
+    }
+
+    /********************************************************************
+     * 8. WEB SPEECH API (READ WORLDS ALOUD IN ENDING CEREMONY)
+     ********************************************************************/
+    function stopSpeech() {
+      if ('speechSynthesis' in window) {
+        window.speechSynthesis.cancel();
+      }
+      gameState.isSpeakingTTS = false;
+      gameState.activeHighlightLine = -1;
+    }
+
+    function readActiveWorldAloud() {
+      if (!('speechSynthesis' in window)) {
+        showToast('Speech synthesis is not supported on this browser.');
+        return;
+      }
+      if (gameState.isSpeakingTTS) {
+        stopSpeech();
+        renderGame();
+        return;
+      }
+
+      const world = gameState.worlds[gameState.ceremonyWorldIndex];
+      if (!world) return;
+
+      window.speechSynthesis.cancel();
+      gameState.isSpeakingTTS = true;
+      gameState.activeHighlightLine = -1;
+      renderGame();
+
+      const sequence = [];
+
+      // 1. Read the world's title and words in the order they arrived
+      sequence.push({
+        text: `${world.title}. The words in the order they arrived: ${world.words.join(', ')}.`,
+        lineIndex: -1
+      });
+
+      // 2. Read each line aloud
+      world.lines.forEach((lineObj, idx) => {
+        sequence.push({
+          text: lineObj.text,
+          lineIndex: idx
+        });
+      });
+
+      // 3. Read the struck words ("the ones the world never heard")
+      if (world.struck.length > 0) {
+        sequence.push({
+          text: `The struck words, the ones the world never heard: ${world.struck.join(', ')}.`,
+          lineIndex: -1
+        });
+      } else {
+        sequence.push({
+          text: `No words were struck from this world.`,
+          lineIndex: -1
+        });
+      }
+
+      let idx = 0;
+      const speakNext = () => {
+        if (!gameState.isSpeakingTTS || idx >= sequence.length) {
+          gameState.isSpeakingTTS = false;
+          gameState.activeHighlightLine = -1;
+          renderGame();
+          return;
+        }
+        const item = sequence[idx];
+        gameState.activeHighlightLine = item.lineIndex;
+        renderGame();
+
+        const utter = new SpeechSynthesisUtterance(item.text);
+        utter.rate = 0.88;
+        utter.pitch = 0.96;
+        utter.onend = () => {
+          idx++;
+          setTimeout(speakNext, 420);
+        };
+        utter.onerror = () => {
+          gameState.isSpeakingTTS = false;
+          gameState.activeHighlightLine = -1;
+          renderGame();
+        };
+        window.speechSynthesis.speak(utter);
+      };
+
+      speakNext();
+    }
+
+    function copyCeremonyWorldText() {
+      const world = gameState.worlds[gameState.ceremonyWorldIndex];
+      if (!world) return;
+      const linesText = world.lines.map(l => `  ${l.text}`).join('\n');
+      const struckText = world.struck.length > 0 ? world.struck.join(' · ') : 'none';
+      const output = `${world.title} (Humus)\nWords: ${world.words.join(' · ')}\n\nLines:\n${linesText || '  (no lines)'}\n\nStruck (never heard): ${struckText}`;
+
+      const ta = document.createElement('textarea');
+      ta.value = output;
+      document.body.appendChild(ta);
+      ta.select();
+      try {
+        document.execCommand('copy');
+        showToast(`Copied ${world.title} to clipboard.`);
+      } catch (e) {
+        showToast('Could not copy text.');
+      }
+      document.body.removeChild(ta);
+    }
+
+    /********************************************************************
+     * 9. UI RENDERING
+     ********************************************************************/
+    function showToast(msg) {
+      const banner = document.getElementById('toast-banner');
+      const text = document.getElementById('toast-message');
+      if (banner && text) {
+        text.textContent = msg;
+        banner.classList.remove('hidden');
+      }
+    }
+
+    function hideToast() {
+      const banner = document.getElementById('toast-banner');
+      if (banner) banner.classList.add('hidden');
+    }
+
+    function renderCardHTML(card, options = {}) {
+      const {
+        isSelected = false,
+        isDisabled = false,
+        badgeText = '',
+        badgeType = 'neutral', // 'neutral' | 'secret' | 'heard' | 'struck' | 'conflict'
+        onClickJs = ''
+      } = options;
+
+      const suitColorClass = card.color === 'red' ? 'text-[#8f342e]' : 'text-[#262320]';
+      let extraCardClass = '';
+      if (isSelected) extraCardClass += ' selected-card';
+      if (badgeType === 'secret') extraCardClass += ' secret-highlight';
+      if (badgeType === 'struck') extraCardClass += ' struck-highlight';
+      if (isDisabled) extraCardClass += ' opacity-50 cursor-not-allowed';
+      else if (onClickJs) extraCardClass += ' cursor-pointer hover:border-[#8c8275]';
+
+      let badgeBg = 'bg-[#e6dfd0] text-[#4a433b]';
+      if (badgeType === 'secret') badgeBg = 'bg-[#3d5245] text-[#f6f2e9]';
+      if (badgeType === 'heard') badgeBg = 'bg-[#262320] text-[#f6f2e9]';
+      if (badgeType === 'struck' || badgeType === 'conflict') badgeBg = 'bg-[#8f342e] text-[#f6f2e9]';
+
+      return `
+        <button
+          type="button"
+          ${isDisabled ? 'disabled' : ''}
+          ${onClickJs ? `onclick="${onClickJs}"` : ''}
+          class="humus-card rounded-xl p-2.5 flex flex-col justify-between text-left min-h-[92px] w-full relative ${extraCardClass}"
+        >
+          <div class="flex items-center justify-between w-full">
+            <span class="font-mono-card text-xs font-semibold ${suitColorClass} leading-none">
+              ${card.rank}${card.suit}
+            </span>
+            <span class="text-[9.5px] uppercase tracking-wider text-[#8c8275] font-medium">
+              ${card.kind.slice(0, -1)}
+            </span>
+          </div>
+
+          <div class="my-1.5 text-center">
+            <span class="font-serif-poetic text-xl font-semibold tracking-tight text-[#262320] block leading-tight">
+              ${card.word}
+            </span>
+          </div>
+
+          <div class="flex items-center justify-between w-full min-h-[16px]">
+            ${badgeText ? `
+              <span class="text-[9.5px] font-medium px-1.5 py-0.5 rounded ${badgeBg} leading-none truncate max-w-full">
+                ${badgeText}
+              </span>
+            ` : `
+              <span class="font-mono-card text-[10px] ${suitColorClass} opacity-40 ml-auto leading-none">
+                ${card.suit}
+              </span>
+            `}
+          </div>
+        </button>
+      `;
+    }
+
+    function renderWorldSheetHTML(world, options = {}) {
+      const { showLatestLineCallout = false } = options;
+      if (!world) {
+        return `
+          <div class="sheet-paper rounded-2xl p-4 text-center space-y-1.5 border border-dashed border-[#cbbba0]">
+            <p class="font-serif-poetic text-lg italic text-[#5c554d]">No world exists yet.</p>
+            <p class="text-xs text-[#8c8275]">The first speaker starts World I by drawing four seed words from the deck.</p>
+          </div>
+        `;
+      }
+
+      const wordsHTML = world.words.map((w, idx) => {
+        const isSeed = idx < 4;
+        const isNewest = idx === world.words.length - 1 && world.lines.length > 0 && gameState.phase === 'REVEAL';
+        return `
+          <span class="inline-flex items-center gap-1 px-2 py-0.5 rounded-md text-sm font-serif-poetic ${
+            isNewest
+              ? 'bg-[#e1ebe4] text-[#283b2f] font-semibold ring-1 ring-[#3d5245]/40'
+              : 'bg-[#f3ede0] text-[#262320]'
+          }">
+            ${w}${isSeed ? `<span class="text-[9px] font-mono-card text-[#8c8275] opacity-75" title="Seed word">•</span>` : ''}
+          </span>
+        `;
+      }).join('');
+
+      const struckHTML = world.struck.length > 0
+        ? world.struck.map(sw => `<span class="pencil-strike font-serif-poetic text-sm mx-1">${sw}</span>`).join(' ')
+        : `<span class="text-[11px] text-[#9c9284] italic">none</span>`;
+
+      const linesHTML = world.lines.length > 0
+        ? world.lines.map((l, idx) => `
+            <div class="py-1.5 border-b border-[#efe9dc] last:border-none flex items-baseline justify-between gap-2">
+              <p class="font-serif-poetic text-[17px] leading-snug text-[#262320] italic">
+                “${l.text}”
+              </p>
+              <span class="font-mono-card text-[10px] text-[#8c8275] shrink-0">
+                T${l.turn}
+              </span>
+            </div>
+          `).join('')
+        : `<p class="text-xs text-[#8c8275] italic py-1">No lines written on this sheet yet.</p>`;
+
+      return `
+        <div class="sheet-paper rounded-2xl p-3.5 space-y-3">
+          <!-- World Sheet Header -->
+          <div class="flex items-center justify-between border-b border-[#e5dec9] pb-2">
+            <div class="flex items-baseline gap-2">
+              <h2 class="font-serif-poetic text-xl font-bold text-[#262320] tracking-tight">${world.title}</h2>
+              <span class="text-[11px] text-[#7a7064] font-mono-card">${world.words.length} words · ${world.lines.length} ${world.lines.length === 1 ? 'line' : 'lines'}</span>
+            </div>
+            <span class="text-[10px] text-[#8c8275] uppercase tracking-wider font-mono-card">Sheet</span>
+          </div>
+
+          <!-- Words in the World -->
+          <div class="space-y-1">
+            <div class="flex items-center justify-between">
+              <span class="text-[10.5px] uppercase tracking-wider font-semibold text-[#6e655c]">Words in this World</span>
+              <span class="text-[10px] text-[#8c8275]">• = initial 4 seed words</span>
+            </div>
+            <div class="flex flex-wrap gap-1.5 pt-0.5">
+              ${wordsHTML}
+            </div>
+          </div>
+
+          <!-- Lines on the Sheet -->
+          <div class="space-y-1 pt-1 border-t border-[#ece5d5]">
+            <span class="text-[10.5px] uppercase tracking-wider font-semibold text-[#6e655c] block">Lines</span>
+            <div class="divide-y divide-[#f2ece0] max-h-[150px] overflow-y-auto pr-1">
+              ${linesHTML}
+            </div>
+          </div>
+
+          <!-- Struck Words -->
+          <div class="pt-1.5 border-t border-[#ece5d5] flex items-center justify-between gap-2">
+            <span class="text-[10.5px] uppercase tracking-wider font-semibold text-[#7a6a64]">Struck (Never Learned)</span>
+            <div class="text-right">${struckHTML}</div>
+          </div>
+        </div>
+      `;
+    }
+
+    function renderGame() {
+      // Update Header Badges
+      const turnBadge = document.getElementById('turn-badge');
+      const roleBadge = document.getElementById('role-badge');
+      const endBtn = document.getElementById('btn-end-early');
+
+      if (turnBadge) {
+        turnBadge.textContent = gameState.phase === 'CEREMONY'
+          ? 'Ending'
+          : `Turn ${gameState.turn} / ${gameState.maxTurns}`;
+      }
+
+      if (roleBadge) {
+        if (gameState.phase === 'CEREMONY') {
+          roleBadge.textContent = 'Reading Worlds';
+          roleBadge.className = 'text-[11px] font-medium px-2 py-0.5 rounded-full bg-[#262320] text-[#f6f2e9]';
+        } else if (gameState.speaker === 'player') {
+          roleBadge.textContent = 'You Speak';
+          roleBadge.className = 'text-[11px] font-medium px-2 py-0.5 rounded-full bg-[#3d5245] text-[#f6f2e9]';
+        } else {
+          roleBadge.textContent = 'Bot Speaks';
+          roleBadge.className = 'text-[11px] font-medium px-2 py-0.5 rounded-full bg-[#6b4c3b] text-[#f6f2e9]';
+        }
+      }
+
+      if (endBtn) {
+        endBtn.classList.toggle('hidden', gameState.phase === 'CEREMONY');
+      }
+
+      const main = document.getElementById('main-content');
+      const footer = document.getElementById('bottom-bar');
+      if (!main || !footer) return;
+
+      // Render Phase
+      if (gameState.phase === 'CEREMONY') {
+        renderCeremonyView(main, footer);
+      } else if (gameState.phase === 'PLAYER_PICK') {
+        renderPlayerPickView(main, footer);
+      } else if (gameState.phase === 'PLAYER_WRITE') {
+        renderPlayerWriteView(main, footer);
+      } else if (gameState.phase === 'BOT_DECODE') {
+        renderBotDecodeView(main, footer);
+      } else if (gameState.phase === 'BOT_SPEAK') {
+        renderBotSpeakWaitingView(main, footer);
+      } else if (gameState.phase === 'PLAYER_DECODE') {
+        renderPlayerDecodeView(main, footer);
+      } else if (gameState.phase === 'REVEAL') {
+        renderRevealView(main, footer);
+      }
+    }
+
+    /**
+     * PHASE 1: PLAYER_PICK (Steps 1, 2, 3 - Draw 4 cards, Pick Secret Word & Pick World)
+     */
+    function renderPlayerPickView(main, footer) {
+      const isNewWorldSelected = gameState.targetWorldIndex === 'NEW';
+      const targetWorld = isNewWorldSelected ? null : gameState.worlds[gameState.targetWorldIndex];
+
+      // World selector tabs
+      const worldTabsHTML = gameState.worlds.map((w, idx) => {
+        const active = gameState.targetWorldIndex === idx;
+        return `
+          <button
+            onclick="selectTargetWorld(${idx})"
+            class="px-3 py-1.5 rounded-xl text-xs font-medium transition border shrink-0 ${
+              active
+                ? 'bg-[#262320] text-[#f6f2e9] border-[#262320] shadow-sm'
+                : 'bg-[#fbf9f4] text-[#4a433b] border-[#d5ccb9] hover:bg-[#efe9da]'
+            }"
+          >
+            ${w.title} <span class="opacity-70 font-mono-card text-[10px]">(${w.words.length})</span>
+          </button>
+        `;
+      }).join('');
+
+      const newWorldTabHTML = `
+        <button
+          onclick="selectTargetWorld('NEW')"
+          class="px-3 py-1.5 rounded-xl text-xs font-medium transition border shrink-0 flex items-center gap-1 ${
+            isNewWorldSelected
+              ? 'bg-[#3d5245] text-[#f6f2e9] border-[#3d5245] shadow-sm'
+              : 'bg-[#fbf9f4] text-[#3d5245] border-[#b8c9be] hover:bg-[#eef3ef]'
+          }"
+        >
+          <span>+ New World</span>
+        </button>
+      `;
+
+      // Hand cards grid (2x2)
+      const handCardsHTML = gameState.hand.map(card => {
+        const isSelected = gameState.secretCard && gameState.secretCard.id === card.id;
+        const hasConflict = targetWorld ? isWordInOrStruckFromWorld(card.word, targetWorld) : false;
+
+        let badgeText = '';
+        let badgeType = 'neutral';
+        if (hasConflict) {
+          badgeText = targetWorld.struck.includes(card.word) ? 'Struck in World' : 'Already in World';
+          badgeType = 'conflict';
+        } else if (isSelected) {
+          badgeText = 'Secret Word';
+          badgeType = 'secret';
+        } else {
+          badgeText = 'Decoy';
+        }
+
+        return renderCardHTML(card, {
+          isSelected,
+          isDisabled: hasConflict,
+          badgeText,
+          badgeType,
+          onClickJs: `selectSecretCard('${card.id}')`
+        });
+      }).join('');
+
+      // Check if any decoy conflicts with targetWorld (to inform user it will auto-swap)
+      let decoySwapNotice = '';
+      if (targetWorld && gameState.secretCard) {
+        const conflictingDecoys = gameState.hand.filter(
+          c => c.id !== gameState.secretCard.id && isWordInOrStruckFromWorld(c.word, targetWorld)
+        );
+        if (conflictingDecoys.length > 0) {
+          decoySwapNotice = `
+            <p class="text-[11px] text-[#6e563a] bg-[#f5ebd9] border border-[#dfc9a6] rounded-lg px-2.5 py-1.5">
+              Note: Decoy <strong>${conflictingDecoys.map(c => c.word).join(', ')}</strong> is already in/struck from ${targetWorld.title} and will be replaced by a fresh draw when you continue.
+            </p>
+          `;
+        }
+      }
+
+      main.innerHTML = `
+        <div class="space-y-3 animate-fade-slide">
+          <!-- Step Instruction Banner -->
+          <div class="px-3 py-2 rounded-xl bg-[#ece5d5] border border-[#d8cfbe] flex items-center justify-between">
+            <div>
+              <p class="text-xs font-semibold text-[#262320]">Steps 1–3: Draw, Pick Secret & Pick World</p>
+              <p class="text-[11px] text-[#5c554d]">Choose 1 card as your secret word to teach, and choose which world sheet to use.</p>
+            </div>
+          </div>
+
+          <!-- World Picker Tabs -->
+          <div class="space-y-1.5">
+            <label class="text-[10.5px] uppercase tracking-wider font-semibold text-[#6e655c] block">
+              1. Choose World Sheet
+            </label>
+            <div class="flex items-center gap-1.5 overflow-x-auto no-scrollbar pb-0.5">
+              ${worldTabsHTML}
+              ${newWorldTabHTML}
+            </div>
+          </div>
+
+          <!-- Preview of Selected World or New World Card -->
+          ${isNewWorldSelected ? `
+            <div class="sheet-paper rounded-2xl p-3.5 border border-dashed border-[#a9bdb0] bg-[#f6faf7] space-y-1">
+              <div class="flex items-center justify-between">
+                <span class="font-serif-poetic text-lg font-bold text-[#2d3e33]">
+                  Start World ${ROMAN_NUMERALS[gameState.worlds.length] || (gameState.worlds.length + 1)}
+                </span>
+                <span class="text-[10px] font-mono-card px-2 py-0.5 rounded bg-[#e1ebe4] text-[#2d3e33]">+4 Seed Cards</span>
+              </div>
+              <p class="text-xs text-[#4a5d4e] leading-relaxed">
+                Four fresh cards will be drawn from the deck and written at the top of this new sheet so it is playable from its first line.
+              </p>
+            </div>
+          ` : renderWorldSheetHTML(targetWorld)}
+
+          <!-- 4 Drawn Hand Cards -->
+          <div class="space-y-1.5">
+            <div class="flex items-center justify-between">
+              <label class="text-[10.5px] uppercase tracking-wider font-semibold text-[#6e655c]">
+                2. Your 4 Drawn Cards (Tap to Pick Secret)
+              </label>
+              <span class="text-[10px] text-[#8c8275]">Only you see these</span>
+            </div>
+            <div class="grid grid-cols-2 gap-2">
+              ${handCardsHTML}
+            </div>
+            ${decoySwapNotice}
+          </div>
+        </div>
+      `;
+
+      const canContinue = Boolean(gameState.secretCard);
+      footer.innerHTML = `
+        <button
+          onclick="lockSecretAndWorld()"
+          ${!canContinue ? 'disabled' : ''}
+          class="w-full py-2.5 px-4 rounded-xl font-medium text-xs shadow-sm transition flex items-center justify-center gap-2 ${
+            canContinue
+              ? 'bg-[#3d5245] hover:bg-[#2f4036] text-[#f6f2e9]'
+              : 'bg-[#d8cfbe] text-[#8c8275] cursor-not-allowed'
+          }"
+        >
+          <span>${
+            canContinue
+              ? `Teach “${gameState.secretCard.word}” in ${isNewWorldSelected ? `New World ${ROMAN_NUMERALS[gameState.worlds.length] || ''}` : targetWorld.title} →`
+              : 'Select a valid Secret Word to continue'
+          }</span>
+        </button>
+      `;
+    }
+
+    function selectTargetWorld(idxOrNew) {
+      gameState.targetWorldIndex = idxOrNew;
+      if (idxOrNew !== 'NEW') {
+        gameState.activeWorldIndex = idxOrNew;
+      }
+      autoSelectValidSecretForTargetWorld();
+      renderGame();
+    }
+
+    function selectSecretCard(cardId) {
+      const card = gameState.hand.find(c => c.id === cardId);
+      if (!card) return;
+      if (gameState.targetWorldIndex !== 'NEW') {
+        const w = gameState.worlds[gameState.targetWorldIndex];
+        if (isWordInOrStruckFromWorld(card.word, w)) return;
+      }
+      gameState.secretCard = card;
+      renderGame();
+    }
+
+    /**
+     * PHASE 2: PLAYER_WRITE (Step 4 - Write a 1 to 7 word line teaching the secret word)
+     */
+    function renderPlayerWriteView(main, footer) {
+      const world = gameState.worlds[gameState.activeWorldIndex];
+      const secret = gameState.secretCard;
+      const decoys = gameState.decoyCards;
+      const check = validateHumusLine(gameState.currentLine, world, secret.word);
+
+      const worldWordPills = world.words.map(w => `
+        <button
+          type="button"
+          onclick="appendWordToLine('${w}')"
+          class="px-2.5 py-1 rounded-lg bg-[#fbf9f4] hover:bg-[#e8e1d1] active:scale-95 border border-[#cfc5b1] text-[#262320] font-serif-poetic text-base font-medium shadow-sm transition"
+        >
+          ${w}
+        </button>
+      `).join('');
+
+      const freeWordPills = FREE_WORDS.map(fw => `
+        <button
+          type="button"
+          onclick="appendWordToLine('${fw}')"
+          class="px-2 py-1 rounded-lg bg-[#efe9dc] hover:bg-[#e2dac8] active:scale-95 border border-[#d5ccb9] text-[#4a433b] text-xs font-medium transition"
+        >
+          ${fw}
+        </button>
+      `).join('');
+
+      const suffixPills = ALLOWED_SUFFIXES.map(suf => `
+        <button
+          type="button"
+          onclick="applyEndingToLastWord('${suf}')"
+          class="px-2 py-1 rounded-lg bg-[#e6ede8] hover:bg-[#d5e2d9] active:scale-95 border border-[#b8c9be] text-[#2d3e33] font-mono-card text-[11px] font-medium transition"
+          title="Attach -${suf} to last word"
+        >
+          -${suf}
+        </button>
+      `).join('');
+
+      main.innerHTML = `
+        <div class="space-y-3 animate-fade-slide">
+          <!-- Compact Secret + Decoys Reminder Bar -->
+          <div class="p-2.5 rounded-xl bg-[#eef4f0] border border-[#bdd0c3] flex items-center justify-between gap-2">
+            <div>
+              <span class="text-[10px] uppercase tracking-wider font-semibold text-[#3d5245] block">Teaching Secret Word</span>
+              <span class="font-serif-poetic text-xl font-bold text-[#262320] leading-tight">
+                ${secret.word}
+                <span class="font-mono-card text-xs font-normal text-[#5c554d]">(${secret.rank}${secret.suit} ${secret.kind.slice(0,-1)})</span>
+              </span>
+            </div>
+            <div class="text-right">
+              <span class="text-[10px] uppercase tracking-wider text-[#6e655c] block">3 Decoys on Table</span>
+              <span class="font-serif-poetic text-sm text-[#4a433b] font-medium">
+                ${decoys.map(d => d.word).join(' · ')}
+              </span>
+            </div>
+          </div>
+
+          <!-- Active World Sheet -->
+          ${renderWorldSheetHTML(world)}
+
+          <!-- Line Composer Box -->
+          <div class="sheet-paper rounded-2xl p-3 space-y-2.5 border-2 border-[#c8beaa]">
+            <div class="flex items-center justify-between">
+              <span class="text-[11px] font-semibold text-[#262320]">Step 4: Write the Line (up to 7 words)</span>
+              <span id="word-count-badge" class="font-mono-card text-[11px] px-2 py-0.5 rounded-full ${
+                check.wordCount >= 1 && check.wordCount <= 7 ? 'bg-[#e1ebe4] text-[#2d3e33]' : 'bg-[#f4e3e1] text-[#8f342e]'
+              }">
+                ${check.wordCount} / 7 words
+              </span>
+            </div>
+
+            <!-- Text Input + Backspace/Clear -->
+            <div class="relative">
+              <input
+                id="line-text-input"
+                type="text"
+                value="${gameState.currentLine.replace(/"/g, '&quot;')}"
+                oninput="handleDirectLineInput(this.value)"
+                placeholder="Tap words below or type your line..."
+                autocomplete="off"
+                autocorrect="off"
+                autocapitalize="off"
+                spellcheck="false"
+                class="w-full px-3 py-2.5 pr-16 rounded-xl bg-[#f6f2e9] border border-[#cbbba0] focus:outline-none focus:border-[#3d5245] font-serif-poetic text-lg text-[#262320] placeholder-[#9c9284]"
+              />
+              <div class="absolute right-1.5 top-1.5 bottom-1.5 flex items-center gap-1">
+                <button
+                  type="button"
+                  onclick="backspaceWordInLine()"
+                  class="px-2 h-full rounded-lg bg-[#e6dfd0] hover:bg-[#d8cfbe] text-[#3a352f] text-xs font-mono-card"
+                  title="Delete last word"
+                >⌫</button>
+                <button
+                  type="button"
+                  onclick="clearLineInput()"
+                  class="px-2 h-full rounded-lg bg-[#e6dfd0] hover:bg-[#d8cfbe] text-[#6e655c] text-xs font-mono-card"
+                  title="Clear line"
+                >✕</button>
+              </div>
+            </div>
+
+            <!-- Live Token Validation Strip -->
+            <div id="token-validation-strip" class="min-h-[22px] text-xs">
+              ${renderValidationFeedbackHTML(check)}
+            </div>
+
+            <!-- Tap-to-Add World Words -->
+            <div class="space-y-1 pt-1 border-t border-[#ece5d5]">
+              <span class="text-[10px] uppercase tracking-wider font-semibold text-[#6e655c] block">
+                Tap ${world.title} Words:
+              </span>
+              <div class="flex flex-wrap gap-1.5">
+                ${worldWordPills}
+              </div>
+            </div>
+
+            <!-- Tap-to-Add Free Words -->
+            <div class="space-y-1">
+              <span class="text-[10px] uppercase tracking-wider font-semibold text-[#6e655c] block">
+                Always Free Words:
+              </span>
+              <div class="flex flex-wrap gap-1">
+                ${freeWordPills}
+              </div>
+            </div>
+
+            <!-- Endings & Punctuation Bar -->
+            <div class="space-y-1 pt-1 border-t border-[#ece5d5]">
+              <span class="text-[10px] uppercase tracking-wider font-semibold text-[#6e655c] block">
+                Attach Ending to Last Word / Punctuation:
+              </span>
+              <div class="flex flex-wrap items-center gap-1">
+                ${suffixPills}
+                <span class="mx-1 text-[#d5ccb9]">|</span>
+                <button type="button" onclick="togglePunctuationOnLine('.')" class="px-2.5 py-1 rounded-lg bg-[#efe9dc] hover:bg-[#e2dac8] border border-[#d5ccb9] font-mono-card text-xs font-bold text-[#262320]">.</button>
+                <button type="button" onclick="togglePunctuationOnLine('?')" class="px-2.5 py-1 rounded-lg bg-[#efe9dc] hover:bg-[#e2dac8] border border-[#d5ccb9] font-mono-card text-xs font-bold text-[#262320]">?</button>
+              </div>
+            </div>
+          </div>
+        </div>
+      `;
+
+      footer.innerHTML = renderPlayerWriteFooterHTML(check);
+    }
+
+    function renderValidationFeedbackHTML(check) {
+      if (check.tokens.length === 0) {
+        return `<span class="text-[#8c8275] text-[11px] italic">${check.error}</span>`;
+      }
+      const chips = check.tokens.map(t => {
+        if (t.status === 'world') {
+          return `<span class="px-1.5 py-0.5 rounded bg-[#e1ebe4] text-[#283b2f] font-mono-card text-[10.5px]">${t.raw} ✓</span>`;
+        }
+        if (t.status === 'free') {
+          return `<span class="px-1.5 py-0.5 rounded bg-[#eae3d2] text-[#4a433b] font-mono-card text-[10.5px]">${t.raw}</span>`;
+        }
+        return `<span class="px-1.5 py-0.5 rounded bg-[#f4e0de] text-[#8f342e] font-mono-card text-[10.5px] font-semibold">${t.raw} ✕</span>`;
+      }).join(' ');
+
+      return `
+        <div class="space-y-1">
+          <div class="flex flex-wrap gap-1">${chips}</div>
+          ${check.error ? `<p class="text-[11px] text-[#8f342e] font-medium">${check.error}</p>` : `<p class="text-[11px] text-[#3d5245]">Line is legal and ready to lay on the table.</p>`}
+        </div>
+      `;
+    }
+
+    function renderPlayerWriteFooterHTML(check) {
+      return `
+        <button
+          id="btn-submit-line"
+          onclick="submitPlayerLineForBotDecode()"
+          ${!check.isValid ? 'disabled' : ''}
+          class="w-full py-2.5 px-4 rounded-xl font-medium text-xs shadow-sm transition flex items-center justify-center gap-2 ${
+            check.isValid
+              ? 'bg-[#3d5245] hover:bg-[#2f4036] text-[#f6f2e9]'
+              : 'bg-[#d8cfbe] text-[#8c8275] cursor-not-allowed'
+          }"
+        >
+          <span>Lay Out 4 Cards & Let Bot Decode →</span>
+        </button>
+      `;
+    }
+
+    function updateValidationPreviewOnly() {
+      const world = gameState.worlds[gameState.activeWorldIndex];
+      const check = validateHumusLine(gameState.currentLine, world, gameState.secretCard.word);
+      const strip = document.getElementById('token-validation-strip');
+      const countBadge = document.getElementById('word-count-badge');
+      const footer = document.getElementById('bottom-bar');
+
+      if (strip) strip.innerHTML = renderValidationFeedbackHTML(check);
+      if (countBadge) {
+        countBadge.textContent = `${check.wordCount} / 7 words`;
+        countBadge.className = `font-mono-card text-[11px] px-2 py-0.5 rounded-full ${
+          check.wordCount >= 1 && check.wordCount <= 7 ? 'bg-[#e1ebe4] text-[#2d3e33]' : 'bg-[#f4e3e1] text-[#8f342e]'
+        }`;
+      }
+      if (footer) footer.innerHTML = renderPlayerWriteFooterHTML(check);
+    }
+
+    /**
+     * PHASE 3: BOT_DECODE (Player spoke, Bot is contemplating the 4 face-up cards)
+     */
+    function renderBotDecodeView(main, footer) {
+      const world = gameState.worlds[gameState.activeWorldIndex];
+      const cardsHTML = gameState.tableCards.map(c => renderCardHTML(c, { isDisabled: true })).join('');
+
+      main.innerHTML = `
+        <div class="space-y-3 animate-fade-slide">
+          ${renderWorldSheetHTML(world)}
+
+          <!-- The Spoken Line -->
+          <div class="sheet-paper rounded-2xl p-4 text-center space-y-1 border-2 border-[#3d5245]/30">
+            <span class="text-[10px] uppercase tracking-wider font-mono-card text-[#6e655c]">Your Line in ${world.title}</span>
+            <p class="font-serif-poetic text-2xl italic text-[#262320]">“${gameState.currentLine}”</p>
+          </div>
+
+          <!-- 4 Cards on Table -->
+          <div class="space-y-1.5">
+            <span class="text-[10.5px] uppercase tracking-wider font-semibold text-[#6e655c] block">
+              The 4 Face-Up Cards on the Table
+            </span>
+            <div class="grid grid-cols-2 gap-2">
+              ${cardsHTML}
+            </div>
+          </div>
+        </div>
+      `;
+
+      footer.innerHTML = `
+        <div class="w-full py-2.5 px-4 rounded-xl bg-[#eae3d2] text-[#4a433b] text-xs font-medium text-center animate-pulse-gentle">
+          Bot is listening to your line and choosing a card...
+        </div>
+      `;
+    }
+
+    /**
+     * PHASE 4: BOT_SPEAK (Bot is drawing 4 cards, picking a world & writing a line)
+     */
+    function renderBotSpeakWaitingView(main, footer) {
+      const currentWorld = gameState.worlds[gameState.activeWorldIndex] || null;
+      main.innerHTML = `
+        <div class="space-y-3 animate-fade-slide">
+          ${renderWorldSheetHTML(currentWorld)}
+          <div class="sheet-paper rounded-2xl p-6 text-center space-y-2">
+            <div class="w-8 h-8 rounded-full bg-[#e6ede8] text-[#3d5245] mx-auto flex items-center justify-center font-serif-poetic text-lg italic animate-pulse-gentle">
+              ✎
+            </div>
+            <p class="font-serif-poetic text-xl text-[#262320]">The Bot is drawing four cards...</p>
+            <p class="text-xs text-[#6e655c]">Choosing a secret word, selecting a world sheet, and writing a line.</p>
+          </div>
+        </div>
+      `;
+
+      footer.innerHTML = `
+        <div class="w-full py-2.5 px-4 rounded-xl bg-[#eae3d2] text-[#5c554d] text-xs font-medium text-center">
+          Silence while the speaker writes...
+        </div>
+      `;
+    }
+
+    /**
+     * PHASE 5: PLAYER_DECODE (Bot wrote a line and laid out 4 face-up cards; Player guesses)
+     */
+    function renderPlayerDecodeView(main, footer) {
+      const world = gameState.worlds[gameState.activeWorldIndex];
+      const cardsHTML = gameState.tableCards.map(c => {
+        const isSelected = gameState.guessedCard && gameState.guessedCard.id === c.id;
+        return renderCardHTML(c, {
+          isSelected,
+          badgeText: isSelected ? 'Your Guess' : 'Tap to Guess',
+          badgeType: isSelected ? 'secret' : 'neutral',
+          onClickJs: `selectPlayerDecodeCard('${c.id}')`
+        });
+      }).join('');
+
+      main.innerHTML = `
+        <div class="space-y-3 animate-fade-slide">
+          <!-- World Tabs so Player can inspect any world if multiple exist -->
+          ${gameState.worlds.length > 1 ? `
+            <div class="flex items-center gap-1.5 overflow-x-auto no-scrollbar">
+              ${gameState.worlds.map((w, idx) => `
+                <button
+                  onclick="switchInspectWorld(${idx})"
+                  class="px-2.5 py-1 rounded-lg text-xs font-medium border ${
+                    idx === gameState.activeWorldIndex
+                      ? 'bg-[#262320] text-[#f6f2e9] border-[#262320]'
+                      : 'bg-[#fbf9f4] text-[#5c554d] border-[#d5ccb9]'
+                  }"
+                >
+                  ${w.title}
+                </button>
+              `).join('')}
+            </div>
+          ` : ''}
+
+          ${renderWorldSheetHTML(world)}
+
+          <!-- Bot's New Line -->
+          <div class="sheet-paper rounded-2xl p-4 text-center space-y-1 border-2 border-[#3d5245]/40 bg-[#f6faf7]">
+            <span class="text-[10px] uppercase tracking-wider font-mono-card text-[#3d5245] font-semibold">
+              Bot Speaks in ${world.title}
+            </span>
+            <p class="font-serif-poetic text-2xl italic text-[#262320] leading-snug">
+              “${gameState.currentLine}”
+            </p>
+          </div>
+
+          <!-- 4 Candidate Cards -->
+          <div class="space-y-1.5">
+            <div class="flex items-center justify-between">
+              <span class="text-[10.5px] uppercase tracking-wider font-semibold text-[#6e655c]">
+                Step 6: Point to the Word the Line Teaches
+              </span>
+            </div>
+            <div class="grid grid-cols-2 gap-2">
+              ${cardsHTML}
+            </div>
+          </div>
+        </div>
+      `;
+
+      const canConfirm = Boolean(gameState.guessedCard);
+      footer.innerHTML = `
+        <button
+          onclick="confirmPlayerDecodeGuess()"
+          ${!canConfirm ? 'disabled' : ''}
+          class="w-full py-2.5 px-4 rounded-xl font-medium text-xs shadow-sm transition ${
+            canConfirm
+              ? 'bg-[#3d5245] hover:bg-[#2f4036] text-[#f6f2e9]'
+              : 'bg-[#d8cfbe] text-[#8c8275] cursor-not-allowed'
+          }"
+        >
+          ${canConfirm ? `Point to “${gameState.guessedCard.word}” & Reveal →` : 'Tap one of the 4 cards above to decode'}
+        </button>
+      `;
+    }
+
+    function switchInspectWorld(idx) {
+      gameState.activeWorldIndex = idx;
+      renderGame();
+    }
+
+    function selectPlayerDecodeCard(cardId) {
+      const card = gameState.tableCards.find(c => c.id === cardId);
+      if (!card) return;
+      gameState.guessedCard = card;
+      renderGame();
+    }
+
+    function confirmPlayerDecodeGuess() {
+      if (!gameState.guessedCard) return;
+      resolveTurnReveal(gameState.guessedCard);
+    }
+
+    /**
+     * PHASE 6: REVEAL (Step 7 - "The world keeps what was heard")
+     */
+    function renderRevealView(main, footer) {
+      const world = gameState.worlds[gameState.activeWorldIndex];
+      const secret = gameState.secretCard;
+      const guessed = gameState.guessedCard;
+      const isMatch = secret.id === guessed.id;
+
+      const cardsHTML = gameState.tableCards.map(c => {
+        const isSecret = c.id === secret.id;
+        const isGuessed = c.id === guessed.id;
+        let badgeText = '';
+        let badgeType = 'neutral';
+
+        if (isSecret && isGuessed) {
+          badgeText = 'Heard & Joined ✓';
+          badgeType = 'secret';
+        } else if (isGuessed && !isSecret) {
+          badgeText = 'Heard → Joined World';
+          badgeType = 'heard';
+        } else if (isSecret && !isGuessed) {
+          badgeText = 'Secret → Struck ✕';
+          badgeType = 'struck';
+        }
+
+        return renderCardHTML(c, {
+          isDisabled: true,
+          badgeText,
+          badgeType
+        });
+      }).join('');
+
+      main.innerHTML = `
+        <div class="space-y-3 animate-fade-slide">
+          <!-- Outcome Banner -->
+          <div class="p-3 rounded-2xl border ${
+            isMatch
+              ? 'bg-[#e6ede8] border-[#abc2b2] text-[#26382c]'
+              : 'bg-[#f4ece6] border-[#d9bfb3] text-[#4a322c]'
+          } space-y-1">
+            <div class="flex items-center justify-between">
+              <span class="text-[10.5px] uppercase tracking-wider font-mono-card font-semibold">
+                Step 7 · The World Keeps What Was Heard
+              </span>
+              <span class="font-mono-card text-xs font-semibold">
+                ${isMatch ? 'Heard Clearly' : 'A Different Word Was Heard'}
+              </span>
+            </div>
+            <p class="text-xs leading-relaxed">
+              ${
+                isMatch
+                  ? `<strong>“${secret.word}”</strong> was heard and joins <strong>${world.title}</strong>.`
+                  : `<strong>“${guessed.word}”</strong> was heard and joins <strong>${world.title}</strong>. The secret word <span class="pencil-strike font-semibold">${secret.word}</span> is struck through—this world never learns it.`
+              }
+            </p>
+          </div>
+
+          <!-- The Line -->
+          <div class="sheet-paper rounded-2xl p-3.5 text-center space-y-0.5">
+            <span class="text-[10px] uppercase tracking-wider font-mono-card text-[#8c8275]">
+              ${gameState.speaker === 'player' ? 'Your Line' : 'Bot’s Line'} in ${world.title}
+            </span>
+            <p class="font-serif-poetic text-2xl italic text-[#262320]">“${gameState.currentLine}”</p>
+          </div>
+
+          <!-- The 4 Cards Breakdown -->
+          <div class="grid grid-cols-2 gap-2">
+            ${cardsHTML}
+          </div>
+
+          <!-- Updated World Sheet -->
+          ${renderWorldSheetHTML(world)}
+        </div>
+      `;
+
+      const isFinalTurn = gameState.turn >= gameState.maxTurns;
+      footer.innerHTML = `
+        <button
+          onclick="advanceToNextTurn()"
+          class="w-full py-2.5 px-4 rounded-xl bg-[#262320] hover:bg-[#3a352f] text-[#f6f2e9] font-medium text-xs shadow-sm transition"
+        >
+          ${isFinalTurn ? 'Complete Turn 12 & Read the Worlds Aloud →' : `Shuffle Cards & Start Turn ${gameState.turn + 1} (${gameState.speaker === 'player' ? 'Bot Speaks Next' : 'You Speak Next'}) →`}
+        </button>
+      `;
+    }
+
+    /**
+     * PHASE 7: ENDING CEREMONY
+     * "Read each world’s words in the order they arrived, then its lines aloud,
+     *  then its struck words, the ones the world never heard."
+     */
+    function renderCeremonyView(main, footer) {
+      if (gameState.worlds.length === 0) {
+        main.innerHTML = `
+          <div class="sheet-paper rounded-2xl p-6 text-center space-y-3 my-4 animate-fade-slide">
+            <h2 class="font-serif-poetic text-2xl font-bold text-[#262320]">The Table is Quiet</h2>
+            <p class="text-xs text-[#5c554d]">No worlds were started during this session.</p>
+          </div>
+        `;
+        footer.innerHTML = `
+          <button onclick="initGame()" class="w-full py-2.5 px-4 rounded-xl bg-[#3d5245] text-[#f6f2e9] font-medium text-xs">
+            Start a New Game
+          </button>
+        `;
+        return;
+      }
+
+      const world = gameState.worlds[gameState.ceremonyWorldIndex] || gameState.worlds[0];
+
+      const worldTabs = gameState.worlds.map((w, idx) => `
+        <button
+          onclick="selectCeremonyWorld(${idx})"
+          class="px-3 py-1.5 rounded-xl text-xs font-medium border transition ${
+            idx === gameState.ceremonyWorldIndex
+              ? 'bg-[#262320] text-[#f6f2e9] border-[#262320]'
+              : 'bg-[#fbf9f4] text-[#4a433b] border-[#d5ccb9]'
+          }"
+        >
+          ${w.title}
+        </button>
+      `).join('');
+
+      const orderedWordsHTML = world.words.map((w, idx) => `
+        <span class="inline-flex items-center gap-1 px-2.5 py-1 rounded-lg bg-[#f3ede0] text-[#262320] font-serif-poetic text-lg">
+          <span class="font-mono-card text-[10px] text-[#8c8275]">${idx + 1}.</span> ${w}
+        </span>
+      `).join('');
+
+      const linesCeremonyHTML = world.lines.length > 0
+        ? world.lines.map((l, idx) => {
+            const isHighlighted = gameState.activeHighlightLine === idx;
+            return `
+              <div class="p-2.5 rounded-xl transition ${
+                isHighlighted ? 'bg-[#e1ebe4] ring-1 ring-[#3d5245]' : 'bg-[#f6f2e9]/70'
+              }">
+                <p class="font-serif-poetic text-xl italic text-[#262320] leading-snug">
+                  “${l.text}”
+                </p>
+              </div>
+            `;
+          }).join('')
+        : `<p class="text-xs text-[#8c8275] italic">No lines were written in this world.</p>`;
+
+      const struckCeremonyHTML = world.struck.length > 0
+        ? world.struck.map(sw => `<span class="pencil-strike font-serif-poetic text-lg mx-1.5">${sw}</span>`).join(' ')
+        : `<span class="text-xs italic text-[#8c8275]">None — every secret word spoken here was heard.</span>`;
+
+      main.innerHTML = `
+        <div class="space-y-3.5 animate-fade-slide">
+          <div class="text-center space-y-1 pt-1">
+            <span class="text-[10px] uppercase tracking-widest font-mono-card text-[#6e655c]">Ending Ceremony</span>
+            <h2 class="font-serif-poetic text-2xl font-bold text-[#262320]">Reading the Worlds</h2>
+            <p class="text-xs text-[#5c554d]">Meaning stays in the players’ heads.</p>
+          </div>
+
+          <!-- World Selector Tabs -->
+          <div class="flex items-center justify-center gap-1.5 flex-wrap">
+            ${worldTabs}
+          </div>
+
+          <!-- Ceremonial Sheet -->
+          <div class="sheet-paper rounded-2xl p-4 space-y-4 border-2 border-[#cfc5b1]">
+            <div class="flex items-center justify-between border-b border-[#e2dac9] pb-2.5">
+              <div>
+                <h3 class="font-serif-poetic text-2xl font-bold text-[#262320]">${world.title}</h3>
+                <p class="text-[11px] text-[#7a7064]">${world.words.length} words arrived · ${world.lines.length} lines spoken</p>
+              </div>
+              <div class="flex items-center gap-1.5">
+                <button
+                  onclick="readActiveWorldAloud()"
+                  class="px-2.5 py-1.5 rounded-xl text-xs font-medium border transition flex items-center gap-1 ${
+                    gameState.isSpeakingTTS
+                      ? 'bg-[#8f342e] text-white border-[#8f342e]'
+                      : 'bg-[#eef4f0] hover:bg-[#dfece3] text-[#2d3e33] border-[#abc2b2]'
+                  }"
+                >
+                  <span>${gameState.isSpeakingTTS ? '■ Stop Reading' : '▶ Read Aloud'}</span>
+                </button>
+                <button
+                  onclick="copyCeremonyWorldText()"
+                  class="px-2.5 py-1.5 rounded-xl text-xs font-medium bg-[#f3ede0] hover:bg-[#e5dec9] text-[#3a352f] border border-[#d5ccb9] transition"
+                  title="Copy World Poem"
+                >
+                  Copy
+                </button>
+              </div>
+            </div>
+
+            <!-- 1. Words in the order they arrived -->
+            <div class="space-y-1.5">
+              <h4 class="text-[10.5px] uppercase tracking-wider font-semibold text-[#6e655c]">
+                1. Words in the Order They Arrived
+              </h4>
+              <div class="flex flex-wrap gap-1.5">
+                ${orderedWordsHTML}
+              </div>
+            </div>
+
+            <!-- 2. Its lines aloud -->
+            <div class="space-y-1.5 pt-2 border-t border-[#ece5d5]">
+              <h4 class="text-[10.5px] uppercase tracking-wider font-semibold text-[#6e655c]">
+                2. Its Lines Aloud
+              </h4>
+              <div class="space-y-1.5">
+                ${linesCeremonyHTML}
+              </div>
+            </div>
+
+            <!-- 3. Its struck words, the ones the world never heard -->
+            <div class="space-y-1 pt-2 border-t border-[#ece5d5]">
+              <h4 class="text-[10.5px] uppercase tracking-wider font-semibold text-[#7a6a64]">
+                3. Its Struck Words — The Ones the World Never Heard
+              </h4>
+              <div class="py-1">
+                ${struckCeremonyHTML}
+              </div>
+            </div>
+          </div>
+        </div>
+      `;
+
+      footer.innerHTML = `
+        <button
+          onclick="initGame()"
+          class="w-full py-2.5 px-4 rounded-xl bg-[#3d5245] hover:bg-[#2f4036] text-[#f6f2e9] font-medium text-xs shadow-sm transition"
+        >
+          Shuffle Deck & Begin a New Game
+        </button>
+      `;
+    }
+
+    function selectCeremonyWorld(idx) {
+      stopSpeech();
+      gameState.ceremonyWorldIndex = idx;
+      renderGame();
+    }
+
+    /********************************************************************
+     * 10. MODALS (WORD KEY, RULES, SETTINGS)
+     ********************************************************************/
+    function openWordKeyModal() {
+      const modal = document.getElementById('modal-word-key');
+      const body = document.getElementById('word-key-body');
+      if (!modal || !body) return;
+
+      const suitBlocks = ['♠', '♥', '♦', '♣'].map(suit => {
+        const info = SUITS[suit];
+        const colorCls = info.color === 'red' ? 'text-[#8f342e]' : 'text-[#262320]';
+        const items = RANKS.map(r => {
+          const w = getCardWord(suit, r);
+          const isVariantWord = gameState.useVariant && ((suit === '♥' && r === 'Q') || (suit === '♦' && r === 'K'));
+          return `
+            <span class="inline-flex items-baseline gap-1 px-1.5 py-0.5 rounded bg-[#fbf9f4] border border-[#e2dac9]">
+              <strong class="font-mono-card text-[10px] ${colorCls}">${r}</strong>
+              <span class="font-serif-poetic text-sm ${isVariantWord ? 'text-[#3d5245] font-bold underline' : 'text-[#262320]'}">${w}</span>
+            </span>
+          `;
+        }).join('');
+
+        return `
+          <div class="p-2.5 rounded-xl bg-[#f4efe4] border border-[#e0d7c5] space-y-1.5">
+            <div class="flex items-center justify-between">
+              <span class="font-semibold ${colorCls} flex items-center gap-1">
+                <span class="font-mono-card text-sm">${suit}</span> ${info.name}: ${info.kind}
+              </span>
+              <span class="text-[10px] text-[#8c8275] font-mono-card">13 words</span>
+            </div>
+            <div class="flex flex-wrap gap-1">
+              ${items}
+            </div>
+          </div>
+        `;
+      }).join('');
+
+      body.innerHTML = `
+        ${suitBlocks}
+        <div class="p-2.5 rounded-xl bg-[#eef3ef] border border-[#cbd9ce] space-y-1">
+          <p class="font-semibold text-[#2d3e33]">Always Free (No Card Needed)</p>
+          <p class="text-[11.5px] text-[#3a352f]">
+            <strong>Words:</strong> <code>the, a, of, in, and, is, to, not</code><br/>
+            <strong>Endings on World Words:</strong> <code>-s, -es, -ed, -ing, -ly</code><br/>
+            <strong>Punctuation:</strong> <code>.</code> and <code>?</code>
+          </p>
+        </div>
+      `;
+
+      modal.classList.remove('hidden');
+    }
+
+    function closeWordKeyModal() {
+      document.getElementById('modal-word-key')?.classList.add('hidden');
+    }
+
+    function openRulesModal() {
+      document.getElementById('modal-rules')?.classList.remove('hidden');
+    }
+
+    function closeRulesModal() {
+      document.getElementById('modal-rules')?.classList.add('hidden');
+    }
+
+    function openSettingsModal() {
+      updateSettingsModalUI();
+      document.getElementById('modal-settings')?.classList.remove('hidden');
+    }
+
+    function closeSettingsModal() {
+      document.getElementById('modal-settings')?.classList.add('hidden');
+    }
+
+    function toggleVariantSetting() {
+      gameState.useVariant = !gameState.useVariant;
+      const dot = document.getElementById('variant-dot');
+      if (dot) dot.classList.toggle('hidden', !gameState.useVariant);
+      updateSettingsModalUI();
+    }
+
+    function setFirstSpeaker(who) {
+      gameState.firstSpeaker = who;
+      updateSettingsModalUI();
+    }
+
+    function updateSettingsModalUI() {
+      const btn = document.getElementById('toggle-variant-btn');
+      const knob = document.getElementById('toggle-variant-knob');
+      if (btn && knob) {
+        if (gameState.useVariant) {
+          btn.className = 'w-12 h-6 rounded-full transition-colors p-0.5 flex items-center bg-[#3d5245]';
+          knob.className = 'w-5 h-5 rounded-full bg-white shadow transform transition-transform translate-x-6';
+        } else {
+          btn.className = 'w-12 h-6 rounded-full transition-colors p-0.5 flex items-center bg-[#cfc6b4]';
+          knob.className = 'w-5 h-5 rounded-full bg-white shadow transform transition-transform translate-x-0';
+        }
+      }
+
+      const pBtn = document.getElementById('first-speaker-player');
+      const bBtn = document.getElementById('first-speaker-bot');
+      if (pBtn && bBtn) {
+        pBtn.className = `py-2 px-3 rounded-xl border text-xs font-medium transition ${
+          gameState.firstSpeaker === 'player'
+            ? 'bg-[#262320] text-[#f6f2e9] border-[#262320]'
+            : 'bg-[#fbf9f4] text-[#4a433b] border-[#d5ccb9]'
+        }`;
+        bBtn.className = `py-2 px-3 rounded-xl border text-xs font-medium transition ${
+          gameState.firstSpeaker === 'bot'
+            ? 'bg-[#262320] text-[#f6f2e9] border-[#262320]'
+            : 'bg-[#fbf9f4] text-[#4a433b] border-[#d5ccb9]'
+        }`;
+      }
+    }
+
+    function startNewGameFromSettings() {
+      closeSettingsModal();
+      initGame();
+    }
+
+    window.onload = function () {
+      initGame();
+    };
+  </script>
+</body>
+</html>

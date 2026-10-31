@@ -35,6 +35,9 @@ def _modern(code):
     code = OPT_CATCH.sub("catch (__e__) {", code)
     code = re.sub(r"\?\?=", "||=", code)
     code = re.sub(r"\?\?", "||", code)
+    code = re.sub(r"\?\.\s*\[", "[", code)
+    code = re.sub(r"\?\.", ".", code)
+    code = re.sub(r'(?<=\d)_(?=\d)', '', code)
     code = IMPORT_META_GLOB.sub("__viteGlob__(", code)
     code = IMPORT_META.sub("__importMeta", code)
     return code
