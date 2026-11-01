@@ -172,7 +172,12 @@ button:focus-visible,select:focus-visible,input:focus-visible,summary:focus-visi
 var GAME_ID = 'braid';
 var MAXLEN = 40;
 var COLORS = ['#a45f3b', '#6d7b4f', '#3f6f73', '#8a5a72'];
-var SEEDS = ['hot', 'light', 'water', 'open', 'rise', 'stone', 'bread', 'night', 'heart', 'fall', 'river', 'salt'];
+var SEED_BANK = [
+  'salt', 'tide', 'ash', 'bone', 'glass', 'root', 'lamp', 'door', 'river', 'ghost', 'moth', 'stone', 'bell',
+  'burn', 'drown', 'wake', 'carry', 'fall', 'break', 'leave', 'hold', 'grow', 'bend', 'climb', 'forget', 'bloom',
+  'quiet', 'bright', 'hollow', 'slow', 'bitter', 'tender', 'strange', 'old', 'hungry', 'cold', 'wild', 'heavy', 'dry',
+  'we', 'you', 'nobody', 'everything', 'they', 'nothing', 'someone', 'everyone', 'always', 'never', 'again', 'here', 'there'
+];
 var UNIVERSAL = ['a synonym of', 'a rhyme of', 'a word starting with the same letter as', 'a word usually found with', 'in the same category as'];
 var NOUNISH = ['a kind of', 'a part of', 'made of'];
 var RELS = UNIVERSAL.concat(NOUNISH);
@@ -197,6 +202,18 @@ function shuffle(a){
     var t = a[i]; a[i] = a[j]; a[j] = t;
   }
   return a;
+}
+function drawSeed(){
+  if (!seedBag.length){
+    seedBag = shuffle(SEED_BANK.slice());
+    if (seedBag.length > 1 && seedBag[seedBag.length - 1] === lastSeed){
+      var t = seedBag[0];
+      seedBag[0] = seedBag[seedBag.length - 1];
+      seedBag[seedBag.length - 1] = t;
+    }
+  }
+  lastSeed = seedBag.pop();
+  return lastSeed;
 }
 function joinNames(arr){
   if (!arr.length) return 'Someone';
@@ -251,6 +268,8 @@ function onDown(e){
 
 var S = null;
 var mode = 'wait';
+var seedBag = [];
+var lastSeed = '';
 var myPicks = [];
 var pickKey = '';
 var toastText = '';
@@ -383,7 +402,7 @@ function startGameWith(o){
   };
   reported = false;
   if (S.order.length === 1){
-    S.words.push({ id: S.nextId++, text: SEEDS[Math.floor(Math.random() * SEEDS.length)], by: S.order[0], links: [], seed: true });
+    S.words.push({ id: S.nextId++, text: drawSeed(), by: S.order[0], links: [], seed: true });
   }
   $('word').value = '';
   makeNeed();
