@@ -1096,7 +1096,8 @@
     };
 
     function onHubMessage(ev) {
-      const m = ev.data;
+      let m = ev.data;
+      if (m && typeof m === 'object' && typeof m.k !== 'string') m = m.gd || m.gu || m.msg || m;   // tolerate a wrapped envelope
       if (!m || typeof m !== 'object' || typeof m.k !== 'string') return;
       const p = m.p, G = gameState;
       if (m.k === 'roster') onRoster(p);
@@ -1109,6 +1110,9 @@
     function onRoster(p) {
       if (!p || !p.you) return;
       const G = gameState;
+      if (G.fallback) {   // the hub answered after all: drop the table of one we started without it
+        G.fallback = false; G.phase = ''; G.players = []; G.names = {}; G.worlds = []; G.sealed = [];
+      }
       G.me = p.you;
       G.roster = p.roster || [];
       if (G.me.isHost) {
@@ -1720,6 +1724,14 @@
       } else {
         Hub.up('hello');
         renderGame();
+        // No roster means the hub isn't running a bridge for this frame (e.g. the game is registered
+        // solo: true). Don't hang on "Joining…": play as a table of one.
+        setTimeout(function () {
+          if (gameState.me) return;
+          gameState.fallback = true;
+          onRoster({ you: { id: 'local', name: 'You', isHost: true }, roster: [{ id: 'local', name: 'You', host: true }] });
+          showToast('No table connection, so this is a solo game.');
+        }, 2000);
       }
     };
   </script>
