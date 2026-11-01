@@ -1089,16 +1089,15 @@
      * Outside the hub (no parent frame) the game runs as a table of one.
      ********************************************************************/
     const standalone = (window.parent === window);
+    const GAME_ID = 'humus';   // must match the id of this game's line in public/games.js
     const Hub = {
-      // NOTE: envelope is {k, p} as in the README's postMessage example; if src/compat.js
-      // expects a wrapper, this is the one place to change.
-      up(k, p) { if (!standalone) window.parent.postMessage({ k, p }, '*'); }
+      // Envelope as chess.html uses it: up = {t:'gu', game, k, p}, down = {t:'gd', game, k, p, from}.
+      up(k, p) { if (!standalone) { try { window.parent.postMessage({ t: 'gu', game: GAME_ID, k, p }, '*'); } catch (e) {} } }
     };
 
     function onHubMessage(ev) {
-      let m = ev.data;
-      if (m && typeof m === 'object' && typeof m.k !== 'string') m = m.gd || m.gu || m.msg || m;   // tolerate a wrapped envelope
-      if (!m || typeof m !== 'object' || typeof m.k !== 'string') return;
+      const m = ev.data;
+      if (!m || m.t !== 'gd' || m.game !== GAME_ID || typeof m.k !== 'string') return;
       const p = m.p, G = gameState;
       if (m.k === 'roster') onRoster(p);
       else if (m.k === 'state') { if (!(G.me && G.me.isHost) && p) applySnapshot(p); }
@@ -1113,7 +1112,8 @@
       if (G.fallback) {   // the hub answered after all: drop the table of one we started without it
         G.fallback = false; G.phase = ''; G.players = []; G.names = {}; G.worlds = []; G.sealed = [];
       }
-      G.me = p.you;
+      G.room = p.room || '';
+      G.me = G.room ? p.you : Object.assign({}, p.you, { isHost: true });   // no room = a table of one, and you run it
       G.roster = p.roster || [];
       if (G.me.isHost) {
         if (!G.phase) { G.phase = 'LOBBY'; G.players = [G.me.id]; drawWords(); }
@@ -1490,6 +1490,7 @@
             <p class="text-[11px] text-[#6e655c] leading-relaxed">${
               G.players.length > 1
                 ? 'Players take turns as speaker; everyone else decodes. Up to 6 can sit.'
+                : G.room ? 'Waiting for friends: they open Humus from the room and tap "Sit down". Start whenever you are ready; alone, you play solo.'
                 : 'Alone at the table you play solo: you write lines and seal them, then read them back later when you have half-forgotten them. Anyone who sits down turns it into a shared game.'}</p>
           </div>
           <div class="sheet-paper rounded-2xl p-3.5 space-y-2">
@@ -1501,7 +1502,7 @@
         </div>`;
       const n = G.players.length;
       footer.innerHTML = host
-        ? `<button onclick="act({a:'start'})" class="${btnClass(true)}">${n > 1 ? `Start with ${n} players` : 'Start a solo game'}</button>`
+        ? `<button onclick="act({a:'start'})" class="${btnClass(true)}">${n > 1 ? `Start with ${n} players` : G.room ? 'Nobody else has sat down: start solo' : 'Start a solo game'}</button>`
         : seated
           ? `<div class="grid grid-cols-2 gap-2">${statusBar('Waiting for the host…')}<button onclick="act({a:'leave'})" class="py-2.5 px-4 rounded-xl border border-[#d5ccb9] bg-[#fbf9f4] text-xs font-medium text-[#3a352f]">Leave seat</button></div>`
           : `<button onclick="act({a:'join'})" class="${btnClass(true)}">Sit down at the table</button>`;
