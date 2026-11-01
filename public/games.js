@@ -74,5 +74,7 @@ window.BUB_GAMES = [
     icon: '🖍️', desc: 'One person writes, the next draws, the next writes and so on.' },
       { id: 'Humus', file: 'humus.html', title: 'Humus', players: '1-8', soloable: true, color: '#f4efe6', fill: true,
     icon: '🍲', desc: 'Humanical Terraformation' },
+  { id: 'braid', file: 'braid.html', title: 'Braid', players: '2-4', color: '#a45f3b', soloable: true, height: 560,
+    icon: '🧶', desc: 'Grow a braid of words one link at a time.' },
     
 ]
