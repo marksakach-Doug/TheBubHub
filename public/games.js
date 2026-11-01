@@ -1,17 +1,3 @@
-// Bub Hub game registry. Adding a game = drop its .html file in this folder
-// and add one line below. index.html is never touched.
-// Loaded with a plain script tag (not fetch) so double-clicking index.html works.
-//
-// `icon` and `desc` are pure decoration: the icon leads the button, the one
-// sentence in `desc` shows up in the button's tooltip next to the player count.
-//
-// `soloable: true` = a bridge game that also runs a real solo table, so it
-// belongs in the pre-room "Solo Corner" list. Such a game promotes itself to
-// local host when the hub reports no room (see goldberg.html for the pattern).
-// It keeps its real player count for the in-room grouping.
-//
-// `menuLabel` overrides the button text only (not the title used in invites,
-// chat, and the record) — for games that aren't really "played".
 window.BUB_GAMES = [
   // Goldberg is deliberately NOT in the pre-room "Solo Corner": it got in via
   // `lobby: true`, which is a different flag from `soloable` and put a whole
@@ -25,13 +11,13 @@ window.BUB_GAMES = [
   // Goldberg has no seat system at all — it is one shared machine — so the
   // menu count was the only place "how many" was ever mentioned, and a fourth
   // player just got a slower table with no explanation. `maxPlayers` is read by
-  // goldberg.html itself, which refuses at the door.
+  // goldberg.html itself, which refuses at the door instead of quietly misbehaving.
   { id: 'goldberg', file: 'goldberg.html', title: 'Goldberg', players: '2-3', maxPlayers: 3, color: '#e6c280', fill: true,
     activityRecord: true,
     icon: '🔔', desc: 'Build a chain-reaction machine together out of parts, then press play and watch it go.' },
   { id: 'daltadka', file: 'daltadka.html', title: 'Dal Tadka', players: 'solo', color: '#d9b26f', solo: true, lobby: true, fill: true,
     icon: '🍲', desc: 'Cook dal.' },
-  { id: 'warp', file: 'warpfront.html', title: 'Warp Front', players: '1-3', color: '#00ffcc', soloable: true,
+  { id: 'warp', file: 'warpfront.html', title: 'Warp Front', players: '1-3', color: '#00ffcc', soloable: true, disabled: true,
     icon: '🛸', desc: 'A co-op race to save planets. Borg are the bad guys. Get to the planets first.' },
   { id: 'lotr', file: 'lotr.html', title: 'LOTR Cards', players: '2-8', color: '#b9c98a',
     // `grow` (not `fill`): the frame is sized to the game and the WHOLE PAGE
@@ -39,16 +25,16 @@ window.BUB_GAMES = [
     // game scroll inside it instead, which is a nested scroll on a phone.
     grow: true,
     icon: '🃏', desc: 'Race to Level 15 while monsters hunt whoever is in the lead.' },
-  { id: 'blastoff', file: 'blastoff.html', title: 'Blast Off!', players: '2-8', color: '#00f2ff', soloable: true,
+  { id: 'blastoff', file: 'blastoff.html', title: 'Blast Off!', players: '2-8', color: '#00f2ff', soloable: true, disabled: true,
     icon: '🚀', desc: 'Pick destinations and maneuver your rocket.' },
-  { id: 'grammar', file: 'discover_the_grammar.html', title: 'Discover the Grammar', players: '2-4', color: '#f3f0e8', soloable: true,
+  { id: 'grammar', file: 'discover_the_grammar.html', title: 'Discover the Grammar', players: '2-4', color: '#f3f0e8', soloable: true, disabled: true,
     icon: '🔤', desc: 'A complex code breaking mind game.' },
   // `soloable: true` also runs a real solo table with no room, so it belongs in
-// the pre-room "Solo Corner". Word Bridge has its own solo mode (you play both
-// sides), so it qualifies — it was simply never flagged.
+  // the pre-room "Solo Corner". Word Bridge has its own solo mode (you play both
+  // sides), so it qualifies — it was simply never flagged.
   { id: 'wordbridge', file: 'wordbridge.html', title: 'Word Bridge', players: '2-8', color: '#000000', soloable: true,
     icon: '🌉', desc: 'Everyone writes one word that fits both meanings, then the table judges each bridge.' },
-// { id: 'wordwright', file: 'wordwright.html', title: 'Wordwright', players: '2-6', color: '#a5b4fc', icon: '📝', desc: 'Co-write a story one sentence at a time.' },
+  // { id: 'wordwright', file: 'wordwright.html', title: 'Wordwright', players: '2-6', color: '#a5b4fc', icon: '📝', desc: 'Co-write a story one sentence at a time.' },
   // solo: playable with no room and no bridge. `lobby: true` also lists it
   // in the lobby so there is something to play while waiting for others.
   // `fill` lets the stage own the viewport (solo games never report a height,
@@ -72,9 +58,9 @@ window.BUB_GAMES = [
   // fixed 3:2 canvas, not a document that scrolls.
   { id: 'the96game', file: 'the96game.html', title: 'The 96 Game', players: '3-8', color: '#b5541f', fill: true,
     icon: '🖍️', desc: 'One person writes, the next draws, the next writes and so on.' },
-      { id: 'Humus', file: 'humus.html', title: 'Humus', players: '1-8', soloable: true, color: '#f4efe6', fill: true,
+      { id: 'Humus', file: 'humus.html', title: 'Humus', players: '1-8', soloable: true, color: '#f4efe6', fill: true, disabled: true,
     icon: '🍲', desc: 'Humanical Terraformation' },
   { id: 'braid', file: 'braid.html', title: 'Braid', players: '2-4', color: '#a45f3b', soloable: true, height: 560,
     icon: '🧶', desc: 'Grow a braid of words one link at a time.' },
-    
+
 ]

@@ -78,6 +78,7 @@ function freshState() {
     solo: false,            // was the round just played one player? frozen at start
     table: [],              // who was actually at the table when it started
     dots: {},               // id -> { a, out, outSince, away, lastReroll, benched }
+    showCircle: showCircle,
     over: null
   };
 }
@@ -142,6 +143,15 @@ export function reduce(state, action, ctx) {
 
   const mine = dots[id];
   if (players.indexOf(id) < 0 || !mine) return { error: 'You are watching — not seated.' };
+
+  if (kind === 'showcircle') {
+    const alone = players.length < 2;
+    if (state.hostId && state.hostId !== id && !alone) {
+      return { error: 'Only the host controls the circle.' };
+    }
+    const show = !!action.show;
+    return same({ showCircle: show });
+  }
 
   if (kind === 'start') {
     // A round can be begun from the lobby or replayed from the results screen.
@@ -288,6 +298,7 @@ export function project(state, playerId, api) {
   return Object.assign({}, state, {
     you: playerId || '',
     dots: dots,
+    showCircle: state.showCircle !== false,
     lapses: hidden ? null : state.lapses,
     over: hidden ? null : state.over,
     // The results screen needs names, and the hub's roster is the only place
@@ -478,12 +489,10 @@ const btns = wrap.querySelector('.dr-btns');
 const btn = wrap.querySelector('.dr-btn');
 const showCircleBox = wrap.querySelector('.dr-showcircle-box');
 if (showCircleBox) {
-  showCircleBox.checked = showCircle;
   showCircleBox.addEventListener('change', function () {
-    showCircle = !!showCircleBox.checked;
-    try { localStorage.setItem(SHOW_CIRCLE_KEY, showCircle ? '1' : '0'); } catch (e) {}
-    updateRings();
-    render();
+    const show = !!showCircleBox.checked;
+    try { localStorage.setItem(SHOW_CIRCLE_KEY, show ? '1' : '0'); } catch (e) {}
+    api.send({ a: 'showcircle', show: show });
   });
 }
 
@@ -525,16 +534,17 @@ if (showCircleBox) {
 
   function updateRings() {
     if (!view) return;
+    const sc = view.showCircle !== false;
     if (view.phase === 'reveal') {
       ring.style.display = 'block';
       centre.style.display = 'block';
       rev.style.display = 'flex';
     } else if (view.phase === 'play') {
-      ring.style.display = showCircle ? 'block' : 'none';
+      ring.style.display = sc ? 'block' : 'none';
       centre.style.display = 'none';
       rev.style.display = 'none';
     } else {
-      ring.style.display = showCircle ? 'block' : 'none';
+      ring.style.display = sc ? 'block' : 'none';
       centre.style.display = 'none';
       rev.style.display = 'none';
     }
@@ -872,6 +882,11 @@ if (showCircleBox) {
     const host = iAmHost();
     const n = list.length;
     const alone = n < 2;
+
+    if (showCircleBox) {
+      showCircleBox.checked = view.showCircle !== false;
+      showCircleBox.disabled = !(host || alone);
+    }
 
     overlay.hidden = playing;
 

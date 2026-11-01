@@ -1193,7 +1193,13 @@
         return;
       }
       G.speaker = G.mode === 'solo' ? G.players[0] : G.players[(G.turn - 1) % G.players.length];
-      G.pile = shuffleArray(ALL_IDS);
+      const forbiddenWords = new Set();
+      (G.worlds || []).forEach(function (w) {
+        (w.words || []).forEach(function (wd) { forbiddenWords.add(wd); });
+        (w.struck || []).forEach(function (wd) { forbiddenWords.add(wd); });
+      });
+      const validIds = ALL_IDS.filter(function (id) { return !forbiddenWords.has(G.map[id]); });
+      G.pile = shuffleArray(validIds.length >= 4 ? validIds : ALL_IDS);
       G.hand = G.pile.splice(0, 4);
       G.phase = 'PICK';
     }

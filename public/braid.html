@@ -105,7 +105,7 @@ button:focus-visible,select:focus-visible,input:focus-visible,summary:focus-visi
       <label>Relations
         <select id="modeSel">
           <option value="dealt">Dealt: a hand each turn</option>
-          <option value="free">Free: any of eight</option>
+          <option value="free">Free association: any connection</option>
         </select>
       </label>
       <label id="countWrap">Players
@@ -156,7 +156,7 @@ button:focus-visible,select:focus-visible,input:focus-visible,summary:focus-visi
 
   <details id="rules" class="card rules">
     <summary>How to play</summary>
-    <p>Players take turns adding one word. Each new word must link to the last two words (<b>loose</b>) or the last three (<b>tight</b>), and every link is a named relation. Each turn the game deals a <b>hand</b> of relations. Pick a different one for each link. A hand always holds relations that fit any word, so you are never stuck, and a word never gets the same relation twice. Switch to <b>free</b> to choose from all eight.</p>
+    <p>Players take turns adding one word. Each new word must link to the last two words (<b>loose</b>) or the last three (<b>tight</b>), and every link is a named relation. Each turn the game deals a <b>hand</b> of relations. Pick a different one for each link. A hand always holds relations that fit any word, so you are never stuck, and a word never gets the same relation twice. Switch to <b>free association</b> for unconstrained word-to-word links.</p>
     <p>Anyone may <b>Challenge</b> the last word and make its author name every link out loud. A broken link drops the word. Call <b>Home</b> when the last word ties back to the first. Words you keep are your score.</p>
     <h3>At a networked table</h3>
     <p>A challenge or a Home call goes to a table vote. A challenged link holds on a tie. A Home call needs a clear majority to close the braid.</p>
@@ -333,6 +333,15 @@ function makeNeed(){
   var k = Math.min(S.window, S.words.length);
   var targets = [];
   for (var j = 0; j < k; j++) targets.push(S.words[S.words.length - 1 - j]);
+  if (S.free){
+    S.hand = [];
+    S.need = targets.map(function(t){
+      return { target: t.text, targetId: t.id, allowed: [] };
+    });
+    myPicks = [];
+    pickKey = needKey();
+    return;
+  }
   var uni = shuffle(UNIVERSAL);
   var extras = shuffle(uni.slice(k).concat(NOUNISH)).slice(0, 2);
   S.hand = k ? shuffle(uni.slice(0, k).concat(extras)) : [];
@@ -452,17 +461,23 @@ function addWord(d, from){
 
   var links = [];
   if (S.need.length){
-    if (!Array.isArray(d.links) || d.links.length !== S.need.length) return 'Pick a relation for every link.';
-    var seen = {};
-    for (var j = 0; j < S.need.length; j++){
-      var l = d.links[j];
-      var need = S.need[j];
-      if (!l || typeof l.rel !== 'string') return 'Pick a relation for every link.';
-      if (l.targetId !== need.targetId) return 'That link does not match the braid.';
-      if (need.allowed.indexOf(l.rel) === -1) return 'That relation is not in your hand.';
-      if (seen[l.rel]) return 'Each link needs a different relation.';
-      seen[l.rel] = true;
-      links.push({ rel: l.rel, targetId: need.targetId, target: need.target });
+    if (S.free){
+      S.need.forEach(function(need){
+        links.push({ rel: 'association', targetId: need.targetId, target: need.target });
+      });
+    } else {
+      if (!Array.isArray(d.links) || d.links.length !== S.need.length) return 'Pick a relation for every link.';
+      var seen = {};
+      for (var j = 0; j < S.need.length; j++){
+        var l = d.links[j];
+        var need = S.need[j];
+        if (!l || typeof l.rel !== 'string') return 'Pick a relation for every link.';
+        if (l.targetId !== need.targetId) return 'That link does not match the braid.';
+        if (need.allowed.indexOf(l.rel) === -1) return 'That relation is not in your hand.';
+        if (seen[l.rel]) return 'Each link needs a different relation.';
+        seen[l.rel] = true;
+        links.push({ rel: l.rel, targetId: need.targetId, target: need.target });
+      }
     }
   }
 
@@ -695,14 +710,14 @@ function actAdd(){
   if (!S || S.phase !== 'play') return;
   var text = $('word').value;
   if (!text.trim()){ toast('Type a word first.'); return; }
-  if (S.need.length){
+  if (S.need.length && !S.free){
     if (myPicks.length !== S.need.length || myPicks.some(function(v){ return !v; })){
       toast('Pick a relation for every link.');
       return;
     }
     if (new Set(myPicks).size !== myPicks.length){ toast('Each link needs a different relation.'); return; }
   }
-  var links = S.need.map(function(l, j){ return { rel: myPicks[j], targetId: l.targetId }; });
+  var links = S.free ? S.need.map(function(l){ return { rel: 'association', targetId: l.targetId }; }) : S.need.map(function(l, j){ return { rel: myPicks[j], targetId: l.targetId }; });
   $('word').value = '';
   myPicks = [];
   doAction({ a: 'add', text: text, links: links });
@@ -730,6 +745,17 @@ function renderNeed(){
   }
   if (!S.need.length){
     box.appendChild(el('p', null, 'The first word is free. Choose anything.'));
+    return;
+  }
+  if (S.free){
+    var line = el('div', 'need-line');
+    line.appendChild(document.createTextNode('Your word must associate with '));
+    S.need.forEach(function(l, j){
+      if (j) line.appendChild(document.createTextNode(' and '));
+      line.appendChild(el('b', null, l.target));
+    });
+    line.appendChild(document.createTextNode(' (free association — any connection).'));
+    box.appendChild(line);
     return;
   }
   if (!S.free){
