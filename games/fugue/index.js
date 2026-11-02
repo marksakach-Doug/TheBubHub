@@ -33,7 +33,7 @@ export const meta = {
 
 const MIN_PLAYERS = 3;
 const MAX_PLAYERS = 8;
-const WORD_MS = 3000;          // a streamer must lock a word this often
+const WORD_MS = 5000;          // a streamer must lock a word this often
 const INTRO_MS = 6000;         // role + prompt screen, ends in a 3-2-1
 const LIVE_MS = 60000;         // one round of streaming
 const VOTE_BASE = 8000;        // vote window = base + per link, capped
