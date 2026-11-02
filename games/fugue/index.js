@@ -24,11 +24,11 @@
 export const meta = {
   id: 'fugue',
   title: 'Fugue',
-  players: { min: 3, max: 8 },
+  players: { min: 1, max: 8 },
   color: '#fde047',
   icon: '⚡',
-  desc: 'Streamers lock a word every 3 seconds; the Connectionist strikes lightning between their streams.',
-  soloable: false
+  desc: 'Streamers lock a word every 3 seconds; play multiplayer or solo streamer mode.',
+  soloable: true
 };
 
 const MIN_PLAYERS = 3;
@@ -114,7 +114,9 @@ function freshState() {
     history: [],
     usedPrompts: [],
     round: null,
-    over: null
+    soloRound: null,
+    over: null,
+    mode: null
   };
 }
 
@@ -133,6 +135,9 @@ export function init(ctx) {
   const st = freshState();
   st.players = tableOf(ctx);
   st.hostId = st.players[0] || '';
+  if (st.players.length === 1) {
+    st.mode = 'solo-streamer';
+  }
   return st;
 }
 
@@ -239,6 +244,58 @@ export function reduce(state, action, ctx) {
   if (!id) return { error: 'No identity — reopen the game.' };
   const host = !!from.host || id === state.hostId;
 
+  if (state.mode === 'solo-streamer') {
+    if (kind === 'join') {
+      if (state.players.indexOf(id) >= 0) return noop();
+      return same(state, { players: state.players.concat([id]) });
+    }
+    if (state.players.indexOf(id) < 0) return { error: 'You are watching — not seated.' };
+    if (kind === 'start') {
+      if (state.phase !== 'lobby' && state.phase !== 'over') return { error: 'A set is already running.' };
+      const prompt = PROMPTS[Math.floor(rng() * PROMPTS.length)];
+      return same(state, {
+        phase: 'live',
+        epoch: state.epoch + 1,
+        soloRound: {
+          prompt: prompt,
+          words: [],
+          endsAt: now + LIVE_MS,
+          startedAt: now
+        }
+      });
+    }
+    if (kind === 'word') {
+      if (state.phase !== 'live' || !state.soloRound) return noop();
+      if (now > state.soloRound.endsAt + GRACE) return noop();
+      const list = state.soloRound.words || [];
+      if (list.length >= MAX_WORDS) return noop();
+      const words = list.concat([cleanWord(action.w)]);
+      return same(state, {
+        soloRound: Object.assign({}, state.soloRound, { words: words })
+      });
+    }
+    if (kind === 'finish') {
+      if (state.phase !== 'live' || !state.soloRound) return noop();
+      const count = (state.soloRound.words || []).length;
+      return same(state, {
+        phase: 'over',
+        over: {
+          count: count,
+          winner: id
+        }
+      });
+    }
+    if (kind === 'reset') {
+      const st = freshState();
+      st.players = state.players;
+      st.hostId = state.players[0] || '';
+      st.mode = 'solo-streamer';
+      st.epoch = state.epoch + 1;
+      return st;
+    }
+    return { error: 'Unknown action: ' + kind };
+  }
+
   if (kind === 'join') {
     if (state.players.indexOf(id) >= 0 || state.late.indexOf(id) >= 0) return noop();
     if (state.players.length + state.late.length >= MAX_PLAYERS) return { error: 'Fugue holds ' + MAX_PLAYERS + ' players.' };
@@ -339,6 +396,12 @@ export function reduce(state, action, ctx) {
 // Someone left. Their seat goes; a round that cannot be played any more is
 // called off rather than left waiting on a stream that will never come.
 export function prune(state, goneId) {
+  if (state.mode === 'solo-streamer') {
+    if (state.players.indexOf(goneId) >= 0) {
+      return same(state, { players: state.players.filter(function (id) { return id !== goneId; }), phase: 'over' });
+    }
+    return state;
+  }
   const inP = state.players.indexOf(goneId) >= 0;
   const inL = state.late.indexOf(goneId) >= 0;
   if (!inP && !inL) return state;
@@ -373,6 +436,30 @@ export function prune(state, goneId) {
 // -------------------------------------------------------------- project ----
 
 export function project(state, playerId, api) {
+  if (state.mode === 'solo-streamer') {
+    const ph = state.phase;
+    const r = state.soloRound ? {
+      prompts: { [playerId]: state.soloRound.prompt },
+      words: { [playerId]: state.soloRound.words },
+      endsAt: state.soloRound.endsAt,
+      linkCount: 0
+    } : null;
+    return {
+      epoch: state.epoch,
+      setNo: state.setNo,
+      phase: ph,
+      players: state.players,
+      hostId: state.hostId,
+      mode: 'solo-streamer',
+      soloRound: state.soloRound,
+      round: r,
+      over: state.over,
+      role: 'stream',
+      you: playerId || '',
+      roster: (api && api.roster) || null,
+      at: Date.now()
+    };
+  }
   const me = playerId || '';
   const r = state.round;
   const ph = state.phase;
@@ -433,6 +520,11 @@ export function roundId(state) {
 }
 
 export function summarize(state, nameOf) {
+  if (state.mode === 'solo-streamer' && state.phase === 'over' && state.over) {
+    const name = nameOf(state.over.winner) || 'You';
+    const count = state.over.count;
+    return name + ' locked ' + count + (count === 1 ? ' word' : ' words') + ' in Fugue Solo Streamer';
+  }
   if (state.phase !== 'over' || !state.over || !state.over.rows.length) return null;
   const o = state.over;
   const nm = function (id) { return nameOf(id) || 'A player'; };
@@ -742,6 +834,13 @@ export function mount(root, api) {
 
   function lobbyScreen() {
     return simple(function (v) {
+      if (v.mode === 'solo-streamer') {
+        return '<div class="center"><h1>FUGUE: SOLO</h1>' +
+          '<p class="rules"><b>Timed Streaming</b>: Get a secret prompt and lock a word every <b>3 seconds</b> — type it, hit space. ' +
+          'Practice your streaming solo against the clock.</p>' +
+          namesHtml(v.players) +
+          '<button class="btn" data-act="start">Start solo game</button></div>';
+      }
       const n = v.players.length;
       const host = v.hostId === myId;
       const can = host && n >= MIN_PLAYERS;
@@ -843,6 +942,11 @@ export function mount(root, api) {
 
   function overScreen() {
     return simple(function (v) {
+      if (v.mode === 'solo-streamer') {
+        const count = v.over ? v.over.count : 0;
+        return '<div class="center"><h2>round complete</h2><div class="big">You locked ' + count + (count === 1 ? ' word' : ' words') + '</div>' +
+          '<button class="btn" data-act="start">Play again</button></div>';
+      }
       const o = v.over || { winners: [], top: 0 };
       const host = v.hostId === myId;
       const heading = o.winners.length > 1 ? 'tied' : 'wins';
@@ -1202,6 +1306,12 @@ export function mount(root, api) {
 
   // ---- routing ----
   function screenName(v) {
+    if (v.mode === 'solo-streamer') {
+      const ph = v.phase;
+      if (ph === 'lobby') return 'lobby';
+      if (ph === 'over') return 'over';
+      return 'stream';
+    }
     const ph = v.phase;
     if (ph === 'lobby') return 'lobby';
     if (ph === 'over') return 'over';
@@ -1231,6 +1341,11 @@ export function mount(root, api) {
 
   function topbar() {
     const v = view;
+    if (v.mode === 'solo-streamer') {
+      whoEl.textContent = 'Fugue Solo · Streamer';
+      clockEl.textContent = '';
+      return;
+    }
     if (v.phase === 'lobby' || v.phase === 'over') { whoEl.textContent = 'Fugue'; clockEl.textContent = ''; return; }
     const r = v.round;
     const rd = 'Round ' + (v.roundIdx + 1) + '/' + v.roundsTotal;
@@ -1242,7 +1357,16 @@ export function mount(root, api) {
   }
 
   function clockTick() {
-    if (!view || !view.round) return;
+    if (!view) return;
+    if (view.mode === 'solo-streamer') {
+      if (view.phase !== 'live' || !view.round) { clockEl.textContent = ''; clockEl.classList.remove('hot'); return; }
+      const t = hostNow();
+      const left = Math.max(0, Math.ceil((view.round.endsAt - t) / 1000));
+      clockEl.textContent = left + 's';
+      clockEl.classList.toggle('hot', left <= 10);
+      return;
+    }
+    if (!view.round) return;
     const r = view.round;
     const t = hostNow();
     let end = 0;
@@ -1287,7 +1411,13 @@ export function mount(root, api) {
   // clock; reduce() is idempotent, so the first ask wins and the rest no-op.
   // This runs on a timer, not a frame, so a hidden tab still moves the game on.
   function pump() {
-    if (dead || !view || !view.round) return;
+    if (dead || !view) return;
+    if (view.mode === 'solo-streamer') {
+      const t = hostNow();
+      if (view.phase === 'live' && view.round && t >= view.round.endsAt) ask('finish');
+      return;
+    }
+    if (!view.round) return;
     const r = view.round;
     const t = hostNow();
     if (view.phase === 'intro' && t >= r.introEndsAt) ask('go');
