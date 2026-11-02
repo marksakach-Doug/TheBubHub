@@ -175,7 +175,8 @@ OFFLINE_SUITES=(
   # One shared suite for every game with a card, so adding a game never means
   # editing this file.
   "game scenarios|game_scenarios.mjs"
-  # The samples Clicker plays have to be in tune. They are extracted from a
+  "fugue rules|fugue_rules.mjs"
+  # The samples Clicker plays has to be in tune. They are extracted from a
   # SoundFont and committed, so nothing else would notice if one of them
   # ended up in the wrong key.
   "clicker samples|clicker_samples_test.py"
