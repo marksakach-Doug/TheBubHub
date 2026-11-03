@@ -40,7 +40,7 @@ const SOLO_BOTS = 3;           // fake streamers in solo connectionist mode
 const BOT_FIRST_MS = 2000;     // first bot word lands this long after live starts
 const BOT_MS_MIN = 2400;       // bot interval floor — slower than the human WORD_MS on purpose
 const BOT_MS_VAR = 1200;       // bot interval jitter range
-const WORD_MS = 5000;          // a streamer must lock a word this often
+const WORD_MS = 10000;          // a streamer must lock a word this often
 const INTRO_MS = 6000;         // role + prompt screen, ends in a 3-2-1
 const LIVE_MS = 120000;         // one round of streaming
 const VOTE_BASE = 8000;        // vote window = base + per link, capped
