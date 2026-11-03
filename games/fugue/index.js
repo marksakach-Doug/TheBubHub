@@ -1142,12 +1142,21 @@ export function mount(root, api) {
       if (v.mode === 'solo-streamer' || v.players.length === 1) {
         return centerScreen([
           el('h1', '', 'FUGUE SOLO'),
-          para('rules', [['b', 'Stream'], ' — a secret prompt; lock a word every ', ['b', '3 seconds'], ', type it, hit space. ',
-            ['b', 'Connect'], ' — three books stream words one by one; you are the Connectionist and strike ', ['b', 'lightning'],
-            ' between words that fit the relation. All links stand; score by weight, straight-down counts double.']),
+          para('rules', [
+            ['b', 'Stream'], 
+            ' — a secret prompt; lock a word every ', 
+            ['b', '3 seconds'], 
+            ', type it, hit space. ', 
+            ['b', 'Connect'], 
+            ' — three books stream words one by one; you are the Connectionist and strike ', 
+            ['b', 'lightning'], 
+            ' between words that fit the relation. All links stand; score by weight, straight-down counts double.'
+          ]),
           namesEl(v.players),
           soloModeBtns()
         ]);
+      } else {
+      }
       const n = v.players.length;
       const host = v.hostId === myId;
       const can = host && n >= MIN_PLAYERS;
@@ -1543,14 +1552,14 @@ export function mount(root, api) {
       if (!b) {
         clearNode(cell);
         b = document.createElement('button');
-            b.type = 'button';
-            b.className = 'b' + (list[i] ? '' : ' blank');
-            b.style.setProperty('--c', colorOf(s));
-            b.setAttribute('data-s', s);
-            b.setAttribute('data-i', String(i));
-            b.textContent = list[i] || '·';
-            cell.appendChild(b);
-          }
+        b.type = 'button';
+        b.className = 'b' + (list[i] ? '' : ' blank');
+        b.style.setProperty('--c', colorOf(s));
+        b.setAttribute('data-s', s);
+        b.setAttribute('data-i', String(i));
+        b.textContent = list[i] || '·';
+        cell.appendChild(b);
+      }
           b.classList.toggle('used', !!(used[s + '|' + i] || pend[s + '|' + i]));
         }
       });
