@@ -42,7 +42,7 @@ const BOT_MS_MIN = 2400;       // bot interval floor — slower than the human W
 const BOT_MS_VAR = 1200;       // bot interval jitter range
 const WORD_MS = 5000;          // a streamer must lock a word this often
 const INTRO_MS = 6000;         // role + prompt screen, ends in a 3-2-1
-const LIVE_MS = 60000;         // one round of streaming
+const LIVE_MS = 120000;         // one round of streaming
 const VOTE_BASE = 8000;        // vote window = base + per link, capped
 const VOTE_PER = 2500;
 const VOTE_MAX = 60000;
@@ -58,22 +58,22 @@ const REVEAL_PROMPTS_TO_CONNECTIONIST = false;
 const COLORS = ['#fb7185', '#38bdf8', '#fde047', '#a78bfa', '#4ade80', '#f472b6', '#fb923c', '#2dd4bf'];
 
 const PROMPTS = [
-  'words to describe enemies', 'words that sound delicious', 'words that bring you down to earth',
-  'things in a kitchen at 3am', 'words that feel like Tuesday', 'words that creak',
-  'words that glow', 'words for how a lie feels', 'things heavier than they look',
-  'words a storm would use', 'words that taste like metal', 'words for being small',
-  'words with sharp edges', 'things you lose without noticing', 'words for a cathedral',
-  'things that rise', 'words your grandmother says', 'things that are better cold',
-  'words that smell like smoke', 'words for what is left after', 'things at the bottom of a pocket',
-  'weather inside a person', 'words that hum', 'things with a lid', 'words for waiting',
-  'things you hold with two hands', 'words that bounce', 'words for the edge of something',
-  'what a river would whisper', 'things older than you', 'words that sound like a lie',
-  'words for morning', 'things that get tangled', 'words that wobble', 'words that keep coming back',
-  'things you can only do once', 'words the color of rust', 'things with an echo',
-  'words for getting lost', 'words that sound fast', 'words that sound slow',
-  'things that burn quietly', 'words for a very good day', 'things inside a clock',
-  'things a tide takes', 'what a crowd does', 'words for what is hidden',
-  'words that sound official', 'words that cross over'
+  'words to describe people', 'words that sound delicious', 'words that bring you down to earth',
+  'things in a kitchen', 'weekend words', 'words that describe noises',
+  'words about light', 'words about bad feelings', 'words for heavy things or feelings',
+  'words about weather', 'words about metal', 'words about smallness',
+  'words about being sick', 'words about loss', 'words people said today, probably',
+  'things that move', 'words from the olden days', 'things that are cold',
+  'words related to fire', 'words about nature', 'clothes',
+  'Internal organs or musical organs, anything organ', 'words that sound funny', 'containers', 'animals',
+  'things you hold', 'words that sound gross', 'stink words',
+  'words a dog/cat/squirrel/cow would think', 'things younger than you', 'words for cool stuff',
+  'words for times of the day/night', 'things/actions related to rope', 'words politicians say', 'words from biology',
+  'things you do regularly', 'words that kids use', 'things that make sound',
+  'words for homey things', 'words that are very long', 'words related to music',
+  'things that burn', 'day words', 'mechanical things',
+  'ocean words', 'words about groups of things/people', 'words about wooden things',
+  'words that you think of (just spit them out)', 'words about magic'
 ];
 
 const RELATIONS = [
