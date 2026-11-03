@@ -29,7 +29,7 @@ export const meta = {
   players: { min: 1, max: 8 },
   color: '#fde047',
   icon: '⚡',
-  desc: 'Streamers lock a word every 3 seconds; play multiplayer or solo streamer mode.',
+  desc: 'Streamers lock a word every 3 seconds; Classic, Full Fugue or Free Association multiplayer, or solo.',
   soloable: true
 };
 
@@ -51,6 +51,11 @@ const GRACE = 800;             // clock-skew allowance on every timed intent
 const MAX_WORDS = 40;
 const MAX_LEN = 24;
 const STREAK_MS = 7000;        // links closer together than this build a chain
+const FREE_REL = 'free';       // pseudo-relation for Free Association rounds
+const WORD_PTS = 1;            // streamer points per locked word
+const BLESS_BONUS = 3;         // extra per blessed word — a blessed word is worth 4 in total
+const PROMPT_COST = 3;         // points a streamer pays to swap the prompt
+const MATCH_MODES = ['classic', 'full', 'free'];
 // The connectionist reads the streams cold by default: the prompts are the
 // reveal at the vote. Flip to true for an easier game.
 const REVEAL_PROMPTS_TO_CONNECTIONIST = false;
@@ -85,8 +90,11 @@ const RELATIONS = [
   { k: 'feeling', name: 'SAME FEELING', hint: 'they make you feel alike', ex: 'dusk · sigh' }
 ];
 
+const FREE_RELATION = { k: 'free', name: 'FREE ASSOCIATION', hint: 'any link that wins the vote', ex: 'anything goes' };
+
 function relOf(k) {
   for (let i = 0; i < RELATIONS.length; i++) if (RELATIONS[i].k === k) return RELATIONS[i];
+  if (k === FREE_REL) return FREE_RELATION;
   return RELATIONS[0];
 }
 
@@ -123,7 +131,8 @@ function freshState() {
     round: null,
     soloRound: null,
     over: null,
-    mode: null
+    mode: null,
+    matchMode: null     // classic (one relation held all round) | full (relation snaps) | free (no relation)
   };
 }
 
@@ -162,6 +171,15 @@ function startRound(st, now, rng) {
   while (idx < st.order.length && st.players.indexOf(st.order[idx]) < 0) idx++;
   if (idx >= st.order.length || st.players.length < MIN_PLAYERS) return endSet(st);
   const conn = st.order[idx];
+  const mode = st.matchMode || 'classic';
+  let rel, deck;
+  if (mode === 'free') { rel = FREE_REL; deck = []; }
+  else {
+    const d = shuffle(RELATIONS.map(function (r) { return r.k; }), rng);
+    rel = d[0];
+    // Classic holds the relation for the whole round; only Full Fugue deals a deck to snap through.
+    deck = mode === 'full' ? d.slice(1) : [];
+  }
   const streamers = st.players.filter(function (id) { return id !== conn; });
   let pool = PROMPTS.filter(function (p) { return st.usedPrompts.indexOf(p) < 0; });
   let used = st.usedPrompts;
@@ -170,7 +188,6 @@ function startRound(st, now, rng) {
   const prompts = {};
   const words = {};
   streamers.forEach(function (id, i) { prompts[id] = picked[i]; words[id] = []; });
-  const deck = shuffle(RELATIONS.map(function (r) { return r.k; }), rng);
   return same(st, {
     epoch: st.epoch + 1,
     phase: 'intro',
@@ -178,21 +195,22 @@ function startRound(st, now, rng) {
     usedPrompts: used.concat(picked),
     round: {
       conn: conn, streamers: streamers, prompts: prompts, words: words,
-      links: [], used: {}, deck: deck.slice(1), rel: deck[0], votes: {},
+      links: [], used: {}, deck: deck, rel: rel, votes: {}, swaps: {}, matchMode: mode,
       introEndsAt: now + INTRO_MS, endsAt: now + INTRO_MS + LIVE_MS,
       voteEndsAt: 0, tallyEndsAt: 0, result: null, aborted: false
     }
   });
 }
 
-function startSet(st, rng) {
+function startSet(st, rng, matchMode) {
   const players = st.players.concat(st.late.filter(function (id) { return st.players.indexOf(id) < 0; }))
     .slice(0, MAX_PLAYERS);
   const scores = {};
   players.forEach(function (id) { scores[id] = 0; });
   return startRound(same(st, {
     players: players, late: [], order: shuffle(players, rng), roundIdx: -1,
-    scores: scores, history: [], usedPrompts: [], over: null, round: null, setNo: st.setNo + 1
+    scores: scores, history: [], usedPrompts: [], over: null, round: null, setNo: st.setNo + 1,
+    matchMode: MATCH_MODES.indexOf(matchMode) >= 0 ? matchMode : 'classic'
   }), Date.now(), rng);
 }
 
@@ -235,12 +253,27 @@ function tally(st, now) {
     points += pts;
     return { n: l.n, yes: yes, no: no, stands: stands, pts: pts };
   });
+  // Blessed words: every pick of a standing link is worth BLESS_BONUS extra to its
+  // streamer (1 for locking, 3 for the bless — 4 in total). Bot books are not seated
+  // players, so solo connectionist rounds leave the board untouched.
+  const stood = {};
+  rows.forEach(function (row) { if (row.stands) stood[row.n] = true; });
+  let blessed = 0;
   const scores = Object.assign({}, st.scores);
+  r.links.forEach(function (l) {
+    if (!stood[l.n]) return;
+    l.picks.forEach(function (p) {
+      if (st.players.indexOf(p.s) >= 0) {
+        scores[p.s] = (scores[p.s] || 0) + BLESS_BONUS;
+        blessed += 1;
+      }
+    });
+  });
   scores[r.conn] = (scores[r.conn] || 0) + points;
   return same(st, {
     phase: 'tally',
     scores: scores,
-    history: st.history.concat([{ conn: r.conn, pts: points, links: r.links.length, stood: rows.filter(function (x) { return x.stands; }).length }]),
+    history: st.history.concat([{ conn: r.conn, pts: points, links: r.links.length, stood: rows.filter(function (x) { return x.stands; }).length, blessed: blessed }]),
     round: Object.assign({}, r, { result: { points: points, rows: rows }, tallyEndsAt: now + TALLY_MS })
   });
 }
@@ -341,7 +374,7 @@ function tallySolo(st, now) {
   return same(st, {
     phase: 'tally',
     scores: scores,
-    history: st.history.concat([{ conn: r.conn, pts: points, links: r.links.length, stood: rows.length }]),
+    history: st.history.concat([{ conn: r.conn, pts: points, links: r.links.length, stood: rows.length, blessed: 0 }]),
     round: Object.assign({}, r, { result: { points: points, rows: rows }, tallyEndsAt: now + TALLY_MS })
   });
 }
@@ -398,6 +431,7 @@ export function reduce(state, action, ctx) {
     if (state.players.indexOf(id) < 0) return { error: 'You are watching — not seated.' };
     if (kind === 'start') {
       if (state.phase !== 'lobby' && state.phase !== 'over') return { error: 'A set is already running.' };
+      if ((action && action.m) === 'free') return { error: 'Free Association needs a table of three — it is not a solo game.' };
       if ((action && action.m) === 'conn') {
         return startSoloConnSet(same(state, { mode: SOLO_CONN, players: state.players.slice(0, 1), late: [] }), now, rng);
       }
@@ -424,6 +458,7 @@ export function reduce(state, action, ctx) {
         }
       });
     }
+    if (kind === 'prompt') return noop();            // solo keeps the prompt it was dealt
     if (kind === 'reset') {
       const st = freshState();
       st.players = state.players;
@@ -443,6 +478,7 @@ export function reduce(state, action, ctx) {
     if (state.players.indexOf(id) < 0) return { error: 'You are watching — not seated.' };
     if (kind === 'start') {
       if (state.phase !== 'lobby' && state.phase !== 'over') return { error: 'A set is already running.' };
+      if ((action && action.m) === 'free') return { error: 'Free Association needs a table of three — it is not a solo game.' };
       if ((action && action.m) === 'stream') {
         return soloStreamerStart(same(state, { mode: 'solo-streamer', players: state.players.slice(0, 1), late: [] }), now, rng);
       }
@@ -459,6 +495,7 @@ export function reduce(state, action, ctx) {
       return tallySolo(state, now);
     }
     if (kind === 'vote' || kind === 'close') return noop();
+    if (kind === 'prompt') return noop();            // solo keeps the prompt it was dealt
     if (kind === 'next') {
       if (state.phase !== 'tally') return noop();
       if (!host && now < r.tallyEndsAt - GRACE) return noop();
@@ -482,7 +519,8 @@ export function reduce(state, action, ctx) {
     if (state.phase !== 'lobby' && state.phase !== 'over') return { error: 'A set is already running.' };
     if (!host) return { error: 'Waiting for the host to start.' };
     if (state.players.length + state.late.length < MIN_PLAYERS) return { error: 'Fugue needs ' + MIN_PLAYERS + ' players.' };
-    return startSet(state, rng);
+    const bm = String(action.m || '');
+    return startSet(state, rng, MATCH_MODES.indexOf(bm) >= 0 ? bm : 'classic');
   }
 
   if (kind === 'go') {
@@ -498,7 +536,34 @@ export function reduce(state, action, ctx) {
     if (list.length >= MAX_WORDS) return noop();
     const words = Object.assign({}, r.words);
     words[id] = list.concat([cleanWord(action.w)]);
-    return same(state, { round: Object.assign({}, r, { words: words }) });
+    const patch = { round: Object.assign({}, r, { words: words }) };
+    // Streamer scoring is a multiplayer game — solo tables keep their count-based record.
+    if (!state.mode) {
+      const scores = Object.assign({}, state.scores);
+      scores[id] = (scores[id] || 0) + WORD_PTS;
+      patch.scores = scores;
+    }
+    return same(state, patch);
+  }
+
+  if (kind === 'prompt') {
+    if (state.mode) return noop();                  // solo tables keep the prompt they were dealt
+    if (state.phase !== 'live' || !r) return noop();
+    if (r.streamers.indexOf(id) < 0) return { error: 'Only streamers swap prompts.' };
+    const swaps = r.swaps || {};
+    if (swaps[id]) return { error: 'One prompt swap per round — you used yours.' };
+    const current = r.prompts[id];
+    const pool = PROMPTS.filter(function (p) { return p !== current && state.usedPrompts.indexOf(p) < 0; });
+    if (!pool.length) return { error: 'No fresh prompts left.' };
+    const picked = pool[Math.floor(rng() * pool.length)];
+    const prompts = Object.assign({}, r.prompts); prompts[id] = picked;
+    const nswaps = Object.assign({}, swaps); nswaps[id] = true;
+    const scores = Object.assign({}, state.scores); scores[id] = (scores[id] || 0) - PROMPT_COST;
+    return same(state, {
+      usedPrompts: state.usedPrompts.concat([picked]),
+      scores: scores,
+      round: Object.assign({}, r, { prompts: prompts, swaps: nswaps })
+    });
   }
 
   if (kind === 'link') {
@@ -528,7 +593,11 @@ export function reduce(state, action, ctx) {
     };
     const used = Object.assign({}, r.used);
     clean.forEach(function (p) { used[p.s + '|' + p.i] = link.n; });
-    const nx = advanceRel(r, rng);
+    // Only Full Fugue (and the solo rounds, which carry no matchMode) snap to a
+    // new relation after a link. Classic holds one relation for the round;
+    // Free Association never had one.
+    let nx = { rel: r.rel, deck: r.deck };
+    if (r.matchMode === 'full' || !r.matchMode) nx = advanceRel(r, rng);
     return same(state, { round: Object.assign({}, r, { links: r.links.concat([link]), used: used, rel: nx.rel, deck: nx.deck }) });
   }
 
@@ -671,6 +740,8 @@ export function project(state, playerId, api) {
       linkCount: r.links.length, mineUsed: mineUsed,
       votes: votes, cast: cast, castTotal: r.links.length * r.streamers.length,
       rel: ((ph === 'intro' || ph === 'live') && role !== 'stream') ? r.rel : '',
+      matchMode: r.matchMode || 'full',
+      promptUsed: role === 'stream' ? !!(r.swaps || {})[me] : false,
       introEndsAt: r.introEndsAt, endsAt: r.endsAt, voteEndsAt: r.voteEndsAt, tallyEndsAt: r.tallyEndsAt,
       result: (ph === 'tally' || ph === 'over') ? r.result : null,
       aborted: r.aborted
@@ -773,7 +844,11 @@ const CSS = [
   // connectionist
   '.lanes{flex:1;min-height:0;overflow:auto;position:relative;display:flex}',
   '.cols{position:relative;display:flex;flex:none;width:max-content;min-width:100%;margin:auto 0}',
-  '.col{display:flex;flex-direction:column;flex:0 0 auto;min-width:76px}',
+  '.col{display:flex;flex-direction:column;flex:0 0 auto;min-width:76px;transition:min-width .3s ease,width .3s ease}',
+  '.col.collapsed{min-width:22px;width:22px}',
+  '.col.collapsed .cell{padding:0}',
+  '.col.collapsed .b{display:none}',
+  '.col.collapsed .cell::after{content:"⚡";font-size:13px;opacity:.55}',
   '.col.hot{background:rgba(253,224,71,.05)}',
   '.cell{height:64px;display:flex;align-items:center;justify-content:center;padding:0 5px;box-sizing:border-box}',
   '.col.lab{position:sticky;left:0;z-index:3;background:#090b12;min-width:78px;max-width:78px;border-right:1px solid #1b2133}',
@@ -824,7 +899,19 @@ const CSS = [
   '.board{display:flex;flex-direction:column;gap:6px;width:100%;max-width:22rem;margin:4px auto}',
   '.board div{display:flex;justify-content:space-between;padding:8px 14px;border-radius:10px;background:#10152a;font-weight:700}',
   '.board div.win{background:#fde047;color:#0b0d14}',
-  '.round-pts{font-size:42px;font-weight:900;color:#fde047;line-height:1}'
+  '.round-pts{font-size:42px;font-weight:900;color:#fde047;line-height:1}',
+  '.blessed{position:absolute;top:-1.4em;left:50%;transform:translate(-50%,6px);color:#4ade80;font-size:10px;font-weight:900;letter-spacing:.12em;pointer-events:none;white-space:nowrap;animation:risefade 1.7s ease-out forwards}',
+  '@keyframes risefade{0%{opacity:0;transform:translate(-50%,8px)}25%{opacity:1}70%{opacity:1}100%{opacity:0;transform:translate(-50%,-14px)}}',
+  '.chip.is-blessed{position:relative;box-shadow:0 0 0 2px #4ade80,0 0 14px rgba(74,222,128,.5)}',
+  '.blessline{color:#4ade80 !important}',
+  '.swapbtn{background:transparent;border:1px solid #334155;color:#94a3b8;border-radius:8px;font-size:11px;letter-spacing:.04em;padding:4px 9px;margin:0 6px;align-self:center}',
+  '.swapbtn:disabled{opacity:.35;cursor:default}',
+  '.modepick{display:flex;gap:8px;flex-wrap:wrap;justify-content:center}',
+  '.modebtn{background:#10152a;border:1px solid #1e2740;border-radius:10px;color:#cbd5e1;padding:8px 12px;display:flex;flex-direction:column;gap:2px;min-width:9.5em;text-align:left}',
+  '.modebtn b{color:#e2e8f0;font-size:14px}',
+  '.modebtn span{font-size:11px;color:#7c8799;font-weight:400}',
+  '.modebtn.on{border-color:#fde047;box-shadow:0 0 0 1px #fde047}',
+  '.modebtn:disabled{opacity:.45;cursor:default}'
 ].join('');
 
 const SVGNS = 'http' + '://www.w3.org/2000/svg';
@@ -1043,18 +1130,22 @@ export function mount(root, api) {
     });
     return wrapNames;
   }
-  function chipEl(link, i) {
+  function chipEl(link, i, blessed) {
     const p = link.picks[i];
     const w = ((view.round.words[p.s] || [])[p.i]) || '';
     const c = el('span', 'chip', w);
     c.style.setProperty('--c', colorOf(p.s));
+    if (blessed && blessed[p.s + '|' + p.i]) {
+      c.classList.add('is-blessed');
+      c.appendChild(el('span', 'blessed', '#blessed'));
+    }
     return c;
   }
-  function pairEl(link) {
+  function pairEl(link, blessed) {
     const d = el('div', 'pair');
     for (let i = 0; i < link.picks.length; i++) {
       if (i) d.appendChild(el('em', '', '⟷'));
-      d.appendChild(chipEl(link, i));
+      d.appendChild(chipEl(link, i, blessed));
     }
     return d;
   }
@@ -1113,6 +1204,7 @@ export function mount(root, api) {
     if (act === 'start') api.send({ a: 'start', m: t.getAttribute('data-m') || '' });
     else if (act === 'next') api.send({ a: 'next' });
     else if (act === 'vote') api.send({ a: 'vote', n: Number(t.getAttribute('data-n')), yes: t.getAttribute('data-yes') === '1' });
+    else if (act === 'prompt') api.send({ a: 'prompt' });
   });
 
   function namesHtml(ids) {
@@ -1163,14 +1255,38 @@ export function mount(root, api) {
       const note = n < MIN_PLAYERS
         ? 'Needs ' + MIN_PLAYERS + ' players — ' + n + ' here.'
         : (host ? n + ' at the table — everyone connects once.' : 'Waiting for the host to start.');
+      // The host picks the flavor of the set; everyone else sees it read-only.
+      const pick = el('div', 'modepick');
+      const startBtn = actionBtn('Start set', 'start', { m: 'classic' }, !can);
+      [['classic', 'Classic', 'one relation, all round'],
+       ['full', 'Full Fugue', 'relation snaps after every link'],
+       ['free', 'Free Association', 'any link — the voters decide']].forEach(function (m, i) {
+        const b = el('button', 'modebtn' + (i === 0 ? ' on' : ''));
+        b.type = 'button';
+        b.setAttribute('data-pick', m[0]);
+        if (!host) b.disabled = true;
+        b.appendChild(el('b', '', m[1]));
+        b.appendChild(el('span', '', m[2]));
+        pick.appendChild(b);
+      });
+      pick.addEventListener('click', function (e) {
+        const t = e.target && e.target.closest ? e.target.closest('[data-pick]') : null;
+        if (!t || !host) return;
+        startBtn.setAttribute('data-m', t.getAttribute('data-pick'));
+        const all = pick.querySelectorAll('.modebtn');
+        for (let i = 0; i < all.length; i++) all[i].classList.toggle('on', all[i] === t);
+      });
       return centerScreen([
         el('h1', '', 'FUGUE'),
         para('rules', [['b', 'Streamers'], ' each get a secret prompt and must lock a word every ', ['b', '3 seconds'], ' — type it, hit space. ',
-          ['b', 'Connectionist'], ' sees every word and strikes ', ['b', 'lightning'], ' between streams: links that fit a relation which changes after every strike. ',
-          'Straight-down links and links across more streams score more. Streamers then vote on each link. Everyone takes a turn connecting.']),
+          ['b', 'Connectionist'], ' sees every word and strikes ', ['b', 'lightning'], ' between streams. ',
+          'Straight-down links and links across more streams score more. Streamers vote on each link. ',
+          'Streamers score too: ', ['b', '1 point'], ' per locked word and ', ['b', '4'], ' for a word blessed by a standing link. ',
+          'One prompt swap per round, for 3 points.']),
+        pick,
         namesEl(v.players),
         v.late.length ? el('p', 'note', v.late.length + ' joining next set') : null,
-        actionBtn('Start set', 'start', null, !can),
+        startBtn,
         el('p', 'note', note)
       ].filter(Boolean));
     });
@@ -1186,13 +1302,19 @@ export function mount(root, api) {
         body = [
           el('h2', '', 'you are a streamer'),
           promptWrap,
-          para('rules', ['Type a word, press ', ['b', 'space'], ' to lock it. A new word is due every 3 seconds — if you stall, whatever you have typed locks anyway. Tap the box to bring up your keyboard.'])
+          para('rules', ['Type a word, press ', ['b', 'space'], ' to lock it. A new word is due every 3 seconds — if you stall, whatever you have typed locks anyway. Tap the box to bring up your keyboard. Locked words score ', ['b', '1 point'], ' — a word the Connectionist blesses scores ', ['b', '4'], '. One prompt swap per round for 3 points.'])
         ];
       } else if (v.role === 'conn') {
+        const mode = r.matchMode || 'full';
+        const how = mode === 'free'
+          ? 'Any link goes — nothing to match. The streamers vote on every link: enough votes and it stands.'
+          : (mode === 'classic'
+            ? 'One relation for the whole round. Words can be used once. Straight down counts double.'
+            : 'The relation changes after every strike. Words can be used once. Straight down counts double.');
         body = [
           el('h2', '', 'you are the connectionist'),
-          el('div', 'big', 'Find what the streams share'),
-          para('rules', ['Tap one word in each stream, then it strikes. The relation changes after every strike. Words can be used once. Straight down counts double.']),
+          el('div', 'big', mode === 'free' ? 'Anything that holds' : 'Find what the streams share'),
+          para('rules', [how, ' Tap one word in each stream, then it strikes.']),
           namesEl(r.streamers)
         ];
       } else {
@@ -1211,7 +1333,7 @@ export function mount(root, api) {
       const isS = v.role === 'stream';
       const sc = el('div', 'scroll');
       const head = el('div', 'vhead');
-      head.appendChild(el('b', '', isS ? 'Does each link fit its relation?' : 'The streamers are voting'));
+      head.appendChild(el('b', '', isS ? (r.matchMode === 'free' ? 'Does each association work?' : 'Does each link fit its relation?') : 'The streamers are voting'));
       head.appendChild(el('small', '', rosterName(r.conn) + ' struck ' + r.links.length + (r.links.length === 1 ? ' link' : ' links') + ' · ' + r.cast + '/' + r.castTotal + ' votes in'));
       sc.appendChild(head);
       sc.appendChild(promptListEl(v));
@@ -1222,7 +1344,7 @@ export function mount(root, api) {
         if (isS) {
           const mine = r.votes[l.n] ? r.votes[l.n][myId] : undefined;
           const vb = el('div', 'vb');
-          const yes = el('button', 'y' + (mine === true ? ' on' : ''), '✓ fits');
+          const yes = el('button', 'y' + (mine === true ? ' on' : ''), r.matchMode === 'free' ? '✓ works' : '✓ fits');
           yes.type = 'button'; yes.setAttribute('data-act', 'vote'); yes.setAttribute('data-n', String(l.n)); yes.setAttribute('data-yes', '1');
           const no = el('button', 'n' + (mine === false ? ' on' : ''), '✗ no');
           no.type = 'button'; no.setAttribute('data-act', 'vote'); no.setAttribute('data-n', String(l.n)); no.setAttribute('data-yes', '0');
@@ -1240,10 +1362,27 @@ export function mount(root, api) {
       const r = v.round;
       const res = r.result || { points: 0, rows: [] };
       const host = v.hostId === myId;
+      // Mark every pick of a standing link as blessed; the float shows who fed the chain.
+      const stood = {};
+      res.rows.forEach(function (row) { if (row.stands) stood[row.n] = true; });
+      const blessedMap = {};
+      let myBlessed = 0;
+      r.links.forEach(function (l) {
+        if (!stood[l.n]) return;
+        l.picks.forEach(function (p) {
+          blessedMap[p.s + '|' + p.i] = true;
+          if (p.s === myId) myBlessed += 1;
+        });
+      });
       const sc = el('div', 'scroll');
       const head = el('div', 'vhead');
       head.appendChild(el('small', '', rosterName(r.conn) + ' connected'));
       head.appendChild(el('div', 'round-pts', '+' + res.points));
+      if (v.role === 'stream') {
+        head.appendChild(el('small', 'blessline', myBlessed
+          ? 'you blessed ' + myBlessed + (myBlessed === 1 ? ' word' : ' words') + ' · +' + (BLESS_BONUS * myBlessed) + ' pts'
+          : 'no blessed words this round'));
+      }
       if (r.aborted) head.appendChild(el('small', '', 'round called off — someone left'));
       sc.appendChild(head);
       res.rows.forEach(function (row) {
@@ -1251,7 +1390,7 @@ export function mount(root, api) {
         r.links.forEach(function (l) { if (l.n === row.n) link = l; });
         if (!link) return;
         const card = el('div', 'card' + (row.stands ? '' : ' no'));
-        card.appendChild(pairEl(link));
+        card.appendChild(pairEl(link, blessedMap));
         card.appendChild(metaEl(relNameOf(link), (row.stands ? '+' + row.pts : 'no') + ' · ' + row.yes + '–' + row.no));
         sc.appendChild(card);
       });
@@ -1296,7 +1435,8 @@ export function mount(root, api) {
     clearNode(stage);
     const promptBox = el('div', 'prompt');
     promptBox.appendChild(el('small', '', 'your stream'));
-    promptBox.appendChild(el('b', '', v0.round.prompts[myId] || ''));
+    const promptB = el('b', '', v0.round.prompts[myId] || '');
+    promptBox.appendChild(promptB);
     const field = el('div', 'field');
     field.style.setProperty('--c', color);
     const barWrap = el('div', 'bar');
@@ -1304,8 +1444,17 @@ export function mount(root, api) {
     barWrap.appendChild(bar);
     const foot = el('div', 'foot');
     const cnt = el('span', 'cnt');
+    const multi = !v0.mode;         // solo tables keep the dealt prompt
+    let swapBtn = null;
+    if (multi) {
+      swapBtn = el('button', 'swapbtn', 'new prompt (−3)');
+      swapBtn.type = 'button';
+      swapBtn.setAttribute('data-act', 'prompt');
+      swapBtn.disabled = !v0.round || !!v0.round.promptUsed;
+    }
     const zaps = el('span', 'zaps');
     foot.appendChild(cnt);
+    if (swapBtn) foot.appendChild(swapBtn);
     foot.appendChild(zaps);
     stage.appendChild(promptBox);
     stage.appendChild(field);
@@ -1383,6 +1532,8 @@ export function mount(root, api) {
     return {
       update: function (v) {
         drawChips();
+        if (promptB && v.round && v.round.prompts) promptB.textContent = v.round.prompts[myId] || '';
+        if (swapBtn) swapBtn.disabled = !v.round || !!v.round.promptUsed;
         zaps.textContent = v.round.linkCount ? '⚡ ' + v.round.linkCount : '';
         if (v.round.linkCount > lastLinks) { flash(0.4); sndZap(0.5); }
         lastLinks = v.round.linkCount;
@@ -1431,7 +1582,9 @@ export function mount(root, api) {
     if (canAct) {
       const rel = el('div', 'rel');
       const nameb = el('div', 'nameb');
-      nameb.appendChild(el('small', '', 'RELATION'));
+      const connMode = (v0.round && v0.round.matchMode) || 'full';
+      const relTag = connMode === 'free' ? 'ANYTHING GOES' : (connMode === 'classic' ? 'RELATION · FIXED THIS ROUND' : 'RELATION');
+      nameb.appendChild(el('small', '', relTag));
       relB = el('b', '');
       relH = el('span', 'h');
       nameb.appendChild(relB);
@@ -1540,6 +1693,21 @@ export function mount(root, api) {
       if (zapBtn) zapBtn.addEventListener('click', fire);
     }
 
+    // A column collapses to a sliver only when every stream has a word in it and
+    // every one of those words is linked — a state a later word can never undo.
+    function paintCollapse() {
+      const r = view.round;
+      const used = usedMap(r);
+      for (let k = 0; k < colEls.length; k++) {
+        let total = 0, linked = 0;
+        S.forEach(function (s) {
+          const list = r.words[s] || [];
+          if (list.length > k) { total += 1; if (used[s + '|' + k]) linked += 1; }
+        });
+        colEls[k].classList.toggle('collapsed', total === S.length && total > 0 && linked === total);
+      }
+    }
+
     function paint() {
       const r = view.round;
       const used = usedMap(r);
@@ -1563,6 +1731,7 @@ export function mount(root, api) {
           b.classList.toggle('used', !!(used[s + '|' + i] || pend[s + '|' + i]));
         }
       });
+      paintCollapse();
     }
 
     function center(el) {
@@ -1657,7 +1826,7 @@ export function mount(root, api) {
             streakUntil = hostNow() + STREAK_MS;
             strike(l);
           });
-          if (canAct && r.rel) drawRel(r.rel, true);
+          if (canAct && r.rel) drawRel(r.rel, r.matchMode === 'full' || !r.matchMode);
         } else if (canAct && r.rel && r.rel !== lastRel) drawRel(r.rel, false);
         lastRel = r.rel;
         lastLinks = r.links.length;

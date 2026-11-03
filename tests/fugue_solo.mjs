@@ -141,7 +141,7 @@ test('conn: finish tallies straight to standing links, no vote phase', () => {
   st = ok(st, { a: 'link', picks: [{ s: 'b1', i: 0 }, { s: 'b2', i: 0 }] });          // vertical, 2 pts
   st = ok(st, { a: 'link', picks: [{ s: 'b1', i: 1 }, { s: 'b2', i: 2 }, { s: 'b3', i: 0 }] }); // 3 streams, 2 pts
   assert.equal(ok(st, { a: 'vote', n: 1, yes: true }).phase, 'live', 'nobody votes here');
-  clock += 61000;
+  clock += 121000;
   st = ok(st, { a: 'finish' });
   assert.equal(st.phase, 'tally');
   assert.equal(st.round.result.points, 4);
@@ -156,7 +156,7 @@ test('conn: three rounds make a set, then the record sheet fills', () => {
   for (let round = 0; round < 3; round++) {
     clock += 4000; st = ok(st, { a: 'drip' });
     st = ok(st, { a: 'link', picks: [{ s: 'b1', i: 0 }, { s: 'b2', i: 0 }] });
-    clock += 60000; st = ok(st, { a: 'finish' });
+    clock += 121000; st = ok(st, { a: 'finish' });
     assert.equal(st.phase, 'tally');
     clock += 15000; st = ok(st, { a: 'next' });
   }
@@ -194,5 +194,21 @@ test('conn: prune removes the player and leaves no half-live bots', () => {
 });
 
 // ---------------------------------------------------------------- verdict ---
+
+test('solo: words score no points and the prompt swap is a no-op', () => {
+  let st = ok(fresh(), { a: 'start', m: 'stream' });
+  st = ok(st, { a: 'word', w: 'alpha' });
+  assert.deepEqual(st.scores, {}, 'solo keeps the count-based record');
+  const before = st.soloRound.prompt;
+  const sw = act(st, { a: 'prompt' });
+  assert.ok(!sw.error, 'the swap is silently ignored, not refused');
+  assert.equal(sw.soloRound.prompt, before);
+  assert.deepEqual(sw.soloRound.words, st.soloRound.words);
+});
+
+test('solo: Free Association is refused, not quietly started', () => {
+  const r = act(fresh(), { a: 'start', m: 'free' });
+  assert.ok(r.error, 'free needs a table of three');
+});
 
 console.log('\n' + passed + ' passed' + (process.exitCode ? ', some FAILED' : ''));

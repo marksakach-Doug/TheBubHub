@@ -18,13 +18,13 @@ const act = (st, who, action) => {
   return r;
 };
 const ok = (st, who, action) => { const r = act(st, who, action); assert.ok(!r.error, 'unexpected error: ' + (r.error || '')); return r; };
-function started(n) {
+function started(n, m) {
   let st = G.init({ atTable: seats(n) });
-  st = ok(st, 'a', { a: 'start' });
+  st = ok(st, 'a', { a: 'start', m: m || 'full' });
   return st;
 }
-function live(n) {
-  let st = started(n);
+function live(n, m) {
+  let st = started(n, m);
   clock = st.round.introEndsAt + 10;
   return ok(st, 'a', { a: 'go' });
 }
@@ -250,6 +250,93 @@ test('prune: connectionist leaves -> round called off; streamer leaves in vote -
   assert.equal(killed.round.aborted, true);
   clock = killed.round.tallyEndsAt + 5;
   assert.equal(ok(killed, killed.players[0], { a: 'next' }).phase, 'over', 'under 3 players ends the set');
+});
+
+test('streamers score a point per locked word', () => {
+  let st = live(3);
+  const s = streamerOf(st, 0);
+  st = ok(st, s, { a: 'word', w: 'one' });
+  st = ok(st, s, { a: 'word', w: 'two' });
+  assert.equal(st.scores[s], 2);
+  assert.equal(st.scores[st.round.conn], 0);
+});
+
+test('a blessed word is worth four in total; a falling link pays nothing', () => {
+  let st = live(3);
+  const c = st.round.conn, [s0, s1] = st.round.streamers;
+  st = ok(st, s0, { a: 'word', w: 'alpha' });
+  st = ok(st, s1, { a: 'word', w: 'beta' });
+  st = ok(st, c, { a: 'link', picks: [{ s: s0, i: 0 }, { s: s1, i: 0 }] });
+  clock = st.round.endsAt + 5;
+  st = ok(st, 'a', { a: 'finish' });
+  st = ok(st, s0, { a: 'vote', n: 1, yes: true });
+  st = ok(st, s1, { a: 'vote', n: 1, yes: true });
+  assert.equal(st.phase, 'tally');
+  assert.equal(st.scores[s0], 4, '1 for the lock, 3 for the bless');
+  assert.equal(st.scores[s1], 4);
+  assert.equal(st.scores[c], 2, 'vertical link, double');
+
+  let st2 = live(3);
+  const c2 = st2.round.conn, [t0, t1] = st2.round.streamers;
+  st2 = ok(st2, t0, { a: 'word', w: 'alpha' });
+  st2 = ok(st2, t1, { a: 'word', w: 'beta' });
+  st2 = ok(st2, c2, { a: 'link', picks: [{ s: t0, i: 0 }, { s: t1, i: 0 }] });
+  clock = st2.round.endsAt + 5;
+  st2 = ok(st2, 'a', { a: 'finish' });
+  st2 = ok(st2, t0, { a: 'vote', n: 1, yes: false });
+  st2 = ok(st2, t1, { a: 'vote', n: 1, yes: false });
+  assert.equal(st2.phase, 'tally');
+  assert.equal(st2.scores[t0], 1);
+  assert.equal(st2.scores[t1], 1);
+  assert.equal(st2.scores[c2], 0);
+});
+
+test('classic holds one relation; full snaps; free has none', () => {
+  let classic = live(3, 'classic');
+  const rel = classic.round.rel;
+  const [a0, a1] = classic.round.streamers;
+  classic = ok(classic, a0, { a: 'word', w: 'quiet' });
+  classic = ok(classic, a1, { a: 'word', w: 'loud' });
+  classic = ok(classic, classic.round.conn, { a: 'link', picks: [{ s: a0, i: 0 }, { s: a1, i: 0 }] });
+  assert.equal(classic.round.rel, rel, 'classic holds the relation all round');
+
+  let full = live(3, 'full');
+  const r0 = full.round.rel;
+  const [f0, f1] = full.round.streamers;
+  full = ok(full, f0, { a: 'word', w: 'quiet' });
+  full = ok(full, f1, { a: 'word', w: 'loud' });
+  full = ok(full, full.round.conn, { a: 'link', picks: [{ s: f0, i: 0 }, { s: f1, i: 0 }] });
+  assert.notEqual(full.round.rel, r0, 'full snaps to a new relation');
+
+  let free = live(3, 'free');
+  assert.equal(free.round.rel, 'free');
+  const [e0, e1] = free.round.streamers;
+  free = ok(free, e0, { a: 'word', w: 'quiet' });
+  free = ok(free, e1, { a: 'word', w: 'loud' });
+  free = ok(free, free.round.conn, { a: 'link', picks: [{ s: e0, i: 0 }, { s: e1, i: 0 }] });
+  assert.equal(free.round.links[0].rel, 'free');
+  assert.equal(free.round.rel, 'free', 'free never deals a relation');
+  clock = free.round.endsAt + 5;
+  free = ok(free, 'a', { a: 'finish' });
+  free = ok(free, e0, { a: 'vote', n: 1, yes: true });
+  free = ok(free, e1, { a: 'vote', n: 1, yes: true });
+  assert.equal(free.phase, 'tally');
+  assert.equal(free.round.result.points, 2, 'vertical free link, double');
+});
+
+test('prompt: swap keeps words, once per round, costs three', () => {
+  let st = live(3);
+  const s = streamerOf(st, 0);
+  st = ok(st, s, { a: 'word', w: 'kept' });
+  const before = st.round.prompts[s];
+  st = ok(st, s, { a: 'prompt' });
+  assert.notEqual(st.round.prompts[s], before, 'a fresh prompt arrives');
+  assert.deepEqual(st.round.words[s], ['kept'], 'locked words carry over');
+  assert.equal(st.scores[s], 1 - 3, 'lock scores, swap costs three');
+  assert.ok(st.round.swaps[s]);
+  assert.ok(act(st, s, { a: 'prompt' }).error, 'once per round');
+  assert.ok(act(st, st.round.conn, { a: 'prompt' }).error, 'the connectionist cannot swap');
+  assert.equal(G.project(st, s, null).round.promptUsed, true);
 });
 
 console.log('\n' + passed + ' passed' + (process.exitCode ? ', some FAILED' : ''));
