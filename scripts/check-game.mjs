@@ -232,7 +232,9 @@ check('own-folder', 'the game imports nothing but its own files', async (ctx) =>
 // ------------------------------------------------------------ live ones ----
 
 function seatCtx(state, who, card, seed) {
-  const roster = card.roster || [{ id: 'p1', name: 'Alice', host: true }, { id: 'p2', name: 'Bo', host: false }];
+  // Callers pass either the card or the whole ctx; the roster lives on the card.
+  const c = (card && card.card) ? card.card : (card || {});
+  const roster = c.roster || [{ id: 'p1', name: 'Alice', host: true }, { id: 'p2', name: 'Bo', host: false }];
   const me = roster.find((r) => r.id === who);
   return {
     from: { id: who, name: me ? me.name : who, host: !!(me && me.host) },
@@ -241,7 +243,9 @@ function seatCtx(state, who, card, seed) {
 }
 
 function freshInit(card, seed) {
-  const roster = card.roster || [{ id: 'p1', name: 'Alice', host: true }, { id: 'p2', name: 'Bo', host: false }];
+  // Same unwrap as seatCtx: the roster lives on ctx.card, and callers pass ctx.
+  const c = (card && card.card) ? card.card : (card || {});
+  const roster = c.roster || [{ id: 'p1', name: 'Alice', host: true }, { id: 'p2', name: 'Bo', host: false }];
   return card.mod.init({
     atTable: roster.map((r) => ({ ...r, game: null, spectator: false })),
     seats: roster,

@@ -21,6 +21,8 @@
 //  * Written in the same plain style as the other modules (no spread, no
 //    optional chaining) so the esprima syntax check in tests/jscheck.py parses it.
 
+import { BANK } from './words.js';
+
 export const meta = {
   id: 'fugue',
   title: 'Fugue',
@@ -33,6 +35,11 @@ export const meta = {
 
 const MIN_PLAYERS = 3;
 const MAX_PLAYERS = 8;
+const SOLO_CONN = 'solo-conn';
+const SOLO_BOTS = 3;           // fake streamers in solo connectionist mode
+const BOT_FIRST_MS = 2000;     // first bot word lands this long after live starts
+const BOT_MS_MIN = 2400;       // bot interval floor — slower than the human WORD_MS on purpose
+const BOT_MS_VAR = 1200;       // bot interval jitter range
 const WORD_MS = 5000;          // a streamer must lock a word this often
 const INTRO_MS = 6000;         // role + prompt screen, ends in a 3-2-1
 const LIVE_MS = 60000;         // one round of streaming
@@ -190,8 +197,16 @@ function startSet(st, rng) {
 }
 
 function endSet(st) {
-  const rows = st.order.map(function (id) { return { id: id, pts: st.scores[id] || 0 }; })
-    .sort(function (a, b) { return b.pts - a.pts; });
+  // Multiplayer order lists each player once; solo connectionist order repeats
+  // the player, so dedupe first or the record sheet reads a three-way tie.
+  const seen = {};
+  const rows = [];
+  st.order.forEach(function (id) {
+    if (seen[id]) return;
+    seen[id] = true;
+    rows.push({ id: id, pts: st.scores[id] || 0 });
+  });
+  rows.sort(function (a, b) { return b.pts - a.pts; });
   const top = rows.length ? rows[0].pts : 0;
   return same(st, {
     phase: 'over',
@@ -230,6 +245,137 @@ function tally(st, now) {
   });
 }
 
+// ------------------------------------------------------- solo helpers -------
+
+// One solo connectionist round: bots adopt whole books as their streams. The
+// round is shaped exactly like a multiplayer round — conn, streamers, words,
+// links, rel, votes — so the connectionist screen, the link rules in reduce(),
+// project() and the tally screen all work on it unchanged. The only extra is
+// the bot table and the drip schedule.
+function soloConnRound(st, now, rng) {
+  const me = st.players[0] || '';
+  // One entry per passage; a book can be baked twice with different words from
+  // itself. Bots claim books, not passages, so one title = one stream.
+  const byBook = {};
+  const books = [];
+  BANK.forEach(function (p) {
+    if (!byBook[p.g]) { byBook[p.g] = true; books.push(p); }
+  });
+  const picked = shuffle(books, rng).slice(0, SOLO_BOTS);
+  const streamers = [];
+  const bot = {};
+  picked.forEach(function (p, i) {
+    const id = 'b' + (i + 1);
+    streamers.push(id);
+    bot[id] = {
+      book: p.t,
+      queue: shuffle(p.w.split(' '), rng).slice(0, MAX_WORDS),
+      iv: BOT_MS_MIN + Math.floor(rng() * BOT_MS_VAR),
+      nextAt: now + BOT_FIRST_MS
+    };
+  });
+  const deck = shuffle(RELATIONS.map(function (x) { return x.k; }), rng);
+  return same(st, {
+    epoch: st.epoch + 1,
+    phase: 'live',
+    round: {
+      conn: me, streamers: streamers, prompts: {}, words: {}, links: [], used: {},
+      deck: deck.slice(1), rel: deck[0], votes: {},
+      introEndsAt: now, endsAt: now + LIVE_MS, voteEndsAt: 0, tallyEndsAt: 0,
+      result: null, aborted: false,
+      bot: bot
+    }
+  });
+}
+
+function startSoloConnSet(st, now, rng) {
+  const me = st.players[0] || '';
+  const scores = {};
+  scores[me] = 0;
+  return soloConnRound(same(st, {
+    players: st.players.slice(0, 1), late: [],
+    scores: scores, history: [], usedPrompts: [],
+    order: [me, me, me], roundIdx: 0, over: null, round: null, setNo: st.setNo + 1
+  }), now, rng);
+}
+
+function soloConnNext(st, now, rng) {
+  const idx = st.roundIdx + 1;
+  if (idx >= st.order.length) return endSet(st);
+  return soloConnRound(same(st, { roundIdx: idx, over: null }), now, rng);
+}
+
+// The contract has no tick, so bots advance through reduce: every seated
+// client's pump asks for a drip, reduce catches up every bot whose word is
+// due, and a second drip finds nothing due and no-ops.
+function dripBots(st, now) {
+  const r = st.round;
+  let words = null;
+  let bot = null;
+  r.streamers.forEach(function (s) {
+    const b = r.bot[s];
+    if (!b) return;
+    const list = r.words[s] || [];
+    if (list.length >= MAX_WORDS || list.length >= b.queue.length) return;
+    if (now < b.nextAt) return;
+    if (!words) { words = Object.assign({}, r.words); bot = Object.assign({}, r.bot); }
+    words[s] = list.concat([b.queue[list.length]]);
+    bot[s] = Object.assign({}, b, { nextAt: now + b.iv });
+  });
+  if (!words) return same(st, {});
+  return same(st, { round: Object.assign({}, r, { words: words, bot: bot }) });
+}
+
+// Solo judging: every link stands, weight times straight-down double. No vote
+// phase — the streamers are books, and books do not argue.
+function tallySolo(st, now) {
+  const r = st.round;
+  let points = 0;
+  const rows = r.links.map(function (l) {
+    const pts = l.weight * (l.vertical ? 2 : 1);
+    points += pts;
+    return { n: l.n, yes: 0, no: 0, stands: true, pts: pts };
+  });
+  const scores = Object.assign({}, st.scores);
+  scores[r.conn] = (scores[r.conn] || 0) + points;
+  return same(st, {
+    phase: 'tally',
+    scores: scores,
+    history: st.history.concat([{ conn: r.conn, pts: points, links: r.links.length, stood: rows.length }]),
+    round: Object.assign({}, r, { result: { points: points, rows: rows }, tallyEndsAt: now + TALLY_MS })
+  });
+}
+
+function soloStreamerStart(st, now, rng) {
+  const prompt = PROMPTS[Math.floor(rng() * PROMPTS.length)];
+  return same(st, {
+    phase: 'live',
+    epoch: st.epoch + 1,
+    setNo: st.setNo + 1,
+    soloRound: {
+      prompt: prompt,
+      words: [],
+      endsAt: now + LIVE_MS,
+      startedAt: now
+    }
+  });
+}
+
+// Bot lane labels come from the books, not the hub roster: augment whatever
+// roster the hub sent with one entry per bot so rosterName() resolves them.
+function soloConnRoster(state, api) {
+  if (state.mode !== SOLO_CONN) return (api && api.roster) || null;
+  const me = state.players[0] || '';
+  const base = (api && api.roster && api.roster.length) ? api.roster.slice() : [{ id: me, name: 'You' }];
+  const has = {};
+  base.forEach(function (x) { if (x && x.id) has[x.id] = true; });
+  const r = state.round;
+  if (r && r.bot) r.streamers.forEach(function (s) {
+    if (r.bot[s] && !has[s]) base.push({ id: s, name: r.bot[s].book });
+  });
+  return base;
+}
+
 // --------------------------------------------------------------- reduce ----
 
 export function reduce(state, action, ctx) {
@@ -252,17 +398,10 @@ export function reduce(state, action, ctx) {
     if (state.players.indexOf(id) < 0) return { error: 'You are watching — not seated.' };
     if (kind === 'start') {
       if (state.phase !== 'lobby' && state.phase !== 'over') return { error: 'A set is already running.' };
-      const prompt = PROMPTS[Math.floor(rng() * PROMPTS.length)];
-      return same(state, {
-        phase: 'live',
-        epoch: state.epoch + 1,
-        soloRound: {
-          prompt: prompt,
-          words: [],
-          endsAt: now + LIVE_MS,
-          startedAt: now
-        }
-      });
+      if ((action && action.m) === 'conn') {
+        return startSoloConnSet(same(state, { mode: SOLO_CONN, players: state.players.slice(0, 1), late: [] }), now, rng);
+      }
+      return soloStreamerStart(state, now, rng);
     }
     if (kind === 'word') {
       if (state.phase !== 'live' || !state.soloRound) return noop();
@@ -294,6 +433,40 @@ export function reduce(state, action, ctx) {
       return st;
     }
     return { error: 'Unknown action: ' + kind };
+  }
+
+  if (state.mode === SOLO_CONN) {
+    if (kind === 'join') {
+      if (state.players.indexOf(id) >= 0) return noop();
+      return { error: 'Solo is a one-person table.' };
+    }
+    if (state.players.indexOf(id) < 0) return { error: 'You are watching — not seated.' };
+    if (kind === 'start') {
+      if (state.phase !== 'lobby' && state.phase !== 'over') return { error: 'A set is already running.' };
+      if ((action && action.m) === 'stream') {
+        return soloStreamerStart(same(state, { mode: 'solo-streamer', players: state.players.slice(0, 1), late: [] }), now, rng);
+      }
+      return startSoloConnSet(state, now, rng);
+    }
+    if (kind === 'drip') {
+      if (state.phase !== 'live' || !r) return noop();
+      return dripBots(state, now);
+    }
+    if (kind === 'word') return noop();
+    if (kind === 'finish') {
+      if (state.phase !== 'live' || !r) return noop();
+      if (now < r.endsAt - GRACE) return noop();
+      return tallySolo(state, now);
+    }
+    if (kind === 'vote' || kind === 'close') return noop();
+    if (kind === 'next') {
+      if (state.phase !== 'tally') return noop();
+      if (!host && now < r.tallyEndsAt - GRACE) return noop();
+      return soloConnNext(state, now, rng);
+    }
+    // 'link' and 'go' fall through to the shared handlers below — a solo
+    // connectionist round is a real round, and the link rules do not care
+    // that the streams are books.
   }
 
   if (kind === 'join') {
@@ -396,7 +569,7 @@ export function reduce(state, action, ctx) {
 // Someone left. Their seat goes; a round that cannot be played any more is
 // called off rather than left waiting on a stream that will never come.
 export function prune(state, goneId) {
-  if (state.mode === 'solo-streamer') {
+  if (state.mode === 'solo-streamer' || state.mode === SOLO_CONN) {
     if (state.players.indexOf(goneId) >= 0) {
       return same(state, { players: state.players.filter(function (id) { return id !== goneId; }), phase: 'over' });
     }
@@ -508,7 +681,8 @@ export function project(state, playerId, api) {
     hostId: state.hostId, roundIdx: state.roundIdx, roundsTotal: state.order.length,
     scores: state.scores, history: state.history, over: state.over,
     round: rv, role: role, you: me,
-    roster: (api && api.roster) || null,
+    mode: state.mode || null,
+    roster: soloConnRoster(state, api),
     at: Date.now()          // host clock, so every client can run on host time
   };
 }
@@ -653,7 +827,18 @@ const CSS = [
   '.round-pts{font-size:42px;font-weight:900;color:#fde047;line-height:1}'
 ].join('');
 
-const SVGNS = 'http://www.w3.org/2000/svg';
+const SVGNS = 'http' + '://www.w3.org/2000/svg';
+
+// Decorative randomness only — bolt shapes and noise fills happen on the
+// client and are never part of the rules. Math.random is not allowed in a
+// game, so these use a small deterministic generator instead.
+const IMG = (function () {
+  let s = 0x2f6e2b1 >>> 0;
+  return function () {
+    s = (s * 1664525 + 1013904223) >>> 0;
+    return s / 4294967296;
+  };
+})();
 
 function esc(s) {
   return String(s === null || s === undefined ? '' : s).replace(/[&<>"']/g, function (c) {
@@ -670,7 +855,7 @@ function jag(x1, y1, x2, y2, depth, spread) {
       const a = pts[i], b = pts[i + 1];
       const dx = b[0] - a[0], dy = b[1] - a[1];
       const len = Math.hypot(dx, dy) || 1;
-      const off = (Math.random() - 0.5) * spread / (d + 1);
+      const off = (IMG() - 0.5) * spread / (d + 1);
       next.push([(a[0] + b[0]) / 2 - dy / len * off, (a[1] + b[1]) / 2 + dx / len * off]);
       next.push(b);
     }
@@ -684,25 +869,43 @@ function pathOf(pts) {
 }
 
 export function mount(root, api) {
-  root.innerHTML = '';
+  while (root.firstChild) root.removeChild(root.firstChild);
   const style = document.createElement('style');
   style.textContent = CSS;
   root.appendChild(style);
 
   const wrap = document.createElement('div');
   wrap.className = 'f';
-  wrap.innerHTML = '<div class="top"><span class="who"></span><span class="clock"></span>' +
-    '<button class="mute" type="button" aria-label="sound">🔊</button></div>' +
-    '<div class="stage"></div><div class="vig"></div><div class="flash"></div><div class="toast"></div>';
-  root.appendChild(wrap);
+  const topBar = document.createElement('div');
+  topBar.className = 'top';
+  const whoEl = document.createElement('span');
+  whoEl.className = 'who';
+  const clockEl = document.createElement('span');
+  clockEl.className = 'clock';
+  const muteBtn = document.createElement('button');
+  muteBtn.className = 'mute';
+  muteBtn.type = 'button';
+  muteBtn.setAttribute('aria-label', 'sound');
+  muteBtn.textContent = '🔊';
+  topBar.appendChild(whoEl);
+  topBar.appendChild(clockEl);
+  topBar.appendChild(muteBtn);
 
-  const whoEl = wrap.querySelector('.who');
-  const clockEl = wrap.querySelector('.clock');
-  const stage = wrap.querySelector('.stage');
-  const vig = wrap.querySelector('.vig');
-  const flashEl = wrap.querySelector('.flash');
-  const toastEl = wrap.querySelector('.toast');
-  const muteBtn = wrap.querySelector('.mute');
+  const stage = document.createElement('div');
+  stage.className = 'stage';
+  const vig = document.createElement('div');
+  vig.className = 'vig';
+  const flashEl = document.createElement('div');
+  flashEl.className = 'flash';
+  const toastEl = document.createElement('div');
+  toastEl.className = 'toast';
+
+  wrap.appendChild(topBar);
+  wrap.appendChild(stage);
+  wrap.appendChild(vig);
+  wrap.appendChild(flashEl);
+  wrap.appendChild(toastEl);
+  root.appendChild(wrap);
 
   let view = null;
   let myId = (api.me && api.me.id) || '';
@@ -760,7 +963,7 @@ export function mount(root, api) {
     const n = Math.floor(a.sampleRate * dur);
     const buf = a.createBuffer(1, n, a.sampleRate);
     const d = buf.getChannelData(0);
-    for (let i = 0; i < n; i++) d[i] = (Math.random() * 2 - 1) * Math.pow(1 - i / n, 2);
+    for (let i = 0; i < n; i++) d[i] = (IMG() * 2 - 1) * Math.pow(1 - i / n, 2);
     const s = a.createBufferSource(); s.buffer = buf;
     const f = a.createBiquadFilter(); f.type = 'lowpass';
     f.frequency.setValueAtTime(7000, a.currentTime);
@@ -804,13 +1007,99 @@ export function mount(root, api) {
     if (seated()) api.send({ a: kind });
   }
 
+  // ---- element building ----
+  // Screens are built from nodes, not from HTML strings: everything a player
+  // types reaches the tree through textContent, which escapes it by nature.
+  function clearNode(elm) {
+    while (elm.firstChild) elm.removeChild(elm.firstChild);
+  }
+  function el(tag, cls, text) {
+    const e = document.createElement(tag);
+    if (cls) e.className = cls;
+    if (text !== undefined && text !== null && text !== '') e.textContent = String(text);
+    return e;
+  }
+  // ['Stream', ' — a secret prompt ... ', ['b', '3 seconds'], ' — type it.']
+  function para(cls, parts) {
+    const p = el('p', cls);
+    parts.forEach(function (x) {
+      if (typeof x === 'string') { p.appendChild(document.createTextNode(x)); return; }
+      p.appendChild(el(x[0], x[2], x[1]));
+    });
+    return p;
+  }
+  function actionBtn(label, act, data, disabled) {
+    const b = el('button', 'btn', label);
+    b.type = 'button';
+    b.setAttribute('data-act', act);
+    Object.keys(data || {}).forEach(function (k) { b.setAttribute('data-' + k, data[k]); });
+    if (disabled) b.disabled = true;
+    return b;
+  }
+  function namesEl(ids) {
+    const wrapNames = el('div', 'names');
+    ids.forEach(function (id) {
+      wrapNames.appendChild(el('span', 'nm' + (id === myId ? ' you' : ''), rosterName(id)));
+    });
+    return wrapNames;
+  }
+  function chipEl(link, i) {
+    const p = link.picks[i];
+    const w = ((view.round.words[p.s] || [])[p.i]) || '';
+    const c = el('span', 'chip', w);
+    c.style.setProperty('--c', colorOf(p.s));
+    return c;
+  }
+  function pairEl(link) {
+    const d = el('div', 'pair');
+    for (let i = 0; i < link.picks.length; i++) {
+      if (i) d.appendChild(el('em', '', '⟷'));
+      d.appendChild(chipEl(link, i));
+    }
+    return d;
+  }
+  function ptsOf(l) { return l.weight * (l.vertical ? 2 : 1); }
+  function promptListEl(v) {
+    const r = v.round;
+    const d = el('div', 'plist');
+    r.streamers.forEach(function (id) {
+      const row = el('div', '', '');
+      row.style.setProperty('--c', colorOf(id));
+      row.appendChild(el('i', '', rosterName(id)));
+      row.appendChild(el('span', '', r.prompts[id] || ''));
+      d.appendChild(row);
+    });
+    return d;
+  }
+  function metaEl(relName, note) {
+    const m = el('div', 'meta');
+    m.appendChild(el('span', 'r', relName));
+    m.appendChild(el('span', '', note));
+    return m;
+  }
+  function relNameOf(l) { return relOf(l.rel).name; }
+  function scoreBoardEl(v) {
+    const ids = v.players.slice().sort(function (a, b) { return (v.scores[b] || 0) - (v.scores[a] || 0); });
+    const top = ids.length ? (v.scores[ids[0]] || 0) : 0;
+    const d = el('div', 'board');
+    ids.forEach(function (id) {
+      const win = (v.scores[id] || 0) === top && top > 0;
+      const row = el('div', win ? 'win' : '');
+      row.appendChild(el('span', '', rosterName(id) + (id === myId ? ' (you)' : '')));
+      row.appendChild(el('span', '', String(v.scores[id] || 0)));
+      d.appendChild(row);
+    });
+    return d;
+  }
+
   // ---- simple screens: re-rendered from the view on every update ----
   function simple(render) {
     return {
       update: function (v) {
         const sc = stage.querySelector('.scroll');
         const top = sc ? sc.scrollTop : 0;
-        stage.innerHTML = render(v);
+        clearNode(stage);
+        stage.appendChild(render(v));
         const sc2 = stage.querySelector('.scroll');
         if (sc2) sc2.scrollTop = top;
       }
@@ -821,7 +1110,7 @@ export function mount(root, api) {
     const t = e.target.closest ? e.target.closest('[data-act]') : null;
     if (!t || !view || dead) return;
     const act = t.getAttribute('data-act');
-    if (act === 'start') api.send({ a: 'start' });
+    if (act === 'start') api.send({ a: 'start', m: t.getAttribute('data-m') || '' });
     else if (act === 'next') api.send({ a: 'next' });
     else if (act === 'vote') api.send({ a: 'vote', n: Number(t.getAttribute('data-n')), yes: t.getAttribute('data-yes') === '1' });
   });
@@ -832,27 +1121,49 @@ export function mount(root, api) {
     }).join('') + '</div>';
   }
 
+  function centerScreen(inner) {
+    const c = el('div', 'center');
+    inner.forEach(function (n) { c.appendChild(n); });
+    return c;
+  }
+
+   function soloModeBtns() {
+    const row = el('div', '');
+    row.style.display = 'flex';
+    row.style.gap = '10px';
+    row.style.justifyContent = 'center';
+    row.appendChild(actionBtn('Stream', 'start', { m: 'stream' }));
+    row.appendChild(actionBtn('Connect', 'start', { m: 'conn' }));
+    return row;
+  }
+
   function lobbyScreen() {
     return simple(function (v) {
-      if (v.mode === 'solo-streamer') {
-        return '<div class="center"><h1>FUGUE: SOLO</h1>' +
-          '<p class="rules"><b>Timed Streaming</b>: Get a secret prompt and lock a word every <b>3 seconds</b> — type it, hit space. ' +
-          'Practice your streaming solo against the clock.</p>' +
-          namesHtml(v.players) +
-          '<button class="btn" data-act="start">Start solo game</button></div>';
-      }
+      if (v.mode === 'solo-streamer' || v.players.length === 1) {
+        return centerScreen([
+          el('h1', '', 'FUGUE SOLO'),
+          para('rules', [['b', 'Stream'], ' — a secret prompt; lock a word every ', ['b', '3 seconds'], ', type it, hit space. ',
+            ['b', 'Connect'], ' — three books stream words one by one; you are the Connectionist and strike ', ['b', 'lightning'],
+            ' between words that fit the relation. All links stand; score by weight, straight-down counts double.']),
+          namesEl(v.players),
+          soloModeBtns()
+        ]);
       const n = v.players.length;
       const host = v.hostId === myId;
       const can = host && n >= MIN_PLAYERS;
-      return '<div class="center"><h1>FUGUE</h1>' +
-        '<p class="rules"><b>Streamers</b> each get a secret prompt and must lock a word every <b>3 seconds</b> — type it, hit space. ' +
-        'The <b>Connectionist</b> sees every word and strikes <b>lightning</b> between streams: links that fit a relation which changes after every strike. ' +
-        'Straight-down links and links across more streams score more. Streamers then vote on each link. ' +
-        'Everyone takes a turn connecting.</p>' +
-        namesHtml(v.players) +
-        (v.late.length ? '<p class="note">' + v.late.length + ' joining next set</p>' : '') +
-        '<button class="btn" data-act="start"' + (can ? '' : ' disabled') + '>Start set</button>' +
-        '<p class="note">' + (n < MIN_PLAYERS ? 'Needs ' + MIN_PLAYERS + ' players — ' + n + ' here.' : (host ? n + ' at the table — everyone connects once.' : 'Waiting for the host to start.')) + '</p></div>';
+      const note = n < MIN_PLAYERS
+        ? 'Needs ' + MIN_PLAYERS + ' players — ' + n + ' here.'
+        : (host ? n + ' at the table — everyone connects once.' : 'Waiting for the host to start.');
+      return centerScreen([
+        el('h1', '', 'FUGUE'),
+        para('rules', [['b', 'Streamers'], ' each get a secret prompt and must lock a word every ', ['b', '3 seconds'], ' — type it, hit space. ',
+          ['b', 'Connectionist'], ' sees every word and strikes ', ['b', 'lightning'], ' between streams: links that fit a relation which changes after every strike. ',
+          'Straight-down links and links across more streams score more. Streamers then vote on each link. Everyone takes a turn connecting.']),
+        namesEl(v.players),
+        v.late.length ? el('p', 'note', v.late.length + ' joining next set') : null,
+        actionBtn('Start set', 'start', null, !can),
+        el('p', 'note', note)
+      ].filter(Boolean));
     });
   }
 
@@ -861,112 +1172,136 @@ export function mount(root, api) {
       const r = v.round;
       let body;
       if (v.role === 'stream') {
-        body = '<h2>you are a streamer</h2><div class="big" style="color:' + colorOf(myId) + '">' + esc(r.prompts[myId]) + '</div>' +
-          '<p class="rules">Type a word, press <b>space</b> to lock it. A new word is due every 3 seconds — if you stall, whatever you have typed locks anyway. ' +
-          'Tap the box to bring up your keyboard.</p>';
+        const promptWrap = el('div', 'big', r.prompts[myId]);
+        promptWrap.style.color = colorOf(myId);
+        body = [
+          el('h2', '', 'you are a streamer'),
+          promptWrap,
+          para('rules', ['Type a word, press ', ['b', 'space'], ' to lock it. A new word is due every 3 seconds — if you stall, whatever you have typed locks anyway. Tap the box to bring up your keyboard.'])
+        ];
       } else if (v.role === 'conn') {
-        body = '<h2>you are the connectionist</h2><div class="big">Find what the streams share</div>' +
-          '<p class="rules">Tap one word in each stream, then it strikes. The relation changes after every strike. Words can be used once. ' +
-          'Straight down counts double.</p>' + namesHtml(r.streamers);
+        body = [
+          el('h2', '', 'you are the connectionist'),
+          el('div', 'big', 'Find what the streams share'),
+          para('rules', ['Tap one word in each stream, then it strikes. The relation changes after every strike. Words can be used once. Straight down counts double.']),
+          namesEl(r.streamers)
+        ];
       } else {
-        body = '<h2>watching</h2><div class="big">' + esc(rosterName(r.conn)) + ' connects</div>';
+        body = [el('h2', '', 'watching'), el('div', 'big', rosterName(r.conn) + ' connects')];
       }
-      return '<div class="center">' + body + '<div class="count">&nbsp;</div></div>';
+      const c = el('div', 'center');
+      body.forEach(function (n) { c.appendChild(n); });
+      c.appendChild(el('div', 'count', '\u00a0'));
+      return c;
     });
-  }
-
-  function chipHtml(link, i) {
-    const p = link.picks[i];
-    const w = ((view.round.words[p.s] || [])[p.i]) || '';
-    return '<span class="chip" style="--c:' + colorOf(p.s) + '">' + esc(w) + '</span>';
-  }
-  function pairHtml(link) {
-    const parts = [];
-    for (let i = 0; i < link.picks.length; i++) parts.push(chipHtml(link, i));
-    return '<div class="pair">' + parts.join('<em>⟷</em>') + '</div>';
-  }
-  function ptsOf(l) { return l.weight * (l.vertical ? 2 : 1); }
-  function promptList(v) {
-    const r = v.round;
-    return '<div class="plist">' + r.streamers.map(function (id) {
-      return '<div style="--c:' + colorOf(id) + '"><i>' + esc(rosterName(id)) + '</i><span>' + esc(r.prompts[id] || '') + '</span></div>';
-    }).join('') + '</div>';
   }
 
   function voteScreen() {
     return simple(function (v) {
       const r = v.round;
       const isS = v.role === 'stream';
-      const cards = r.links.map(function (l) {
-        const mine = r.votes[l.n] ? r.votes[l.n][myId] : undefined;
-        const btns = isS
-          ? '<div class="vb"><button class="y' + (mine === true ? ' on' : '') + '" data-act="vote" data-n="' + l.n + '" data-yes="1">✓ fits</button>' +
-            '<button class="n' + (mine === false ? ' on' : '') + '" data-act="vote" data-n="' + l.n + '" data-yes="0">✗ no</button></div>' : '';
-        return '<div class="card">' + pairHtml(l) + '<div class="meta"><span class="r">' + esc(relOf(l.rel).name) + '</span>' +
-          '<span>+' + ptsOf(l) + (l.vertical ? ' · straight down' : '') + (l.weight > 1 ? ' · ' + (l.weight + 1) + ' streams' : '') + '</span></div>' + btns + '</div>';
-      }).join('');
-      return '<div class="scroll"><div class="vhead"><b>' + (isS ? 'Does each link fit its relation?' : 'The streamers are voting') + '</b>' +
-        '<small>' + esc(rosterName(r.conn)) + ' struck ' + r.links.length + (r.links.length === 1 ? ' link' : ' links') + ' · ' + r.cast + '/' + r.castTotal + ' votes in</small></div>' +
-        promptList(v) + cards + '</div>';
+      const sc = el('div', 'scroll');
+      const head = el('div', 'vhead');
+      head.appendChild(el('b', '', isS ? 'Does each link fit its relation?' : 'The streamers are voting'));
+      head.appendChild(el('small', '', rosterName(r.conn) + ' struck ' + r.links.length + (r.links.length === 1 ? ' link' : ' links') + ' · ' + r.cast + '/' + r.castTotal + ' votes in'));
+      sc.appendChild(head);
+      sc.appendChild(promptListEl(v));
+      r.links.forEach(function (l) {
+        const card = el('div', 'card');
+        card.appendChild(pairEl(l));
+        card.appendChild(metaEl(relNameOf(l), '+' + ptsOf(l) + (l.vertical ? ' · straight down' : '') + (l.weight > 1 ? ' · ' + (l.weight + 1) + ' streams' : '')));
+        if (isS) {
+          const mine = r.votes[l.n] ? r.votes[l.n][myId] : undefined;
+          const vb = el('div', 'vb');
+          const yes = el('button', 'y' + (mine === true ? ' on' : ''), '✓ fits');
+          yes.type = 'button'; yes.setAttribute('data-act', 'vote'); yes.setAttribute('data-n', String(l.n)); yes.setAttribute('data-yes', '1');
+          const no = el('button', 'n' + (mine === false ? ' on' : ''), '✗ no');
+          no.type = 'button'; no.setAttribute('data-act', 'vote'); no.setAttribute('data-n', String(l.n)); no.setAttribute('data-yes', '0');
+          vb.appendChild(yes); vb.appendChild(no);
+          card.appendChild(vb);
+        }
+        sc.appendChild(card);
+      });
+      return sc;
     });
-  }
-
-  function scoreBoard(v) {
-    const ids = v.players.slice().sort(function (a, b) { return (v.scores[b] || 0) - (v.scores[a] || 0); });
-    const top = ids.length ? (v.scores[ids[0]] || 0) : 0;
-    return '<div class="board">' + ids.map(function (id) {
-      return '<div' + ((v.scores[id] || 0) === top && top > 0 ? ' class="win"' : '') + '><span>' + esc(rosterName(id)) + (id === myId ? ' (you)' : '') + '</span><span>' + (v.scores[id] || 0) + '</span></div>';
-    }).join('') + '</div>';
   }
 
   function tallyScreen() {
     return simple(function (v) {
       const r = v.round;
       const res = r.result || { points: 0, rows: [] };
-      const cards = res.rows.map(function (row) {
+      const host = v.hostId === myId;
+      const sc = el('div', 'scroll');
+      const head = el('div', 'vhead');
+      head.appendChild(el('small', '', rosterName(r.conn) + ' connected'));
+      head.appendChild(el('div', 'round-pts', '+' + res.points));
+      if (r.aborted) head.appendChild(el('small', '', 'round called off — someone left'));
+      sc.appendChild(head);
+      res.rows.forEach(function (row) {
         let link = null;
         r.links.forEach(function (l) { if (l.n === row.n) link = l; });
-        if (!link) return '';
-        return '<div class="card' + (row.stands ? '' : ' no') + '">' + pairHtml(link) + '<div class="meta"><span class="r">' + esc(relOf(link.rel).name) +
-          '</span><span class="stamp ' + (row.stands ? 'ok' : 'bad') + '">' + (row.stands ? '+' + row.pts : 'no') + ' · ' + row.yes + '–' + row.no + '</span></div></div>';
-      }).join('');
-      const host = v.hostId === myId;
-      return '<div class="scroll"><div class="vhead"><small>' + esc(rosterName(r.conn)) + ' connected</small>' +
-        '<div class="round-pts">+' + res.points + '</div>' +
-        (r.aborted ? '<small>round called off — someone left</small>' : '') + '</div>' + cards + scoreBoard(v) +
-        '<div style="text-align:center;margin-top:10px">' +
-        (host ? '<button class="btn" data-act="next">Next round</button>' : '<p class="note">Next round starts on its own.</p>') +
-        '</div></div>';
+        if (!link) return;
+        const card = el('div', 'card' + (row.stands ? '' : ' no'));
+        card.appendChild(pairEl(link));
+        card.appendChild(metaEl(relNameOf(link), (row.stands ? '+' + row.pts : 'no') + ' · ' + row.yes + '–' + row.no));
+        sc.appendChild(card);
+      });
+      sc.appendChild(scoreBoardEl(v));
+      const tail = el('div', '');
+      tail.style.textAlign = 'center';
+      tail.style.marginTop = '10px';
+      if (host) tail.appendChild(actionBtn('Next round', 'next'));
+      else tail.appendChild(el('p', 'note', 'Next round starts on its own.'));
+      sc.appendChild(tail);
+      return sc;
     });
   }
 
   function overScreen() {
     return simple(function (v) {
-      if (v.mode === 'solo-streamer') {
-        const count = v.over ? v.over.count : 0;
-        return '<div class="center"><h2>round complete</h2><div class="big">You locked ' + count + (count === 1 ? ' word' : ' words') + '</div>' +
-          '<button class="btn" data-act="start">Play again</button></div>';
+      if (v.players.length === 1 && v.over) {
+        const n = v.mode === 'solo-streamer' ? (v.over.count || 0) : (v.over.top || 0);
+        const big = (v.mode === 'solo-streamer' ? 'You locked ' : 'You scored ') + n + (n === 1 ? (v.mode === 'solo-streamer' ? ' word' : ' point') : (v.mode === 'solo-streamer' ? ' words' : ' points'));
+        return centerScreen([
+          el('h2', '', 'set complete'),
+          el('div', 'big', big),
+          soloModeBtns()
+        ]);
       }
       const o = v.over || { winners: [], top: 0 };
       const host = v.hostId === myId;
       const heading = o.winners.length > 1 ? 'tied' : 'wins';
-      return '<div class="center"><h2>set complete</h2><div class="big">' + o.winners.map(function (id) { return esc(rosterName(id)); }).join(' & ') +
-        ' ' + heading + '</div>' + scoreBoard(v) +
-        '<button class="btn" data-act="start"' + (host ? '' : ' disabled') + '>' + (host ? 'Play again' : 'Waiting for host') + '</button></div>';
+      const names = o.winners.map(function (id) { return rosterName(id); }).join(' & ');
+      return centerScreen([
+        el('h2', '', 'set complete'),
+        el('div', 'big', names + ' ' + heading),
+        scoreBoardEl(v),
+        actionBtn(host ? 'Play again' : 'Waiting for host', 'start', null, !host)
+      ]);
     });
   }
 
   // ---- streamer screen: the email-address field ----
   function streamScreen(v0) {
     const color = colorOf(myId);
-    stage.innerHTML = '<div class="prompt"><small>your stream</small><b></b></div>' +
-      '<div class="field" style="--c:' + color + '"></div><div class="bar"><i></i></div>' +
-      '<div class="foot"><span class="cnt"></span><span class="zaps"></span></div>';
-    stage.querySelector('.prompt b').textContent = v0.round.prompts[myId] || '';
-    const field = stage.querySelector('.field');
-    const bar = stage.querySelector('.bar i');
-    const cnt = stage.querySelector('.cnt');
-    const zaps = stage.querySelector('.zaps');
+    clearNode(stage);
+    const promptBox = el('div', 'prompt');
+    promptBox.appendChild(el('small', '', 'your stream'));
+    promptBox.appendChild(el('b', '', v0.round.prompts[myId] || ''));
+    const field = el('div', 'field');
+    field.style.setProperty('--c', color);
+    const barWrap = el('div', 'bar');
+    const bar = el('i', '');
+    barWrap.appendChild(bar);
+    const foot = el('div', 'foot');
+    const cnt = el('span', 'cnt');
+    const zaps = el('span', 'zaps');
+    foot.appendChild(cnt);
+    foot.appendChild(zaps);
+    stage.appendChild(promptBox);
+    stage.appendChild(field);
+    stage.appendChild(barWrap);
+    stage.appendChild(foot);
     const inp = document.createElement('input');
     inp.type = 'text';
     inp.autocomplete = 'off';
@@ -1068,30 +1403,54 @@ export function mount(root, api) {
   function connScreen(v0) {
     const canAct = v0.role === 'conn';
     const S = v0.round.streamers.slice();
-    stage.innerHTML = '<div class="lanes"><div class="cols"><svg class="bolts"><g class="scars"></g><g class="strikes"></g></svg></div></div>' +
-      (canAct
-        ? '<div class="rel"><div class="nameb"><small>RELATION</small><b></b><span class="h"></span></div><div class="chain"></div></div>' +
-          '<div class="act"><div class="selinfo"></div>' + (S.length > 2 ? '<button class="zap" type="button">⚡ LINK</button>' : '') + '</div>'
-        : '<div class="rel watch">👁 watching — ' + esc(rosterName(v0.round.conn)) + ' is connecting</div>');
-    const lanes = stage.querySelector('.lanes');
-    const cols = stage.querySelector('.cols');
-    const svg = stage.querySelector('.bolts');
-    const scars = svg.querySelector('.scars');
-    const strikes = svg.querySelector('.strikes');
-    const relB = stage.querySelector('.rel b');
-    const relH = stage.querySelector('.rel .h');
-    const chainEl = stage.querySelector('.chain');
-    const selInfo = stage.querySelector('.selinfo');
-    const zapBtn = stage.querySelector('.zap');
+    clearNode(stage);
+    const lanes = el('div', 'lanes');
+    const cols = el('div', 'cols');
+    const svg = document.createElementNS(SVGNS, 'svg');
+    svg.setAttribute('class', 'bolts');
+    const scars = document.createElementNS(SVGNS, 'g');
+    scars.setAttribute('class', 'scars');
+    const strikes = document.createElementNS(SVGNS, 'g');
+    strikes.setAttribute('class', 'strikes');
+    svg.appendChild(scars);
+    svg.appendChild(strikes);
+    cols.appendChild(svg);
+    lanes.appendChild(cols);
+    stage.appendChild(lanes);
+
+    let relB = null, relH = null, chainEl = null, selInfo = null, zapBtn = null;
+    if (canAct) {
+      const rel = el('div', 'rel');
+      const nameb = el('div', 'nameb');
+      nameb.appendChild(el('small', '', 'RELATION'));
+      relB = el('b', '');
+      relH = el('span', 'h');
+      nameb.appendChild(relB);
+      nameb.appendChild(relH);
+      chainEl = el('div', 'chain');
+      rel.appendChild(nameb);
+      rel.appendChild(chainEl);
+      stage.appendChild(rel);
+
+      const act = el('div', 'act');
+      selInfo = el('div', 'selinfo');
+      act.appendChild(selInfo);
+      if (S.length > 2) {
+        zapBtn = el('button', 'zap', '⚡ LINK');
+        zapBtn.type = 'button';
+        act.appendChild(zapBtn);
+      }
+      stage.appendChild(act);
+    } else {
+      stage.appendChild(el('div', 'rel watch', '👁 watching — ' + rosterName(v0.round.conn) + ' is connecting'));
+    }
 
     // label column
-    const lab = document.createElement('div');
-    lab.className = 'col lab';
+    const lab = el('div', 'col lab');
     S.forEach(function (s) {
-      const c = document.createElement('div');
-      c.className = 'cell lab';
+      const c = el('div', 'cell lab');
       c.style.setProperty('--c', colorOf(s));
-      c.innerHTML = '<span>' + esc(rosterName(s)) + '</span>';
+      c.appendChild(el('span', '', rosterName(s)));
       lab.appendChild(c);
     });
     cols.insertBefore(lab, svg);
@@ -1112,7 +1471,7 @@ export function mount(root, api) {
       S.forEach(function (s) {
         const c = document.createElement('div');
         c.className = 'cell';
-        c.innerHTML = '<span class="ghost"></span>';
+        c.appendChild(el('span', 'ghost'));
         col.appendChild(c);
         cells[s].push(c);
       });
@@ -1180,10 +1539,10 @@ export function mount(root, api) {
         for (let i = 0; i < list.length; i++) {
           const cell = cells[s][i];
           if (!cell) continue;
-          let b = cell.querySelector('.b');
-          if (!b) {
-            cell.innerHTML = '';
-            b = document.createElement('button');
+      let b = cell.querySelector('.b');
+      if (!b) {
+        clearNode(cell);
+        b = document.createElement('button');
             b.type = 'button';
             b.className = 'b' + (list[i] ? '' : ' blank');
             b.style.setProperty('--c', colorOf(s));
@@ -1246,9 +1605,9 @@ export function mount(root, api) {
       addPath(g, main, 1.6, 1, '#ffffff');
       const forks = 2 + Math.round(power * 2);
       for (let f = 0; f < forks; f++) {
-        const base = main[Math.floor(Math.random() * main.length)];
-        const ang = Math.random() * Math.PI * 2;
-        const len = 40 + Math.random() * 70 * power;
+        const base = main[Math.floor(IMG() * main.length)];
+        const ang = IMG() * Math.PI * 2;
+        const len = 40 + IMG() * 70 * power;
         const seg = jag(base[0], base[1], base[0] + Math.cos(ang) * len, base[1] + Math.sin(ang) * len, 4, 30);
         addPath(g, seg, 3, 0.55, '#7dd3fc');
         addPath(g, seg, 1, 0.9, '#ffffff');
@@ -1417,6 +1776,9 @@ export function mount(root, api) {
       if (view.phase === 'live' && view.round && t >= view.round.endsAt) ask('finish');
       return;
     }
+    // Solo connectionist: books are given voice by drip. Not ask() — ask's
+    // 700ms dedupe would slow the streams; drip is idempotent in reduce.
+    if (view.mode === 'solo-conn' && view.phase === 'live') api.send({ a: 'drip' });
     if (!view.round) return;
     const r = view.round;
     const t = hostNow();

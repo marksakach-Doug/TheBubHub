@@ -176,6 +176,7 @@ OFFLINE_SUITES=(
   # editing this file.
   "game scenarios|game_scenarios.mjs"
   "fugue rules|fugue_rules.mjs"
+  "fugue solo (streamer + connectionist)|fugue_solo.mjs"
   # The samples Clicker plays has to be in tune. They are extracted from a
   # SoundFont and committed, so nothing else would notice if one of them
   # ended up in the wrong key.

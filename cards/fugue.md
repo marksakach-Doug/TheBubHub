@@ -1,7 +1,7 @@
 id: fugue
 title: Fugue
-players: 3-8
-max-lines: 500
+players: 1-8
+max-lines: 1900
 hidden: none
 
 rules: |
@@ -13,6 +13,10 @@ rules: |
   to a new one after every link. Straight vertical links and links reaching
   more streams score more. Afterwards the streamers vote on every link. Only
   the connectionist scores; everyone takes a turn, then the set is compared.
+  On a one-player table the lobby offers two solo modes: Stream (timed word
+  locking from a prompt) and Connect (three books, drawn from the bank baked
+  by scripts/bake-fugue-words.py, drip words; the player is the connectionist
+  and every link stands unjudged).
 
 actions: |
   { a: 'join' }

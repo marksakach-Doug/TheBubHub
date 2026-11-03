@@ -52,8 +52,11 @@ class FakeElement {
     this.ownerDocument = doc;
     this.children = [];
     this.parentNode = null;
-    this.style = new Proxy({}, {
-      // Reading an unset property gives the empty string, like a real element.
+    this.attrs = {};
+    this.style = new Proxy({
+      setProperty(k, v) { this[k] = v; },
+      getPropertyValue(k) { return this[k] || ''; }
+    }, {
       get: (t, k) => (typeof t[k] === 'undefined' && typeof k === 'string' ? '' : t[k]),
       set: (t, k, v) => { t[k] = v; return true; }
     });
@@ -85,13 +88,43 @@ class FakeElement {
     child.parentNode = null;
     return child;
   }
-  remove() { if (this.parentNode) this.parentNode.removeChild(this); }
-  replaceWith(node) {
-    if (!this.parentNode) return;
-    const i = this.parentNode.children.indexOf(this);
-    if (i >= 0) { this.parentNode.children[i] = node; node.parentNode = this.parentNode; }
-    this.parentNode = null;
-  }
+    remove() { if (this.parentNode) this.parentNode.removeChild(this); }
+    replaceWith(node) {
+      if (!this.parentNode) return;
+      const i = this.parentNode.children.indexOf(this);
+      if (i >= 0) { this.parentNode.children[i] = node; node.parentNode = this.parentNode; }
+      this.parentNode = null;
+    }
+    get firstChild() { return this.children[0] || null; }
+    insertBefore(child, ref) {
+      if (child.parentNode) child.parentNode.removeChild(child);
+      child.parentNode = this;
+      const i = ref ? this.children.indexOf(ref) : -1;
+      if (i < 0) this.children.push(child);
+      else this.children.splice(i, 0, child);
+      return child;
+    }
+    setAttribute(k, v) {
+      this.attrs[k] = String(v);
+      if (k === 'class') this.className = String(v);
+      else if (k === 'id') this.id = String(v);
+    }
+    getAttribute(k) {
+      if (k === 'class') return this.className || null;
+      if (k === 'id') return this.id || null;
+      return Object.prototype.hasOwnProperty.call(this.attrs, k) ? this.attrs[k] : null;
+    }
+    closest(sel) {
+      let cur = this;
+      while (cur && cur.tagName) {
+        if (matches(cur, sel)) return cur;
+        cur = cur.parentNode;
+      }
+      return null;
+    }
+    getBoundingClientRect() {
+      return { left: 0, top: 0, width: 100, height: 40, right: 100, bottom: 40 };
+    }
   cloneNode() {
     const c = new FakeElement(this.tagName, this.ownerDocument);
     c.className = this.className;
@@ -153,6 +186,7 @@ class FakeText extends FakeElement {
 class FakeDocument {
   constructor() { this.body = new FakeElement('body', this); this.documentElement = this.body; }
   createElement(tag) { return new FakeElement(tag, this); }
+  createElementNS(_ns, tag) { return new FakeElement(tag, this); }
   createTextNode(t) { return new FakeText(t, this); }
   createDocumentFragment() { return new FakeElement('#fragment', this); }
   getElementById(id) { return this.body.querySelector('#' + id); }
@@ -194,7 +228,14 @@ export function fakeApi(me = 'p1') {
     // clock - one that reschedules itself - would otherwise recurse until the
     // stack gives out. That would be a failure of this harness, not of the
     // game, so those callbacks wait instead of running.
-    raf(fn) { timers.raf++; if (typeof fn === 'function') fn(0); return timers.raf; },
+    raf(fn) {
+      timers.raf++;
+      if (typeof fn !== 'function') return timers.raf;
+      if (timers.running) { timers.pending.push(fn); return timers.raf; }
+      timers.running = true;
+      try { fn(0); } finally { timers.running = false; }
+      return timers.raf;
+    },
     cancelRaf() {},
     setTimeout(fn) {
       timers.timeout++;
