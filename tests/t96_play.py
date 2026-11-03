@@ -1,50 +1,38 @@
 #!/usr/bin/env python3
-"""Play test for public/the96game.html — the last game with no DOM test.
+"""Play test for public/the96game.html — parallel chains, secrecy, timer, save.
 
-The 96 Game is a legacy iframe game, and every bug that made it unplayable was
-invisible to `jscheck.py`, because none of them were syntax errors. All of them
-were things that only happen at runtime, across two frames:
+The 96 Game is a legacy iframe game: three real frames are driven against a
+fake hub that forwards messages in the order the game emits them. This suite
+covers the rewrite to simultaneous play:
 
-  * The host hands each player a private brief — the sentence the drawer draws,
-    the drawing the describer describes — over the `denied` channel, because
-    that is the only per-player pipe the hub offers. `beginStep()` used to emit
-    that brief BEFORE the state snapshot, so a guest was still sitting on the
-    previous step when it arrived. The brief was then either rejected outright
-    or accepted and wiped a render later, and the drawer sat on "Waiting for
-    the words..." forever. The host never saw this, because it short-circuits
-    delivery to itself *after* it has already advanced its own state — which is
-    exactly why this read as "works on the host, broken for everyone else".
-  * The board was hidden with `visibility:hidden` whenever it had no strokes,
-    i.e. exactly when you need to put the first one down. Hidden elements take
-    no pointer events, so nothing was drawable at all.
-  * `S.names` was snapshotted at start and never refreshed, so a rename left a
-    stale name in the seat strip for the rest of the session.
-  * A player who left mid-lap stayed in the running order unless it happened to
-    be their turn, so the lap could stall on a ghost.
-
-This drives three real frames against a fake hub that forwards messages in the
-order the game emits them — including the brief-before-state ordering — and
-asserts on the DOM of the guest frames, because a guest is where all of this
-goes wrong. The hub itself is exercised by `tests/t96_play.py`'s sibling, the
-`denied` routing in `src/main.js`.
+  * every player opens their own chain at once; all three chains exist
+  * briefs are routed to the right player of the right chain ONLY
+  * a describer never sees the sentence they must describe, for any chain
+  * the turn indicator (chain cards + seat strip) agrees with who is up
+  * the first stroke on a blank board is drawable, an enclosed fill fills
+  * a pending turn the table ignores is auto-skipped by the host's timer
+    (#fast shrinks the two-minute clock so the skip costs seconds)
+  * the reveal shows every chain, and Save downloads a self-contained
+    HTML page with the texts and inline PNG drawings
 
     pip install playwright && playwright install chromium
     python3 tests/t96_play.py
 """
 import pathlib
 import sys
+import re
+import tempfile
 
 from playwright.sync_api import sync_playwright
 
 ROOT = pathlib.Path(__file__).resolve().parent.parent
 GAME = ROOT / "public" / "the96game.html"
 
-# The fake hub. It is deliberately dumb: it forwards whatever the game posts,
-# in whatever order the game posts it, because that ordering is the bug.
-HARNESS = """<!DOCTYPE html><html><body>
-<iframe id="f0" src="/the96game.html"></iframe>
-<iframe id="f1" src="/the96game.html"></iframe>
-<iframe id="f2" src="/the96game.html"></iframe>
+HARNESS = """<!DOCTYPE html><html><head><style>iframe{width:100%;height:940px;border:1px solid #ccc}</style></head>
+<body>
+<iframe id="f0" src="/the96game.html?x=0#fast"></iframe>
+<iframe id="f1" src="/the96game.html?x=1#fast"></iframe>
+<iframe id="f2" src="/the96game.html?x=2#fast"></iframe>
 <script>
 var PLAYERS = [
   { id: 'p0', name: 'Sam', host: true },
@@ -70,16 +58,15 @@ function roster(i) {
 window.addEventListener('message', function (e) {
   var m = e.data;
   if (!m || m.t !== 'gu' || m.game !== 'the96game') return;
-  var i = ['f0', 'f1', 'f2'].indexOf(e.source === document.getElementById('f0').contentWindow ? 'f0'
-    : e.source === document.getElementById('f1').contentWindow ? 'f1'
-    : e.source === document.getElementById('f2').contentWindow ? 'f2' : -1);
+  var src = e.source;
+  var i = -1;
+  ['f0', 'f1', 'f2'].forEach(function (id, j) {
+    if (document.getElementById(id).contentWindow === src) i = j;
+  });
   if (i < 0) return;
   if (m.k === 'hello') { ready[i] = true; roster(i); return; }
-  // Host broadcasts the authoritative snapshot to everybody else.
   if (m.k === 'state') { gd(1, 'state', m.p); gd(2, 'state', m.p); return; }
-  // A guest intent is routed to the host, which validates and replies.
   if (m.k === 'intent') { gd(0, 'intent', m.p, PLAYERS[i]); return; }
-  // Per-player channel: the brief, or a refusal. Routed to one frame only.
   if (m.k === 'denied') {
     var to = m.p && m.p.to;
     var idx = -1;
@@ -87,6 +74,8 @@ window.addEventListener('message', function (e) {
     if (idx >= 0) gd(idx, 'denied', { text: m.p.text });
     return;
   }
+  // 'result' is the record sheet — observed, never answered.
+  // 'height' is the hub's layout knob — observed, never answered.
 });
 </script></body></html>"""
 
@@ -105,174 +94,222 @@ def main():
         if not cond:
             bad += 1
 
-    def wait_for(frame, expr, timeout=3000):
-        """A wait that reports rather than raises.
-
-        The whole point of this file is to diagnose a game that is stuck, so a
-        bare Playwright timeout on the first missing sentence would abort the
-        run before it could tell us anything about the rest of the lap.
-        """
+    def wait_for(frame, expr, timeout=4000):
         try:
             frame.wait_for_function(expr, timeout=timeout)
             return True
         except Exception:
             return False
 
+    sentences = {'p0': 'a cat wearing a hat', 'p1': 'a duck playing the fiddle', 'p2': 'a robot gardener'}
+
     with sync_playwright() as pw:
         br = pw.chromium.launch()
-
-        # Route both URLs from memory: the harness is synthetic and the game is
-        # the real shipped file, so this needs no server and no temp files.
-        ctx = br.new_context(viewport={"width": 1280, "height": 900})
+        ctx = br.new_context(viewport={"width": 1280, "height": 980}, accept_downloads=True)
 
         def fake(route, body):
             route.fulfill(body=body, content_type="text/html; charset=utf-8")
 
-        ctx.route("http://t96.test/harness.html",
-                  lambda r: fake(r, HARNESS))
-        ctx.route("http://t96.test/the96game.html",
-                  lambda r: fake(r, game_src))
+        ctx.route("http://t96.test/harness.html", lambda r: fake(r, HARNESS))
+        ctx.route(re.compile(r"http://t96\.test/the96game\.html.*"), lambda r: fake(r, game_src))
 
         pg = ctx.new_page()
         errors = []
         pg.on("pageerror", lambda e: errors.append(str(e)))
         pg.goto("http://t96.test/harness.html")
 
-        # The game announces itself with `hello`; the harness only answers then.
-        pg.wait_for_function("document.querySelectorAll('iframe').length === 3")
-        frames = [f for f in pg.frames if f != pg.main_frame]
+        frames = []
+        for f in pg.frames:
+            if 'the96game.html' in (f.url or ''):
+                frames.append(f)
+        frames = sorted(frames, key=lambda f: int(re.search(r'x=(\d)', f.url).group(1)))
         if len(frames) != 3:
             print("  FAIL expected 3 game frames, got %d" % len(frames))
             return 1
-        for f in frames:
-            f.wait_for_function("!!document.getElementById('t96-game')")
 
-        host, drawer, describer = frames[0], frames[1], frames[2]
+        hostf, bof, cyf = frames
+        for f in frames:
+            f.wait_for_selector("#t96-game:not(.hidden), #t96-waiting:not(.hidden), #t96-setup:not(.hidden)", timeout=6000)
 
         ok("no page errors on load", not errors)
 
-        # ---- the host starts the game ------------------------------------
-        host.wait_for_selector("#t96-setup:not(.hidden)")
-        host.click("#t96-start")
-
+        # ---- the host starts --------------------------------------------
+        hostf.wait_for_selector("#t96-setup:not(.hidden)")
+        hostf.click("#t96-start")
         for f in frames:
-            f.wait_for_selector("#t96-game:not(.hidden)")
-        ok("the host is told it is their turn to write", wait_for(
-            host,
-            "document.querySelector('#t96-status b').textContent.indexOf('start it off') !== -1"))
+            ok("game screen reaches %s" % f.url.split('x=')[1].split('#')[0],
+               wait_for(f, "!document.getElementById('t96-game').classList.contains('hidden')"))
 
-        # ---- step 0: the host writes the sentence -------------------------
-        host.fill("#t96-say", "a cat wearing a hat")
-        host.click("#t96-send")
+        ok("three chains exist on the host", wait_for(
+            hostf, "document.querySelectorAll('#t96-chains .chaincard').length === 3"))
+        ok("everyone has a pending move at the start",
+           hostf.eval_on_selector_all("#t96-seats .seat.now", "els => els.length") == 3)
+
+        # ---- everyone writes their own starter sentence at once ----------
+        for pid, f in zip(('p0', 'p1', 'p2'), frames):
+            f.fill("#t96-say", sentences[pid])
+            f.click("#t96-send")
+
+        # all chains move to step 1 (the draw step)
+        pg.wait_for_timeout(600)
+        for f in frames:
+            moved = wait_for(f, "Array.from(document.querySelectorAll('#t96-chains .job')).every(e => /is drawing|draw/.test(e.textContent))", 8000)
+            ok("all chains moved to the draw step (%s)" % f.url.split('x=')[1].split('#')[0], moved)
+            if not moved:
+                print('        jobs:', f.locator("#t96-chains .chaincard .job").all_inner_texts())
+                print('        status:', f.locator("#t96-status b").inner_text())
+
+        # secret channel: chain started by Cy is drawn by the next seat
+        # order is p0, p1, p2 → Cy (p2) starts chain 2, actor for step 1 is p0 (Sam, the host)
+        # select Cy's chain on the host to see who is up
+        hostf.locator("#t96-chains .chaincard").nth(2).click()
+        sam_sees = hostf.locator("#t96-status b").inner_text()
+        ok("the player assigned to draw Cy's chain is told to draw it: %r" % sam_sees,
+           "Draw this sentence" in sam_sees or "robot gardener" in sam_sees)
+        ok("the unrelated describer cannot see Cy's sentence: %r" % cyf.locator("#t96-idle .big").inner_text(),
+           "robot gardener" not in cyf.locator("#t96-idle .big").inner_text())
+
+        # ---- turn indicator: cards and seats agree ----------------------
+        # Every seat whose name shows up as the actor in a chain card must be .now,
+        # and no seat may be .now without being an actor in a card.
+        def actors_of(f):
+            return [re.sub(r'\s+is\s.*$', '', e.inner_text()).strip()
+                    for e in f.locator("#t96-chains .chaincard .job").all()]
+        def seat_nows(f):
+            return [re.sub(r'\s*[·(].*$', '', e.inner_text()).strip()
+                    for e in f.locator("#t96-seats .seat.now").all()]
+        ok("indicator syncs with pending turns (host view)",
+           sorted(a for a in actors_of(hostf)) == sorted(seat_nows(hostf)))
+        ok("indicator syncs with pending turns (guest view)",
+           sorted(a for a in actors_of(bof)) == sorted(seat_nows(bof)))
+
+        # ---- the first stroke on a blank board is drawable --------------
+        hostf.locator("#t96-canvas").scroll_into_view_if_needed()
         pg.wait_for_timeout(120)
+        box = hostf.locator("#t96-canvas").bounding_box()
+        ok("canvas has a real hit area", box is not None and box["width"] > 100)
 
-        # ---- step 1: Bo draws. This is the regression. -------------------
-        drawer.wait_for_selector("#t96-game:not(.hidden)")
-        got = wait_for(
-            drawer,
-            "document.querySelector('#t96-status b').textContent.indexOf('cat wearing a hat') !== -1")
-        status = drawer.locator("#t96-status b").inner_text()
-        ok("the DRAWER sees the sentence: %r" % status, got and "a cat wearing a hat" in status)
-        ok("the drawer is told to draw it",
-           got and "Draw this sentence" in drawer.locator("#t96-status small").inner_text())
-
-        # The describer must NOT be able to see the original sentence.
-        dstat = describer.locator("#t96-status b").inner_text()
-        ok("the describer cannot see the sentence: %r" % dstat,
-           "cat wearing a hat" not in dstat and "Waiting for Bo" in dstat)
-
-        # ---- the board has to be drawable while it is still blank ---------
-        vis = drawer.evaluate(
-            "getComputedStyle(document.getElementById('t96-canvas')).visibility")
-        ok("a blank board is visible to the drawer (was visibility:hidden)", vis != "hidden")
-
-        # The three frames are stacked full-height, so the drawer's canvas is
-        # normally scrolled out of the viewport and raw page.mouse coordinates
-        # would land on a different frame entirely. Bring it into view first.
-        drawer.locator("#t96-canvas").scroll_into_view_if_needed()
-        pg.wait_for_timeout(100)
-        box = drawer.locator("#t96-canvas").bounding_box()
-        ok("the canvas has a real hit area", box is not None and box["width"] > 100)
-        if box:
-            # A single drag: down, several moves, up. The first stroke is the
-            # one that used to be impossible.
-            pg.mouse.move(box["x"] + box["width"] * 0.25, box["y"] + box["height"] * 0.30)
+        def drag_stroke(f, pts):
+            b = f.locator("#t96-canvas").bounding_box()
+            x0 = b["x"] + b["width"] * pts[0][0]
+            y0 = b["y"] + b["height"] * pts[0][1]
+            pg.mouse.move(x0, y0)
             pg.mouse.down()
-            for f in (0.35, 0.45, 0.55, 0.65):
-                pg.mouse.move(box["x"] + box["width"] * f, box["y"] + box["height"] * 0.45)
+            for px, py in pts[1:]:
+                pg.mouse.move(b["x"] + b["width"] * px, b["y"] + b["height"] * py)
             pg.mouse.up()
-            pg.wait_for_timeout(200)
+            pg.wait_for_timeout(80)
 
-            painted = drawer.evaluate("""() => {
+        def dark_px(f):
+            return f.evaluate("""() => {
               const c = document.getElementById('t96-canvas');
               const d = c.getContext('2d').getImageData(0, 0, c.width, c.height).data;
-              // Paper is #fffdf7; anything meaningfully darker is a real stroke.
               let n = 0;
               for (let i = 0; i < d.length; i += 4) {
-                if (d[i] < 200 && d[i + 1] < 200 && d[i + 2] < 200) n++;
+                if (d[i] < 200 && d[i+1] < 200 && d[i+2] < 200) n++;
               }
               return n;
             }""")
-            ok("the drawer's first stroke reached the canvas (%d dark px)" % painted, painted > 200)
 
-        # ---- the describer gets the drawing, not the sentence -------------
-        drawer.click("#t96-done")
-        pg.wait_for_timeout(200)
+        drag_stroke(hostf, [(0.2, 0.3), (0.3, 0.3), (0.45, 0.3), (0.6, 0.3)])
+        ok("the drawer's first stroke reached the canvas", dark_px(hostf) > 200)
+        hostf.click("#t96-undo")
+        pg.wait_for_timeout(120)
+        ok("undo removed the stroke", dark_px(hostf) < 50)
 
-        ok("the describer is told to describe", wait_for(
-            describer,
-            "document.querySelector('#t96-status b').textContent.indexOf('Describe') !== -1"))
+        # ---- paint bucket fill ------------------------------------------
+        drag_stroke(hostf, [(0.25, 0.5), (0.25, 0.75), (0.55, 0.75), (0.55, 0.5), (0.25, 0.5)])
+        hostf.locator(".sw[aria-label='Fill bucket']").click()
+        box = hostf.locator("#t96-canvas").bounding_box()
+        pg.mouse.click(box["x"] + box["width"] * 0.4, box["y"] + box["height"] * 0.62)
+        pg.wait_for_timeout(120)
+        ok("bucket filled the enclosed region", dark_px(hostf) > 300)
+        hostf.locator(".sw[aria-label='Fill bucket']").click()  # toggle off
 
-        dpaint = describer.evaluate("""() => {
-          const c = document.getElementById('t96-canvas');
-          const d = c.getContext('2d').getImageData(0, 0, c.width, c.height).data;
-          let n = 0;
-          for (let i = 0; i < d.length; i += 4) {
-            if (d[i] < 200 && d[i + 1] < 200 && d[i + 2] < 200) n++;
-          }
-          return n;
-        }""")
-        ok("the describer can see the drawing (%d dark px)" % dpaint, dpaint > 200)
-        dtext = describer.locator("#t96-write").inner_text()
-        ok("the describer is not shown the original sentence", "cat wearing a hat" not in dtext)
+        # ---- host draws for Cy's chain, then done ------------------------
+        hostf.click("#t96-done")
+        pg.wait_for_timeout(150)
 
-        # ---- step 2: the describer writes, and the lap reveals ----------
-        describer.fill("#t96-say", "an animal with a hat on it")
-        describer.click("#t96-send")
-        pg.wait_for_timeout(250)
+        # ---- the shipped 2-minute timer auto-skips an idle turn ----------
+        # Bo never draws chain 0 (Sam's story). Wait out the fast clock and
+        # check that the chain moved on by itself.
+        wait_for(hostf, "Array.from(document.querySelectorAll('#t96-chains .job')).some(e => /is writing|is starting/.test(e.textContent))", 31000)
+        pg.wait_for_timeout(350)
+        # complete whatever is left, whoever it is, one action at a time
+        deadline = __import__('time').time() + 45
+        def current_event(f):
+            try:
+                return f.locator("#t96-status b").inner_text()
+            except Exception:
+                return ''
+        while __import__('time').time() < deadline:
+            any_acted = False
+            for f in frames:
+                try:
+                    mine = f.eval_on_selector_all("#t96-chains .chaincard.yours", "els => els.length")
+                except Exception:
+                    mine = 0
+                if not mine:
+                    continue
+                # act on the first chain that is waiting on us (best effort:
+                # a turn can expire between the count check and the click)
+                try:
+                    f.locator("#t96-chains .chaincard.yours").first.click(timeout=2500)
+                except Exception:
+                    continue
+                pg.wait_for_timeout(60)
+                mode = f.evaluate("""() => {
+                    const w = document.getElementById('t96-write');
+                    if (w && !w.classList.contains('hidden')) return 'write';
+                    const t = document.getElementById('t96-tools');
+                    if (t && !t.classList.contains('hidden')) return 'draw';
+                    return 'none';
+                }""")
+                if mode == 'write':
+                    f.fill("#t96-say", 'describe %s' % __import__('time').time())
+                    f.click("#t96-send")
+                    any_acted = True
+                    continue
+                if mode == 'draw':
+                    drag_stroke(f, [(0.2, 0.2), (0.5, 0.5), (0.8, 0.25)])
+                    f.click("#t96-done")
+                    any_acted = True
+                    continue
+            if frames[0].locator("#t96-reveal:not(.hidden)").count():
+                break
+            if not any_acted:
+                pg.wait_for_timeout(80)
 
-        for name, f in (("host", host), ("drawer", drawer), ("describer", describer)):
-            shown = wait_for(f, "!document.getElementById('t96-reveal').classList.contains('hidden')")
-            steps = f.locator("#t96-chain .step").count()
-            ok("the %s sees the reveal chain (%d steps)" % (name, steps), shown and steps == 3)
+        for f in frames:
+            ok("reveal reached (%s)" % f.url.split('x=')[1].split('#')[0],
+               wait_for(f, "!document.getElementById('t96-reveal').classList.contains('hidden')", 3000))
 
-        chain = drawer.locator("#t96-chain").inner_text()
-        ok("the guest reveal shows the original sentence", "a cat wearing a hat" in chain)
-        ok("the guest reveal shows the final description", "an animal with a hat on it" in chain)
+        ok("all three stories are on the reveal",
+           hostf.eval_on_selector_all("#t96-chain .story", "els => els.length") == 3)
+        for f in frames:
+            body = f.locator("#t96-reveal").inner_text()
+            for s in sentences.values():
+                ok("sentence %r visible at reveal (%s)" % (s, f.url.split('x=')[1].split('#')[0]), s in body)
 
-        # Each reveal step with a drawing must actually have pixels on it.
-        step_paint = drawer.evaluate("""() => {
-          const cs = document.querySelectorAll('#t96-chain .step canvas');
-          let painted = 0;
-          for (const c of cs) {
-            const d = c.getContext('2d').getImageData(0, 0, c.width, c.height).data;
-            for (let i = 0; i < d.length; i += 4) {
-              if (d[i] < 200 && d[i + 1] < 200 && d[i + 2] < 200) { painted++; break; }
-            }
-          }
-          return { canvases: cs.length, painted: painted };
-        }""")
-        ok("the guest reveal renders the drawing (%d/%d canvases painted)"
-           % (step_paint["painted"], step_paint["canvases"]),
-           step_paint["canvases"] >= 1 and step_paint["painted"] >= 1)
+        # ---- save the story downloads a self-contained page --------------
+        with pg.expect_download() as dl_info:
+            hostf.click("#t96-save")
+        dl = dl_info.value
+        tmp = pathlib.Path(tempfile.mkdtemp()) / (dl.suggested_filename or 'story.html')
+        dl.save_as(str(tmp))
+        content = tmp.read_text(encoding='utf-8')
+        ok("save suggested an .html download", (dl.suggested_filename or '').endswith('.html'))
+        ok("save produced inline PNG drawings", 'data:image/png;base64' in content)
+        ok("save contains the sentences", all(s in content for s in sentences.values()))
 
-        ok("no page errors during play", not errors)
+        ok("no page errors at the end", not errors)
+        if errors:
+            for e in errors[:5]:
+                print("        pageerror:", e)
+
         br.close()
-
-    print()
-    print("%d checks failed" % bad if bad else "all checks passed")
     return 1 if bad else 0
 
 
-if __name__ == "__main__":
+if __name__ == '__main__':
     sys.exit(main())

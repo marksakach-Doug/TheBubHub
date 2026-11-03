@@ -6,18 +6,15 @@
 <meta name="color-scheme" content="light">
 <title>The 96 Game</title>
 <style>
-/* Palette. Word Bridge is a pure two-colour inversion system (--paper/#fff +
-   --ink/#000, zero radius, no gradients); this swaps the pair for something
-   warmer and promotes the two hard-coded strays into variables. */
 :root{
   --paper:#f6f1e7; --card:#fffdf7; --ink:#1c2333; --ash:#5d6474;
-  --rule:#ddd3bd; --accent:#b5541f; --accent2:#2f6f6b; --warn:#a3341f;
+  --rule:#ddd3bd; --accent:#b5541f; --accent2:#2f6f6b; --warn:#a3341f; --gold:#e0a020;
   --gut:clamp(12px,3vw,18px);
 }
 *{box-sizing:border-box}
 html,body{margin:0;padding:0;background:var(--paper);color:var(--ink)}
 body{font:15px/1.45 "Avenir Next","Segoe UI",system-ui,-apple-system,sans-serif;-webkit-text-size-adjust:100%}
-#t96{max-width:1000px;margin:0 auto;padding:var(--gut);min-height:100dvh;display:flex;flex-direction:column;gap:12px}
+#t96{max-width:1120px;margin:0 auto;padding:var(--gut);min-height:100dvh;display:flex;flex-direction:column;gap:12px}
 h1{font-size:clamp(20px,4vw,28px);letter-spacing:-.02em;margin:0}
 h1 .q{color:var(--accent)}
 p{margin:0 0 8px}
@@ -26,7 +23,6 @@ p{margin:0 0 8px}
 .hidden{display:none!important}
 .card{background:var(--card);border:1px solid var(--rule);border-radius:12px;padding:14px;box-shadow:0 1px 2px rgba(28,35,51,.05)}
 
-/* ---------- buttons ---------- */
 button{font:600 14px/1.2 inherit;color:var(--ink);background:var(--card);
   border:2px solid var(--ink);border-radius:10px;padding:9px 14px;cursor:pointer;min-height:38px}
 button:hover{background:var(--ink);color:var(--card)}
@@ -37,22 +33,33 @@ button.quiet{border-color:var(--rule);color:var(--ash)}
 :focus-visible{outline:3px solid var(--accent);outline-offset:2px}
 .row{display:flex;gap:8px;flex-wrap:wrap;align-items:center}
 
-/* ---------- status ---------- */
 #t96-status{background:var(--ink);color:var(--paper);border-radius:12px;padding:12px 14px;min-height:64px;
   display:flex;flex-direction:column;justify-content:center}
 #t96-status b{font-size:17px}
 #t96-status small{display:block;font-size:12px;color:#c3bba9;margin-top:3px}
 
+/* ---------- chain strip ---------- */
+#t96-chains{display:flex;gap:8px;flex-wrap:wrap}
+.chaincard{display:flex;flex-direction:column;gap:2px;align-items:flex-start;min-width:118px;text-align:left;
+  background:var(--card);border:2px solid var(--rule);border-radius:12px;padding:8px 10px;cursor:pointer;min-height:52px}
+.chaincard .who{font-weight:800;font-size:13px}
+.chaincard .job{font-size:11px;color:var(--ash)}
+.chaincard .left{font-size:11px;font-variant-numeric:tabular-nums;color:var(--ash)}
+.chaincard.done{opacity:.55}
+.chaincard.yours{border-color:var(--accent);box-shadow:0 0 0 3px rgba(181,84,31,.25);animation:pulse 1.3s ease-in-out infinite}
+.chaincard.now{border-color:var(--accent2)}
+.chaincard:hover{background:#fff}
+@keyframes pulse{0%,100%{box-shadow:0 0 0 3px rgba(181,84,31,.25)}50%{box-shadow:0 0 0 6px rgba(181,84,31,.4)}}
+@media (prefers-reduced-motion:reduce){.chaincard.yours{animation:none}}
+
 /* ---------- stage (canvas area) ---------- */
-/* Fixed logical world scaled by CSS only: the backing store never resizes, so
-   content can never be lost. Same pattern as DrawDrive / eggs. */
-#t96-stage{position:relative;flex:1 1 auto;min-height:0;display:flex;align-items:center;justify-content:center;
+#t96-stage{position:relative;flex:1 1 auto;min-height:280px;display:flex;align-items:center;justify-content:center;
   background:var(--card);border:1px solid var(--rule);border-radius:14px;overflow:hidden;padding:10px}
 #t96-canvas{display:block;width:auto;height:auto;max-width:100%;max-height:100%;aspect-ratio:3/2;
   background:var(--card);touch-action:none;border-radius:8px;border:1px solid var(--rule)}
 #t96-idle{position:absolute;inset:0;display:flex;align-items:center;justify-content:center;text-align:center;
   padding:20px;pointer-events:none}
-#t96-idle div{max-width:32ch}
+#t96-idle div{max-width:34ch}
 #t96-idle .big{font-size:20px;font-weight:800;display:block;margin-bottom:6px}
 #t96-idle .small{font-size:13px;color:var(--ash)}
 
@@ -67,7 +74,13 @@ button.quiet{border-color:var(--rule);color:var(--ash)}
   background:var(--card);border:2px solid var(--rule);border-radius:10px;padding:10px 12px;resize:vertical}
 #t96-write textarea:focus{outline:none;border-color:var(--accent)}
 
-/* ---------- reveal chain ---------- */
+/* ---------- reveal ---------- */
+#t96-reveal{display:flex;flex-direction:column;gap:14px}
+.story{border:1px solid var(--rule);border-radius:14px;background:var(--card);padding:12px}
+.story>.head{display:flex;align-items:baseline;gap:8px;margin-bottom:8px;border-bottom:1px solid var(--rule);padding-bottom:8px}
+.story .n{font:800 11px/1 inherit;color:var(--accent2);letter-spacing:.06em}
+.story .whose{font-weight:800}
+.story .tag{font-size:11px;color:var(--ash);margin-left:auto}
 #t96-chain{display:flex;flex-direction:column;gap:10px}
 .step{border:1px solid var(--rule);border-radius:12px;background:var(--card);padding:11px 12px}
 .step .head{display:flex;gap:8px;align-items:baseline;margin-bottom:7px}
@@ -76,6 +89,7 @@ button.quiet{border-color:var(--rule);color:var(--ash)}
 .step .job{font-size:11px;color:var(--ash);margin-left:auto;text-align:right}
 .step canvas{width:100%;height:auto;aspect-ratio:3/2;border-radius:8px;border:1px solid var(--rule);display:block}
 .step .said{border-left:3px solid var(--accent);padding:4px 0 4px 11px;font-size:16px;line-height:1.4}
+.step.skipped{opacity:.65;font-style:italic}
 .step.final{border-color:var(--accent);box-shadow:0 0 0 3px rgba(181,84,31,.12)}
 
 /* ---------- roster ---------- */
@@ -96,7 +110,7 @@ button.quiet{border-color:var(--rule);color:var(--ash)}
 
   <section id="t96-setup" class="card hidden">
     <h1>The <span class="q">96</span> Game</h1>
-    <p class="muted tiny" style="margin-top:6px">Write a sentence. Then the next player draws it. The next one sees that picture and writes a sentence, and so on... Make sure you're having fun, Bucko.</p>
+    <p class="muted tiny" style="margin-top:6px">Everyone writes their own sentence. Then the next player draws it, the next describes it, and so on. Every chain runs at once — everyone is always playing. Two minutes per turn. Make sure you're having fun, Bucko.</p>
     <p id="t96-setup-note" class="tiny muted" style="margin-top:10px"></p>
     <div class="seats" id="t96-setup-seats" style="margin:10px 0"></div>
     <button class="go" id="t96-start">Start the game</button>
@@ -112,6 +126,8 @@ button.quiet{border-color:var(--rule);color:var(--ash)}
     <div id="t96-status"><b></b><small></small></div>
 
     <div class="seats" id="t96-seats"></div>
+
+    <div id="t96-chains"></div>
 
     <div id="t96-stage">
       <canvas id="t96-canvas" width="900" height="600"></canvas>
@@ -137,9 +153,11 @@ button.quiet{border-color:var(--rule);color:var(--ash)}
     </div>
 
     <div id="t96-reveal" class="hidden">
+      <div class="row" style="justify-content:center"><h1 style="font-size:22px">What the table made</h1></div>
       <div id="t96-chain"></div>
-      <div class="row" style="margin-top:12px;justify-content:center">
-        <button class="go" id="t96-nextlap">Next lap — new storyteller</button>
+      <div class="row" style="justify-content:center;margin-top:12px">
+        <button class="quiet" id="t96-save">Save the story</button>
+        <button class="go" id="t96-nextlap">Next lap — everyone opens a new story</button>
       </div>
     </div>
 
@@ -164,14 +182,12 @@ var MAXPTS = 60, MAXSTROKES = 120;
 var ERASER_W = 18, PEN_W = 4;
 var PAPER = '#fffdf7';
 var COLOURS = ['#1c2333','#b5541f','#e0a020','#3f7d3a','#2f6f6b','#3b5ea8','#8b4a9c','#a83a3a'];
+// The test suite shrinks this with a #fast hash so a two-minute clock costs 1.2s.
+var TURN_MS = (location.hash.indexOf('fast') >= 0) ? 30000 : 120000;
 
-// ---------- bridge ----------
-// `denied` is the ONLY per-player channel the hub offers: it routes to one
-// peer and reduces the payload to {text} (index.html). That single string is
-// enough to hand a player their private input without anybody else seeing it,
-// which is the whole point of this game. Two prefixes, one pipe.
 var PFX_T = 'TELT|';   // a sentence, for the drawer to draw from
 var PFX_C = 'TELC|';   // a canvas, for the describer to look at
+var PFX_S = 'TELS|';   // a skipped turn, for the skipped player's screen
 
 var Hub = {
     me:null, roster:[], room:'', names:{},
@@ -213,17 +229,20 @@ function sh(id, on){ var n = $(id); if (n) n.classList.toggle('hidden', !on); }
 
 // ---------- public state ----------
 // Contains NO sentences and NO pixels during a lap. `chain` is filled in only
-// at the reveal, which is the one moment everyone is meant to see everything.
+// at the reveal. `chains` is public: who is playing what step is public.
+// Each chain object: { id, starter, step, startedAt, done }
 var S = null;
 
 // ---------- host-only, never broadcast ----------
 var hostText = {};      // stepKey -> sentence
 var hostCanvas = {};    // stepKey -> [strokes]
+var hostSkip = {};      // stepKey -> true if the timer skipped it
+var turnTimer = {};     // chainId -> timeout id (host only)
 
 // ---------- local-only ----------
-var myArt = null;       // my private input this step: {k:'text'|'canvas', ...}
+var myArt = null;       // my private input this step: {k:'text'|'canvas', chain:stepKey…}
 var briefs = {};        // stepKey -> brief, for briefs that arrive before their turn
-var myStrokes = [];     // my own drawing, optimistic (the host holds the truth)
+var myStrokes = [];     // my own drawing, optimistic
 var draft = null;       // stroke in progress
 var drawing = false;
 var penColour = COLOURS[0];
@@ -231,69 +250,170 @@ var lastKey = '';
 var reported = false;
 var canvas = null, ctx = null;
 var toastT = null;
+var selected = 0;       // chain index the stage is bound to
+var tickT = null;       // rAF/interval for countdowns
 
-function stepKey(){ return S ? (S.lap + ':' + S.step) : ''; }
-function actorId(){ return S && S.order[(S.starter + S.step) % S.order.length]; }
-function stepKind(i){ return ((i == null ? S.step : i) % 2 === 0) ? 'text' : 'draw'; }
-function iAmActor(){ return !!S && S.phase === 'play' && actorId() === myId(); }
+function stepKey(lap, chain, step){ return lap + ':' + chain + ':' + step; }
+function chainKey(c){ return stepKey(S.lap, c, S.chains[c].step); }
+function stepKind(i){ i = (i == null ? 0 : i); return (i % 2 === 0) ? 'text' : 'draw'; }
+function seatIndex(id){ return S.order.indexOf(id); }
+// Who acts in a chain at a given step. THE one place turns are computed.
+function actorOf(ch, step){
+    var k = (step == null ? ch.step : step);
+    var at = seatIndex(ch.starter);
+    if (at < 0) return null;
+    return S.order[(at + k) % S.order.length];
+}
+function isActor(ch, id){ return !!ch && actorOf(ch) === id; }
+function myPending(){
+    if (!S || S.phase !== 'play') return [];
+    var me = myId(), out = [];
+    for (var i = 0; i < S.chains.length; i++){
+        var ch = S.chains[i];
+        if (ch.done) continue;
+        if (actorOf(ch) === me) out.push(i);
+    }
+    return out;
+}
+function selChain(){ return S && S.chains[selected]; }
+function iAmActor(){
+    var ch = selChain();
+    return !!S && S.phase === 'play' && ch && !ch.done && actorOf(ch) === myId();
+}
 
 // ---------- setup ----------
 function fresh(){
     var ids = Hub.roster.map(function(m){ return m.id; });
     var names = {};
     Hub.roster.forEach(function(m){ names[m.id] = m.name; });
-    S = { inst: Date.now() + '-' + Math.floor(Math.random()*1e6),
+    var now = Date.now();
+    S = { inst: now + '-' + Math.floor(Math.random()*1e6),
           order: ids, names: names,
-          lap: 0, starter: 0, step: 0, phase: 'play',
-          lapsPlayed: 0, chain: null };
-    hostText = {}; hostCanvas = {}; briefs = {};
+          lap: 0, phase: 'play', lapsPlayed: 0, startedAt: now,
+          chains: ids.map(function(id, i){
+              return { id: i, starter: id, step: 0, startedAt: now, done: false };
+          }),
+          chain: null };
+    hostText = {}; hostCanvas = {}; hostSkip = {}; briefs = {};
+    clearTimers();
     reported = false;
     lastKey = '';
-    beginStep();
+    selected = 0;
+    for (var i = 0; i < S.chains.length; i++) armTimer(i);
+    broadcast();
+}
+
+// ---------- timers (host authoritative) ----------
+function clearTimers(){
+    for (var k in turnTimer){ if (turnTimer.hasOwnProperty(k)) clearTimeout(turnTimer[k]); }
+    turnTimer = {};
+}
+function armTimer(c){
+    if (!isHost() || !S) return;
+    if (turnTimer[c]) clearTimeout(turnTimer[c]);
+    var ch = S.chains[c];
+    var left = (ch.startedAt + TURN_MS) - Date.now();
+    if (left < 0) left = 0;
+    turnTimer[c] = setTimeout(function(){ expireStep(c); }, left + 25);
+}
+function expireStep(c){
+    if (!S || S.phase !== 'play' || !S.chains[c] || S.chains[c].done) return;
+    var ch = S.chains[c], k = chainKey(c);
+    if (stepKind(ch.step) === 'text') hostText[k] = '(time)';
+    else hostCanvas[k] = [];
+    hostSkip[k] = true;
+    skipTo(actorOf(ch), k);
+    advanceChain(c);
 }
 
 // ---------- the lap ----------
-function beginStep(){
-    myArt = null; myStrokes = []; draft = null; drawing = false;
-    $('t96-say').value = '';
-    // State FIRST, brief second. The brief is tagged with the step it is FOR,
-    // but a guest can still be a step behind when it lands, so publishing the
-    // snapshot before the artifact removes the race instead of depending on the
-    // order two separate messages happen to arrive in.
-    broadcast();
+// Each chain advances on its own cursor. `skipTo` lets the table know when a
+// turn dies on the clock instead of quietly vanishing.
+function skipTo(id, key){
+    if (!isHost() || !id) return;
+    pushTo(id, PFX_S + key + '|skipped');
+}
+
+function stepBrief(c){
     // Hand exactly one artifact to exactly one player. Self-delivery is
-    // short-circuited: a message to yourself cannot round-trip through the hub.
-    if (S.step > 0 && isHost()){
-        var a = actorId();
-        var prev = stepKeyFor(S.lap, S.step - 1);
-        var tag = stepKeyFor(S.lap, S.step);
-        if (stepKind() === 'text'){
-            pushTo(a, PFX_C + tag + '|' + JSON.stringify(hostCanvas[prev] || []));
-        } else {
-            pushTo(a, PFX_T + tag + '|' + (hostText[prev] || ''));
-        }
+    // short-circuited in pushTo; state went out first in broadcast().
+    if (!isHost()) return;
+    var ch = S.chains[c];
+    if (ch.step === 0) return;
+    var a = actorOf(ch);
+    if (!a) return;
+    var prev = stepKey(S.lap, c, ch.step - 1);
+    var tag = chainKey(c);
+    if (stepKind(ch.step) === 'text'){
+        pushTo(a, PFX_C + tag + '|' + JSON.stringify(hostCanvas[prev] || []));
+    } else {
+        pushTo(a, PFX_T + tag + '|' + (hostText[prev] || ''));
     }
 }
-function stepKeyFor(lap, step){ return lap + ':' + step; }
 
-function advance(){
-    S.step++;
-    if (S.step >= S.order.length){ revealLap(); return; }
-    beginStep();
+function broadcast(){
+    render();
+    if (!S || !isHost()) return;
+    Hub.up('state', S);
+}
+
+function beginStep(c){
+    var ch = S.chains[c];
+    ch.startedAt = Date.now();
+    armTimer(c);
+    broadcast();
+    stepBrief(c);
+}
+
+function advanceChain(c){
+    var ch = S.chains[c];
+    if (!ch) return;
+    ch.step++;
+    // A chain must never wait on a player who is no longer at the table.
+    while (ch.step < S.order.length){
+        var a = actorOf(ch);
+        if (a !== null && S.order.indexOf(a) >= 0) break;
+        var k = chainKey(c);
+        if (stepKind(ch.step) === 'text') hostText[k] = '(that player left)';
+        else hostCanvas[k] = [];
+        hostSkip[k] = true;
+        ch.step++;
+    }
+    if (ch.step >= S.order.length){
+        ch.done = true;
+        if (turnTimer[c]) { clearTimeout(turnTimer[c]); turnTimer[c] = null; }
+        if (S.chains.every(function(x){ return x.done; })){ revealLap(); return; }
+        broadcast();
+        return;
+    }
+    ch.startedAt = Date.now();
+    armTimer(c);
+    broadcast();
+    stepBrief(c);
 }
 
 function revealLap(){
     S.phase = 'reveal';
     S.lapsPlayed = S.lap + 1;
-    var chain = [], n = S.order.length;
-    for (var i = 0; i < n; i++){
-        var key = stepKeyFor(S.lap, i);
-        chain.push({ i:i, id: S.order[(S.starter + i) % n], kind: stepKind(i),
-                     text: hostText[key] || '', canvas: hostCanvas[key] || [] });
-    }
-    S.chain = chain;
+    clearTimers();
+    var n = S.order.length;
+    S.chain = S.chains.map(function(ch){
+        var steps = [];
+        for (var k = 0; k < n; k++){
+            var key = stepKey(S.lap, ch.id, k);
+            steps.push({ i: k, id: orderActorOf(ch, k), kind: stepKind(k),
+                         text: hostText[key] || '', canvas: hostCanvas[key] || [],
+                         skipped: !!hostSkip[key] });
+        }
+        return { id: ch.id, starter: ch.starter, steps: steps };
+    });
     reportResult();
     broadcast();
+}
+function orderActorOf(ch, k){
+    var at = seatIndex(ch.starter);
+    if (at < 0) return ch.starter;
+    return S.order[(at + k) % S.order.length];
 }
 
 function nextLap(){
@@ -301,13 +421,19 @@ function nextLap(){
     var ids = Hub.roster.map(function(m){ return m.id; });
     var names = {};
     Hub.roster.forEach(function(m){ names[m.id] = m.name; });
+    var now = Date.now();
     S.order = ids; S.names = names;
     S.lap++;
-    S.starter = (S.starter + 1) % Math.max(1, S.order.length);
-    S.step = 0; S.phase = 'play'; S.chain = null;
-    hostText = {}; hostCanvas = {}; briefs = {};
+    S.phase = 'play'; S.chain = null; S.startedAt = now;
+    S.chains = ids.map(function(id, i){
+        return { id: i, starter: id, step: 0, startedAt: now, done: false };
+    });
+    hostText = {}; hostCanvas = {}; hostSkip = {}; briefs = {};
+    clearTimers();
     lastKey = '';
-    beginStep();
+    selected = 0;
+    for (var i = 0; i < S.chains.length; i++) armTimer(i);
+    broadcast();
 }
 
 function pushTo(id, payload){
@@ -316,30 +442,37 @@ function pushTo(id, payload){
 }
 
 // A brief is addressed to the step it is FOR, and can land before the state
-// that creates that step. So it is parked by key and picked up when its turn
-// actually arrives, rather than being compared against whatever step the
-// client happens to be sitting on when the message shows up.
+// that creates that step. Park and pick up by key, then drop stale ones.
 function applyBrief(){
-    var k = stepKey();
-    var ahead = S ? stepKeyFor(S.lap, S.step + 1) : '';
-    myArt = (iAmActor() && briefs[k]) ? briefs[k] : null;
-    // Keep this turn and the one after it. Everything else is a sentence the
-    // table has moved past, and a stale brief sitting in a client's memory is
-    // exactly the thing this game must not have.
-    Object.keys(briefs).forEach(function(key){
-        if (key !== k && key !== ahead) delete briefs[key];
-    });
+    var k = chainKey(selected);
+    var me = myId();
+    myArt = null;
+    var ch = selChain();
+    if (ch && actorOf(ch) === me && briefs[k]) myArt = briefs[k];
+    // Keep every live chain's brief for me; everything else is moved past.
+    var mine = {};
+    for (var i = 0; i < (S ? S.chains.length : 0); i++){
+        var key = S.chains[i] ? stepKey(S.lap, i, S.chains[i].step) : '';
+        if (briefs[key]) mine[key] = briefs[key];
+    }
+    Object.keys(briefs).forEach(function(key){ if (!mine[key]) delete briefs[key]; });
 }
 
 function onDenied(text){
     if (!text) return;
     var isText = text.indexOf(PFX_T) === 0;
-    var pfx = isText ? PFX_T : PFX_C;
-    if (!isText && text.indexOf(PFX_C) !== 0) { toast(text); return; }
+    var isSkip = text.indexOf(PFX_S) === 0;
+    var pfx = isText ? PFX_T : (isSkip ? PFX_S : PFX_C);
+    if (!isText && !isSkip && text.indexOf(PFX_C) !== 0) { toast(text); return; }
     var i = text.indexOf('|', pfx.length);
     if (i < 0) return;
     var key = text.slice(pfx.length, i);
-    if (!/^\d+:\d+$/.test(key)) return;
+    if (!/^\d+:\d+:\d+$/.test(key)) return;
+    if (isSkip){
+        // The clock took your turn. Nothing to act on — just tell them.
+        toast('Time was up — your turn in that story passed.');
+        return;
+    }
     if (isText){
         briefs[key] = { k:'text', key:key, t: text.slice(i + 1) };
     } else {
@@ -352,76 +485,99 @@ function onDenied(text){
 }
 
 // ---------- host validation ----------
-// Every action runs through here, for local input AND remote intents, so a
-// crafted postMessage cannot act out of turn.
-function needActor(from){
+// Every action runs through here, for local input AND remote intents.
+function needActor(d, from){
     if (!S) return 'There is no table yet.';
     if (S.phase !== 'play') return 'That lap is already finished.';
     if (!from || !from.id) return 'Who are you?';
     if (S.order.indexOf(from.id) === -1) return 'You are not at this table.';
-    if (from.id !== actorId()) return 'It is not your turn.';
+    var c = d.chain;
+    if (typeof c !== 'number' || c !== Math.floor(c) || !S.chains[c]) return 'No such story.';
+    var ch = S.chains[c];
+    if (ch.done) return 'That story is finished.';
+    if (actorOf(ch) !== from.id) return 'It is not your turn in that story.';
     if (paused()) return 'The host has left. Waiting for them.';
+    return null;
+}
+function freshCheck(d, err){
+    if (err) return err;
+    var ch = S.chains[d.chain];
+    if (d.lap !== S.lap || d.step !== ch.step) return 'That turn has moved on.';
     return null;
 }
 
 function handleText(d, from){
-    var e = needActor(from);
+    var e = needActor(d, from);
     if (e) return e;
-    if (stepKind() !== 'text') return 'It is your turn to draw, not to write.';
-    if (d.lap !== S.lap || d.step !== S.step) return 'That turn has moved on.';
+    if (stepKind(S.chains[d.chain].step) !== 'text') return 'It is your turn to draw, not to write.';
+    e = freshCheck(d); if (e) return e;
     var t = String(d.t == null ? '' : d.t).trim().slice(0, MAXLEN);
     if (!t) return 'Write something first.';
-    hostText[stepKey()] = t;
-    advance();
+    hostText[chainKey(d.chain)] = t;
+    advanceChain(d.chain);
     return null;
 }
 function handleStroke(d, from){
-    var e = needActor(from);
+    var e = needActor(d, from);
     if (e) return e;
-    if (stepKind() !== 'draw') return 'It is your turn to write, not to draw.';
-    if (d.lap !== S.lap || d.step !== S.step) return 'That turn has moved on.';
-    // `indexOf` returns 0 for the first colour, and `!0` is true — so this
-    // used to reject COLOURS[0], which is the default pen. Compare to -1.
+    var ch = S.chains[d.chain];
+    if (stepKind(ch.step) !== 'draw') return 'It is your turn to write, not to draw.';
+    e = freshCheck(d); if (e) return e;
+
+    if (d.type === 'fill'){
+        if (COLOURS.indexOf(d.c) === -1 && d.c !== PAPER) return 'Bad colour.';
+        var x = Math.round(+d.x), y = Math.round(+d.y);
+        if (!(x >= 0 && x < W && y >= 0 && y < H)) return 'That fill landed off the page.';
+        var fills = hostCanvas[chainKey(d.chain)];
+        if (!fills) fills = hostCanvas[chainKey(d.chain)] = [];
+        if (fills.length >= MAXSTROKES) return 'Board full — undo or clear.';
+        fills.push({ t: 'fill', c: d.c, x: x, y: y });
+        return null;
+    }
+
     if (COLOURS.indexOf(d.c) === -1 && d.c !== PAPER) return 'Bad colour.';
     var pts = d.pts;
     if (!pts || pts.length < 2) return 'Empty stroke.';
     if (pts.length > MAXPTS) return 'Stroke too long.';
     var clean = [];
     for (var i = 0; i < pts.length; i++){
-        var x = Math.round(+pts[i].x), y = Math.round(+pts[i].y);
-        if (!(x >= 0 && x <= W && y >= 0 && y <= H)) return 'That drifted off the page.';
-        clean.push({ x:x, y:y });
+        var px = Math.round(+pts[i].x), py = Math.round(+pts[i].y);
+        if (!(px >= 0 && px <= W && py >= 0 && py <= H)) return 'That drifted off the page.';
+        clean.push({ x: px, y: py });
     }
-    var arr = hostCanvas[stepKey()];
-    if (!arr) arr = hostCanvas[stepKey()] = [];
+    var arr = hostCanvas[chainKey(d.chain)];
+    if (!arr) arr = hostCanvas[chainKey(d.chain)] = [];
     if (arr.length >= MAXSTROKES) return 'Board full — undo or clear.';
     arr.push({ c: d.c, w: (+d.w === ERASER_W) ? ERASER_W : PEN_W, pts: clean });
-    // Deliberately no broadcast: during a lap nobody but the drawer sees this.
     return null;
 }
 function handleUndo(d, from){
-    var e = needActor(from);
+    var e = needActor(d, from);
     if (e) return e;
-    if (stepKind() !== 'draw') return 'Nothing to undo.';
-    if (d.lap !== S.lap || d.step !== S.step) return 'That turn has moved on.';
-    var arr = hostCanvas[stepKey()];
+    if (stepKind(S.chains[d.chain].step) !== 'draw') return 'Nothing to undo.';
+    e = freshCheck(d); if (e) return e;
+    var arr = hostCanvas[chainKey(d.chain)];
     if (arr && arr.length) arr.pop();
     return null;
 }
 function handleClear(d, from){
-    var e = needActor(from);
+    var e = needActor(d, from);
     if (e) return e;
-    if (stepKind() !== 'draw') return 'Nothing to clear.';
-    if (d.lap !== S.lap || d.step !== S.step) return 'That turn has moved on.';
-    hostCanvas[stepKey()] = [];
+    if (stepKind(S.chains[d.chain].step) !== 'draw') return 'Nothing to clear.';
+    e = freshCheck(d); if (e) return e;
+    hostCanvas[chainKey(d.chain)] = [];
     return null;
 }
 function handleDone(d, from){
-    var e = needActor(from);
+    var e = needActor(d, from);
     if (e) return e;
-    if (d.lap !== S.lap || d.step !== S.step) return 'That turn has moved on.';
-    if (!hostText[stepKey()]) hostText[stepKey()] = '(nothing drawn)';
-    advance();
+    e = freshCheck(d); if (e) return e;
+    var k = chainKey(d.chain);
+    if (!hostText[k] && hostCanvas[k] && hostCanvas[k].length === 0 && !hostSkip[k]){
+        if (stepKind(S.chains[d.chain].step) === 'text') hostText[k] = '(nothing written)';
+        else hostText[k] = '(nothing drawn)';
+    }
+    advanceChain(d.chain);
     return null;
 }
 function handleNextLap(d, from){
@@ -448,11 +604,11 @@ function onIntent(d, from){
 function deny(to, text){ Hub.up('denied', { to: to, text: text }); }
 
 // ---------- sending ----------
-// The host runs the SAME validators the remote path uses, so a guest can never
-// reach a move the host would refuse.
 function act(d){
     if (!S) return;
-    d.lap = S.lap; d.step = S.step;
+    d.lap = S.lap;
+    d.chain = selected;
+    d.step = S.chains[selected] ? S.chains[selected].step : 0;
     if (isHost()){
         var me = { id: myId(), name: myName() }, err = null;
         if (d.a === 'text') err = handleText(d, me);
@@ -470,11 +626,9 @@ function act(d){
 
 function pushStroke(pts){
     if (!pts || pts.length < 2) return;
-    // `lap`/`step` must ride along, exactly as act() stamps them. Without them
-    // the host's handleStroke() rejects every stroke as "That turn has moved
-    // on" — which is to say nothing could be drawn, by anyone, ever.
+    var ch = selChain(); if (!ch) return;
     var d = { a:'stroke', c: penColour, w: (penColour === PAPER) ? ERASER_W : PEN_W,
-              pts: pts, lap: S.lap, step: S.step };
+              pts: pts, lap: S.lap, chain: selected, step: ch.step };
     if (isHost()){
         var err = handleStroke(d, { id: myId(), name: myName() });
         if (err) toast(err);
@@ -495,14 +649,26 @@ function pushClear(){
     act({ a:'clear' });
     render();
 }
+function pushBucket(p){
+    var ch = selChain(); if (!ch) return;
+    var x = Math.round(p.x), y = Math.round(p.y);
+    var d = { a:'stroke', type:'fill', c: penColour, x: x, y: y, lap: S.lap, chain: selected, step: ch.step };
+    if (isHost()){
+        var err = handleStroke(d, { id: myId(), name: myName() });
+        if (err) toast(err);
+        render();
+    } else {
+        myStrokes.push({ t:'fill', c: d.c, x: x, y: y });
+        Hub.up('intent', d);
+        render();
+    }
+}
 function pushText(){
     var t = $('t96-say').value;
     $('t96-say').value = '';
     act({ a:'text', t: t });
 }
 function pushDone(){
-    // An empty drawing is allowed — it becomes "(nothing drawn)" in the chain,
-    // which is a legitimate and occasionally funny outcome.
     act({ a:'done' });
 }
 
@@ -510,6 +676,10 @@ function pushDone(){
 function toWorld(e){
     var r = canvas.getBoundingClientRect();
     return { x: (e.clientX - r.left) * W / r.width, y: (e.clientY - r.top) * H / r.height };
+}
+function hexToRgb(h){
+    var m = /^#?([0-9a-f]{2})([0-9a-f]{2})([0-9a-f]{2})$/i.exec(String(h || ''));
+    return m ? [parseInt(m[1], 16), parseInt(m[2], 16), parseInt(m[3], 16)] : [0, 0, 0];
 }
 function paint(c2, strokes, w, h, scale){
     c2.setTransform(1,0,0,1,0,0);
@@ -520,28 +690,61 @@ function paint(c2, strokes, w, h, scale){
     c2.lineCap = 'round'; c2.lineJoin = 'round';
     for (var i = 0; i < strokes.length; i++){
         var s = strokes[i];
-        if (!s || !s.pts || s.pts.length < 2) continue;
-        c2.strokeStyle = s.c || '#1c2333';
-        c2.lineWidth = s.w || PEN_W;
-        c2.beginPath();
-        c2.moveTo(s.pts[0].x, s.pts[0].y);
-        for (var k = 1; k < s.pts.length; k++) c2.lineTo(s.pts[k].x, s.pts[k].y);
-        c2.stroke();
+        if (!s) continue;
+        if (s.t === 'fill') applyFill(c2, s);
+        else {
+            if (!s.pts || s.pts.length < 2) continue;
+            c2.strokeStyle = s.c || '#1c2333';
+            c2.lineWidth = s.w || PEN_W;
+            c2.beginPath();
+            c2.moveTo(s.pts[0].x, s.pts[0].y);
+            for (var k = 1; k < s.pts.length; k++) c2.lineTo(s.pts[k].x, s.pts[k].y);
+            c2.stroke();
+        }
     }
     c2.setTransform(1,0,0,1,0,0);
 }
+function applyFill(c2, s){
+    var img, d, target, fill, tol;
+    try { img = c2.getImageData(0, 0, W, H); } catch (e) { return; }
+    d = img.data;
+    var idx = (Math.round(s.y) * W + Math.round(s.x)) * 4;
+    target = [d[idx], d[idx + 1], d[idx + 2]];
+    fill = hexToRgb(s.c);
+    if (target[0] === fill[0] && target[1] === fill[1] && target[2] === fill[2]) return;
+    tol = 64;
+    var stack = [Math.round(s.x), Math.round(s.y)];
+    var seen = new Uint8Array(W * H);
+    while (stack.length){
+        var p = stack.pop() * 1;
+        var y = Math.floor(p / W), x = p - y * W;
+        if (x < 0 || y < 0 || x >= W || y >= H) continue;
+        var o = (y * W + x) * 4;
+        var i2 = y * W + x;
+        if (seen[i2]) continue;
+        if (Math.abs(d[o] - target[0]) + Math.abs(d[o + 1] - target[1]) + Math.abs(d[o + 2] - target[2]) > tol) continue;
+        seen[i2] = 1;
+        d[o] = fill[0]; d[o + 1] = fill[1]; d[o + 2] = fill[2]; d[o + 3] = 255;
+        stack.push(i2 + 1, i2 - 1, i2 + W, i2 - W);
+    }
+    c2.putImageData(img, 0, 0);
+}
 function myList(){
     if (!S || S.phase !== 'play') return [];
-    if (stepKind() !== 'draw') return [];
-    if (actorId() !== myId()) return [];
-    return isHost() ? (hostCanvas[stepKey()] || []) : myStrokes;
+    var ch = selChain();
+    if (!ch || ch.done) return [];
+    if (stepKind(ch.step) !== 'draw') return [];
+    if (actorOf(ch) !== myId()) return [];
+    return isHost() ? (hostCanvas[chainKey(selected)] || []) : myStrokes;
 }
 function viewList(){
-    applyBrief();
     if (!S || S.phase !== 'play') return [];
-    if (stepKind() === 'draw') return myList();
+    var ch = selChain();
+    if (!ch || ch.done) return [];
+    applyBrief();
+    if (stepKind(ch.step) === 'draw') return myList();
     // A describer sees the drawing they must describe, and nothing else.
-    if (iAmActor() && myArt && myArt.k === 'canvas') return myArt.c;
+    if (actorOf(ch) === myId() && myArt && myArt.k === 'canvas' && myArt.key === chainKey(selected)) return myArt.c;
     return [];
 }
 function drawBoard(){
@@ -550,13 +753,15 @@ function drawBoard(){
     if (draft && draft.pts && draft.pts.length) list = list.concat([draft]);
     paint(ctx, list, W, H, 1);
 }
+var bucketOn = false;
 function bindPointer(){
     canvas = $('t96-canvas'); ctx = canvas.getContext('2d');
     canvas.addEventListener('pointerdown', function(e){
         Hub.up('hello');
-        if (!iAmActor() || stepKind() !== 'draw' || paused()) return;
+        if (!iAmActor() || stepKind(selChain() && selChain().step) !== 'draw' || paused()) return;
         var p = toWorld(e);
         if (p.x < 0 || p.x > W || p.y < 0 || p.y > H) return;
+        if (bucketOn){ pushBucket(p); e.preventDefault(); return; }
         try { canvas.setPointerCapture(e.pointerId); } catch(err) {}
         drawing = true;
         draft = { c: penColour, w: (penColour === PAPER) ? ERASER_W : PEN_W,
@@ -586,6 +791,27 @@ function bindPointer(){
     canvas.addEventListener('pointercancel', function(){ drawing = false; draft = null; drawBoard(); });
 }
 
+// ---------- timers display ----------
+function paintTimers(){
+    if (!S) return;
+    var now = Date.now();
+    var pending = myPending();
+    for (var i = 0; i < S.chains.length; i++){
+        var ch = S.chains[i];
+        var el = $('t96-left-' + i);
+        if (!el) continue;
+        if (ch.done){ el.textContent = 'done'; continue; }
+        var left = Math.max(0, (ch.startedAt + TURN_MS) - now);
+        var s = Math.ceil(left / 1000);
+        el.textContent = Math.floor(s / 60) + ':' + ('0' + (s % 60)).slice(-2) + ' left';
+    }
+}
+function startTick(){
+    if (tickT) return;
+    tickT = setInterval(paintTimers, 500);
+}
+// (no stop — the interval is cheap and hidden tabs throttle it anyway)
+
 // ---------- render ----------
 function render(){
     var hasTable = !!S;
@@ -608,64 +834,100 @@ function render(){
 
     var st = $('t96-status');
     var big = st.querySelector('b'), small = st.querySelector('small');
+    var ch = selChain();
+
+    var alive = S.chains.filter(function(c){ return !c.done; }).length;
 
     if (S.phase === 'reveal'){
-        var nextStarter = S.order.length ? S.order[(S.starter + 1) % S.order.length] : null;
         big.textContent = 'Lap ' + (S.lap + 1) + ' — that is what the table made of it.';
-        small.textContent = nextStarter
-            ? 'Next lap starts with ' + nm(nextStarter) + ' writing.'
-            : 'Everyone has left the table. Host to start a new game.';
+        small.textContent = 'Every story finished. Save them, then start the next lap.';
     } else if (paused()){
         big.textContent = 'Paused';
         small.textContent = 'The host disconnected. It resumes when they return.';
     } else if (iAmActor()){
-        var sk = stepKind();
+        var sk = stepKind(ch.step);
         if (sk === 'text'){
-            big.textContent = S.step === 0 ? 'Your turn to start it off' : 'Describe what you can see';
-            small.textContent = S.step === 0 ? 'One sentence. Something a person could draw. You will not see it again.'
-                                            : 'Describe ONLY the drawing in front of you. You cannot see the original sentence — do not guess at it.';
+            big.textContent = ch.step === 0 ? 'Your turn to start the story' : 'Describe what you can see';
+            small.textContent = ch.step === 0 ? 'One sentence. Something a person could draw. You will not see it again.'
+                                              : 'Describe ONLY the drawing in front of you. You cannot see the original sentence — do not guess at it.';
         } else {
-            big.textContent = myArt && myArt.t ? '"' + myArt.t + '"' : 'Draw what they described';
-            small.textContent = myArt && myArt.t ? 'Draw this sentence on the canvas below.' : 'Waiting for the sentence…';
+            big.textContent = (myArt && myArt.t) ? '"' + myArt.t + '"' : 'Draw what they described';
+            small.textContent = (myArt && myArt.t) ? 'Draw this sentence on the canvas below.' : 'Waiting for the sentence…';
         }
+    } else if (myPending().length){
+        var mpn = myPending().length;
+        big.textContent = mpn === 1 ? 'Your move is waiting on another chain' : 'Your moves are waiting (' + mpn + ')';
+        small.textContent = 'They are highlighted below. Two minutes a turn — the clock keeps honest.';
     } else {
-        big.textContent = 'Waiting for ' + nm(actorId());
-        small.textContent = stepKind() === 'text' ? 'They are writing a description.' : 'They are drawing.';
+        big.textContent = 'Everyone is playing';
+        small.textContent = alive + (alive === 1 ? ' story' : ' stories') + ' still running — your next turn lights up when a chain reaches you.';
     }
 
+    // seat strip: who has a pending move, who am I
     var seats = $('t96-seats'); clear(seats);
-    S.order.forEach(function(id, i){
-        var at = (S.starter + i) % S.order.length;
-        var c = 'seat' + (S.phase === 'play' && at === S.step ? ' now' : '') + (id === myId() ? ' me' : '');
+    S.order.forEach(function(id){
+        var mine = hasPending(id);
+        var c = 'seat' + (mine ? ' now' : '') + (id === myId() ? ' me' : '');
         var label = nm(id) + (id === myId() ? ' (you)' : '');
-        if (S.phase === 'play' && at === S.step) label += ' · their turn';
+        if (mine) label += ' · their move';
         seats.appendChild(el('span', c, label));
     });
 
+    // chain strip
+    var strip = $('t96-chains'); clear(strip);
+    S.chains.forEach(function(ch, i){
+        var card = el('button', 'chaincard' + (ch.done ? ' done' : '')
+            + (actorOf(ch) === myId() && !ch.done ? ' yours' : '')
+            + (i === selected ? ' now' : ''));
+        card.type = 'button';
+        card.setAttribute('data-chain', String(i));
+        card.appendChild(el('span', 'who', 'chain by ' + nm(ch.starter)));
+        var job;
+        if (ch.done) job = 'finished';
+        else {
+            var a = actorOf(ch), k = stepKind(ch.step);
+            job = (a ? nm(a) : '?') + (k === 'text' ? (ch.step === 0 ? ' is starting it' : ' is writing') : ' is drawing')
+                + ' · ' + (ch.step + 1) + '/' + S.order.length;
+        }
+        card.appendChild(el('span', 'job', job));
+        var left = el('span', 'left'); left.id = 't96-left-' + i;
+        card.appendChild(left);
+        strip.appendChild(card);
+    });
+
     var mine = iAmActor();
-    var writing = mine && stepKind() === 'text';
-    var drawing2 = mine && stepKind() === 'draw';
+    var kind = ch ? stepKind(ch.step) : 'text';
+    var writing = mine && kind === 'text';
+    var drawing2 = mine && kind === 'draw';
     sh('t96-tools', drawing2);
     sh('t96-write', writing);
     sh('t96-reveal', S.phase === 'reveal');
 
     var idle = $('t96-idle');
     var list = viewList();
-    var showIdle = (S.phase !== 'reveal') && !list.length;
+    var showIdle = (S.phase !== 'reveal') && !(list && list.length);
     sh('t96-idle', showIdle);
-    if (showIdle){
+    if (showIdle && ch){
         var bs = idle.querySelector('.big'), ss = idle.querySelector('.small');
         if (S.phase === 'reveal'){ bs.textContent = ''; ss.textContent = ''; }
-        else if (writing && S.step === 0){ bs.textContent = 'Your sentence starts it all'; ss.textContent = 'Nobody else will ever see this word for word.'; }
-        else if (writing){ bs.textContent = 'Describe the drawing'; ss.textContent = (myArt && myArt.k === 'canvas') ? 'What is actually in front of you?' : 'Waiting for the drawing…'; }
-        else if (drawing2){
-            bs.textContent = myArt && myArt.t ? '"' + myArt.t + '"' : 'Draw it';
-            ss.textContent = myArt && myArt.t ? 'Draw the sentence above on the canvas.' : 'Waiting for the words…';
+        else if (ch.done){ bs.textContent = 'That story is finished'; ss.textContent = 'Watch the rest finish, or save the lap when it all lands.'; }
+        else if (actorOf(ch) === myId()){
+            if (kind === 'text'){
+                bs.textContent = ch.step === 0 ? 'Your sentence starts this story' : 'Describe what you can see';
+                ss.textContent = ch.step === 0 ? 'One sentence. Something a person could draw.'
+                                               : 'Describe ONLY the drawing in front of you. You cannot see the original sentence.';
+            } else {
+                bs.textContent = (myArt && myArt.t) ? '"' + myArt.t + '"' : 'Draw what they described';
+                ss.textContent = (myArt && myArt.t) ? 'Draw this sentence on the canvas below.' : 'Waiting for the words…';
+            }
+        } else {
+            var a = actorOf(ch);
+            bs.textContent = (a ? nm(a) : 'Somebody') + (kind === 'text' ? ' is writing' : ' is drawing');
+            ss.textContent = 'Nothing to see here until the reveal.';
         }
-        else { bs.textContent = nm(actorId()) + (stepKind() === 'text' ? ' is writing' : ' is drawing'); ss.textContent = 'Nothing to see until the reveal.'; }
     }
 
-    if (writing && S.step === 0){
+    if (writing && ch && ch.step === 0){
         $('t96-send').textContent = 'Send it';
     } else if (writing){
         $('t96-send').textContent = 'Send the description';
@@ -673,35 +935,108 @@ function render(){
 
     if (S.phase === 'reveal') renderChain();
 
-    // The board stays visible and clickable even when it is blank. Hiding it
-    // here was fatal: a fresh drawing turn has no strokes yet, `visibility:
-    // hidden` takes no pointer events, so the first stroke — the one that makes
-    // the list non-empty and would have un-hidden it — could never be drawn.
-    // The idle overlay sits on top and is already `pointer-events:none`.
     drawBoard();
+    paintTimers();
+    reportHeight();
+}
+
+function hasPending(id){
+    for (var i = 0; i < S.chains.length; i++){
+        var ch = S.chains[i];
+        if (!ch.done && actorOf(ch) === id) return true;
+    }
+    return false;
 }
 
 function renderChain(){
     var box = $('t96-chain'); clear(box);
-    (S.chain || []).forEach(function(s){
-        var card = el('div', 'step' + (s.i === S.chain.length - 1 ? ' final' : ''));
+    (S.chain || []).forEach(function(story){
+        var card = el('div', 'story');
         var head = el('div', 'head');
-        head.appendChild(el('span', 'n', 'STEP ' + (s.i + 1)));
-        head.appendChild(el('span', 'who', nm(s.id)));
-        head.appendChild(el('span', 'job', s.kind === 'text'
-            ? (s.i === 0 ? 'wrote the sentence' : 'described the drawing')
-            : 'drew it'));
+        head.appendChild(el('span', 'n', 'STORY'));
+        head.appendChild(el('span', 'whose', 'started by ' + nm(story.starter)));
+        head.appendChild(el('span', 'tag', story.steps.length + ' steps'));
         card.appendChild(head);
-        if (s.kind === 'text'){
-            card.appendChild(el('div', 'said', s.text || '(nothing)'));
-        } else {
-            var c = document.createElement('canvas');
-            c.width = W; c.height = H;
-            paint(c.getContext('2d'), s.canvas || [], W, H, 1);
-            card.appendChild(c);
-        }
+        story.steps.forEach(function(s){
+            var div = el('div', 'step' + (s.i === story.steps.length - 1 ? ' final' : '') + (s.skipped ? ' skipped' : ''));
+            var h = el('div', 'head');
+            h.appendChild(el('span', 'n', 'STEP ' + (s.i + 1)));
+            h.appendChild(el('span', 'who', nm(s.id)));
+            h.appendChild(el('span', 'job', s.kind === 'text'
+                ? (s.i === 0 ? 'wrote the sentence' : 'described the drawing')
+                : 'drew it'));
+            div.appendChild(h);
+            if (s.kind === 'text'){
+                div.appendChild(el('div', 'said', s.text || '(nothing)'));
+            } else {
+                var c = document.createElement('canvas');
+                c.width = W; c.height = H;
+                paint(c.getContext('2d'), s.canvas || [], W, H, 1);
+                div.appendChild(c);
+            }
+            card.appendChild(div);
+        });
         box.appendChild(card);
     });
+}
+
+// ---------- save ----------
+function esc(s){
+    return String(s == null ? '' : s).replace(/[&<>"']/g, function(c){
+        return { '&':'&amp;', '<':'&lt;', '>':'&gt;', '"':'&quot;', "'":'&#39;' }[c];
+    });
+}
+function saveStory(){
+    if (!S || S.phase !== 'reveal' || !S.chain) return;
+    var date = new Date().toLocaleString();
+    var parts = [
+        '<!DOCTYPE html><html lang="en"><head><meta charset="utf-8">',
+        '<meta name="viewport" content="width=device-width, initial-scale=1">',
+        '<title>The 96 Game — lap ' + (S.lap + 1) + '</title>',
+        '<style>',
+        'body{font:16px/1.5 Georgia,serif;max-width:760px;margin:0 auto;padding:32px 20px;color:#1c2333;background:#fffdf7}',
+        'h1{font-size:34px;letter-spacing:-.02em;margin:0 0 4px;border-bottom:3px solid #b5541f;padding-bottom:10px}',
+        '.meta{color:#5d6474;font-size:13px;margin-bottom:28px}',
+        '.story{border:1px solid #ddd3bd;border-radius:12px;padding:16px 18px;margin:0 0 22px;page-break-inside:avoid}',
+        '.story h2{font-size:19px;margin:0 0 12px;color:#b5541f}',
+        '.step{border-left:3px solid #b5541f;padding:6px 0 6px 14px;margin:14px 0}',
+        '.step h3{font-size:11px;letter-spacing:.09em;text-transform:uppercase;color:#2f6f6b;margin:0 0 4px;font-family:system-ui,sans-serif}',
+        '.said{font-size:17px;margin:0}',
+        '.step img{max-width:100%;height:auto;border:1px solid #ddd3bd;border-radius:8px}',
+        '.time{color:#a3341f;font-style:italic}',
+        '@media print{ .story{box-shadow:none} }',
+        '</style></head><body>',
+        '<h1>The 96 Game</h1>',
+        '<p class="meta">Lap ' + (S.lap + 1) + ' · ' + esc(date) + '</p>'
+    ];
+    S.chain.forEach(function(story){
+        parts.push('<section class="story"><h2>Story started by ' + esc(nm(story.starter)) + '</h2>');
+        story.steps.forEach(function(s){
+            var who = nm(s.id);
+            var job = s.kind === 'text' ? (s.i === 0 ? 'wrote the sentence' : 'described the drawing') : 'drew it';
+            parts.push('<div class="step"><h3>Step ' + (s.i + 1) + ' · ' + esc(who) + ' ' + job + '</h3>');
+            if (s.kind === 'text'){
+                parts.push('<p class="said">' + esc(s.text || '(nothing)') + (s.skipped ? ' <span class="time">(time was up)</span>' : '') + '</p>');
+            } else {
+                var c = document.createElement('canvas');
+                c.width = W; c.height = H;
+                paint(c.getContext('2d'), s.canvas || [], W, H, 1);
+                parts.push('<img alt="drawing by ' + esc(who) + '" src="' + c.toDataURL('image/png') + '">');
+                if (s.skipped) parts.push('<p class="time">(time was up — nobody drew)</p>');
+            }
+            parts.push('</div>');
+        });
+        parts.push('</section>');
+    });
+    parts.push('</body></html>');
+    var blob = new Blob(parts, { type: 'text/html' });
+    var url = URL.createObjectURL(blob);
+    var a = document.createElement('a');
+    a.href = url;
+    a.download = 'the96game-lap' + (S.lap + 1) + '.html';
+    document.body.appendChild(a);
+    a.click();
+    setTimeout(function(){ URL.revokeObjectURL(url); if (a.parentNode) a.parentNode.removeChild(a); }, 2000);
 }
 
 function buildSwatches(){
@@ -709,24 +1044,29 @@ function buildSwatches(){
     COLOURS.forEach(function(c){
         var b = document.createElement('button');
         b.className = 'sw'; b.style.background = c;
-        b.setAttribute('aria-pressed', c === penColour ? 'true' : 'false');
+        b.setAttribute('aria-pressed', !bucketOn && c === penColour ? 'true' : 'false');
         b.setAttribute('aria-label', 'Pen colour ' + c);
-        b.addEventListener('click', function(){ penColour = c; buildSwatches(); drawBoard(); });
+        b.addEventListener('click', function(){ bucketOn = false; penColour = c; buildSwatches(); drawBoard(); });
         box.appendChild(b);
     });
+    var bk = document.createElement('button');
+    bk.className = 'sw'; bk.style.background = 'linear-gradient(135deg,#b5541f 0 50%, #e0a020 50% 100%)';
+    bk.textContent = '';
+    bk.innerHTML = '<span style="color:#fff;font-weight:900;text-shadow:0 1px 2px #000">&#9679;</span>';
+    bk.setAttribute('aria-pressed', bucketOn ? 'true' : 'false');
+    bk.setAttribute('aria-label', 'Fill bucket');
+    bk.addEventListener('click', function(){ bucketOn = !bucketOn; buildSwatches(); });
+    box.appendChild(bk);
     var er = document.createElement('button');
     er.className = 'sw'; er.style.background = PAPER;
     er.innerHTML = '<span style="color:#1c2333;font-weight:800">⌫</span>';
-    er.setAttribute('aria-pressed', penColour === PAPER ? 'true' : 'false');
+    er.setAttribute('aria-pressed', !bucketOn && penColour === PAPER ? 'true' : 'false');
     er.setAttribute('aria-label', 'Eraser');
-    er.addEventListener('click', function(){ penColour = PAPER; buildSwatches(); drawBoard(); });
+    er.addEventListener('click', function(){ bucketOn = false; penColour = PAPER; buildSwatches(); drawBoard(); });
     box.appendChild(er);
 }
 
 // ---------- misc ----------
-// Names are live and membership is not. A rename has to reach the seat strip
-// and the "Waiting for X" line mid-game, because `nm()` prefers S.names over
-// the roster and a stale name there outlives the person who had it.
 function syncNames(){
     if (!S || !S.names) return false;
     var changed = false;
@@ -736,10 +1076,8 @@ function syncNames(){
     return changed;
 }
 
-// Anyone who leaves is dropped from the running order, so the lap cannot stall
-// on a turn nobody is left to take. Anyone who joins waits for the next lap:
-// the chain length has to stay stable once a lap has started, and the reveal
-// walks S.order exactly as it was at the top of the lap.
+// Anyone who leaves is dropped from the running order; a chain whose turn
+// lands on the departed is marked and moved along by the same advance.
 function syncTable(){
     if (!S) return false;
     var changed = syncNames();
@@ -747,26 +1085,37 @@ function syncTable(){
     var ids = Hub.roster.map(function(m){ return m.id; });
     var kept = S.order.filter(function(id){ return ids.indexOf(id) !== -1; });
     if (kept.length === S.order.length) return changed;
-    if (!kept.length){ S.order = kept; return true; }
-    var at = (S.starter + S.step) % S.order.length;
-    var actor = S.order[at];
+    if (!kept.length){
+        S.order = kept;
+        S.chains.forEach(function(ch){ ch.done = true; });
+        return true;
+    }
     S.order = kept;
-    var seat = kept.indexOf(actor);
-    if (seat >= 0){ S.step = seat; return true; }
-    // The player whose turn it was left. Record the abandoned turn so the
-    // reveal is honest about it, then park the cursor one turn back and let
-    // advance() walk forward onto whoever is next in the new order.
-    hostText[stepKeyFor(S.lap, at)] = '(that player left)';
-    hostCanvas[stepKeyFor(S.lap, at)] = [];
-    S.step = Math.min(at - 1, kept.length - 1);
-    advance();
+    // Re-drive whichever chains were parked on a departed player.
+    for (var i = 0; i < S.chains.length; i++){
+        var ch = S.chains[i];
+        if (ch.done) continue;
+        var skipped = false, guard = 0;
+        while (guard++ < 64){
+            var a = actorOf(ch);
+            if (a === null) break;
+            if (S.order.indexOf(a) >= 0) break;
+            var k = chainKey(i);
+            if (stepKind(ch.step) === 'text') hostText[k] = '(that player left)';
+            else hostCanvas[k] = [];
+            hostSkip[k] = true;
+            skipped = true;
+            ch.step++;
+            if (ch.step >= S.order.length){ ch.done = true; break; }
+        }
+        if (skipped && !ch.done){ ch.startedAt = Date.now(); armTimer(i); }
+    }
+    if (S.chains.every(function(x){ return x.done; })){ revealLap(); return true; }
     return true;
 }
 
 function onRoster(){
     if (isHost()){
-        // Never auto-start: three people arriving does not mean the host has
-        // agreed to begin. The Start button is the host's decision.
         syncTable();
         broadcast();
     } else {
@@ -777,18 +1126,18 @@ function onRoster(){
 function onState(st){
     if (!st) return;
     S = st;
-    var k = S.lap + ':' + S.step + ':' + S.phase;
+    var k = S.lap + ':' + (S.chains ? S.chains.map(function(c){ return c.step + (c.done ? 'x' : ''); }).join(',') : '') + ':' + S.phase;
     if (k !== lastKey){
         lastKey = k;
         myStrokes = []; draft = null; drawing = false;
         $('t96-say').value = '';
     }
+    if (selected >= S.chains.length) selected = 0;
+    // Snap the stage to a chain waiting on me, but never yank it away from
+    // one I am actively playing.
+    var act = myPending();
+    if (act.length && act.indexOf(selected) < 0) selected = act[0];
     render();
-}
-function broadcast(){
-    render();
-    if (!S || !isHost()) return;
-    Hub.up('state', S);
 }
 function reportResult(){
     if (reported || !S || !(S.lapsPlayed > 0)) return;
@@ -797,7 +1146,8 @@ function reportResult(){
 }
 function doReset(){
     reportResult();
-    S = null; hostText = {}; hostCanvas = {}; briefs = {};
+    clearTimers();
+    S = null; hostText = {}; hostCanvas = {}; hostSkip = {}; briefs = {};
     myArt = null; myStrokes = []; draft = null; lastKey = ''; reported = false;
     render();
 }
@@ -833,7 +1183,6 @@ $('t96-start').addEventListener('click', function(){
     if (Hub.roster.length < MIN_PLAYERS){ toast('Need at least ' + MIN_PLAYERS + ' players.'); return; }
     reportResult();
     fresh();
-    broadcast();
 });
 $('t96-send').addEventListener('click', pushText);
 $('t96-say').addEventListener('keydown', function(e){ if (e.key === 'Enter'){ e.preventDefault(); pushText(); } });
@@ -844,6 +1193,14 @@ $('t96-clear').addEventListener('click', function(){
 });
 $('t96-done').addEventListener('click', pushDone);
 $('t96-nextlap').addEventListener('click', function(){ act({ a:'nextlap' }); });
+$('t96-save').addEventListener('click', saveStory);
+$('t96-chains').addEventListener('click', function(e){
+    var t = e.target && e.target.closest ? e.target.closest('[data-chain]') : null;
+    if (!t || !S) return;
+    selected = +t.getAttribute('data-chain') || 0;
+    applyBrief();
+    render();
+});
 window.addEventListener('resize', reportHeight);
 document.addEventListener('visibilitychange', function(){
     if (!document.hidden && Hub.me) Hub.up('hello');
@@ -851,6 +1208,7 @@ document.addEventListener('visibilitychange', function(){
 
 bindPointer();
 buildSwatches();
+startTick();
 Hub.init();
 render();
 reportHeight();

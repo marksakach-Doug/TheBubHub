@@ -4,1075 +4,194 @@
 <meta charset="utf-8">
 <meta name="viewport" content="width=device-width, initial-scale=1">
 <meta name="color-scheme" content="light">
-<title>Braid</title>
+<title>Braid — the loose-strand word game</title>
 <style>
-:root{
-  --paper:#f5f0e6;
-  --card:#fffdf8;
-  --ink:#332e26;
-  --muted:#6f675b;
-  --line:#d9cfbe;
-  --wash:#e9e0d0;
-  --accent:#a45f3b;
-  --accent-dark:#82482b;
-  --olive:#6d7b4f;
-  --teal:#3f6f73;
-  --plum:#8a5a72;
-  --radius:14px;
-  --gut:clamp(14px,3vw,24px);
-  --shadow:0 1px 2px rgba(51,46,38,.06),0 8px 24px rgba(51,46,38,.06);
-}
-*{box-sizing:border-box}
-html,body{margin:0;padding:0;background:var(--paper);color:var(--ink)}
-body{font:15px/1.5 "Segoe UI",system-ui,-apple-system,"Helvetica Neue",Arial,sans-serif;-webkit-text-size-adjust:100%}
-#app{max-width:880px;margin:0 auto;padding:var(--gut) var(--gut) calc(var(--gut)*1.5)}
+:root{--paper:#f5f0e6;--card:#fffdf8;--ink:#332e26;--muted:#6f675b;--line:#d9cfbe;--wash:#e9e0d0;--accent:#a45f3b;--olive:#6d7b4f;--teal:#3f6f73;--plum:#8a5a72;--radius:14px;--gut:clamp(14px,3vw,24px);--shadow:0 1px 2px rgba(51,46,38,.06),0 8px 24px rgba(51,46,38,.06)}
+*{box-sizing:border-box}html,body{margin:0;background:var(--paper);color:var(--ink)}
+body{font:15px/1.5 "Segoe UI",system-ui,-apple-system,Arial,sans-serif}
+#app{max-width:900px;margin:auto;padding:var(--gut)}
 .hidden{display:none!important}
-.hero{background:linear-gradient(135deg,#fbf7ef,#efe6d5);border:1px solid var(--line);border-radius:calc(var(--radius) + 4px);padding:clamp(18px,4vw,30px);box-shadow:var(--shadow);margin:0 0 16px;text-align:center}
-.hero h1{margin:0;font-family:Georgia,"Iowan Old Style","Palatino Linotype",serif;font-size:clamp(34px,8vw,54px);letter-spacing:.02em;color:var(--ink);font-weight:600}
-.hero .tag{margin:6px 0 0;color:var(--muted);font-size:15px}
-.card{background:var(--card);border:1px solid var(--line);border-radius:var(--radius);padding:clamp(14px,3vw,22px);box-shadow:var(--shadow);margin:0 0 14px}
-.status{min-height:1.4em;margin:0 0 14px;font-weight:600;color:var(--accent-dark)}
-.status:empty{display:none}
-.controls{display:flex;flex-wrap:wrap;gap:10px 16px;align-items:end}
-.controls label{display:flex;flex-direction:column;gap:4px;font-size:13px;color:var(--muted);font-weight:600}
-select,input[type=text]{font:inherit;color:var(--ink);background:var(--card);border:1px solid var(--line);border-radius:10px;padding:9px 12px;min-height:42px}
-select{font-size:14px;max-width:100%}
-input[type=text]{font-size:16px;width:100%}
-select:focus,input[type=text]:focus{outline:2px solid rgba(164,95,59,.35);outline-offset:1px;border-color:var(--accent)}
-button{font:inherit;color:var(--ink);background:linear-gradient(#fffdf8,#f1e9db);border:1px solid var(--line);border-radius:999px;padding:8px 18px;min-height:40px;cursor:pointer;box-shadow:0 1px 2px rgba(51,46,38,.08);transition:background .15s,transform .1s}
-button:hover:not(:disabled){background:linear-gradient(#fffdf8,#e9e0d0)}
-button:active:not(:disabled){transform:translateY(1px)}
+.hero,.card{background:var(--card);border:1px solid var(--line);border-radius:var(--radius);box-shadow:var(--shadow);margin-bottom:14px}
+.hero{padding:24px;text-align:center;background:linear-gradient(135deg,#fbf7ef,#efe6d5)}
+h1{font:600 clamp(34px,8vw,52px) Georgia,serif;margin:0}.tag{color:var(--muted);margin:4px 0 0}
+.card{padding:clamp(14px,3vw,22px)}
+h2{font-size:19px;margin:0 0 8px;color:var(--accent-dark,var(--accent))}
+p{margin:6px 0}.muted{color:var(--muted);font-size:14px}
+.status{font-weight:600;color:var(--accent);margin:0 0 12px;min-height:1.4em}
+.controls,.actions,.entry{display:flex;gap:9px;align-items:end;flex-wrap:wrap}
+label{display:flex;flex-direction:column;gap:4px;color:var(--muted);font-size:13px;font-weight:600}
+select,input{font:inherit;color:var(--ink);background:var(--card);border:1px solid var(--line);border-radius:10px;padding:10px 12px;min-height:42px}
+input[type=text]{font-size:16px;min-width:0;flex:1}
+button{font:inherit;color:var(--ink);background:linear-gradient(#fffdf8,#f1e9db);border:1px solid var(--line);border-radius:999px;padding:9px 17px;min-height:42px;cursor:pointer}
+button.primary{background:linear-gradient(#b56b46,#a45f3b);border-color:#8e4f30;color:white}
 button:disabled{opacity:.5;cursor:not-allowed}
-button.primary{background:linear-gradient(#b56b46,#a45f3b);border-color:#8e4f30;color:#fff}
-button.primary:hover:not(:disabled){background:linear-gradient(#c27a53,#b06740)}
-button:focus-visible,select:focus-visible,input:focus-visible,summary:focus-visible{outline:3px solid rgba(164,95,59,.45);outline-offset:2px}
-.actions{display:flex;gap:8px;flex-wrap:wrap;align-items:center;margin-top:10px}
-.muted{color:var(--muted);font-size:14px}
-.turn{font-size:16px;font-weight:600;margin:0 0 10px}
-.need{margin:0 0 10px;line-height:1.9}
-.hand{display:flex;flex-wrap:wrap;gap:6px;margin:0 0 8px}
-.chip{display:inline-block;background:var(--wash);border:1px solid var(--line);border-radius:999px;padding:3px 10px;font-size:13px;color:var(--ink)}
-.need-line{display:flex;flex-wrap:wrap;gap:6px;align-items:center}
-.need-line b{color:var(--accent-dark)}
-.entry-row{display:flex;gap:8px;flex-wrap:wrap;align-items:stretch;margin-top:6px}
-.entry-row input{flex:1 1 220px;min-width:0}
-.braid{overflow-x:auto;border:1px solid var(--line);border-radius:12px;background:linear-gradient(180deg,#fffdf8,#f8f3e9);min-height:300px;padding:4px}
-.braid svg{display:block}
-.people{list-style:none;margin:0;padding:0;display:flex;flex-wrap:wrap;gap:6px 18px;font-size:14px;color:var(--muted)}
-.people li{display:inline-flex;align-items:center;gap:6px}
-.people li.turn{color:var(--ink);font-weight:700}
-.badge{display:inline-block;background:var(--wash);border:1px solid var(--line);border-radius:999px;padding:0 7px;font-size:11px;color:var(--muted);font-weight:600;line-height:1.6}
-.scores{display:flex;flex-wrap:wrap;gap:8px;margin-top:12px}
-.score{display:inline-flex;align-items:center;gap:7px;background:var(--wash);border:1px solid var(--line);border-radius:999px;padding:5px 12px;font-size:14px}
-.dot{width:10px;height:10px;border-radius:50%;flex:none}
-.vote h2,.over h2{margin:0 0 8px;font-size:18px;color:var(--accent-dark)}
-.linkline{font-size:15px;line-height:1.7;margin:0 0 8px}
-.linkline b{color:var(--accent-dark)}
-.votebtns{display:flex;gap:8px;flex-wrap:wrap;margin-top:10px}
-.tally{color:var(--muted);font-size:14px;margin:8px 0 0}
-.rules summary{cursor:pointer;font-weight:600;color:var(--accent-dark);padding:2px 0}
-.rules h3{margin:14px 0 4px;font-size:15px}
-.rules p{margin:6px 0 0;max-width:65ch;font-size:14px;line-height:1.6}
-.rules ul{margin:6px 0 0;padding-left:1.3em;max-width:65ch;font-size:14px;line-height:1.6}
-@media (max-width:640px){
-  .controls label{flex:1 1 100%}
-  select{width:100%}
-  .braid{min-height:240px}
-  button{min-height:44px}
-  .hero{padding:18px 14px}
-}
-@media (pointer:coarse){button{min-height:44px}}
-@media (prefers-reduced-motion:reduce){*{animation:none!important;transition:none!important}}
+button:focus-visible,input:focus-visible,select:focus-visible{outline:3px solid #a45f3b66;outline-offset:2px}
+.entry input{flex:1 1 220px}.actions{margin-top:12px}
+.wordrow{display:flex;flex-wrap:wrap;gap:10px;margin:14px 0}
+.word{border:2px solid var(--line);border-radius:14px;padding:12px 16px;background:#fffdf8;min-width:100px;text-align:center;flex:1}
+.word strong{font:600 22px Georgia,serif;overflow-wrap:anywhere}
+.word small{display:block;color:var(--muted);font-size:12px;margin-top:3px}
+.word.loose{border-style:dashed;border-color:var(--plum);background:#fbf5f8}
+.word.linked{border-color:var(--olive);background:#f5f7ef}
+.stitch{border:1px solid var(--line);border-radius:12px;padding:13px;margin:10px 0;background:#fffefa}
+.stitchhead{font-size:13px;color:var(--muted);font-weight:700;letter-spacing:.04em;text-transform:uppercase}
+.result{margin-top:8px;padding:9px 11px;background:var(--wash);border-radius:9px}
+.pairchoices{display:grid;gap:8px;margin:12px 0}
+.pairchoice{display:flex;gap:9px;align-items:center;padding:10px;border:1px solid var(--line);border-radius:10px;background:#fffefa}
+.pairchoice input{min-height:auto;flex:none}
+.people{list-style:none;padding:0;margin:0;display:flex;gap:8px;flex-wrap:wrap}
+.people li{padding:5px 10px;border-radius:99px;background:var(--wash);font-size:14px}
+.people li.turn{outline:2px solid var(--accent);font-weight:700}
+details summary{cursor:pointer;font-weight:700;color:var(--accent)}
+details p{max-width:68ch;font-size:14px}
+@media(max-width:600px){.controls label{width:100%}select{width:100%}.word{min-width:0}.entry{align-items:stretch}}
 </style>
 </head>
 <body>
 <div id="app">
-  <header class="hero">
-    <h1>Braid</h1>
-    <p class="tag">A word game of linked strands.</p>
-  </header>
-
-  <p id="status" class="status" role="status" aria-live="polite"></p>
-
-  <section id="lobby" class="card">
-    <div id="lobbyControls" class="controls">
-      <label>Strand
-        <select id="windowSel">
-          <option value="2">Loose: link the last two words</option>
-          <option value="3">Tight: link the last three words</option>
-        </select>
+<header class="hero"><h1>Braid</h1><p class="tag">A word game of linked strands and loose ends.</p></header>
+<p id="status" class="status" role="status" aria-live="polite"></p>
+<section id="lobby" class="card">
+  <div id="setup" class="controls">
+    <label>Players <select id="count"><option value="1">Solo</option><option value="2" selected>2 players</option><option value="3">3 players</option><option value="4">4 players</option><option value="5">5 players</option><option value="6">6 players</option></select></label>
+  </div>
+  <div class="actions"><button id="start" class="primary">Start braid</button><span id="waiting" class="muted hidden">Waiting for the host to start.</span></div>
+</section>
+<section id="game" class="hidden">
+  <section class="card">
+    <div id="turn" style="font-weight:700;margin-bottom:8px"></div>
+    <div id="prompt" class="muted"></div>
+    <div id="entry" class="entry"><input id="wordInput" type="text" maxlength="40" placeholder="Add one word…" autocomplete="off"><button id="add" class="primary">Add word</button></div>
+    <div id="resolve" class="hidden">
+      <h2>Find the linked pair</h2>
+      <p>Choose the two words with a clear association. The remaining word is the <b>loose strand</b>.</p>
+      <div id="choices" class="pairchoices"></div>
+      <label>Why are they linked?
+        <input id="reason" type="text" maxlength="180" placeholder="Give a short explanation…">
       </label>
-      <label>Relations
-        <select id="modeSel">
-          <option value="dealt">Dealt: a hand each turn</option>
-          <option value="free">Free association: any connection</option>
-        </select>
-      </label>
-      <label id="countWrap">Players
-        <select id="count">
-          <option value="1">Solo</option>
-          <option value="2" selected>2 players</option>
-          <option value="3">3 players</option>
-          <option value="4">4 players</option>
-        </select>
-      </label>
-    </div>
-    <div class="actions">
-      <button id="startBtn" class="primary">Start braid</button>
-      <span id="waitHost" class="muted hidden">Waiting for the host to start.</span>
+      <div class="actions"><button id="confirm" class="primary">Confirm stitch</button></div>
+      <p class="muted" id="resolverNote"></p>
     </div>
   </section>
-
-  <section id="game" class="hidden">
-    <div class="card">
-      <div id="turnLine" class="turn"></div>
-      <div id="needBox" class="need"></div>
-      <div id="entryRow" class="entry-row">
-        <input id="word" type="text" maxlength="40" autocomplete="off" autocapitalize="none" autocorrect="off" spellcheck="false" enterkeyhint="done" placeholder="type a word">
-        <button id="addBtn" class="primary">Add word</button>
-      </div>
-      <div class="actions">
-        <button id="challengeBtn">Challenge last word</button>
-        <button id="homeBtn">Call Home</button>
-      </div>
-    </div>
-
-    <div class="card">
-      <div id="braid" class="braid"></div>
-    </div>
-
-    <div id="vote" class="card vote hidden"></div>
-    <div id="over" class="card over hidden"></div>
-
-    <div class="card">
-      <ul id="people" class="people" aria-label="Players"></ul>
-      <div id="scores" class="scores"></div>
-    </div>
-
-    <div class="actions">
-      <button id="newBtn" class="primary hidden">New braid</button>
-    </div>
-  </section>
-
-  <details id="rules" class="card rules">
-    <summary>How to play</summary>
-    <p>Players take turns adding one word. Each new word must link to the last two words (<b>loose</b>) or the last three (<b>tight</b>), and every link is a named relation. Each turn the game deals a <b>hand</b> of relations. Pick a different one for each link. A hand always holds relations that fit any word, so you are never stuck, and a word never gets the same relation twice. Switch to <b>free association</b> for unconstrained word-to-word links.</p>
-    <p>Anyone may <b>Challenge</b> the last word and make its author name every link out loud. A broken link drops the word. Call <b>Home</b> when the last word ties back to the first. Words you keep are your score.</p>
-    <h3>At a networked table</h3>
-    <p>A challenge or a Home call goes to a table vote. A challenged link holds on a tie. A Home call needs a clear majority to close the braid.</p>
-    <h3>Solo</h3>
-    <p>One voice holds two strands. You begin from a seed word and build alone, checking your own links. Your score is the words you kept, minus two for every word you drop.</p>
-  </details>
+  <section class="card"><h2>Current stitch</h2><div id="currentWords" class="wordrow"></div><p id="currentNote" class="muted"></p></section>
+  <section class="card"><h2>The braid so far</h2><div id="history"></div><div class="actions"><button id="export">Save braid as HTML</button><button id="new" class="hidden">New braid</button></div></section>
+  <section class="card"><h2>Players</h2><ul id="people" class="people"></ul></section>
+</section>
+<details class="card"><summary>How to play</summary>
+<p><b>One stitch is three words.</b> Players take turns adding one word at a time. Once three words are on the board, choose the two that have a clear association and explain the connection. The third word is the <b>loose strand</b>.</p>
+<p><b>Carry the loose word forward.</b> It becomes the first word of the next stitch. Players add two new words, then identify a linked pair again. The loose word can remain loose for several stitches; the aim is to weave it in naturally, not force a connection.</p>
+<p>With three players, each person adds one word per stitch. With two players, alternate turns until the stitch has three words. With more players, continue around the circle. Keep going for as long as the group likes.</p>
+<p><b>Example:</b> moon — tide — violin. Moon and tide are linked because the moon's gravity influences tides. Violin is the loose strand.</p>
+<p>Use <b>Save braid as HTML</b> to download a readable record of the braid so far.</p>
+</details>
 </div>
-
 <script>
 (function(){
 'use strict';
-
-var GAME_ID = 'braid';
-var MAXLEN = 40;
-var COLORS = ['#a45f3b', '#6d7b4f', '#3f6f73', '#8a5a72'];
-var SEED_BANK = [
-  'salt', 'tide', 'ash', 'bone', 'glass', 'root', 'lamp', 'door', 'river', 'ghost', 'moth', 'stone', 'bell',
-  'burn', 'drown', 'wake', 'carry', 'fall', 'break', 'leave', 'hold', 'grow', 'bend', 'climb', 'forget', 'bloom',
-  'quiet', 'bright', 'hollow', 'slow', 'bitter', 'tender', 'strange', 'old', 'hungry', 'cold', 'wild', 'heavy', 'dry',
-  'we', 'you', 'nobody', 'everything', 'they', 'nothing', 'someone', 'everyone', 'always', 'never', 'again', 'here', 'there'
-];
-var UNIVERSAL = ['a synonym of', 'a rhyme of', 'a word starting with the same letter as', 'a word usually found with', 'in the same category as'];
-var NOUNISH = ['a kind of', 'a part of', 'made of'];
-var RELS = UNIVERSAL.concat(NOUNISH);
-
-function $(id){ return document.getElementById(id); }
-function el(tag, cls, text){
-  var n = document.createElement(tag);
-  if (cls) n.className = cls;
-  if (text != null) n.textContent = text;
-  return n;
+const $=id=>document.getElementById(id);
+const COLORS=['#a45f3b','#6d7b4f','#3f6f73','#8a5a72','#6b6590','#a17a35'];
+let S=null,mode='wait',Hub={me:null,roster:[],up(k,p){try{parent.postMessage({t:'gu',game:'braid',k,p},'*')}catch(e){} }};
+function esc(s){return String(s).replace(/[&<>"']/g,c=>({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;'}[c]));}
+function myId(){return mode==='local'?'local':Hub.me&&Hub.me.id}
+function isHost(){return mode==='local'||!!(Hub.me&&Hub.me.isHost)}
+function nameOf(id){return S.names[id]||'Player'}
+function nextAfter(id){let i=S.order.indexOf(id);return S.order[(i+1+S.order.length)%S.order.length]}
+function postState(){render();if(mode==='hub'&&isHost())Hub.up('state',S)}
+function say(t){$('status').textContent=t;setTimeout(()=>{if($('status').textContent===t)$('status').textContent=''},2800)}
+function start(order,names){
+ S={order,names,turnId:order[0],phase:'add',current:[],history:[],resolver:null,selected:null};
+ $('wordInput').value='';postState();
 }
-function clear(n){ while (n.firstChild) n.removeChild(n.firstChild); }
-function esc(s){
-  return String(s).replace(/[&<>"']/g, function(c){
-    return ({ '&':'&amp;', '<':'&lt;', '>':'&gt;', '"':'&quot;', "'":'&#39;' })[c];
-  });
+function localStart(){let n=+$('count').value,order=[],names={};for(let i=0;i<n;i++){order.push('local-'+i);names[order[i]]=n===1?'You':'Player '+(i+1)}start(order,names)}
+function act(a){if(mode==='local'){let actor=S?(a.a==='resolve'?S.resolver:S.turnId):myId();apply(a,actor);return}if(isHost()){apply(a,myId())}else Hub.up('intent',a)}
+function apply(a,from){
+ if(!S)return;
+ if(a.a==='add'){
+  if(S.phase!=='add'||from!==S.turnId)return;
+  let t=String(a.text||'').trim().replace(/\s+/g,' ');
+  if(!t||t.length>40){say('Enter a word (up to 40 characters).');return}
+  S.current.push({text:t,by:from});
+  if(S.current.length===3){S.phase='resolve';S.resolver=from;S.selected=null}
+  else S.turnId=nextAfter(from);
+ }else if(a.a==='resolve'){
+  if(S.phase!=='resolve'||from!==S.resolver)return;
+  let pair=a.pair,reason=String(a.reason||'').trim();
+  if(!Array.isArray(pair)||pair.length!==2||!reason){say('Choose a pair and explain the connection.');return}
+  let loose=[0,1,2].find(i=>!pair.includes(i));
+  S.history.push({words:S.current.map(w=>w.text),linked:pair.slice(),loose,reason});
+  let carry=S.current[loose];
+  S.current=[carry];S.phase='add';S.turnId=nextAfter(from);S.resolver=null;S.selected=null;
+ }else if(a.a==='new'){if(!isHost())return;localStart();return}
+ postState();
 }
-function shuffle(a){
-  a = a.slice();
-  for (var i = a.length - 1; i > 0; i--){
-    var j = Math.floor(Math.random() * (i + 1));
-    var t = a[i]; a[i] = a[j]; a[j] = t;
-  }
-  return a;
-}
-function drawSeed(){
-  if (!seedBag.length){
-    seedBag = shuffle(SEED_BANK.slice());
-    if (seedBag.length > 1 && seedBag[seedBag.length - 1] === lastSeed){
-      var t = seedBag[0];
-      seedBag[0] = seedBag[seedBag.length - 1];
-      seedBag[seedBag.length - 1] = t;
-    }
-  }
-  lastSeed = seedBag.pop();
-  return lastSeed;
-}
-function joinNames(arr){
-  if (!arr.length) return 'Someone';
-  if (arr.length === 1) return arr[0];
-  if (arr.length === 2) return arr[0] + ' and ' + arr[1];
-  return arr.slice(0, -1).join(', ') + ' and ' + arr[arr.length - 1];
-}
-
-var Hub = {
-  me: null,
-  roster: [],
-  room: '',
-  up: function(k, p){
-    try { window.parent.postMessage({ t:'gu', game:GAME_ID, k:k, p:p }, '*'); } catch (e) {}
-  },
-  init: function(){
-    window.addEventListener('message', onDown);
-    this.up('hello');
-    var topLevel = (window.parent === window);
-    setTimeout(function(){ if (!Hub.me) goLocal(); }, topLevel ? 50 : 1500);
-  }
-};
-
-var heightT = null;
-function reportHeight(){
-  clearTimeout(heightT);
-  heightT = setTimeout(function(){
-    var app = $('app');
-    if (!app) return;
-    Hub.up('height', Math.ceil(app.getBoundingClientRect().height));
-  }, 60);
-}
-
-function onDown(e){
-  var m = e.data;
-  if (!m || m.t !== 'gd' || m.game !== GAME_ID) return;
-  if (m.k === 'roster'){
-    var wasLocal = mode === 'local';
-    Hub.me = m.p.you;
-    Hub.roster = m.p.roster || [];
-    Hub.room = m.p.room;
-    mode = 'hub';
-    if (wasLocal && S){ S = null; myPicks = []; pickKey = ''; }
-    onRoster();
-    return;
-  }
-  if (m.k === 'state'){ onState(m.p); return; }
-  if (m.k === 'intent'){ onIntent(m.p, m.from); return; }
-  if (m.k === 'denied'){ onDenied(m.p && m.p.text); return; }
-  if (m.k === 'show'){ Hub.up('hello'); return; }
-}
-
-var S = null;
-var mode = 'wait';
-var seedBag = [];
-var lastSeed = '';
-var myPicks = [];
-var pickKey = '';
-var toastText = '';
-var noteT = null;
-var reported = false;
-
-function myId(){ return mode === 'local' ? 'local' : (Hub.me && Hub.me.id); }
-function myName(){ return (Hub.me && Hub.me.name) || 'Player'; }
-function isHost(){ return mode === 'local' || !!(Hub.me && Hub.me.isHost); }
-function hostPresent(){ return Hub.roster.some(function(m){ return m.host; }); }
-function paused(){ return !!S && mode === 'hub' && !isHost() && !hostPresent(); }
-function isMyTurn(){ return !!S && S.phase === 'play' && (mode === 'local' || S.turnId === myId()); }
-function nameOf(id){
-  if (S && S.names && S.names[id]) return S.names[id];
-  for (var i = 0; i < Hub.roster.length; i++) if (Hub.roster[i].id === id) return Hub.roster[i].name;
-  return '???';
-}
-function nm(id){
-  var base = nameOf(id);
-  var ids = S ? S.order : Hub.roster.map(function(m){ return m.id; });
-  var twins = ids.filter(function(x){ return nameOf(x) === base; });
-  var i = twins.indexOf(id);
-  return (twins.length > 1 && i !== -1) ? base + ' ' + (i + 1) : base;
-}
-function playerColor(id){
-  var i = S ? S.order.indexOf(id) : -1;
-  return COLORS[(i < 0 ? 0 : i) % COLORS.length];
-}
-function keyOf(){ return S ? (S.inst + ':' + S.nextId + ':' + S.turnId) : ''; }
-function needKey(){ return S ? (S.inst + ':' + S.nextId + ':' + S.turnId + ':' + S.words.length) : ''; }
-function scoreOf(id){
-  if (!S) return 0;
-  return S.words.filter(function(w){ return w.by === id && !w.seed; }).length;
-}
-function soloScore(){
-  if (!S) return 0;
-  return S.words.filter(function(w){ return !w.seed; }).length - 2 * S.dropped;
-}
-function nextAfter(id){
-  if (!S || !S.order.length) return null;
-  var i = S.order.indexOf(id);
-  if (i === -1) return S.order[0];
-  return S.order[(i + 1) % S.order.length];
-}
-function eligibleVoters(v){
-  if (!S || !v) return [];
-  if (v.kind === 'challenge') return S.order.filter(function(id){ return id !== v.author; });
-  return S.order.slice();
-}
-
-function toast(t){
-  if (!t) return;
-  toastText = t;
-  render();
-  clearTimeout(noteT);
-  noteT = setTimeout(function(){ toastText = ''; noteT = null; render(); }, 2800);
-}
-
-function makeNeed(){
-  if (!S) return;
-  var k = Math.min(S.window, S.words.length);
-  var targets = [];
-  for (var j = 0; j < k; j++) targets.push(S.words[S.words.length - 1 - j]);
-  if (S.free){
-    S.hand = [];
-    S.need = targets.map(function(t){
-      return { target: t.text, targetId: t.id, allowed: [] };
-    });
-    myPicks = [];
-    pickKey = needKey();
-    return;
-  }
-  var uni = shuffle(UNIVERSAL);
-  var extras = shuffle(uni.slice(k).concat(NOUNISH)).slice(0, 2);
-  S.hand = k ? shuffle(uni.slice(0, k).concat(extras)) : [];
-  S.need = targets.map(function(t){
-    var pool = S.free ? RELS : S.hand;
-    var fresh = pool.filter(function(r){ return (S.used[t.id] || []).indexOf(r) === -1; });
-    return { target: t.text, targetId: t.id, allowed: fresh.length ? fresh : pool };
-  });
-  myPicks = [];
-  pickKey = needKey();
-}
-
-function broadcast(){
-  render();
-  if (!S || !isHost() || mode === 'local') return;
-  Hub.up('state', S);
-}
-
-function deny(to, text){
-  if (!text) return;
-  Hub.up('denied', { to: to, text: text });
-  if (to === myId()) toast(text);
-}
-
-function resultText(){
-  if (!S || !S.words) return '';
-  var played = S.words.filter(function(w){ return !w.seed; }).length;
-  if (S.order.length === 1){
-    return nm(S.order[0]) + ' braided ' + played + ' word' + (played === 1 ? '' : 's') + ' at Braid, scoring ' + soloScore();
-  }
-  var scored = S.order.map(function(id){ return { id: id, name: nm(id), score: scoreOf(id) }; });
-  scored.sort(function(a, b){ return b.score - a.score; });
-  var top = scored.length ? scored[0].score : 0;
-  var winners = scored.filter(function(x){ return x.score === top; });
-  if (winners.length === 1) return winners[0].name + ' won Braid with ' + top + ' word' + (top === 1 ? '' : 's');
-  return joinNames(S.order.map(nm)) + ' braided ' + played + ' word' + (played === 1 ? '' : 's') + ' at Braid';
-}
-
-function reportResult(){
-  if (reported || !S || !S.words || !S.words.length) return;
-  if (mode === 'local' || !isHost()) return;
-  reported = true;
-  var text = resultText();
-  if (text) Hub.up('result', { text: text, inst: S.inst });
-}
-
-function startGameWith(o){
-  if (!o.order.length) return;
-  reportResult();
-  S = {
-    inst: 'braid-' + Date.now() + '-' + Math.floor(Math.random() * 1e6),
-    host: myId(),
-    phase: 'play',
-    window: o.window,
-    free: !!o.free,
-    order: o.order.slice(),
-    names: Object.assign({}, o.names),
-    turnId: o.order[0],
-    words: [],
-    used: {},
-    hand: [],
-    need: [],
-    dropped: 0,
-    vote: null,
-    over: false,
-    nextId: 1
-  };
-  reported = false;
-  if (S.order.length === 1){
-    S.words.push({ id: S.nextId++, text: drawSeed(), by: S.order[0], links: [], seed: true });
-  }
-  $('word').value = '';
-  makeNeed();
-  broadcast();
-}
-
-function startGame(){
-  if (mode === 'local'){ startLocal(); return; }
-  if (!isHost()) return;
-  var ids = Hub.roster.map(function(m){ return m.id; });
-  if (!ids.length) return;
-  var names = {};
-  Hub.roster.forEach(function(m){ names[m.id] = m.name; });
-  startGameWith({
-    order: ids,
-    names: names,
-    window: parseInt($('windowSel').value, 10) || 2,
-    free: $('modeSel').value === 'free'
-  });
-}
-
-function startLocal(){
-  var n = parseInt($('count').value, 10) || 2;
-  var order = [];
-  var names = {};
-  for (var i = 0; i < n; i++){
-    var id = 'local-' + i;
-    order.push(id);
-    names[id] = n === 1 ? 'You' : 'Player ' + (i + 1);
-  }
-  startGameWith({
-    order: order,
-    names: names,
-    window: parseInt($('windowSel').value, 10) || 2,
-    free: $('modeSel').value === 'free'
-  });
-}
-
-function addWord(d, from){
-  if (S.phase !== 'play') return 'Not taking words right now.';
-  if (from.id !== S.turnId) return 'Not your turn.';
-  if (typeof d.text !== 'string') return 'Type a word first.';
-  var text = d.text.replace(/\s+/g, ' ').trim();
-  if (!text) return 'Type a word first.';
-  if (text.length > MAXLEN) return 'Forty characters at most.';
-  if (S.words.some(function(w){ return w.text.toLowerCase() === text.toLowerCase(); })) return 'That word is already in the braid.';
-
-  var links = [];
-  if (S.need.length){
-    if (S.free){
-      S.need.forEach(function(need){
-        links.push({ rel: 'association', targetId: need.targetId, target: need.target });
-      });
-    } else {
-      if (!Array.isArray(d.links) || d.links.length !== S.need.length) return 'Pick a relation for every link.';
-      var seen = {};
-      for (var j = 0; j < S.need.length; j++){
-        var l = d.links[j];
-        var need = S.need[j];
-        if (!l || typeof l.rel !== 'string') return 'Pick a relation for every link.';
-        if (l.targetId !== need.targetId) return 'That link does not match the braid.';
-        if (need.allowed.indexOf(l.rel) === -1) return 'That relation is not in your hand.';
-        if (seen[l.rel]) return 'Each link needs a different relation.';
-        seen[l.rel] = true;
-        links.push({ rel: l.rel, targetId: need.targetId, target: need.target });
-      }
-    }
-  }
-
-  S.words.push({ id: S.nextId++, text: text, by: from.id, links: links });
-  links.forEach(function(l){
-    (S.used[l.targetId] = S.used[l.targetId] || []).push(l.rel);
-  });
-  S.turnId = nextAfter(from.id);
-  makeNeed();
-  return null;
-}
-
-function dropLastWord(){
-  var removed = S.words.pop();
-  if (!removed) return;
-  S.dropped++;
-  removed.links.forEach(function(l){
-    var arr = S.used[l.targetId];
-    if (!arr) return;
-    var i = arr.indexOf(l.rel);
-    if (i !== -1) arr.splice(i, 1);
-    if (!arr.length) delete S.used[l.targetId];
-  });
-  if (S.order.indexOf(removed.by) !== -1) S.turnId = removed.by;
-  else S.turnId = nextAfter(S.turnId);
-  S.phase = 'play';
-  S.vote = null;
-  makeNeed();
-}
-
-function challenge(d, from){
-  if (S.phase !== 'play') return 'Not now.';
-  if (S.words.length < 2) return 'Nothing to challenge yet.';
-  var last = S.words[S.words.length - 1];
-  if (mode === 'hub' && S.order.length > 1 && last.by === from.id) return 'You cannot challenge your own word.';
-  S.phase = 'challenge';
-  S.vote = { kind: 'challenge', by: from.id, author: last.by, targetId: last.id, votes: {} };
-  return null;
-}
-
-function callHome(d, from){
-  if (S.phase !== 'play') return 'Not now.';
-  if (S.words.length < 2) return 'Need at least two words first.';
-  S.phase = 'home';
-  S.vote = { kind: 'home', by: from.id, author: null, targetId: null, votes: {} };
-  return null;
-}
-
-function maybeResolveVote(){
-  var v = S.vote;
-  if (!v) return false;
-  var elig = eligibleVoters(v);
-  if (!elig.length) return false;
-  for (var i = 0; i < elig.length; i++) if (!v.votes[elig[i]]) return false;
-  var yes = 0, no = 0;
-  elig.forEach(function(id){ if (v.votes[id] === 'yes') yes++; else no++; });
-  if (v.kind === 'challenge'){
-    if (no > yes){ dropLastWord(); return true; }
-    S.phase = 'play';
-    S.vote = null;
-    return true;
-  }
-  if (yes > no){
-    S.phase = 'over';
-    S.over = true;
-    S.vote = null;
-    reportResult();
-    return true;
-  }
-  S.phase = 'play';
-  S.vote = null;
-  return true;
-}
-
-function vote(d, from){
-  if (!S.vote) return 'Nothing to vote on.';
-  var v = S.vote;
-  if (S.order.indexOf(from.id) === -1) return 'You are not at this table.';
-  if (v.kind === 'challenge' && from.id === v.author) return 'The author does not vote.';
-  if (v.votes[from.id]) return 'You already voted.';
-  v.votes[from.id] = d.value === 'yes' ? 'yes' : 'no';
-  maybeResolveVote();
-  return null;
-}
-
-function resolveLocal(d, from){
-  if (mode === 'hub' && S.order.length > 1) return 'The table votes on that.';
-  if (d.kind === 'challenge'){
-    if (S.phase !== 'challenge') return 'Nothing to resolve.';
-    if (d.yes){
-      S.phase = 'play';
-      S.vote = null;
-    } else dropLastWord();
-    return null;
-  }
-  if (d.kind === 'home'){
-    if (S.phase !== 'home') return 'Nothing to resolve.';
-    if (d.yes){
-      S.phase = 'over';
-      S.over = true;
-      S.vote = null;
-      reportResult();
-    } else {
-      S.phase = 'play';
-      S.vote = null;
-    }
-    return null;
-  }
-  return 'Unknown resolve.';
-}
-
-function syncTable(){
-  if (!S || mode !== 'hub') return false;
-  var ids = Hub.roster.map(function(m){ return m.id; });
-  var prev = S.order.slice();
-  var changed = false;
-  Hub.roster.forEach(function(m){
-    if (S.names[m.id] !== m.name){ S.names[m.id] = m.name; changed = true; }
-    if (m.host && S.host !== m.id){ S.host = m.id; changed = true; }
-  });
-  ids.forEach(function(id){
-    if (S.order.indexOf(id) === -1){ S.order.push(id); changed = true; }
-  });
-  var kept = S.order.filter(function(id){ return ids.indexOf(id) !== -1; });
-  if (kept.length !== S.order.length){ S.order = kept; changed = true; }
-  if (!S.order.length){ S.turnId = null; S.vote = null; return changed; }
-  if (S.order.indexOf(S.turnId) === -1){
-    var oldIdx = prev.indexOf(S.turnId);
-    var next = null;
-    for (var k = 1; k <= prev.length; k++){
-      var cand = prev[(oldIdx + k) % prev.length];
-      if (S.order.indexOf(cand) !== -1){ next = cand; break; }
-    }
-    S.turnId = next || S.order[0];
-    changed = true;
-  }
-  if (S.vote){
-    Object.keys(S.vote.votes).forEach(function(id){
-      if (S.order.indexOf(id) === -1) delete S.vote.votes[id];
-      else if (S.vote.kind === 'challenge' && id === S.vote.author) delete S.vote.votes[id];
-    });
-    if (maybeResolveVote()) changed = true;
-  }
-  return changed;
-}
-
-function applyIntent(d, from){
-  if (!isHost()) return 'Not the host.';
-  if (d.a === 'hello'){
-    if (S) broadcast(); else render();
-    return null;
-  }
-  if (!S){
-    if (d.a === 'new'){
-      if (from.id !== myId()) return 'Only the host can start.';
-      startGame();
-      return null;
-    }
-    return 'No braid yet.';
-  }
-  if (d.a === 'new'){
-    if (from.id !== myId()) return 'Only the host can start.';
-    startGame();
-    return null;
-  }
-  var err = null;
-  if (d.a === 'add') err = addWord(d, from);
-  else if (d.a === 'challenge') err = challenge(d, from);
-  else if (d.a === 'vote') err = vote(d, from);
-  else if (d.a === 'home') err = callHome(d, from);
-  else if (d.a === 'resolve') err = resolveLocal(d, from);
-  else return 'Unknown action.';
-  if (err) return err;
-  broadcast();
-  return null;
-}
-
-function onRoster(){
-  if (mode !== 'hub') return;
-  if (isHost()){
-    if (S) syncTable();
-    broadcast();
-  } else {
-    render();
-    Hub.up('intent', { a: 'hello' });
-  }
-}
-
-function onState(state){
-  if (!state) return;
-  if (mode === 'hub' && isHost() && S) return;
-  S = state;
-  mode = 'hub';
-  if (needKey() !== pickKey){ myPicks = []; pickKey = needKey(); }
-  render();
-}
-
-function onIntent(d, from){
-  if (!isHost() || !d || !from) return;
-  var err = applyIntent(d, from);
-  if (err) deny(from.id, err);
-}
-
-function onDenied(text){ if (text) toast(text); }
-
-function goLocal(){
-  if (Hub.me) return;
-  mode = 'local';
-  S = null;
-  render();
-}
-
-function doAction(a){
-  if (paused()){ toast('The host has left. Waiting for them.'); return; }
-  if (mode === 'local'){
-    var from = { id: (a.a === 'add' && S ? S.turnId : myId()), name: 'Local' };
-    var err = applyIntent(a, from);
-    if (err) toast(err);
-    return;
-  }
-  if (isHost()){
-    var err2 = applyIntent(a, { id: myId(), name: myName() });
-    if (err2) toast(err2);
-  } else {
-    Hub.up('intent', a);
-  }
-}
-
-function actAdd(){
-  if (!S || S.phase !== 'play') return;
-  var text = $('word').value;
-  if (!text.trim()){ toast('Type a word first.'); return; }
-  if (S.need.length && !S.free){
-    if (myPicks.length !== S.need.length || myPicks.some(function(v){ return !v; })){
-      toast('Pick a relation for every link.');
-      return;
-    }
-    if (new Set(myPicks).size !== myPicks.length){ toast('Each link needs a different relation.'); return; }
-  }
-  var links = S.free ? S.need.map(function(l){ return { rel: 'association', targetId: l.targetId }; }) : S.need.map(function(l, j){ return { rel: myPicks[j], targetId: l.targetId }; });
-  $('word').value = '';
-  myPicks = [];
-  doAction({ a: 'add', text: text, links: links });
-}
-
-function statusText(){
-  if (mode === 'wait') return 'Connecting to the table…';
-  if (toastText) return toastText;
-  if (paused()) return 'The host has left. Waiting for them to come back.';
-  if (!S){
-    if (mode === 'local') return '';
-    if (isHost()) return Hub.roster.length === 1 ? 'Ready when you are.' : 'Choose the rules and start when everyone is here.';
-    return 'Waiting for the host to start a braid.';
-  }
-  return '';
-}
-
-function renderNeed(){
-  var box = $('needBox');
-  clear(box);
-  if (!S || S.phase !== 'play') return;
-  if (!isMyTurn()){
-    box.appendChild(el('p', 'muted', mode === 'local' ? '' : 'Waiting for ' + nm(S.turnId) + ' to add a word.'));
-    return;
-  }
-  if (!S.need.length){
-    box.appendChild(el('p', null, 'The first word is free. Choose anything.'));
-    return;
-  }
-  if (S.free){
-    var line = el('div', 'need-line');
-    line.appendChild(document.createTextNode('Your word must associate with '));
-    S.need.forEach(function(l, j){
-      if (j) line.appendChild(document.createTextNode(' and '));
-      line.appendChild(el('b', null, l.target));
-    });
-    line.appendChild(document.createTextNode(' (free association — any connection).'));
-    box.appendChild(line);
-    return;
-  }
-  if (!S.free){
-    var hand = el('div', 'hand');
-    S.hand.forEach(function(r){ hand.appendChild(el('span', 'chip', r)); });
-    box.appendChild(hand);
-  }
-  var line = el('div', 'need-line');
-  line.appendChild(document.createTextNode('Your word must be '));
-  S.need.forEach(function(l, j){
-    if (j) line.appendChild(document.createTextNode(' and '));
-    var sel = document.createElement('select');
-    sel.className = 'relsel';
-    sel.dataset.j = String(j);
-    var opt = document.createElement('option');
-    opt.value = '';
-    opt.textContent = 'choose…';
-    sel.appendChild(opt);
-    l.allowed.forEach(function(r){
-      var o = document.createElement('option');
-      o.value = r;
-      o.textContent = r;
-      if (myPicks[j] === r) o.selected = true;
-      sel.appendChild(o);
-    });
-    line.appendChild(sel);
-    line.appendChild(document.createTextNode(' '));
-    line.appendChild(el('b', null, l.target));
-  });
-  line.appendChild(document.createTextNode('.'));
-  box.appendChild(line);
-}
-
-function drawBraid(){
-  var box = $('braid');
-  if (!S){ clear(box); return; }
-  var w = S.words;
-  var W = Math.max(640, w.length * 112 + 120);
-  var H = 290;
-  function pos(i){ return { x: 70 + i * 112, y: i % 2 ? 215 : 75 }; }
-  var g = '';
-  g += '<line x1="24" y1="75" x2="' + (W - 24) + '" y2="75" stroke="#d9cfbe" stroke-width="2"/>';
-  g += '<line x1="24" y1="215" x2="' + (W - 24) + '" y2="215" stroke="#d9cfbe" stroke-width="2"/>';
-  for (var i = 1; i < w.length; i++){
-    var a = pos(i - 1), b = pos(i);
-    g += '<path d="M' + a.x + ' ' + a.y + ' C' + (a.x + 56) + ' ' + a.y + ', ' + (b.x - 56) + ' ' + b.y + ', ' + b.x + ' ' + b.y + '" fill="none" stroke="' + playerColor(w[i].by) + '" stroke-width="3" stroke-linecap="round"/>';
-  }
-  for (var i2 = 2; i2 < w.length; i2++){
-    var a2 = pos(i2 - 2), b2 = pos(i2), d2 = a2.y < 145 ? -1 : 1;
-    g += '<path d="M' + a2.x + ' ' + (a2.y + d2 * 24) + ' Q' + ((a2.x + b2.x) / 2) + ' ' + (a2.y + d2 * 72) + ' ' + b2.x + ' ' + (b2.y + d2 * 24) + '" fill="none" stroke="' + playerColor(w[i2].by) + '" stroke-width="1.5" stroke-dasharray="4 4" opacity="0.55"/>';
-  }
-  for (var i3 = 3; i3 < w.length; i3++){
-    var a3 = pos(i3 - 3), b3 = pos(i3), d3 = a3.y < 145 ? -1 : 1;
-    g += '<path d="M' + a3.x + ' ' + (a3.y + d3 * 40) + ' Q' + ((a3.x + b3.x) / 2) + ' ' + (a3.y + d3 * 112) + ' ' + b3.x + ' ' + (b3.y + d3 * 40) + '" fill="none" stroke="' + playerColor(w[i3].by) + '" stroke-width="1" stroke-dasharray="2 5" opacity="0.4"/>';
-  }
-  w.forEach(function(wd, i4){
-    var p = pos(i4);
-    var c = playerColor(wd.by);
-    var tw = Math.min(102, Math.max(46, wd.text.length * 8 + 18));
-    var fs = wd.text.length > 12 ? 11 : (wd.text.length > 8 ? 13 : 15);
-    var squeeze = wd.text.length > 12 ? ' textLength="' + (tw - 14) + '" lengthAdjust="spacingAndGlyphs"' : '';
-    if (i4 === w.length - 1 && !S.over){
-      g += '<rect x="' + (p.x - tw / 2 - 5) + '" y="' + (p.y - 21) + '" width="' + (tw + 10) + '" height="42" rx="21" fill="none" stroke="' + c + '" stroke-width="1" opacity="0.28"/>';
-    }
-    g += '<rect x="' + (p.x - tw / 2) + '" y="' + (p.y - 16) + '" width="' + tw + '" height="32" rx="16" fill="#fffdf8" stroke="' + c + '" stroke-width="2"/>';
-    g += '<text x="' + p.x + '" y="' + (p.y + 5) + '" text-anchor="middle" font-size="' + fs + '" font-family="Georgia, serif" fill="' + (wd.seed ? '#332e26' : c) + '"' + squeeze + '>' + esc(wd.text) + '</text>';
-  });
-  if (!w.length){
-    g += '<text x="' + (W / 2) + '" y="145" text-anchor="middle" font-size="16" font-family="Georgia, serif" fill="#6f675b" font-style="italic">The braid is empty. Add the first word.</text>';
-  }
-  box.innerHTML = '<svg width="' + W + '" height="' + H + '" viewBox="0 0 ' + W + ' ' + H + '" xmlns="http://www.w3.org/2000/svg">' + g + '</svg>';
-}
-
-function renderPeople(){
-  var ul = $('people');
-  clear(ul);
-  if (!S) return;
-  S.order.forEach(function(id){
-    var li = el('li', id === S.turnId && S.phase === 'play' ? 'turn' : null);
-    var label = nm(id) + (mode !== 'local' && id === myId() ? ' (you)' : '');
-    li.appendChild(document.createTextNode(label));
-    if (id === S.host) li.appendChild(el('span', 'badge', 'host'));
-    if (S.vote && S.vote.votes && S.vote.votes[id]) li.appendChild(el('span', 'badge', 'voted'));
-    ul.appendChild(li);
-  });
-}
-
-function scoreChip(label, value){
-  var chip = el('span', 'score');
-  chip.appendChild(document.createTextNode(label + ': ' + value));
-  return chip;
-}
-
-function renderScores(){
-  var box = $('scores');
-  clear(box);
-  if (!S) return;
-  if (S.order.length === 1){
-    var kept = S.words.filter(function(w){ return !w.seed; }).length;
-    box.appendChild(scoreChip('Words kept', kept));
-    box.appendChild(scoreChip('Dropped', S.dropped));
-    box.appendChild(scoreChip('Score', soloScore()));
-    return;
-  }
-  S.order.forEach(function(id){
-    var chip = el('span', 'score');
-    var dot = el('span', 'dot');
-    dot.style.background = playerColor(id);
-    chip.appendChild(dot);
-    chip.appendChild(document.createTextNode(nm(id) + ': ' + scoreOf(id)));
-    box.appendChild(chip);
-  });
-  if (S.dropped) box.appendChild(scoreChip('Dropped', S.dropped));
-}
-
-function makeButton(label, fn, primary){
-  var b = el('button', primary ? 'primary' : null, label);
-  b.type = 'button';
-  b.addEventListener('click', fn);
-  return b;
-}
-
-function voteTally(v){
-  var elig = eligibleVoters(v);
-  var yes = 0, no = 0, waiting = [];
-  elig.forEach(function(id){
-    if (v.votes[id] === 'yes') yes++;
-    else if (v.votes[id] === 'no') no++;
-    else waiting.push(nm(id));
-  });
-  var yesLabel = v.kind === 'challenge' ? 'Holds' : 'Home';
-  var noLabel = v.kind === 'challenge' ? 'Breaks' : 'Not yet';
-  var s = yesLabel + ' ' + yes + ' · ' + noLabel + ' ' + no;
-  if (waiting.length) s += ' · waiting for ' + joinNames(waiting);
-  else s += ' · counting…';
-  return s;
-}
-
-function renderVote(){
-  var box = $('vote');
-  clear(box);
-  var active = !!S && !!S.vote && (S.phase === 'challenge' || S.phase === 'home');
-  box.classList.toggle('hidden', !active);
-  if (!active) return;
-
-  var v = S.vote;
-  box.appendChild(el('h2', null, S.phase === 'challenge' ? 'Challenge' : 'Call Home'));
-
-  if (S.phase === 'challenge'){
-    var last = S.words[S.words.length - 1];
-    var p = el('p', 'linkline');
-    p.appendChild(document.createTextNode(nm(last.by) + ' must name each link: '));
-    if (last.links.length){
-      last.links.forEach(function(l, k){
-        if (k) p.appendChild(document.createTextNode(', '));
-        p.appendChild(el('b', null, last.text));
-        p.appendChild(document.createTextNode(' is '));
-        p.appendChild(el('b', null, l.rel));
-        p.appendChild(document.createTextNode(' '));
-        p.appendChild(el('b', null, l.target));
-      });
-      p.appendChild(document.createTextNode('.'));
-    } else {
-      p.appendChild(document.createTextNode('It has no links to check.'));
-    }
-    box.appendChild(p);
-  } else {
-    var first = S.words[0];
-    var lastWord = S.words[S.words.length - 1];
-    var hp = el('p', 'linkline');
-    hp.appendChild(document.createTextNode('Does '));
-    hp.appendChild(el('b', null, lastWord.text));
-    hp.appendChild(document.createTextNode(' tie back to the first word, '));
-    hp.appendChild(el('b', null, first.text));
-    hp.appendChild(document.createTextNode(', by one link?'));
-    box.appendChild(hp);
-  }
-
-  if (mode === 'local' || S.order.length === 1){
-    var row = el('div', 'votebtns');
-    if (S.phase === 'challenge'){
-      row.appendChild(makeButton('It holds', function(){ doAction({ a:'resolve', kind:'challenge', yes:true }); }, true));
-      row.appendChild(makeButton('It breaks (drop the word)', function(){ doAction({ a:'resolve', kind:'challenge', yes:false }); }));
-    } else {
-      row.appendChild(makeButton('Yes, Home', function(){ doAction({ a:'resolve', kind:'home', yes:true }); }, true));
-      row.appendChild(makeButton('Not yet', function(){ doAction({ a:'resolve', kind:'home', yes:false }); }));
-    }
-    box.appendChild(row);
-    return;
-  }
-
-  if (paused()){
-    box.appendChild(el('p', 'tally', 'The host has left. Waiting for them to come back.'));
-    return;
-  }
-
-  var me = myId();
-  if (S.phase === 'challenge' && me === v.author){
-    box.appendChild(el('p', 'tally', 'You wrote this word, so the table decides.'));
-  } else if (v.votes[me]){
-    var myVote = v.votes[me] === 'yes' ? (S.phase === 'challenge' ? 'holds' : 'Home') : (S.phase === 'challenge' ? 'breaks' : 'not yet');
-    box.appendChild(el('p', 'tally', 'You voted ' + myVote + '.'));
-  } else {
-    var row2 = el('div', 'votebtns');
-    if (S.phase === 'challenge'){
-      row2.appendChild(makeButton('It holds', function(){ doAction({ a:'vote', value:'yes' }); }, true));
-      row2.appendChild(makeButton('It breaks', function(){ doAction({ a:'vote', value:'no' }); }));
-    } else {
-      row2.appendChild(makeButton('Yes, Home', function(){ doAction({ a:'vote', value:'yes' }); }, true));
-      row2.appendChild(makeButton('Not yet', function(){ doAction({ a:'vote', value:'no' }); }));
-    }
-    box.appendChild(row2);
-  }
-  box.appendChild(el('p', 'tally', voteTally(v)));
-}
-
-function renderOver(){
-  var box = $('over');
-  clear(box);
-  var show = !!S && S.over;
-  box.classList.toggle('hidden', !show);
-  if (!show) return;
-  box.appendChild(el('h2', null, 'Braid closed'));
-  if (S.order.length === 1){
-    var kept = S.words.filter(function(w){ return !w.seed; }).length;
-    box.appendChild(el('p', null, 'You kept ' + kept + ' word' + (kept === 1 ? '' : 's') + ' and dropped ' + S.dropped + '. Score: ' + soloScore() + '.'));
-  } else {
-    var scored = S.order.map(function(id){ return { name: nm(id), score: scoreOf(id) }; });
-    scored.sort(function(a, b){ return b.score - a.score; });
-    var top = scored.length ? scored[0].score : 0;
-    var winners = scored.filter(function(x){ return x.score === top; });
-    if (winners.length === 1) box.appendChild(el('p', null, winners[0].name + ' wins with ' + top + ' word' + (top === 1 ? '' : 's') + '.'));
-    else box.appendChild(el('p', null, 'It is a tie at ' + top + ' word' + (top === 1 ? '' : 's') + '.'));
-  }
-  box.appendChild(el('p', 'tally', isHost() ? 'Start a new braid when everyone is ready.' : 'Waiting for the host to start a new braid.'));
-}
-
-function renderGame(){
-  var playing = S.phase === 'play';
-  var over = S.over;
-  var gone = paused();
-  var myTurn = isMyTurn();
-  if (needKey() !== pickKey){ myPicks = []; pickKey = needKey(); }
-
-  var turn = $('turnLine');
-  if (over) turn.textContent = 'The braid is closed.';
-  else if (S.phase === 'challenge') turn.textContent = 'Challenge: ' + (S.vote ? nm(S.vote.author) : 'the author') + ' must name the links.';
-  else if (S.phase === 'home') turn.textContent = 'Home: does the last word tie back to the first?';
-  else if (mode === 'local') turn.textContent = S.order.length === 1 ? 'Your turn.' : 'Player ' + ((S.order.indexOf(S.turnId) + 1) || 1) + "'s turn.";
-  else if (S.turnId === myId()) turn.textContent = 'Your turn.';
-  else turn.textContent = 'Waiting for ' + nm(S.turnId) + '.';
-
-  renderNeed();
-
-  $('entryRow').classList.toggle('hidden', !playing || !myTurn || gone);
-  $('addBtn').disabled = !playing || !myTurn || gone;
-  $('word').disabled = !playing || !myTurn || gone;
-  $('challengeBtn').classList.toggle('hidden', !playing);
-  $('homeBtn').classList.toggle('hidden', !playing);
-  $('challengeBtn').disabled = !playing || S.words.length < 2 || gone;
-  $('homeBtn').disabled = !playing || S.words.length < 2 || gone;
-  $('newBtn').classList.toggle('hidden', !isHost());
-
-  drawBraid();
-  renderPeople();
-  renderScores();
-  renderVote();
-  renderOver();
-}
-
 function render(){
-  var showGame = !!S;
-  var showLobby = !S && (mode === 'local' || mode === 'hub');
-  $('lobby').classList.toggle('hidden', !showLobby);
-  $('game').classList.toggle('hidden', !showGame);
-
-  var canSetup = !S && (mode === 'local' || (mode === 'hub' && isHost()));
-  $('lobbyControls').classList.toggle('hidden', !canSetup);
-  $('countWrap').classList.toggle('hidden', mode !== 'local');
-  $('startBtn').classList.toggle('hidden', !canSetup);
-  if (canSetup) $('startBtn').textContent = mode === 'hub' && Hub.roster.length === 1 ? 'Start solo braid' : 'Start braid';
-  $('waitHost').classList.toggle('hidden', !(mode === 'hub' && !S && !isHost()));
-
-  var st = statusText();
-  $('status').textContent = st;
-  $('status').classList.toggle('hidden', !st);
-
-  if (showGame) renderGame();
-  reportHeight();
+ $('lobby').classList.toggle('hidden',!!S);$('game').classList.toggle('hidden',!S);
+ $('setup').classList.toggle('hidden',mode==='hub');$('start').classList.toggle('hidden',mode==='hub'&&!isHost());
+ $('waiting').classList.toggle('hidden',!(mode==='hub'&&!isHost()&&!S));
+ if(!S)return;
+ let isTurn=myId()===S.turnId;
+ $('turn').textContent=S.phase==='resolve'?'Stitch complete — find the linked pair.':(isTurn?'Your turn to add a word.':'Waiting for '+nameOf(S.turnId)+'.');
+ $('prompt').textContent=S.phase==='add'?(S.current.length===0?'Start with any word.':S.current.length===1?'One word is down; add the second.':'Two words are down; add the third.'):'';
+ $('entry').classList.toggle('hidden',S.phase!=='add'||!isTurn);
+ $('resolve').classList.toggle('hidden',S.phase!=='resolve');
+ $('currentWords').innerHTML='';
+ S.current.forEach((w,i)=>{let d=document.createElement('div');d.className='word';d.innerHTML='<strong>'+esc(w.text)+'</strong><small>'+(S.history.length&&i===0?'carried loose strand':'')+'</small>'; $('currentWords').appendChild(d)});
+ $('currentNote').textContent=S.phase==='resolve'?'All three words are in. Decide which two belong together.':S.current.length===1?'The loose strand from the previous stitch is carried forward.':'';
+ renderChoices();renderHistory();renderPeople();
+ $('new').classList.toggle('hidden',!isHost());
 }
-
-$('startBtn').addEventListener('click', function(){
-  if (mode === 'local') startLocal();
-  else if (isHost()) startGame();
+function renderChoices(){
+ let box=$('choices');box.innerHTML='';
+ if(!S||S.phase!=='resolve')return;
+ [[0,1],[0,2],[1,2]].forEach(pair=>{
+  let label=document.createElement('label');label.className='pairchoice';
+  let radio=document.createElement('input');radio.type='radio';radio.name='pair';radio.value=pair.join(',');
+  if(S.selected===pair.join(','))radio.checked=true;
+  radio.addEventListener('change',()=>{S.selected=pair.join(',')});
+  label.appendChild(radio);label.appendChild(document.createTextNode(S.current[pair[0]].text+' + '+S.current[pair[1]].text));
+  box.appendChild(label);
+ });
+ let canResolve=mode==='local'||myId()===S.resolver;
+ $('confirm').disabled=!canResolve;
+ $('reason').disabled=!canResolve;
+ $('resolverNote').textContent=canResolve?'Choose the pair and enter the reason.':nameOf(S.resolver)+' is choosing the pair.';
+}
+function renderHistory(){
+ let box=$('history');box.innerHTML='';
+ S.history.forEach((st,i)=>{
+  let div=document.createElement('div');div.className='stitch';
+  let words=st.words.map((w,j)=>'<div class="word '+(j===st.loose?'loose':'linked')+'"><strong>'+esc(w)+'</strong><small>'+(j===st.loose?'loose strand':'linked pair')+'</small></div>').join('');
+  let linked=st.linked.map(j=>st.words[j]).join(' + ');
+  div.innerHTML='<div class="stitchhead">Stitch '+(i+1)+'</div><div class="wordrow">'+words+'</div><div class="result"><b>'+esc(linked)+'</b> — '+esc(st.reason)+'<br><span class="muted">Loose strand carried forward: <b>'+esc(st.words[st.loose])+'</b></span></div>';
+  box.appendChild(div);
+ });
+ if(!S.history.length)box.innerHTML='<p class="muted">Your completed stitches will appear here.</p>';
+}
+function renderPeople(){
+ let ul=$('people');ul.innerHTML='';
+ S.order.forEach(id=>{let li=document.createElement('li');li.textContent=nameOf(id)+(S.phase==='add'&&id===S.turnId?' · up next':'');if(S.phase==='add'&&id===S.turnId)li.className='turn';ul.appendChild(li)});
+}
+function exportHtml(){
+ if(!S)return;
+ let body='<h1>Braid</h1><p>A word game of linked strands and loose ends.</p>';
+ S.history.forEach((st,i)=>{body+='<section><h2>Stitch '+(i+1)+'</h2><p>'+st.words.map((w,j)=>'<b>'+esc(w)+'</b>'+(j===st.loose?' (loose strand)':'')).join(' — ')+'</p><p><b>Linked pair:</b> '+esc(st.linked.map(j=>st.words[j]).join(' + '))+'</p><p><b>Why:</b> '+esc(st.reason)+'</p><p><b>Loose strand carried forward:</b> '+esc(st.words[st.loose])+'</p></section>'});
+ if(S.current.length)body+='<section><h2>Current stitch in progress</h2><p>'+S.current.map(w=>'<b>'+esc(w.text)+'</b>').join(' — ')+'</p></section>';
+ let doc='<!doctype html><html lang="en"><meta charset="utf-8"><meta name="viewport" content="width=device-width"><title>Braid record</title><style>body{max-width:760px;margin:40px auto;padding:0 20px;font:16px/1.6 system-ui;color:#332e26;background:#f5f0e6}section{background:#fffdf8;border:1px solid #d9cfbe;border-radius:12px;padding:18px;margin:16px 0}h1{font: bold 42px Georgia}</style><body>'+body+'</body></html>';
+ let blob=new Blob([doc],{type:'text/html'}),url=URL.createObjectURL(blob),a=document.createElement('a');a.href=url;a.download='braid-record.html';a.click();URL.revokeObjectURL(url);
+}
+$('start').addEventListener('click',()=>{if(mode==='local')localStart();else if(isHost()){let order=Hub.roster.map(p=>p.id),names={};Hub.roster.forEach(p=>names[p.id]=p.name);start(order,names)}});
+$('add').addEventListener('click',()=>{let t=$('wordInput').value;if(!t.trim())return;say('');$('wordInput').value='';act({a:'add',text:t})});
+$('wordInput').addEventListener('keydown',e=>{if(e.key==='Enter')$('add').click()});
+$('confirm').addEventListener('click',()=>{let r=document.querySelector('input[name="pair"]:checked');let reason=$('reason').value.trim();if(!r||!reason){say('Choose a pair and explain the connection.');return}act({a:'resolve',pair:r.value.split(',').map(Number),reason});$('reason').value=''});
+$('export').addEventListener('click',exportHtml);
+$('new').addEventListener('click',()=>{if(mode==='local')localStart();else if(isHost())act({a:'new'})});
+window.addEventListener('message',e=>{
+ let m=e.data;if(!m||m.t!=='gd'||m.game!=='braid')return;
+ if(m.k==='roster'){Hub.me=m.p.you;Hub.roster=m.p.roster||[];mode='hub';if(isHost()&&S)Hub.up('state',S);else if(!S)render()}
+ if(m.k==='state'&&!(mode==='hub'&&isHost()&&S)){S=m.p;mode='hub';render()}
+ if(m.k==='intent'&&isHost()){let a=m.p,from=m.from&&m.from.id;if(a.a==='new'){let order=Hub.roster.map(p=>p.id),names={};Hub.roster.forEach(p=>names[p.id]=p.name);start(order,names)}else apply(a,from);if(S)Hub.up('state',S)}
 });
-$('newBtn').addEventListener('click', function(){
-  if (mode === 'local') startLocal();
-  else if (isHost()) doAction({ a: 'new' });
-});
-$('addBtn').addEventListener('click', actAdd);
-$('word').addEventListener('keydown', function(e){ if (e.key === 'Enter'){ e.preventDefault(); actAdd(); } });
-$('challengeBtn').addEventListener('click', function(){ doAction({ a:'challenge' }); });
-$('homeBtn').addEventListener('click', function(){ doAction({ a:'home' }); });
-$('needBox').addEventListener('change', function(e){
-  if (e.target.classList && e.target.classList.contains('relsel')) myPicks[+e.target.dataset.j] = e.target.value;
-});
-$('rules').addEventListener('toggle', reportHeight);
-window.addEventListener('resize', function(){ render(); });
-document.addEventListener('visibilitychange', function(){ if (!document.hidden && mode === 'hub') Hub.up('hello'); });
-document.addEventListener('click', function(){ Hub.up('hello'); }, { once: true });
-window.addEventListener('error', function(e){
-  toast('Error: ' + (e.message || 'script error'));
-});
-
-Hub.init();
-render();
+mode='local';render();Hub.up('hello');setTimeout(()=>{if(!Hub.me){mode='local';render()}},1200);
 })();
 </script>
-</body>
-</html>
+</body></html>
