@@ -15,6 +15,7 @@ import { createRecord } from '../plugins/record.js';
 
 const SKEY = 'bubhub.session.v2';
 const NAME_KEY = 'bubhub.name';
+const THINGS = [];
 
 function loadSession() {
   try { return JSON.parse(sessionStorage.getItem(SKEY) || 'null'); } catch (e) { return null; }
@@ -391,6 +392,37 @@ export async function boot() {
       sb.innerHTML = '';
       roomLists(registry).solo.forEach(function (g) { sb.appendChild(gameButton(g, 'solo')); });
     }
+  }
+
+  function renderThings() {
+    const ul = document.getElementById('things-made-list');
+    if (!ul) return;
+    ul.innerHTML = '';
+    if (!THINGS.length) {
+      const li = document.createElement('li');
+      li.className = 'text-slate-500 text-xs italic';
+      li.textContent = 'Nothing yet — no bubs have made a thing.';
+      ul.appendChild(li);
+      return;
+    }
+    THINGS.forEach(function (t) {
+      const li = document.createElement('li');
+      const b = document.createElement('button');
+      b.className = 'btn-bouncy rounded-xl px-3 py-2 text-sm font-bold';
+      b.style.background = '#0f766e';
+      b.textContent = t.title;
+      b.addEventListener('click', function () { openThing(t); });
+      li.appendChild(b);
+      ul.appendChild(li);
+    });
+  }
+
+  function openThing(t) {
+    const slug = 'show-' + String(t.title || '').toLowerCase().replace(/[^a-z0-9]+/g, '-');
+    closeStageOnly();
+    compat.open({ id: slug, title: t.title, file: t.file, fill: false, height: 560 }, t.file);
+    const ft = document.getElementById('focus-title');
+    if (ft) ft.textContent = t.title;
   }
 
   // ---------- opening games ----------
@@ -1253,6 +1285,7 @@ export async function boot() {
     document.getElementById('player-name').value = getName();
 
     renderButtons();
+    renderThings();
     renderNameGate();
     renderRoster();
 

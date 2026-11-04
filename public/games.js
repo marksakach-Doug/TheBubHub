@@ -17,7 +17,7 @@ window.BUB_GAMES = [
     icon: '🔔', desc: 'Build a chain-reaction machine together out of parts, then press play and watch it go.' },
   { id: 'daltadka', file: 'daltadka.html', title: 'Dal Tadka', players: 'solo', color: '#d9b26f', solo: true, lobby: true, fill: true,
     icon: '🍲', desc: 'Cook dal.' },
-  { id: 'warp', file: 'warpfront.html', title: 'Warp Front', players: '1-3', color: '#00ffcc', soloable: true, disabled: true,
+  { id: 'warp', file: 'warpfront.html', title: 'Warp Front', players: '1-3', color: '#00ffcc', soloable: true,
     icon: '🛸', desc: 'A co-op race to save planets. Borg are the bad guys. Get to the planets first.' },
   { id: 'lotr', file: 'lotr.html', title: 'LOTR Cards', players: '2-8', color: '#b9c98a',
     // `grow` (not `fill`): the frame is sized to the game and the WHOLE PAGE

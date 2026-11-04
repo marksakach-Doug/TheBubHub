@@ -335,8 +335,8 @@ function drawCurve(x0,y0,x1,y1,color,isOver,isDashed){
   let dash=isDashed?' stroke-dasharray="5 5"':'';
   let s='';
   if(isOver)s+=`<path d="${d}" fill="none" stroke="#faf5ec" stroke-width="13" stroke-linecap="round"/>`;
-  s+=`<path d="${d}" fill="none" stroke="${color}" stroke-width="7" stroke-linecap="round" opacity="${isDashed?.12:.18}"${dash}/>`;
-  s+=`<path d="${d}" fill="none" stroke="${color}" stroke-width="${isOver?3.4:2.8}" stroke-linecap="round" opacity="${isDashed?.6:.92}"${dash}/>`;
+  s+=`<path d="${d}" fill="none" stroke="${color}" stroke-width="7" stroke-linecap="round" opacity="${isDashed ? .12 : .18}"${dash}/>`;
+  s+=`<path d="${d}" fill="none" stroke="${color}" stroke-width="${isOver?3.4:2.8}" stroke-linecap="round" opacity="${isDashed ? .6 : .92}"${dash}/>`;
   return s;
 }
 
