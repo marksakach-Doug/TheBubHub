@@ -35,7 +35,11 @@ p{margin:6px 0}.muted{color:var(--muted);font-size:14px}
 .status{min-height:1.4em;margin:0 0 12px;color:#874c2d;font-weight:700}.status:empty{display:none}
 .setup{display:flex;gap:12px;align-items:end;flex-wrap:wrap}.setup label{width:180px}
 .actions{display:flex;gap:9px;align-items:center;flex-wrap:wrap;margin-top:12px}
-.turnline{font-weight:750;font-size:17px;margin-bottom:4px}
+.turnhead{display:flex;justify-content:space-between;align-items:center;gap:12px;flex-wrap:wrap;margin-bottom:4px}
+.turnline{font-weight:750;font-size:17px}
+.timer{font-variant-numeric:tabular-nums;font-weight:800;font-size:15px;padding:4px 12px;border-radius:999px;background:var(--wash);border:1px solid var(--line);color:var(--ink)}
+.timer.urgent{background:#f9e6e2;border-color:#c96a5b;color:#9e2f20}
+.timer.paused{background:#f3eee5;color:var(--muted)}
 .prompt{color:var(--muted);margin-bottom:10px}
 .entry{display:flex;gap:8px;align-items:stretch;margin-top:10px}
 .entry input{flex:1;min-width:0;font-size:17px}
@@ -51,6 +55,7 @@ p{margin:6px 0}.muted{color:var(--muted);font-size:14px}
 .playerlist{display:flex;gap:7px;flex-wrap:wrap;padding:0;margin:0;list-style:none}
 .playerlist li{display:flex;align-items:center;gap:7px;padding:6px 11px;background:var(--wash);border-radius:99px;font-size:13px}
 .playerlist li.current{outline:2px solid var(--accent);font-weight:800}
+.playerlist li.out{opacity:.45;text-decoration:line-through}
 .dot{width:9px;height:9px;border-radius:50%;display:inline-block}
 details summary{cursor:pointer;font-weight:750;color:#805033}
 details p{max-width:78ch;font-size:14px}
@@ -66,28 +71,30 @@ details p{max-width:78ch;font-size:14px}
 
   <section id="lobby" class="card">
     <h2>Gather the strands</h2>
-    <p class="muted">Three strands weave alternately over the middle. Three seed words start the braid.</p>
+    <p class="muted">Three strands weave alternately over the middle. Two seed words start the braid; beat the 60-second clock to stay alive.</p>
     <div class="setup"><label>Players
       <select id="playerCount"><option value="2" selected>2 players</option><option value="3">3 players</option><option value="4">4 players</option><option value="5">5 players</option><option value="6">6 players</option></select>
-    </label><button id="start" class="primary">Start braid</button><button id="lobbyDownload">Download HTML</button><span id="waiting" class="muted hidden">Waiting for the host to start.</span></div>
+    </label><button id="start" class="primary">Start braid</button><span id="waiting" class="muted hidden">Waiting for the host to start.</span></div>
   </section>
 
   <main id="game" class="hidden">
     <section class="card">
-      <div id="turn" class="turnline"></div>
+      <div class="turnhead">
+        <div id="turn" class="turnline"></div>
+        <div id="timer" class="timer hidden" aria-live="off">1:00</div>
+      </div>
       <div id="prompt" class="prompt"></div>
       <div id="seedEntry" class="entry hidden"><input id="seedWord" type="text" maxlength="32" autocomplete="off" placeholder="Your one seed word"><button id="addSeed" class="primary">Add seed word</button></div>
       <div id="playEntry" class="hidden">
         <div class="entry"><input id="newWord" type="text" maxlength="32" autocomplete="off" placeholder="One word only" aria-label="Your one-word bridge"><button id="addWord" class="primary">Add one word</button></div>
       </div>
       <div id="judging" class="hidden">
-        <h2>Does the pivot hold?</h2>
+        <h2 id="judgeHeading">Other players: vote</h2>
         <p id="judgePrompt" class="muted"></p>
-        <div class="judgegrid">
+        <div id="judgeControls" class="judgegrid">
           <div class="judgeitem"><strong id="judgeQSyn">Is it associated?</strong><div class="toggle"><button data-kind="syn" data-value="yes">Yes</button><button data-kind="syn" data-value="no">No</button></div></div>
           <div class="judgeitem"><strong id="judgeQAnt">Is it clearly NOT associated?</strong><div class="toggle"><button data-kind="ant" data-value="yes">Yes</button><button data-kind="ant" data-value="no">No</button></div></div>
         </div>
-        <div class="actions"><button id="confirmJudgment" class="primary" disabled>Confirm</button></div>
       </div>
     </section>
 
@@ -98,16 +105,16 @@ details p{max-width:78ch;font-size:14px}
 
     <section class="card">
       <h2>Players</h2><ul id="players" class="playerlist"></ul>
-      <div class="actions"><button id="export">Save braid as HTML</button><button id="downloadHtml">Download game HTML</button><button id="new" class="hidden">New braid</button><button id="lobbyBtn" class="hidden">Back to lobby</button></div>
+      <div class="actions"><button id="new" class="hidden">New braid</button><button id="lobbyBtn" class="hidden">Back to lobby</button></div>
     </section>
   </main>
 
   <details class="card"><summary>How to play</summary>
     <div class="rulesgrid">
-      <p><b>1. Seed the three strands.</b> The first three turns place one starting word on the Left, Middle, and Right strands.</p>
-      <p><b>2. Cross over the middle.</b> Strands alternate crossing from the Left and Right over the Middle strand.</p>
-      <p><b>3. Pivot the meaning.</b> Enter one word that is <b>associated</b> with the middle strand's word and <b>clearly NOT associated</b> with the loose outer strand's word.</p>
-      <p><b>4. Weave the braid.</b> If the group agrees both hold, the outer strand crosses into the middle; otherwise the word is discarded and the next player tries the same crossing.</p>
+      <p><b>1. Seed two strands.</b> The first two turns place one starting word on the Middle and Right strands.</p>
+      <p><b>2. Cross and pivot.</b> The active outer strand crosses over the middle: enter one word <b>associated</b> with the middle word and <b>clearly NOT associated</b> with the loose outer word.</p>
+      <p><b>3. Other players vote.</b> Your clock pauses while the other players tap Yes or No on both links. If rejected, your clock resumes and you must try again.</p>
+      <p><b>4. Beat the 60s clock.</b> If your timer hits zero, you are knocked out and the next player takes the turn. Last player standing wins.</p>
     </div>
   </details>
 </div>
@@ -119,15 +126,26 @@ const $=id=>document.getElementById(id);
 const STRAND_COLORS=['#a45f3b','#3f7778','#8a5a72'];
 const SLOT_NAMES=['Left','Middle','Right'];
 const PLAYER_COLORS=['#a45f3b','#3f7778','#8a5a72','#71834e','#746b9b','#b08336'];
+const TURN_MS=60000;
 let S=null, mode='wait', Hub={me:null,roster:[],up(k,p){try{window.parent.postMessage({t:'gu',game:'braid',k,p},'*')}catch(e){}}};
-let verdict={syn:null,ant:null}, pickTurn=null, heightTimer=null;
+let verdict={syn:null,ant:null}, pickTurn=null, focusKey=null, heightTimer=null;
 
 function esc(s){return String(s).replace(/[&<>"']/g,c=>({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;'}[c]));}
 function playerName(id){return S&&S.names[id]||'Player'}
 function myId(){return mode==='local'?'local':Hub.me&&Hub.me.id}
 function isHost(){return mode==='local'||!!(Hub.me&&Hub.me.isHost)}
 function isMyTurn(){return !!S&&(mode==='local'||S.turnId===myId())}
-function nextAfter(id){let i=S.order.indexOf(id);return S.order[(i+1+S.order.length)%S.order.length]}
+function canVote(){return !!S&&S.phase==='judge'&&(mode==='local'||(myId()&&myId()!==S.turnId))}
+function alivePlayers(){return S?S.order.filter(id=>!(S.eliminated||[]).includes(id)):[]}
+function nextAfter(id){
+  if(!S)return null;
+  let n=S.order.length, startIdx=S.order.indexOf(id);
+  for(let step=1;step<=n;step++){
+    let cand=S.order[(startIdx+step+n)%n];
+    if(!(S.eliminated||[]).includes(cand))return cand;
+  }
+  return id;
+}
 function playerColor(id){let i=S?S.order.indexOf(id):0;return PLAYER_COLORS[(i<0?0:i)%PLAYER_COLORS.length]}
 function say(t){$('status').textContent=t;clearTimeout(say.timer);say.timer=setTimeout(()=>{$('status').textContent=''},3200)}
 function syncPickTurn(){
@@ -149,13 +167,15 @@ function latestOnStrand(strandId){
 /*
  * Three-strand state:
  * slots: [leftStrandId, midStrandId, rightStrandId] -> initially [0, 1, 2]
- * nextSide: 'L' (Left outer slot 0 crosses over Middle slot 1) | 'R' (Right outer slot 2 crosses over Middle slot 1)
- * words: array of accepted words (3 seeds at step 0, followed by accepted crossings at step 1..N)
+ * Seed 1 goes on Middle strand (1), Seed 2 goes on Right strand (2).
+ * Then Left strand (0) crosses over Middle (1) on the first play turn.
  */
 function start(order,names){
   S={
     order:order.slice(),
     names:Object.assign({},names),
+    eliminated:[],
+    winnerId:null,
     phase:'seed',
     turnId:order[0],
     seedCount:0,
@@ -165,9 +185,10 @@ function start(order,names){
     nextId:1,
     stepCount:0,
     pending:null,
-    judgeId:null
+    timeLeftMs:TURN_MS,
+    turnDeadline:Date.now()+TURN_MS
   };
-  verdict={syn:null,ant:null};pickTurn=null;postState();
+  verdict={syn:null,ant:null};pickTurn=null;focusKey=null;postState();
 }
 
 function localStart(){
@@ -187,6 +208,11 @@ function currentTargets(){
   return {outerSlot,looseSlot,midSlot,movingStrand,A,B};
 }
 
+function resetClock(){
+  S.timeLeftMs=TURN_MS;
+  S.turnDeadline=Date.now()+TURN_MS;
+}
+
 function apply(a,from){
   if(!S||!a)return;
   if(a.a==='seed'){
@@ -194,7 +220,7 @@ function apply(a,from){
     let text=String(a.text||'').trim();
     if(!validWord(text))return 'Please enter exactly one word.';
     if(S.words.some(w=>w.text.toLowerCase()===text.toLowerCase()))return 'That word is already on the braid.';
-    let strand=S.seedCount;
+    let strand=S.seedCount+1; // Seed 1 -> Middle (1), Seed 2 -> Right (2)
     S.words.push({
       id:S.nextId++,
       text,
@@ -205,11 +231,12 @@ function apply(a,from){
       slots:[0,1,2]
     });
     S.seedCount++;
-    if(S.seedCount>=3){
+    if(S.seedCount>=2){
       S.phase='play';
       S.nextSide='L';
     }
     S.turnId=nextAfter(from);
+    resetClock();
   }else if(a.a==='add'){
     if(S.phase!=='play'||from!==S.turnId)return 'It is not your turn.';
     let text=String(a.text||'').trim();
@@ -217,6 +244,7 @@ function apply(a,from){
     if(S.words.some(w=>w.text.toLowerCase()===text.toLowerCase()))return 'That word is already on the braid.';
     let t=currentTargets();
     if(!t.A||!t.B)return 'Seed words are still needed.';
+    S.timeLeftMs=Math.max(500,S.turnDeadline-Date.now());
     S.pending={
       text,
       by:from,
@@ -226,11 +254,11 @@ function apply(a,from){
       bId:t.B.id,
       slotsBefore:S.slots.slice()
     };
-    S.judgeId=from;
     S.phase='judge';
   }else if(a.a==='judge'){
-    if(S.phase!=='judge'||from!==S.judgeId)return "Only the word's author can confirm.";
-    if(!['yes','no'].includes(a.syn)||!['yes','no'].includes(a.ant))return 'Mark both Yes or No.';
+    if(S.phase!=='judge')return null;
+    if(mode==='hub'&&from===S.turnId)return 'The other players vote on your word.';
+    if(!['yes','no'].includes(a.syn)||!['yes','no'].includes(a.ant))return 'Vote Yes or No on both links.';
     let p=S.pending;if(!p)return 'Missing pending word.';
     let synOk=a.syn==='yes', antOk=a.ant==='yes';
 
@@ -257,11 +285,31 @@ function apply(a,from){
         bId:p.bId
       });
       S.nextSide=S.nextSide==='L'?'R':'L';
+      let doneBy=S.turnId;
+      S.pending=null;
+      S.phase='play';
+      S.turnId=nextAfter(doneBy);
+      resetClock();
     }else{
-      say('Word discarded — the next player tries the same crossing.');
+      S.pending=null;
+      S.phase='play';
+      S.turnDeadline=Date.now()+Math.max(500,S.timeLeftMs||TURN_MS);
+      say('Rejected — clock resumed! Try another word.');
     }
-    let doneBy=S.judgeId;
-    S.pending=null;S.judgeId=null;S.phase='play';S.turnId=nextAfter(doneBy);
+  }else if(a.a==='timeout'){
+    if((S.phase!=='seed'&&S.phase!=='play')||!isHost())return null;
+    let outId=S.turnId;
+    if(!S.eliminated.includes(outId))S.eliminated.push(outId);
+    let alive=alivePlayers();
+    if(alive.length<=1){
+      S.phase='gameover';
+      S.winnerId=alive[0]||outId;
+      say(`${playerName(outId)} ran out of time! ${playerName(S.winnerId)} wins!`);
+    }else{
+      S.turnId=nextAfter(outId);
+      resetClock();
+      say(`${playerName(outId)} ran out of time and is knocked out!`);
+    }
   }else if(a.a==='new'){
     if(!isHost())return 'Only the host can start a new braid.';
     if(mode==='local')localStart();
@@ -276,8 +324,8 @@ function apply(a,from){
 
 function act(a){
   let from;
-  if(mode==='local')from=S?(a.a==='judge'?S.judgeId:S.turnId):'local';
-  else if(isHost())from=myId();
+  if(mode==='local')from=S?(a.a==='judge'?'voters':S.turnId):'local';
+  else from=myId();
   if(mode==='local'||isHost()){let e=apply(a,from);if(e)say(e)}
   else Hub.up('intent',a);
 }
@@ -318,6 +366,7 @@ function svgBoard(){
     [0,1,2].forEach(lane=>{
       out+=`<line x1="40" y1="${Y[lane]}" x2="${W-40}" y2="${Y[lane]}" stroke="${STRAND_COLORS[lane]}" stroke-width="2.5" opacity=".25" stroke-dasharray="4 8"/>`;
     });
+    out+=`<circle cx="${X0}" cy="${Y[0]}" r="6" fill="${STRAND_COLORS[0]}"/>`;
     seeds.forEach(w=>{
       out+=drawBead(X0,Y[w.strand],w.text,STRAND_COLORS[w.strand],false);
     });
@@ -326,6 +375,7 @@ function svgBoard(){
   }
 
   let beads=[];
+  out+=`<circle cx="${X0}" cy="${Y[0]}" r="6" fill="${STRAND_COLORS[0]}"/>`;
   seeds.forEach(w=>{
     beads.push({x:X0,y:Y[w.strand],text:w.text,strand:w.strand});
   });
@@ -371,12 +421,39 @@ function drawBoard(){
 function renderPlayers(){
   let ul=$('players');ul.innerHTML='';
   S.order.forEach(id=>{
+    let isOut=(S.eliminated||[]).includes(id);
+    let isCurrent=(S.phase==='seed'||S.phase==='play'||S.phase==='judge')&&id===S.turnId&&!isOut;
     let li=document.createElement('li');
-    if((S.phase==='seed'||S.phase==='play')&&id===S.turnId)li.className='current';
+    if(isCurrent)li.className='current';
+    else if(isOut)li.className='out';
     let dot=document.createElement('i');dot.className='dot';dot.style.background=playerColor(id);
-    li.append(dot,document.createTextNode(playerName(id)+(id===S.turnId&&S.phase!=='judge'?' · up next':'')));
+    let suffix=isOut?' · out':(S.phase==='gameover'&&id===S.winnerId?' · winner':(isCurrent?' · active':''));
+    li.append(dot,document.createTextNode(playerName(id)+suffix));
     ul.append(li);
   });
+}
+
+function fmtClock(ms){
+  let s=Math.max(0,Math.ceil(ms/1000));
+  let m=Math.floor(s/60), r=s%60;
+  return m+':'+(r<10?'0':'')+r;
+}
+
+function updateTimerDisplay(){
+  let el=$('timer');
+  if(!S||S.phase==='gameover'){el.classList.add('hidden');return}
+  el.classList.remove('hidden');
+  if(S.phase==='judge'){
+    el.textContent='Paused · '+fmtClock(S.timeLeftMs||0);
+    el.className='timer paused';
+    return;
+  }
+  let rem=Math.max(0,(S.turnDeadline||0)-Date.now());
+  el.textContent=fmtClock(rem);
+  el.className='timer'+(rem<=10000?' urgent':'');
+  if(rem<=0&&isHost()){
+    apply({a:'timeout'},S.turnId);
+  }
 }
 
 function render(){
@@ -386,30 +463,36 @@ function render(){
   $('waiting').classList.toggle('hidden',!(mode==='hub'&&!S&&!isHost()));
   if(!S){$('status').textContent=mode==='wait'?'Connecting to the shared table…':'';reportHeight();return}
   syncPickTurn();
+  updateTimerDisplay();
 
-  let myTurn=isMyTurn(), judgeTurn=S.phase==='judge'&&(mode==='local'||S.judgeId===myId());
+  let myTurn=isMyTurn(), voter=canVote();
   let t=currentTargets();
 
-  $('turn').textContent=S.phase==='seed'
-    ?(myTurn?`${playerName(S.turnId)}: lay a seed word.`:`Waiting for ${playerName(S.turnId)} to lay a seed word.`)
-    :S.phase==='play'
-    ?(myTurn?`${playerName(S.turnId)}’s turn.`:`Waiting for ${playerName(S.turnId)}.`)
-    :(judgeTurn?'Check both links together.':`${playerName(S.judgeId)} is checking the links.`);
-
-  $('prompt').textContent=S.phase==='seed'
-    ?`Add one word to start the ${SLOT_NAMES[S.seedCount]} strand (seed ${S.seedCount+1} of 3).`
-    :S.phase==='play'
-    ?`Enter a word that is associated with “${t.A?t.A.text:''}” and clearly NOT associated with “${t.B?t.B.text:''}”.`
-    :`The new word is “${S.pending.text}”. Does the pivot hold?`;
+  if(S.phase==='gameover'){
+    $('turn').textContent=`${playerName(S.winnerId)} is the last one standing!`;
+    $('prompt').textContent='Game over. Start a new braid to play again.';
+  }else if(S.phase==='seed'){
+    let strandName=SLOT_NAMES[S.seedCount+1];
+    $('turn').textContent=myTurn?`${playerName(S.turnId)}: lay a seed word.`:`Waiting for ${playerName(S.turnId)} to lay a seed word.`;
+    $('prompt').textContent=`Add one word to start the ${strandName} strand (seed ${S.seedCount+1} of 2).`;
+  }else if(S.phase==='play'){
+    $('turn').textContent=myTurn?`${playerName(S.turnId)}’s turn.`:`Waiting for ${playerName(S.turnId)}.`;
+    $('prompt').textContent=`Enter a word that is associated with “${t.A?t.A.text:''}” and clearly NOT associated with “${t.B?t.B.text:''}”.`;
+  }else if(S.phase==='judge'){
+    $('turn').textContent=voter?`Other players: vote on ${playerName(S.turnId)}’s word.`:`Waiting for the other players to vote on “${S.pending?S.pending.text:''}”…`;
+    $('prompt').textContent=`Timer paused for ${playerName(S.turnId)}.`;
+  }
 
   $('seedEntry').classList.toggle('hidden',!(S.phase==='seed'&&myTurn));
   $('playEntry').classList.toggle('hidden',!(S.phase==='play'&&myTurn));
-  $('judging').classList.toggle('hidden',S.phase!=='judge'||!judgeTurn);
+  $('judging').classList.toggle('hidden',S.phase!=='judge');
 
   if(S.phase==='judge'&&S.pending){
     let aWord=byId(S.pending.aId), bWord=byId(S.pending.bId);
     let aText=aWord?aWord.text:'', bText=bWord?bWord.text:'';
-    $('judgePrompt').textContent=`“${S.pending.text}” · associated with “${aText}”? · clearly NOT associated with “${bText}”?`;
+    $('judgeHeading').textContent=voter?`Other players: vote on “${S.pending.text}”`:`Players are voting on “${S.pending.text}”`;
+    $('judgePrompt').textContent=voter?'Tap Yes or No for both links to immediately resolve:':'Hold tight while the rest of the table votes.';
+    $('judgeControls').classList.toggle('hidden',!voter);
     $('judgeQSyn').textContent=`Is “${S.pending.text}” associated with “${aText}”?`;
     $('judgeQAnt').textContent=`Is “${S.pending.text}” clearly NOT associated with “${bText}”?`;
     document.querySelectorAll('[data-kind]').forEach(btn=>{
@@ -418,43 +501,28 @@ function render(){
       btn.classList.toggle('yes',v==='yes'&&btn.dataset.value==='yes');
       btn.classList.toggle('no',v==='no'&&btn.dataset.value==='no');
     });
-    $('confirmJudgment').disabled=!judgeTurn||!verdict.syn||!verdict.ant;
   }
 
   $('new').classList.toggle('hidden',!isHost());
   $('lobbyBtn').classList.toggle('hidden',!isHost());
   drawBoard();renderPlayers();reportHeight();
-}
 
-function exportHtml(){
-  if(!S)return;
-  let svg=svgBoard();
-  let rows=S.words.map(w=>{
-    if(w.seed)return `<li><b>${esc(w.text)}</b> (${esc(playerName(w.by))}) — ${SLOT_NAMES[w.strand]} strand seed</li>`;
-    let a=byId(w.aId), b=byId(w.bId);
-    return `<li><b>${esc(w.text)}</b> (${esc(playerName(w.by))}) — associated with “${esc(a?a.text:'')}”, clearly NOT associated with “${esc(b?b.text:'')}”</li>`;
-  }).join('');
-  let html=`<!doctype html><html lang="en"><meta charset="utf-8"><meta name="viewport" content="width=device-width"><title>Braid record</title><style>body{margin:0;padding:28px;background:#f4efe5;color:#302c25;font:15px/1.6 system-ui}main{max-width:1100px;margin:auto}section{background:#fffdf8;border:1px solid #d9cfbd;border-radius:14px;padding:20px;margin:16px 0;overflow:auto}h1{font:600 48px Georgia,serif;margin:0}li{margin:8px 0}.muted{color:#746b5f}</style><main><h1>Braid</h1><p class="muted">A three-strand word game of associations and pivots.</p><section><h2>The braid</h2>${svg}</section><section><h2>Word record</h2><ol>${rows}</ol></section></main></html>`;
-  let blob=new Blob([html],{type:'text/html'}),url=URL.createObjectURL(blob),a=document.createElement('a');a.href=url;a.download='braid-record.html';a.click();setTimeout(()=>URL.revokeObjectURL(url),1000);
-}
-
-function downloadStandaloneHtml(){
-  let clone=document.documentElement.cloneNode(true);
-  let lobby=clone.querySelector('#lobby'), game=clone.querySelector('#game'), board=clone.querySelector('#board'), status=clone.querySelector('#status');
-  if(lobby)lobby.classList.remove('hidden');
-  if(game)game.classList.add('hidden');
-  if(board)board.innerHTML='';
-  if(status)status.textContent='';
-  let html='<!doctype html>\n'+clone.outerHTML;
-  let blob=new Blob([html],{type:'text/html'}),url=URL.createObjectURL(blob),a=document.createElement('a');
-  a.href=url;a.download='braid.html';a.click();setTimeout(()=>URL.revokeObjectURL(url),1000);
+  let newFocusKey=S.phase+':'+S.turnId+':'+(S.words.length);
+  if(myTurn&&newFocusKey!==focusKey){
+    focusKey=newFocusKey;
+    setTimeout(()=>{
+      if(S&&S.phase==='seed'&&isMyTurn())$('seedWord').focus();
+      else if(S&&S.phase==='play'&&isMyTurn())$('newWord').focus();
+    },30);
+  }else if(S.phase==='judge'){
+    focusKey=null;
+  }
 }
 
 $('start').addEventListener('click',()=>{
   if(mode==='local')localStart();
   else if(isHost()){let order=Hub.roster.map(p=>p.id),names={};Hub.roster.forEach(p=>names[p.id]=p.name);if(order.length<2){say('At least two players are needed.');return}start(order,names)}
 });
-$('lobbyDownload').addEventListener('click',downloadStandaloneHtml);
 $('addSeed').addEventListener('click',()=>{let text=$('seedWord').value.trim();if(!validWord(text)){say('Enter exactly one word.');return}$('seedWord').value='';act({a:'seed',text})});
 $('seedWord').addEventListener('keydown',e=>{if(e.key==='Enter')$('addSeed').click()});
 $('addWord').addEventListener('click',()=>{
@@ -462,12 +530,19 @@ $('addWord').addEventListener('click',()=>{
   $('newWord').value='';act({a:'add',text});
 });
 $('newWord').addEventListener('keydown',e=>{if(e.key==='Enter')$('addWord').click()});
-document.querySelectorAll('[data-kind]').forEach(btn=>btn.addEventListener('click',()=>{if(!S||S.phase!=='judge'||(mode!=='local'&&S.judgeId!==myId()))return;verdict[btn.dataset.kind]=btn.dataset.value;render()}));
-$('confirmJudgment').addEventListener('click',()=>{if(!verdict.syn||!verdict.ant)return;act({a:'judge',syn:verdict.syn,ant:verdict.ant});verdict={syn:null,ant:null}});
-$('export').addEventListener('click',exportHtml);
-$('downloadHtml').addEventListener('click',downloadStandaloneHtml);
+document.querySelectorAll('[data-kind]').forEach(btn=>btn.addEventListener('click',()=>{
+  if(!canVote())return;
+  verdict[btn.dataset.kind]=btn.dataset.value;
+  render();
+  if(verdict.syn&&verdict.ant){
+    let syn=verdict.syn, ant=verdict.ant;
+    verdict={syn:null,ant:null};
+    act({a:'judge',syn,ant});
+  }
+}));
 $('new').addEventListener('click',()=>{if(mode==='local')localStart();else if(isHost())act({a:'new'})});
 $('lobbyBtn').addEventListener('click',()=>{if(isHost())act({a:'toLobby'})});
+setInterval(updateTimerDisplay,200);
 
 window.addEventListener('message',e=>{
   let m=e.data;if(!m||m.t!=='gd'||m.game!=='braid')return;
