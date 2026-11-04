@@ -339,4 +339,25 @@ test('prompt: swap keeps words, once per round, costs three', () => {
   assert.equal(G.project(st, s, null).round.promptUsed, true);
 });
 
+test('toLobby: over returns to the lobby, seats kept, host-only', () => {
+  let st = G.init({ atTable: seats(3) });
+  st = ok(st, 'a', { a: 'start' });
+  for (let r = 0; r < 3; r++) {
+    clock = st.round.introEndsAt + 5; st = ok(st, 'a', { a: 'go' });
+    clock = st.round.endsAt + 5; st = ok(st, 'a', { a: 'finish' });
+    clock = st.round.tallyEndsAt + 5;
+    st = ok(st, 'b', { a: 'next' });
+  }
+  assert.equal(st.phase, 'over');
+  assert.ok(act(st, 'b', { a: 'toLobby' }).error, 'a guest cannot reset the table');
+  const lobby = ok(st, 'a', { a: 'toLobby' });
+  assert.equal(lobby.phase, 'lobby');
+  assert.deepEqual(lobby.players.slice().sort(), ['a', 'b', 'c']);
+  assert.equal(lobby.over, null);
+  assert.equal(lobby.round, null);
+  assert.ok(lobby.epoch > st.epoch, 'epoch bump re-anchors clients');
+  const again = ok(lobby, 'a', { a: 'start' });
+  assert.equal(again.phase, 'intro', 'can start again from the lobby');
+});
+
 console.log('\n' + passed + ' passed' + (process.exitCode ? ', some FAILED' : ''));

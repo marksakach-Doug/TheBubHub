@@ -211,4 +211,41 @@ test('solo: Free Association is refused, not quietly started', () => {
   assert.ok(r.error, 'free needs a table of three');
 });
 
+// ---------------------------------------------------------- solo <-> multi ----
+// init() seats who opened first; later arrivals come through `join`. A second
+// human must promote the table out of solo, or multiplayer is unreachable.
+
+test('solo -> multi: a second join promotes the table, three can start', () => {
+  let st = fresh();
+  assert.equal(st.mode, 'solo-streamer');
+  st = ok(st, { a: 'join' }, { id: 'p2', name: 'Bo', host: false });
+  assert.equal(st.mode, null, 'second player leaves solo');
+  assert.deepEqual(st.players, ['p1', 'p2']);
+  assert.equal(st.soloRound, null);
+  assert.equal(act(st, { a: 'start' }).error, 'Fugue needs 3 players.', 'two players is the multiplayer lobby, not solo');
+  st = ok(st, { a: 'join' }, { id: 'p3', name: 'Cy', host: false });
+  st = ok(st, { a: 'start', m: 'classic' });
+  assert.equal(st.phase, 'intro');
+  assert.equal(st.round.streamers.length, 2);
+  clock = st.round.introEndsAt + 10;
+  st = ok(st, { a: 'go' });
+  assert.equal(st.phase, 'live');
+  const s0 = st.round.streamers[0];
+  st = ok(st, { a: 'word', w: 'alpha' }, { id: s0, name: s0, host: false });
+  assert.equal(st.round.words[s0].length, 1);
+});
+
+test('multi -> solo: prune back to one player in lobby restores solo', () => {
+  let st = fresh();
+  st = ok(st, { a: 'join' }, { id: 'p2', name: 'Bo', host: false });
+  assert.equal(st.mode, null);
+  st = G.prune(st, 'p2');
+  assert.equal(st.mode, 'solo-streamer');
+  assert.deepEqual(st.players, ['p1']);
+  assert.equal(st.hostId, 'p1');
+  assert.equal(st.phase, 'lobby');
+  st = ok(st, { a: 'start', m: 'stream' });
+  assert.equal(st.phase, 'live');
+});
+
 console.log('\n' + passed + ' passed' + (process.exitCode ? ', some FAILED' : ''));

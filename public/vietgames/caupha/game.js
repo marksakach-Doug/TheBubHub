@@ -950,7 +950,7 @@ export function mount(root,api){
     }
     // eating food / an object
     const kind=kindOf(O),spoony=kind==='rice'||kind==='pho',pfx=spoony?345:400,sx=spoony?240:pfx-L*.55-34,mx=sx+L*.5,my=FLOOR-L*.6;
-    const amt=done?0:not?1:prog?.55:.75,sk=done?1:.6+.4*amt;
+    const amt=done?0:not?1:prog?0.55:.75,sk=done?1:.6+.4*amt;
     shade(pfx,34*sk);ctx.save();ctx.translate(pfx,FLOOR);ctx.scale(sk,sk);drawProp(0,0,O,{done,noShadow:true});ctx.restore();
     shade(sx,26);ctx.save();ctx.translate(sx,FLOOR);ctx.rotate(lean);who(0,0,S,{dir:1,full:done,emptyBelly:not,noShadow:true,hide:(spoony&&!done&&!not)?useArm(S):null});ctx.restore();
     if(!done&&!not){

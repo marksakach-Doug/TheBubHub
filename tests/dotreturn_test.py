@@ -251,6 +251,13 @@ JS_CASES = r"""
   out.push(['start resets away time and lapses',
     tickReplay.lapses === 0 && tickReplay.dots.w1.away === 0 && tickReplay.dots.w1.out === false]);
   out.push(['replay unbenched the waiter', tickReplay.dots.w2.benched === false]);
+
+  const ctxH = (id) => ({ from: { id: id, name: id, host: id === 'w1' }, rng: Math.random });
+  const lobbied = reduce(tick2Done, { a: 'toLobby' }, ctxH('w1'));
+  out.push(['toLobby returns to ready', lobbied.phase === 'ready' && lobbied.over === null]);
+  out.push(['toLobby keeps seats', lobbied.players.join(',') === 'w1,b1,w2']);
+  out.push(['non-host toLobby refused', !!reduce(tick2Done, { a: 'toLobby' }, ctxH('b1')).error]);
+  out.push(['mid-round toLobby refused', !!reduce(started, { a: 'toLobby' }, ctxH('w1')).error]);
   Date.now = realNow;
 
   return out;

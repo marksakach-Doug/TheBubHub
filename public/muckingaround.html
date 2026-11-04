@@ -522,9 +522,9 @@ function drawP(id,p,x,y,a,f,mv,lev,z,now){
   if(s&&s.k&&FXD[s.k]&&now-s.at<FXD[s.k])fx={k:s.k,t:now-s.at,d:FXD[s.k]};
   if(p.pop){emoji('✨',x,y-14,18);return}
   var burning=(p.br||0)>0;
-  var fe=fx?fx.t/fx.d:0,ox=0,ang=0,sx=p.wd||1,sy=1,sc=(p.gr||1)*(p.mi?.55:1);
+  var fe=fx?fx.t/fx.d:0,ox=0,ang=0,sx=p.wd||1,sy=1,sc=(p.gr||1)*(p.mi?0.55:1);
   var sw=lev===0&&a<2&&inPond(x,y),bob=sw?Math.sin(now/350)*1.5:(mv&&!p.rl&&!z&&!lev&&a<2?Math.abs(Math.sin(now/110))*3:0);
-  if(lev===0&&!sw){ctx.fillStyle='rgba(0,0,0,'+(a>2?.1:.18)+')';ctx.beginPath();ctx.ellipse(x,y+14,12,4.5,0,0,7);ctx.fill()}
+  if(lev===0&&!sw){ctx.fillStyle='rgba(0,0,0,'+(a>2?0.1:.18)+')';ctx.beginPath();ctx.ellipse(x,y+14,12,4.5,0,0,7);ctx.fill()}
   var by=y-a-bob+(z===1?5:0);
   if(fx){
     var t=fx.t;
@@ -533,7 +533,7 @@ function drawP(id,p,x,y,a,f,mv,lev,z,now){
     else if(fx.k==='jut')ox=f*16*Math.sin(fe*Math.PI);
     else if(fx.k==='sneeze')ox=Math.sin(t/25)*3*(1-fe);
     else if(fx.k==='jelly')sy=1+.25*Math.sin(t/90)*(1-fe);
-    else if(fx.k==='pancake')sy=t<200?1-.6*t/200:t<1000?.4:.4+.6*(t-1000)/200;
+    else if(fx.k==='pancake')sy=t<200?1-.6*t/200:t<1000?0.4:.4+.6*(t-1000)/200;
     else if(fx.k==='flip')ang=t<500?t/500*Math.PI:t<1500?Math.PI:t<2000?Math.PI*(1-(t-1500)/500):0;
     else if(fx.k==='fall')ang=t/900*6.283;
     else if(fx.k==='respawn')sc*=.2+.8*fe;

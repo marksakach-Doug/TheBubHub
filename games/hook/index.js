@@ -90,6 +90,15 @@ export function reduce(s, a, ctx) {
     if (s.order.length >= 8) return { error: 'The table is full.' };
     return { ...s, order: [...s.order, id], names: { ...s.names, [id]: (ctx.from && ctx.from.name) || id } };
   }
+  // Back to lobby: the table keeps its seats, the round is cleared. Without
+  // this, `over` is terminal until the host deals a new round — the "stuck
+  // in a game you have started" trap.
+  if (a.a === 'toLobby') {
+    if (s.phase === 'play') return { error: 'The round is still running.' };
+    if (s.phase !== 'vote' && s.phase !== 'reveal') return s;
+    if (!isHost) return { error: 'Only the host can send the table back to the lobby.' };
+    return { ...deal(s, rng, now), note: 'Back to lobby.' };
+  }
   // The host wants a different pair to play: throw this round away, keep the scores.
   if (a.a === 'newpair') {
     if (!isHost) return { error: 'Only the host deals a new pair.' };
@@ -242,6 +251,7 @@ const play = (part, notes) => {
     const voted = Object.keys(v.votes).length;
     // Only the host may re-deal: one player should not pull the pair out from under a table.
     const newGame = seated && api.isHost ? ' <button data-a="newpair">New game</button>' : '';
+    const toLobby = seated && api.isHost ? ' <button data-a="toLobby">Back to lobby</button>' : '';
     $('#game').innerHTML = head + (v.phase === 'play'
       ? `<div class="box"><pre>intro  ${fmt(v.pair.intro.steps, v.scale)}\nhook   ${fmt(hookSteps(v.pair, draft), v.scale)}\noutro  ${fmt(v.pair.outro.steps, v.scale)}</pre>
           <p>${filled}/${n} slots filled. Tap a column to set its note.  ${newGame}</p>${playsHtml(draft)}</div>
@@ -251,12 +261,12 @@ const play = (part, notes) => {
       : v.phase === 'reveal'
       ? `<div class="box"><pre>intro  ${fmt(v.pair.intro.steps, v.scale)}\nhook   ${fmt(hookSteps(v.pair, v.subs[v.you] || []), v.scale)}\noutro  ${fmt(v.pair.outro.steps, v.scale)}</pre>
           ${playsHtml(v.subs[v.you])}</div><p>Your hook${seated ? '' : ' (watching)'}. `
-        + (seated ? '<button data-a="next">Next round</button>' : '') + `</p>`
+        + (seated ? '<button data-a="next">Next round</button>' : '') + toLobby + `</p>`
       : `<div class="box"><pre>${ends}</pre></div><p>Vote for the best hook${cands.length > 1 ? ' (not your own)' : ''}. ${voted}/${v.order.length} voted.</p>`
         + cands.map((p) => `<p>${esc(v.names[p])}: <tt>${fmt(hookSteps(v.pair, v.subs[p]), v.scale)}</tt> <button data-part="hook" data-b="${csv(v.subs[p])}">▶</button> <button data-part="all" data-b="${csv(v.subs[p])}">▶ All</button> `
           + (seated && (p !== v.you || cands.length === 1) ? `<button data-a="vote" data-id="${esc(p)}">${v.votes[v.you] === p ? 'Voted ✓' : 'Vote'}</button>` : '') + '</p>').join('')
         // A table that is done voting should not have to sit out the clock.
-        + (seated && voted ? '<button data-a="skip">Next round</button>' : ''));
+        + (seated && voted ? '<button data-a="skip">Next round</button>' : '') + toLobby);
     showClock();
   };
 

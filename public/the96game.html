@@ -114,11 +114,7 @@ button.quiet{border-color:var(--rule);color:var(--ash)}
     <p id="t96-setup-note" class="tiny muted" style="margin-top:10px"></p>
     <div class="seats" id="t96-setup-seats" style="margin:10px 0"></div>
     <button class="go" id="t96-start">Start the game</button>
-  </section>
-
-  <section id="t96-waiting" class="card hidden">
-    <h1>The <span class="q">96</span> Game</h1>
-    <p class="muted tiny" style="margin-top:6px">Waiting for the host to start. This game needs at least 3 people.</p>
+    <p id="t96-waiting-note" class="muted tiny" style="margin-top:6px">Waiting for the host to start. This game needs at least 3 people.</p>
   </section>
 
   <section id="t96-game" class="hidden" style="display:flex;flex-direction:column;gap:10px;flex:1;min-height:0">
@@ -158,6 +154,7 @@ button.quiet{border-color:var(--rule);color:var(--ash)}
       <div class="row" style="justify-content:center;margin-top:12px">
         <button class="quiet" id="t96-save">Save the story</button>
         <button class="go" id="t96-nextlap">Next lap — everyone opens a new story</button>
+        <button class="quiet" id="t96-lobbtn">Back to lobby</button>
       </div>
     </div>
 
@@ -588,6 +585,14 @@ function handleNextLap(d, from){
     nextLap();
     return null;
 }
+function handleToLobby(d, from){
+    if (!S || !from) return 'No table.';
+    if (!isHost()) return 'Only the host can send the table back to the lobby.';
+    doReset();
+    Hub.up('reset');
+    render();
+    return null;
+}
 
 function onIntent(d, from){
     if (!isHost() || !d) return;
@@ -597,8 +602,9 @@ function onIntent(d, from){
     else if (d.a === 'stroke') err = handleStroke(d, from);
     else if (d.a === 'undo') err = handleUndo(d, from);
     else if (d.a === 'clear') err = handleClear(d, from);
-    else if (d.a === 'done') err = handleDone(d, from);
+    else     if (d.a === 'done') err = handleDone(d, from);
     else if (d.a === 'nextlap') err = handleNextLap(d, from);
+    else if (d.a === 'toLobby') err = handleToLobby(d, from);
     if (err && from && from.id) deny(from.id, err);
 }
 function deny(to, text){ Hub.up('denied', { to: to, text: text }); }
@@ -616,6 +622,7 @@ function act(d){
         else if (d.a === 'clear') err = handleClear(d, me);
         else if (d.a === 'done') err = handleDone(d, me);
         else if (d.a === 'nextlap') err = handleNextLap(d, me);
+        else if (d.a === 'toLobby') err = handleToLobby(d, me);
         if (err) toast(err);
         render();
     } else {
@@ -815,8 +822,7 @@ function startTick(){
 // ---------- render ----------
 function render(){
     var hasTable = !!S;
-    sh('t96-setup', !hasTable && isHost());
-    sh('t96-waiting', !hasTable && !isHost());
+    sh('t96-setup', !hasTable);
     sh('t96-game', hasTable);
 
     if (!hasTable){
@@ -828,7 +834,10 @@ function render(){
         Hub.roster.forEach(function(m){
             seats.appendChild(el('span', 'seat', (m.name || 'Player') + (m.host ? ' · host' : '')));
         });
-        $('t96-start').disabled = n < MIN_PLAYERS;
+        $('t96-start').disabled = !(isHost() && n >= MIN_PLAYERS);
+        $('t96-start').hidden = !isHost();
+        $('t96-waiting-note').hidden = isHost();
+        var gs = $('t96-game'); if (gs) gs.classList.add('hidden');
         return;
     }
 
@@ -1193,6 +1202,7 @@ $('t96-clear').addEventListener('click', function(){
 });
 $('t96-done').addEventListener('click', pushDone);
 $('t96-nextlap').addEventListener('click', function(){ act({ a:'nextlap' }); });
+$('t96-lobbtn').addEventListener('click', function(){ act({ a:'toLobby' }); });
 $('t96-save').addEventListener('click', saveStory);
 $('t96-chains').addEventListener('click', function(e){
     var t = e.target && e.target.closest ? e.target.closest('[data-chain]') : null;

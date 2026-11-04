@@ -572,7 +572,7 @@ export function mount(root,api){
       if(p.x>wl.x-hw&&p.x<wl.x+wl.w+hw&&p.y>wl.top+1&&(!wl.gap||p.y-bodyH()<GY-wl.gap)){
         if(wl.kind==='stone'&&any('k')&&sz>=1.5&&capNow('smash'))breakWall(wl);   // a big body (lớn, voi) just walks through it
         else{p.x=p.x<wl.x+wl.w/2?wl.x-hw:wl.x+wl.w+hw;p.vx=0}}}
-    const jh=!L&&(K.jump||K.up),edge=jh&&!p.jp;p.jp=jh;if(edge)p.jb=.13;p.jb-=dt;p.coy=p.og?.12:p.coy-dt;
+    const jh=!L&&(K.jump||K.up),edge=jh&&!p.jp;p.jp=jh;if(edge)p.jb=.13;p.jb-=dt;p.coy=p.og?0.12:p.coy-dt;
     const mj=any('mj')||2;
     if(jm>0&&!L&&!fl){
       if(p.jb>0&&p.coy>0){p.vy=-370*jm;p.og=false;p.coy=0;p.jb=0;p.jn=1;p.ju=1;tone(520,.12,780,.08);puff(p.x,p.y,4)}
@@ -736,7 +736,7 @@ export function mount(root,api){
     if(G.wife){const w=G.wife;mini(w.x-cam,up?w.y:w.y+17,w.f,w.og,w.vx,'hsl(330,70%,78%)',1,true,!up)}
   }
   function city(pl,ly){
-    const cam=G.cam,fx=ly?.55:.3,cell=ly?118:92,i0=Math.floor(cam*fx/cell)-1,n=Math.ceil(LW/cell)+3;
+    const cam=G.cam,fx=ly?0.55:.3,cell=ly?118:92,i0=Math.floor(cam*fx/cell)-1,n=Math.ceil(LW/cell)+3;
     for(let i=i0;i<i0+n;i++){
       const r=k=>hh(i,k+ly*9),w=44+r(1)*48,h=(ly?70:90)+r(2)*(ly?65:90),x=i*cell+r(3)*16-cam*fx,hue=G.lv===7?(i*47+G.t*25)%360:pl.h;
       ctx.fillStyle=`hsl(${hue},${ly?32:24}%,${ly?38:62}%)`;ctx.fillRect(x,GY-h,w,h);

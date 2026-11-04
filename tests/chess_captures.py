@@ -55,7 +55,7 @@ def const(name):
 
 FUNCS = ["makeState", "copy", "posKey", "kingSq", "attackedBy", "inCheck",
          "pseudo", "applyMove", "legal", "outcome", "hasMatingMaterial",
-         "botMove", "opponent", "isWhite", "colourOf", "typeOf"]
+         "posBonus", "evalFor", "botMove", "opponent", "isWhite", "colourOf", "typeOf"]
 
 HARNESS = """
 (() => {

@@ -282,6 +282,14 @@ JS_CASES = r"""
     { from: { id: 'dev' }, rng: rng0, now: Date.now() + 1000 });
   out.push(['a missed clock is counted', missed.miss && missed.miss.dev === 1 && missed.miss.w1 === 1]);
 
+  // ---- toLobby: back to lobby keeps seats, host-only
+  const voteState = { ...s0, phase: 'vote', subs: { dev: goodBridge(s0), w1: goodBridge(s0) }, votes: {} };
+  const lobbyState = reduce(voteState, { a: 'toLobby' }, ctx('dev', rng0, true));
+  out.push(['toLobby deals a fresh round', lobbyState.phase === 'play' && lobbyState.round === 2]);
+  out.push(['toLobby keeps seats', lobbyState.order.join(',') === 'dev,w1']);
+  out.push(['non-host toLobby refused', !!reduce(voteState, { a: 'toLobby' }, ctx('w1', rng0, false)).error]);
+  out.push(['mid-round toLobby refused', !!reduce(s0, { a: 'toLobby' }, ctx('dev', rng0, true)).error]);
+
   return out;
 }
 """

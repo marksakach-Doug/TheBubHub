@@ -256,7 +256,7 @@ let ADV=false;try{ADV=localStorage.getItem('dal:adv')==='1'}catch(e){}
 const SPICES=[{n:'Cumin seeds',btn:'ADD CUMIN SEEDS',need:4,cool:0},{n:'Hing',btn:'ADD HING',need:1.5,cool:0},{n:'Ginger',btn:'ADD GINGER',need:4.5,cool:12},{n:'Garlic',btn:'ADD GARLIC',need:2.5,cool:8},{n:'Kashmiri chili',btn:'ADD KASHMIRI CHILI',need:1.5,cool:0}];
 const ADVDIR=['Ghee + heat','Cumin','Hing','Ginger','Garlic','Chili','Pour','Garam masala','Cilantro'];
 function dalReady(){const p=S.pot,L=S.L,sc=scl();return S.phase==='cook'&&p.cooked>=L.need*sc*.95&&(!L.double||(p.in2&&p.cooked2>=L.B.need*sc*.95))}
-const rateAt=t=>t>=155&&t<=180?1:t>=130&&t<155?.4:t>=100&&t<130?.1:t>180?.3:0;
+const rateAt=t=>t>=155&&t<=180?1:t>=130&&t<155?0.4:t>=100&&t<130?0.1:t>180?0.3:0;
 const advScore=v=>v<90?Math.max(0,100-(90-v)*1.2):v>125?Math.max(0,100-(v-125)*2):100;
 const SIMPLE=$('dir').innerHTML,SERVE_T=$('serve').textContent;
 function advStep(){
@@ -392,7 +392,7 @@ function step(dt){
       S.spill+=rate[1]*dt;
   }
   const cDry=c.rich<=0; // ghee is the pan's buffer: an empty pan heats fast and runs far hotter
-  c.temp+=(25+c.dial*(cDry?34:21.5)-c.temp)*(cDry?.45:.22)*dt;
+  c.temp+=(25+c.dial*(cDry?34:21.5)-c.temp)*(cDry?0.45:.22)*dt;
   if(c.temp>=240){spoil('PAN FIRE',1);c.temp=150;c.dial=0}
   if(c.spice){
       const t=c.temp;
@@ -407,7 +407,7 @@ function step(dt){
   }
   if(S.adv&&c.st>=1&&c.st<=5)c.prog+=rateAt(c.temp)*dt;
   const pDry=p.water<=0; // water caps the pot at boiling; an empty pot just keeps getting hotter
-  p.temp+=((pDry?25+p.dial*30:Math.min(100,25+p.dial*9.5))-p.temp)*(pDry?.3:.12)*dt;
+  p.temp+=((pDry?25+p.dial*30:Math.min(100,25+p.dial*9.5))-p.temp)*(pDry?0.3:.12)*dt;
   if(!pDry&&p.temp>100)p.temp=100;
   if(p.temp>=70)p.water-=(p.temp-65)/35*.02*dt;
   p.water=Math.max(0,p.water);
@@ -418,7 +418,7 @@ function step(dt){
       {const g=dt*(1+Math.min(.8,(p.temp-70)/50));p.cooked+=g;if(p.in2)p.cooked2+=g}
       p.water-=(p.temp-65)/35*.08*dt;
     }
-    p.foam=wet?Math.max(0,p.foam+(p.temp>=92?.3:-.4)*dt):0;
+    p.foam=wet?Math.max(0,p.foam+(p.temp>=92?0.3:-.4)*dt):0;
     if(p.foam>=1){spoil('BOIL OVER',1);p.foam=.3;p.water-=.4}
     p.stick+=wet?(p.temp>=70?1:.3)*L.stick*dt:Math.max(.02,(p.temp-60)/250)*dt; // dry dal scorches fast once hot
     if(p.stick>=1){spoil('STUCK AND SCORCHED',1);p.stick=.3}
@@ -496,7 +496,7 @@ function R(){
   // bowl: water colour goes from clear blue to muddy brown; grit specks fade as grit is removed
   const d=S.waterDirt/100,mixc=(a,b)=>Math.round(a+(b-a)*d);
   $('bw').setAttribute('fill',S.basin==='full'?`rgb(${mixc(143,128)},${mixc(211,98)},${mixc(244,58)})`:'#6e6252');
-  $('bw').style.opacity=S.basin==='full'?.9:.6;
+  $('bw').style.opacity=S.basin==='full'?0.9:.6;
   $('gt').style.opacity=S.grit/100;
   $('sw').classList.toggle('spin',!!S.rinse);$('sw').style.animationDuration=[0,3,1.5,.7][S.rinse]+'s';
   $('mn').className='ph-'+(S.phase==='wash'?'wash':'cook');
@@ -578,7 +578,7 @@ document.addEventListener('click',e=>{
   }
   else if(a==='water'){if(p.water>=10||S.lw==='-')S.care.jam++;S.lw='+';p.water=Math.min(10,p.water+1);p.temp=Math.max(25,p.temp-10);say('+1 cup of water.')}
   else if(a==='add2'&&S.L.double&&S.phase==='cook'&&!p.in2){p.in2=true;$('b_add2').classList.remove('pulse');$('b_add2').disabled=true;$('b_add2').textContent=S.L.B.n+' added';say(S.L.B.n+' added to the pot.','g')}
-  else if(a==='unwater'){const fl=S.phase==='cook'?.5:0;if(p.water<=fl||S.lw==='+')S.care.jam++;S.lw='-';p.water=Math.max(Math.min(p.water,fl),p.water-1);say('−1 cup of water.')}
+  else if(a==='unwater'){const fl=S.phase==='cook'?0.5:0;if(p.water<=fl||S.lw==='+')S.care.jam++;S.lw='-';p.water=Math.max(Math.min(p.water,fl),p.water-1);say('−1 cup of water.')}
   else if(a==='stir'&&S.phase==='cook'){if(p.stick<.2&&p.foam<.2)S.care.jam++;p.stick=0;p.foam=Math.max(0,p.foam-.2);say('Stirred.')}
   else if(a==='ghee'){
     if(c.rich>=4.2)S.care.jam++;

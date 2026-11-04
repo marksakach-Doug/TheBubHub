@@ -188,6 +188,24 @@ export function reduce(state, action, ctx) {
     });
   }
 
+  // Back to lobby: the table keeps its seats, the round is cleared. Without
+  // this, `over` is terminal until the host starts a new round — the "stuck
+  // in a game you have started" trap. Host-only, with the solo exception.
+  if (kind === 'toLobby') {
+    if (state.phase === 'play' || state.phase === 'reveal') return { error: 'A round is already running.' };
+    if (state.phase !== 'over') return same({});
+    const alone = players.length < 2;
+    if (state.hostId && state.hostId !== id && !alone) {
+      return { error: 'Only the host can send the table back to the lobby.' };
+    }
+    return same({
+      epoch: state.epoch + 1,
+      phase: 'ready',
+      over: null,
+      dots: dots
+    });
+  }
+
   if (kind === 'finish') {
     if (state.phase !== 'play') return same({});
     if (now < state.endsAt - FINISH_GRACE) return { error: 'The clock is still running.' };
@@ -503,6 +521,13 @@ if (showCircleBox) {
   btnSolo.className = 'dr-btn alt';
   btnSolo.type = 'button';
   btnSolo.textContent = 'Start solo';
+
+  // Back to lobby: the way out of a game you have started, without leaving the
+  // table. Host-only in reduce(); mirrored here as a display toggle.
+  const btnLobby = document.createElement('button');
+  btnLobby.className = 'dr-btn alt';
+  btnLobby.type = 'button';
+  btnLobby.textContent = 'Back to lobby';
 
   let view = null;
   let myId = (api.me && api.me.id) || '';
@@ -931,6 +956,10 @@ if (showCircleBox) {
         : 'Start round';
       btn.disabled = !canStart;
       btns.appendChild(btn);
+      if (view.phase === 'over') {
+        btnLobby.disabled = !canStart;
+        btns.appendChild(btnLobby);
+      }
       // Host, alone, in a room: a table of one is a valid game, so say so
       // rather than greying out the only way forward.
       if (alone && !soloCorner && host && view.phase === 'ready') {
@@ -1060,6 +1089,11 @@ if (showCircleBox) {
 
   btn.addEventListener('click', askStart);
   btnSolo.addEventListener('click', askStart);
+  btnLobby.addEventListener('click', function () {
+    if (!view || view.phase !== 'over') return;
+    if (!seated()) return;
+    api.send({ a: 'toLobby' });
+  });
 
   // A hidden tab freezes the sim — the step cap stops the spiral — which would
   // freeze the penalty too. Report the exit on hide; the first frame back

@@ -261,7 +261,7 @@ function stepCar(c,i,dt){
  if(i.th>0)vf+=i.th*300*dt;else if(i.th<0)vf+=i.th*(vf>10?520:220)*dt;
  vf-=vf*1.2*dt; if(Math.abs(i.th)<.05)vf-=Math.sign(vf)*Math.min(Math.abs(vf),50*dt);
  vf=Math.max(-100,vf);
- var g=hold?.9:(Math.abs(vl)>110?2.8:5.2),before=Math.abs(vl);
+ var g=hold?0.9:(Math.abs(vl)>110?2.8:5.2),before=Math.abs(vl);
  vl*=Math.exp(-g*dt); if(vf>0)vf+=(before-Math.abs(vl))*.5;
  if(hold&&Math.abs(i.ax)>.25)c.charge+=dt;
  else{if(c.charge>.8){var lv=c.charge>1.8?260:150;vf+=lv;c.boost=.35+lv/600;shake=Math.max(shake,4)}c.charge=0}
@@ -395,7 +395,7 @@ function render(){ var vs=gameMode==='versus',two=cars.length>1;
   drawCar(start.x,start.y,Math.atan2(goal.y-start.y,goal.x-start.x),false,0);
   if(two)drawCar(goal.x,goal.y,Math.atan2(start.y-goal.y,start.x-goal.x),false,1)}
  else cars.forEach(function(c){if(c.dead)return;
-  ctx.globalAlpha=c.inv>0&&((c.inv*8)|0)%2?.35:1;
+  ctx.globalAlpha=c.inv>0&&((c.inv*8)|0)%2?0.35:1;
   drawCar(c.x,c.y,c.a,c.boost>0,c.k);ctx.globalAlpha=1;
   if(vs){ctx.fillStyle='rgba(0,0,0,.25)';ctx.fillRect(c.x-13,c.y-18,26,4);ctx.fillStyle=c.hp>35?'#2ea05a':'#e0432f';ctx.fillRect(c.x-13,c.y-18,26*c.hp/100,4)}});
  for(var fi=0;fi<fx.length;fi++){var p=fx[fi];ctx.globalAlpha=Math.max(0,p.l/p.m);ctx.fillStyle=p.c;ctx.beginPath();ctx.arc(p.x,p.y,p.s*(1+p.g*(1-p.l/p.m)),0,7);ctx.fill()}

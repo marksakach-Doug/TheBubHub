@@ -426,7 +426,13 @@ export function reduce(state, action, ctx) {
   if (state.mode === 'solo-streamer') {
     if (kind === 'join') {
       if (state.players.indexOf(id) >= 0) return noop();
-      return same(state, { players: state.players.concat([id]) });
+      var joined = state.players.concat([id]);
+      if (joined.length >= 2 && state.phase === 'lobby') {
+        var st = same(state, { players: joined, mode: null, phase: 'lobby', over: null, soloRound: null });
+        st.epoch = st.epoch + 1;
+        return st;
+      }
+      return same(state, { players: joined });
     }
     if (state.players.indexOf(id) < 0) return { error: 'You are watching — not seated.' };
     if (kind === 'start') {
@@ -632,6 +638,18 @@ export function reduce(state, action, ctx) {
     return startRound(state, now, rng);
   }
 
+  // Back to lobby: the table keeps its seats, the set is cleared. Without
+  // this, `over` is terminal until the host starts a new set — the "stuck in
+  // a game you have started" trap.
+  if (kind === 'toLobby') {
+    if (state.phase !== 'over') return noop();
+    if (!host) return { error: 'Only the host can send the table back to the lobby.' };
+    return same(state, {
+      epoch: state.epoch + 1,
+      phase: 'lobby', over: null, round: null, scores: {}, history: [], order: [], roundIdx: -1
+    });
+  }
+
   return { error: 'Unknown action: ' + kind };
 }
 
@@ -650,6 +668,14 @@ export function prune(state, goneId) {
   const keep = function (id) { return id !== goneId; };
   let st = same(state, { players: state.players.filter(keep), late: state.late.filter(keep) });
   if (st.hostId === goneId) st.hostId = st.players[0] || '';
+  if (st.players.length === 1 && st.late.length === 0 && (state.phase === 'lobby' || state.phase === 'over')) {
+    var fresh = freshState();
+    fresh.players = st.players;
+    fresh.hostId = st.hostId;
+    fresh.mode = 'solo-streamer';
+    fresh.epoch = st.epoch + 1;
+    return fresh;
+  }
   const r = state.round;
   const ph = state.phase;
   if (inP && r && (ph === 'intro' || ph === 'live' || ph === 'vote')) {
@@ -1205,6 +1231,7 @@ export function mount(root, api) {
     else if (act === 'next') api.send({ a: 'next' });
     else if (act === 'vote') api.send({ a: 'vote', n: Number(t.getAttribute('data-n')), yes: t.getAttribute('data-yes') === '1' });
     else if (act === 'prompt') api.send({ a: 'prompt' });
+    else if (act === 'toLobby') api.send({ a: 'toLobby' });
   });
 
   function namesHtml(ids) {
@@ -1229,9 +1256,28 @@ export function mount(root, api) {
     return row;
   }
 
+  // The lobby page: one overlay for waiting AND results, like Focus. Rebuilt
+  // from `view` on every update; enablement computed from the live `view`.
   function lobbyScreen() {
     return simple(function (v) {
-      if (v.mode === 'solo-streamer' || v.players.length === 1) {
+      if (v.phase === 'over' && v.players.length > 1 && v.over && v.over.rows && v.over.rows.length) {
+        const o = v.over;
+        const host = v.hostId === myId;
+        const heading = o.winners.length > 1 ? 'tied' : 'wins';
+        const names = o.winners.map(function (id) { return rosterName(id); }).join(' & ');
+        const btns = el('div', '');
+        btns.style.display = 'flex'; btns.style.gap = '10px'; btns.style.justifyContent = 'center';
+        btns.appendChild(actionBtn(host ? 'Play again' : 'Waiting for host', 'start', null, !host));
+        if (host) btns.appendChild(actionBtn('Back to lobby', 'toLobby'));
+        return centerScreen([
+          el('h2', '', 'set complete'),
+          el('div', 'big', names + ' ' + heading),
+          scoreBoardEl(v),
+          btns,
+          el('p', 'note', host ? 'Back to lobby keeps the seats and clears the set.' : 'Waiting for the host.')
+        ]);
+      }
+      if (v.players.length === 1) {
         return centerScreen([
           el('h1', '', 'FUGUE SOLO'),
           para('rules', [
@@ -1405,28 +1451,10 @@ export function mount(root, api) {
     });
   }
 
+  // `over` used to be its own screen; it now lives on the lobby page, so
+  // the route below resolves to the same overlay.
   function overScreen() {
-    return simple(function (v) {
-      if (v.players.length === 1 && v.over) {
-        const n = v.mode === 'solo-streamer' ? (v.over.count || 0) : (v.over.top || 0);
-        const big = (v.mode === 'solo-streamer' ? 'You locked ' : 'You scored ') + n + (n === 1 ? (v.mode === 'solo-streamer' ? ' word' : ' point') : (v.mode === 'solo-streamer' ? ' words' : ' points'));
-        return centerScreen([
-          el('h2', '', 'set complete'),
-          el('div', 'big', big),
-          soloModeBtns()
-        ]);
-      }
-      const o = v.over || { winners: [], top: 0 };
-      const host = v.hostId === myId;
-      const heading = o.winners.length > 1 ? 'tied' : 'wins';
-      const names = o.winners.map(function (id) { return rosterName(id); }).join(' & ');
-      return centerScreen([
-        el('h2', '', 'set complete'),
-        el('div', 'big', names + ' ' + heading),
-        scoreBoardEl(v),
-        actionBtn(host ? 'Play again' : 'Waiting for host', 'start', null, !host)
-      ]);
-    });
+    return lobbyScreen();
   }
 
   // ---- streamer screen: the email-address field ----

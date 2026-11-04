@@ -249,6 +249,29 @@ Writes go through a `localStorage` outbox and retry, so a line survives being
 offline and a reload. Nothing is lost to a failed `fetch` any more; the status
 line under the record card says when something is still queued.
 
+### Lobby page
+
+Every game that takes a table shows the same screen when it is not running a
+round: title, how-to, seated players, host settings, a Start button, and a
+status line ("3 at the table — invite someone, or start"). Re-render it from
+`view` on every `update()`; compute enablement from the live `view`, never a
+cached roster. The reference is Dot Return (`games/dotreturn/index.js`) — one
+overlay for waiting and results, rebuilt per render.
+
+Two exits from the results view:
+
+- **Back to lobby** — send `{ a: 'toLobby' }`. Host-only. Keep seats, clear the
+  round, bump the epoch. This is the way out of a game you have started:
+  "Play again" goes forward, `toLobby` goes back.
+- **New game / Play again** — `{ a: 'start' }` from the lobby or results.
+
+Gate `start` on `from.host` in `reduce()`, with one exception: a table of one
+may be started by whoever is left holding it. Some games need more than a
+status line on the overlay (Fugue's match-mode picker, Hook's fresh-pair
+rule) — allowed, as long as it lives on the overlay rather than as a separate
+page. Iframe games follow the same rule: a host-only `toLobby` intent that
+nulls the table and re-shows the lobby section on `render()`.
+
 ---
 
 ## The `api` object
@@ -708,6 +731,11 @@ layout height and your `hide`/`show` handling.
 
 There is no `reset` — v10 never sends one. Room teardown does not reach your
 frame, so do not expect a courtesy notice that the table is gone.
+
+For a lobby/return page, follow the same rule as module games (see
+[Lobby page](#lobby-page)): a host-only `toLobby` intent that nulls the table
+and re-shows the lobby section on `render()`. See `public/braid.html` and
+`public/the96game.html` for the pattern.
 
 ### The golden rule
 

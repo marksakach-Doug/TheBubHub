@@ -1,197 +1,363 @@
-<!DOCTYPE html>
+<!doctype html>
 <html lang="en">
 <head>
 <meta charset="utf-8">
 <meta name="viewport" content="width=device-width, initial-scale=1">
 <meta name="color-scheme" content="light">
-<title>Braid — the loose-strand word game</title>
+<title>Braid — synonym / antonym word game</title>
 <style>
-:root{--paper:#f5f0e6;--card:#fffdf8;--ink:#332e26;--muted:#6f675b;--line:#d9cfbe;--wash:#e9e0d0;--accent:#a45f3b;--olive:#6d7b4f;--teal:#3f6f73;--plum:#8a5a72;--radius:14px;--gut:clamp(14px,3vw,24px);--shadow:0 1px 2px rgba(51,46,38,.06),0 8px 24px rgba(51,46,38,.06)}
-*{box-sizing:border-box}html,body{margin:0;background:var(--paper);color:var(--ink)}
-body{font:15px/1.5 "Segoe UI",system-ui,-apple-system,Arial,sans-serif}
-#app{max-width:900px;margin:auto;padding:var(--gut)}
+:root{
+  --paper:#f4efe5;--card:#fffdf8;--ink:#302c25;--muted:#746b5f;--line:#d9cfbd;
+  --wash:#eee6d8;--accent:#a45f3b;--syn:#3f7778;--ant:#94607e;--fail:#a49a8d;
+  --radius:15px;--shadow:0 2px 4px #332e2610,0 10px 26px #332e260d;
+}
+*{box-sizing:border-box}
+html,body{margin:0;background:var(--paper);color:var(--ink)}
+body{font:15px/1.5 "Segoe UI",system-ui,-apple-system,BlinkMacSystemFont,Arial,sans-serif}
+button,input,select{font:inherit}
+button{color:var(--ink);background:linear-gradient(#fffefa,#f0e9dc);border:1px solid var(--line);border-radius:999px;padding:9px 17px;min-height:42px;cursor:pointer;box-shadow:0 1px 2px #332e260d}
+button:hover:not(:disabled){filter:brightness(.985);border-color:#b9aa94}
+button:disabled{opacity:.45;cursor:not-allowed}
+button:focus-visible,input:focus-visible,summary:focus-visible{outline:3px solid #a45f3b66;outline-offset:2px}
+button.primary{background:linear-gradient(#b66c47,#a45f3b);border-color:#8e4f30;color:white}
+button.soft{background:#f3ede3}
+input[type=text],select{width:100%;min-height:44px;border:1px solid var(--line);border-radius:10px;padding:10px 12px;background:#fffefa;color:var(--ink)}
+label{display:flex;flex-direction:column;gap:5px;font-size:13px;font-weight:700;color:var(--muted)}
+#app{max-width:1040px;margin:auto;padding:clamp(14px,3vw,26px)}
 .hidden{display:none!important}
-.hero,.card{background:var(--card);border:1px solid var(--line);border-radius:var(--radius);box-shadow:var(--shadow);margin-bottom:14px}
-.hero{padding:24px;text-align:center;background:linear-gradient(135deg,#fbf7ef,#efe6d5)}
-h1{font:600 clamp(34px,8vw,52px) Georgia,serif;margin:0}.tag{color:var(--muted);margin:4px 0 0}
-.card{padding:clamp(14px,3vw,22px)}
-h2{font-size:19px;margin:0 0 8px;color:var(--accent-dark,var(--accent))}
+.hero{position:relative;overflow:hidden;text-align:center;padding:24px 18px;margin-bottom:14px;border:1px solid var(--line);border-radius:19px;background:linear-gradient(135deg,#fcf8f0,#eee3d0);box-shadow:var(--shadow)}
+.hero:before,.hero:after{content:"";position:absolute;left:-5%;width:110%;height:14px;border-top:2px solid #a45f3b25;border-radius:50%;transform:rotate(-3deg)}
+.hero:before{top:12px}.hero:after{bottom:5px;transform:rotate(2deg)}
+h1{font:600 clamp(38px,8vw,58px)/1 Georgia,"Times New Roman",serif;letter-spacing:.02em;margin:0;color:#3d3328}
+.tag{margin:9px 0 0;color:var(--muted);font-size:15px}
+.card{background:var(--card);border:1px solid var(--line);border-radius:var(--radius);padding:clamp(15px,3vw,22px);box-shadow:var(--shadow);margin-bottom:14px}
+h2{font:600 21px Georgia,"Times New Roman",serif;margin:0 0 8px;color:#60452f}
+h3{font-size:15px;margin:0 0 6px}
 p{margin:6px 0}.muted{color:var(--muted);font-size:14px}
-.status{font-weight:600;color:var(--accent);margin:0 0 12px;min-height:1.4em}
-.controls,.actions,.entry{display:flex;gap:9px;align-items:end;flex-wrap:wrap}
-label{display:flex;flex-direction:column;gap:4px;color:var(--muted);font-size:13px;font-weight:600}
-select,input{font:inherit;color:var(--ink);background:var(--card);border:1px solid var(--line);border-radius:10px;padding:10px 12px;min-height:42px}
-input[type=text]{font-size:16px;min-width:0;flex:1}
-button{font:inherit;color:var(--ink);background:linear-gradient(#fffdf8,#f1e9db);border:1px solid var(--line);border-radius:999px;padding:9px 17px;min-height:42px;cursor:pointer}
-button.primary{background:linear-gradient(#b56b46,#a45f3b);border-color:#8e4f30;color:white}
-button:disabled{opacity:.5;cursor:not-allowed}
-button:focus-visible,input:focus-visible,select:focus-visible{outline:3px solid #a45f3b66;outline-offset:2px}
-.entry input{flex:1 1 220px}.actions{margin-top:12px}
-.wordrow{display:flex;flex-wrap:wrap;gap:10px;margin:14px 0}
-.word{border:2px solid var(--line);border-radius:14px;padding:12px 16px;background:#fffdf8;min-width:100px;text-align:center;flex:1}
-.word strong{font:600 22px Georgia,serif;overflow-wrap:anywhere}
-.word small{display:block;color:var(--muted);font-size:12px;margin-top:3px}
-.word.loose{border-style:dashed;border-color:var(--plum);background:#fbf5f8}
-.word.linked{border-color:var(--olive);background:#f5f7ef}
-.stitch{border:1px solid var(--line);border-radius:12px;padding:13px;margin:10px 0;background:#fffefa}
-.stitchhead{font-size:13px;color:var(--muted);font-weight:700;letter-spacing:.04em;text-transform:uppercase}
-.result{margin-top:8px;padding:9px 11px;background:var(--wash);border-radius:9px}
-.pairchoices{display:grid;gap:8px;margin:12px 0}
-.pairchoice{display:flex;gap:9px;align-items:center;padding:10px;border:1px solid var(--line);border-radius:10px;background:#fffefa}
-.pairchoice input{min-height:auto;flex:none}
-.people{list-style:none;padding:0;margin:0;display:flex;gap:8px;flex-wrap:wrap}
-.people li{padding:5px 10px;border-radius:99px;background:var(--wash);font-size:14px}
-.people li.turn{outline:2px solid var(--accent);font-weight:700}
-details summary{cursor:pointer;font-weight:700;color:var(--accent)}
-details p{max-width:68ch;font-size:14px}
-@media(max-width:600px){.controls label{width:100%}select{width:100%}.word{min-width:0}.entry{align-items:stretch}}
+.status{min-height:1.4em;margin:0 0 12px;color:#874c2d;font-weight:700}.status:empty{display:none}
+.setup{display:flex;gap:12px;align-items:end;flex-wrap:wrap}.setup label{width:180px}
+.actions{display:flex;gap:9px;align-items:center;flex-wrap:wrap;margin-top:12px}
+.turnline{font-weight:750;font-size:17px;margin-bottom:5px}
+.prompt{color:var(--muted);margin-bottom:12px}
+.anchorrow{display:grid;grid-template-columns:1fr 1fr;gap:10px;margin:12px 0}
+.anchor{border:1px dashed var(--line);border-radius:12px;background:#faf6ee;padding:10px 12px;min-height:75px}
+.anchor .label{font-size:11px;letter-spacing:.1em;text-transform:uppercase;color:var(--muted);font-weight:800}
+.anchor .value{font:600 21px Georgia,serif;margin-top:3px;overflow-wrap:anywhere}
+.anchor .hint{font-size:12px;color:var(--muted)}
+.entry{display:flex;gap:8px;align-items:stretch;margin-top:10px}
+.entry input{flex:1;min-width:0;font-size:17px}
+.boardwrap{overflow:auto;border:1px solid var(--line);border-radius:13px;background:linear-gradient(180deg,#fffefa,#f8f2e8);padding:8px}
+#board svg{display:block;max-width:none}
+.legend{display:flex;gap:13px 18px;flex-wrap:wrap;margin-top:11px;color:var(--muted);font-size:12px}
+.legend span{display:inline-flex;align-items:center;gap:6px}
+.swatch{width:27px;height:0;border-top:3px solid var(--syn);display:inline-block}
+.swatch.ant{border-top-color:var(--ant)}
+.swatch.no{border-top-color:var(--fail);border-top-style:dotted}
+.swatch.strand{border-top-color:var(--accent);border-top-width:5px;opacity:.65}
+.hintline{padding:9px 11px;border-radius:9px;background:#f3eee5;color:var(--muted);font-size:13px;margin-top:10px}
+.wordinputlabel{display:block;margin:9px 0 4px}
+.judgegrid{display:grid;grid-template-columns:1fr 1fr;gap:10px;margin:12px 0}
+.judgeitem{padding:12px;border:1px solid var(--line);border-radius:11px;background:#faf7f0}
+.judgeitem strong{display:block;margin-bottom:8px}
+.toggle{display:flex;gap:7px}
+.toggle button{flex:1;min-height:38px;padding:6px 10px}
+.toggle button.chosen.yes{background:#e7f0e9;border-color:#6d997c;color:#2e6240}
+.toggle button.chosen.no{background:#f1e8ec;border-color:#b28a9f;color:#79445e}
+.playerlist{display:flex;gap:7px;flex-wrap:wrap;padding:0;margin:0;list-style:none}
+.playerlist li{display:flex;align-items:center;gap:7px;padding:6px 11px;background:var(--wash);border-radius:99px;font-size:13px}
+.playerlist li.current{outline:2px solid var(--accent);font-weight:800}
+.dot{width:9px;height:9px;border-radius:50%;display:inline-block}
+details summary{cursor:pointer;font-weight:750;color:#805033}
+details p{max-width:78ch;font-size:14px}
+.rulesgrid{display:grid;grid-template-columns:1fr 1fr;gap:4px 20px}
+@media(max-width:620px){.anchorrow,.judgegrid,.rulesgrid{grid-template-columns:1fr}.entry{flex-direction:column}.entry button{width:100%}.setup label{width:100%}}
+@media(prefers-reduced-motion:reduce){*{scroll-behavior:auto!important;transition:none!important}}
 </style>
 </head>
 <body>
 <div id="app">
-<header class="hero"><h1>Braid</h1><p class="tag">A word game of linked strands and loose ends.</p></header>
-<p id="status" class="status" role="status" aria-live="polite"></p>
-<section id="lobby" class="card">
-  <div id="setup" class="controls">
-    <label>Players <select id="count"><option value="1">Solo</option><option value="2" selected>2 players</option><option value="3">3 players</option><option value="4">4 players</option><option value="5">5 players</option><option value="6">6 players</option></select></label>
-  </div>
-  <div class="actions"><button id="start" class="primary">Start braid</button><span id="waiting" class="muted hidden">Waiting for the host to start.</span></div>
-</section>
-<section id="game" class="hidden">
-  <section class="card">
-    <div id="turn" style="font-weight:700;margin-bottom:8px"></div>
-    <div id="prompt" class="muted"></div>
-    <div id="entry" class="entry"><input id="wordInput" type="text" maxlength="40" placeholder="Add one word…" autocomplete="off"><button id="add" class="primary">Add word</button></div>
-    <div id="resolve" class="hidden">
-      <h2>Find the linked pair</h2>
-      <p>Choose the two words with a clear association. The remaining word is the <b>loose strand</b>.</p>
-      <div id="choices" class="pairchoices"></div>
-      <label>Why are they linked?
-        <input id="reason" type="text" maxlength="180" placeholder="Give a short explanation…">
-      </label>
-      <div class="actions"><button id="confirm" class="primary">Confirm stitch</button></div>
-      <p class="muted" id="resolverNote"></p>
-    </div>
+  <header class="hero"><h1>Braid</h1><p class="tag">One word between two meanings.</p></header>
+  <p id="status" class="status" role="status" aria-live="polite"></p>
+
+  <section id="lobby" class="card">
+    <h2>Gather the strands</h2>
+    <p class="muted">Each player gets a colored string. First, everyone lays down one seed word. Then the word-bridging begins.</p>
+    <div class="setup"><label>Players
+      <select id="playerCount"><option value="2" selected>2 players</option><option value="3">3 players</option><option value="4">4 players</option><option value="5">5 players</option><option value="6">6 players</option></select>
+    </label><button id="start" class="primary">Start braid</button><span id="waiting" class="muted hidden">Waiting for the host to start.</span></div>
   </section>
-  <section class="card"><h2>Current stitch</h2><div id="currentWords" class="wordrow"></div><p id="currentNote" class="muted"></p></section>
-  <section class="card"><h2>The braid so far</h2><div id="history"></div><div class="actions"><button id="export">Save braid as HTML</button><button id="new" class="hidden">New braid</button></div></section>
-  <section class="card"><h2>Players</h2><ul id="people" class="people"></ul></section>
-</section>
-<details class="card"><summary>How to play</summary>
-<p><b>One stitch is three words.</b> Players take turns adding one word at a time. Once three words are on the board, choose the two that have a clear association and explain the connection. The third word is the <b>loose strand</b>.</p>
-<p><b>Carry the loose word forward.</b> It becomes the first word of the next stitch. Players add two new words, then identify a linked pair again. The loose word can remain loose for several stitches; the aim is to weave it in naturally, not force a connection.</p>
-<p>With three players, each person adds one word per stitch. With two players, alternate turns until the stitch has three words. With more players, continue around the circle. Keep going for as long as the group likes.</p>
-<p><b>Example:</b> moon — tide — violin. Moon and tide are linked because the moon's gravity influences tides. Violin is the loose strand.</p>
-<p>Use <b>Save braid as HTML</b> to download a readable record of the braid so far.</p>
-</details>
+
+  <main id="game" class="hidden">
+    <section class="card">
+      <div id="turn" class="turnline"></div>
+      <div id="prompt" class="prompt"></div>
+      <div id="seedEntry" class="entry hidden"><input id="seedWord" type="text" maxlength="32" autocomplete="off" placeholder="Your one seed word"><button id="addSeed" class="primary">Add seed word</button></div>
+      <div id="playEntry" class="hidden">
+        <div class="anchorrow">
+          <div class="anchor"><div class="label">A · synonym target</div><div id="anchorA" class="value">Choose a word on the braid</div><div class="hint">Your word should mean something similar.</div></div>
+          <div class="anchor"><div class="label">B · antonym target</div><div id="anchorB" class="value">Choose a word on another strand</div><div class="hint">Your word should mean the opposite.</div></div>
+        </div>
+        <div class="entry"><input id="newWord" type="text" maxlength="32" autocomplete="off" placeholder="One word only" aria-label="Your one-word bridge"><button id="addWord" class="primary" disabled>Add one word</button></div>
+        <p class="muted">Click one existing word for A, then a word on a different player's strand for B. Then add a single word that bridges them.</p>
+      </div>
+      <div id="judging" class="hidden">
+        <h2>Does each link hold?</h2>
+        <p id="judgePrompt" class="muted"></p>
+        <div class="judgegrid">
+          <div class="judgeitem"><strong>Is the new word a synonym of A?</strong><div class="toggle"><button data-kind="syn" data-value="yes">Yes</button><button data-kind="syn" data-value="no">No</button></div></div>
+          <div class="judgeitem"><strong>Is the new word an antonym of B?</strong><div class="toggle"><button data-kind="ant" data-value="yes">Yes</button><button data-kind="ant" data-value="no">No</button></div></div>
+        </div>
+        <p class="muted" id="judgeNote">Talk it through, then mark both links. No explanation or extra words are needed.</p>
+        <div class="actions"><button id="confirmJudgment" class="primary" disabled>Confirm links</button></div>
+      </div>
+    </section>
+
+    <section class="card">
+      <h2>The braid</h2>
+      <p class="muted">Each colored string follows one player's words. The cross-threads show the meaning links.</p>
+      <div class="boardwrap"><div id="board"></div></div>
+      <div class="legend">
+        <span><i class="swatch strand"></i> player strand</span>
+        <span><i class="swatch"></i> synonym link</span>
+        <span><i class="swatch ant"></i> antonym link</span>
+        <span><i class="swatch no"></i> no link (×)</span>
+      </div>
+      <p id="boardHint" class="hintline">During your turn, click two words on different strands to set A and B.</p>
+    </section>
+
+    <section class="card">
+      <h2>Players</h2><ul id="players" class="playerlist"></ul>
+      <div class="actions"><button id="export">Save braid as HTML</button><button id="new" class="hidden">New braid</button><button id="lobbyBtn" class="hidden">Back to lobby</button></div>
+    </section>
+  </main>
+
+  <details class="card"><summary>How to play</summary>
+    <div class="rulesgrid">
+      <p><b>1. Start the strings.</b> Each player adds one seed word. That is the only word they contribute during that opening turn.</p>
+      <p><b>2. Choose A and B.</b> On your turn, click two existing words on different players' strings. A is the synonym target; B is the antonym target.</p>
+      <p><b>3. Add one word.</b> Write exactly one word that you think is a synonym of A and an antonym of B. No sentences or explanations.</p>
+      <p><b>4. Check the two links.</b> Talk it through together and mark Yes or No for each relationship. A solid line means the link holds; a broken line with an × means it does not.</p>
+    </div>
+    <p>Each new word is added to its author's colored string, while its two meaning-links cross to A and B. Over time, the strings and cross-links form the braid. A word can make both links, just one, or neither.</p>
+    <p><b>Example:</b> A = <i>happy</i>, B = <i>sad</i>. A possible bridge is <i>glad</i>: it is close in meaning to happy and opposite in meaning to sad.</p>
+    <p><b>Keep it light:</b> the group decides what counts as a convincing synonym or antonym. If a word is debatable, discuss it; the game is about the reasoning, not a dictionary ruling.</p>
+  </details>
 </div>
+
 <script>
 (function(){
 'use strict';
 const $=id=>document.getElementById(id);
-const COLORS=['#a45f3b','#6d7b4f','#3f6f73','#8a5a72','#6b6590','#a17a35'];
-let S=null,mode='wait',Hub={me:null,roster:[],up(k,p){try{parent.postMessage({t:'gu',game:'braid',k,p},'*')}catch(e){} }};
+const COLORS=['#a45f3b','#3f7778','#8a5a72','#71834e','#746b9b','#b08336'];
+const SYN='#3f7778', ANT='#94607e', FAIL='#a49a8d';
+let S=null, mode='wait', Hub={me:null,roster:[],up(k,p){try{window.parent.postMessage({t:'gu',game:'braid',k,p},'*')}catch(e){}}};
+let pickedA=null,pickedB=null,pickTurn=null,verdict={syn:null,ant:null},heightTimer=null;
 function esc(s){return String(s).replace(/[&<>"']/g,c=>({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;'}[c]));}
+function playerName(id){return S&&S.names[id]||'Player'}
 function myId(){return mode==='local'?'local':Hub.me&&Hub.me.id}
 function isHost(){return mode==='local'||!!(Hub.me&&Hub.me.isHost)}
-function nameOf(id){return S.names[id]||'Player'}
+function isMyTurn(){return !!S&&(mode==='local'||S.turnId===myId())}
 function nextAfter(id){let i=S.order.indexOf(id);return S.order[(i+1+S.order.length)%S.order.length]}
+function colorOf(id){let i=S.order.indexOf(id);return COLORS[(i<0?0:i)%COLORS.length]}
+function say(t){$('status').textContent=t;clearTimeout(say.timer);say.timer=setTimeout(()=>{$('status').textContent=''},3000)}
+function syncPickTurn(){let key=S?(S.phase+':'+S.turnId+':'+(S.pendingId||'')):'';if(key!==pickTurn){pickedA=null;pickedB=null;verdict={syn:null,ant:null};pickTurn=key}}
+function reportHeight(){clearTimeout(heightTimer);heightTimer=setTimeout(()=>{let app=$('app');if(app)Hub.up('height',Math.ceil(app.getBoundingClientRect().height))},60)}
 function postState(){render();if(mode==='hub'&&isHost())Hub.up('state',S)}
-function say(t){$('status').textContent=t;setTimeout(()=>{if($('status').textContent===t)$('status').textContent=''},2800)}
 function start(order,names){
- S={order,names,turnId:order[0],phase:'add',current:[],history:[],resolver:null,selected:null};
- $('wordInput').value='';postState();
+  S={order:order.slice(),names:Object.assign({},names),phase:'seed',turnId:order[0],words:[],nextId:1,seedCount:0,pendingId:null,judgeId:null};
+  pickedA=null;pickedB=null;verdict={syn:null,ant:null};pickTurn=null;postState();
 }
-function localStart(){let n=+$('count').value,order=[],names={};for(let i=0;i<n;i++){order.push('local-'+i);names[order[i]]=n===1?'You':'Player '+(i+1)}start(order,names)}
-function act(a){if(mode==='local'){let actor=S?(a.a==='resolve'?S.resolver:S.turnId):myId();apply(a,actor);return}if(isHost()){apply(a,myId())}else Hub.up('intent',a)}
+function localStart(){let n=+$('playerCount').value,order=[],names={};for(let i=0;i<n;i++){let id='local-'+i;order.push(id);names[id]='Player '+(i+1)}start(order,names)}
+function byId(id){return S.words.find(w=>w.id===id)||null}
+function validWord(t){return !!t&&!/\s/.test(t)&&t.length<=32}
 function apply(a,from){
- if(!S)return;
- if(a.a==='add'){
-  if(S.phase!=='add'||from!==S.turnId)return;
-  let t=String(a.text||'').trim().replace(/\s+/g,' ');
-  if(!t||t.length>40){say('Enter a word (up to 40 characters).');return}
-  S.current.push({text:t,by:from});
-  if(S.current.length===3){S.phase='resolve';S.resolver=from;S.selected=null}
-  else S.turnId=nextAfter(from);
- }else if(a.a==='resolve'){
-  if(S.phase!=='resolve'||from!==S.resolver)return;
-  let pair=a.pair,reason=String(a.reason||'').trim();
-  if(!Array.isArray(pair)||pair.length!==2||!reason){say('Choose a pair and explain the connection.');return}
-  let loose=[0,1,2].find(i=>!pair.includes(i));
-  S.history.push({words:S.current.map(w=>w.text),linked:pair.slice(),loose,reason});
-  let carry=S.current[loose];
-  S.current=[carry];S.phase='add';S.turnId=nextAfter(from);S.resolver=null;S.selected=null;
- }else if(a.a==='new'){if(!isHost())return;localStart();return}
- postState();
+  if(!S||!a)return;
+  if(a.a==='seed'){
+    if(S.phase!=='seed'||from!==S.turnId)return 'It is not your seed turn.';
+    let text=String(a.text||'').trim();if(!validWord(text))return 'Please enter exactly one word.';
+    if(S.words.some(w=>w.text.toLowerCase()===text.toLowerCase()))return 'That word is already on the braid.';
+    S.words.push({id:S.nextId++,text,by:from,seed:true});S.seedCount++;
+    if(S.seedCount>=S.order.length){S.phase='play';S.turnId=S.order[0]}
+    else S.turnId=S.order[S.seedCount];
+  }else if(a.a==='add'){
+    if(S.phase!=='play'||from!==S.turnId)return 'It is not your turn.';
+    let text=String(a.text||'').trim();if(!validWord(text))return 'Please enter exactly one word.';
+    if(S.words.some(w=>w.text.toLowerCase()===text.toLowerCase()))return 'That word is already on the braid.';
+    let A=byId(a.aId),B=byId(a.bId);
+    if(!A||!B||A.id===B.id)return 'Choose two different words.';
+    if(A.by===B.by)return 'Choose A and B from different player strands.';
+    S.words.push({id:S.nextId++,text,by:from,seed:false,aId:A.id,bId:B.id,links:null});
+    S.pendingId=S.nextId-1;S.judgeId=from;S.phase='judge';
+  }else if(a.a==='judge'){
+    if(S.phase!=='judge'||from!==S.judgeId)return "Only the word's author can confirm the links.";
+    if(!['yes','no'].includes(a.syn)||!['yes','no'].includes(a.ant))return 'Mark both relationships Yes or No.';
+    let w=byId(S.pendingId);if(!w)return 'The word to check is missing.';
+    w.links={syn:a.syn==='yes',ant:a.ant==='yes'};
+    let doneBy=S.judgeId;S.phase='play';S.turnId=nextAfter(doneBy);S.pendingId=null;S.judgeId=null;
+  }else if(a.a==='new'){
+    if(!isHost())return 'Only the host can start a new braid.';
+    if(mode==='local')localStart();else{let order=Hub.roster.map(p=>p.id),names={};Hub.roster.forEach(p=>names[p.id]=p.name);start(order,names)}return null;
+  }else if(a.a==='toLobby'){
+    if(!isHost())return 'Only the host can send the table back to the lobby.';
+    S=null;postState();return null;
+  }else return 'Unknown move.';
+  postState();return null;
+}
+function act(a){
+  let from;
+  if(mode==='local')from=S?(a.a==='judge'?S.judgeId:S.turnId):'local';
+  else if(isHost())from=myId();
+  if(mode==='local'||isHost()){let e=apply(a,from);if(e)say(e)}
+  else Hub.up('intent',a);
+}
+function selectNode(id){
+  if(!S||S.phase!=='play'||!isMyTurn())return;
+  let w=byId(id);if(!w)return;
+  if(pickedA===id){pickedA=null;pickedB=null}
+  else if(pickedB===id){pickedB=null}
+  else if(!pickedA){pickedA=id}
+  else if(!pickedB){let A=byId(pickedA);if(A.by===w.by){say('A and B must come from different player strands.');return}pickedB=id}
+  else {pickedA=id;pickedB=null}
+  render();
+}
+function posMap(){
+  let map={},counts={};
+  S.words.forEach((w,i)=>{
+    let lane=S.order.indexOf(w.by);let col=i;
+    map[w.id]={x:158+col*154,y:74+lane*106,lane,index:i};
+  });
+  return map;
+}
+function svgBoard(){
+  if(!S)return '';
+  const p=posMap(),n=S.order.length,W=Math.max(610,190+S.words.length*154),H=105+n*106;
+  let out=`<svg xmlns="http://www.w3.org/2000/svg" width="${W}" height="${H}" viewBox="0 0 ${W} ${H}" role="img" aria-label="Braid of player word strands and synonym and antonym links">`;
+  out+='<defs><filter id="shadow" x="-30%" y="-30%" width="160%" height="160%"><feDropShadow dx="0" dy="2" stdDeviation="2" flood-color="#302c25" flood-opacity=".12"/></filter></defs>';
+  // Fine horizontal guides identify each player's string.
+  S.order.forEach((id,i)=>{let y=74+i*106;out+=`<line x1="105" y1="${y}" x2="${W-25}" y2="${y}" stroke="${colorOf(id)}" stroke-width="1.5" opacity=".10" stroke-dasharray="3 9"/>`;out+=`<text x="15" y="${y+4}" font-family="system-ui,sans-serif" font-size="11" font-weight="700" fill="${colorOf(id)}">${esc(playerName(id))}</text>`});
+  // Each player's own words are joined by a flowing, colored string. The curves pass through the other strands.
+  S.order.forEach(id=>{
+    let own=S.words.filter(w=>w.by===id);
+    for(let j=1;j<own.length;j++){
+      let a=p[own[j-1].id],b=p[own[j].id],dx=b.x-a.x,lane=S.order.indexOf(id),amp=Math.min(125,70+S.order.length*5),bend=Math.sin((lane+.5)*2*Math.PI/S.order.length+(j%2)*Math.PI)*amp;
+      let d=`M ${a.x} ${a.y} C ${a.x+dx*.34} ${a.y+bend}, ${b.x-dx*.34} ${b.y+bend}, ${b.x} ${b.y}`;
+      out+=`<path d="${d}" fill="none" stroke="${colorOf(id)}" stroke-width="7" stroke-linecap="round" opacity=".17"/>`;
+      out+=`<path d="${d}" fill="none" stroke="${colorOf(id)}" stroke-width="2.8" stroke-linecap="round" opacity=".9"/>`;
+    }
+  });
+  // Cross-threads: teal means synonym, plum means antonym; dashed grey with an X means no link.
+  S.words.filter(w=>!w.seed&&w.aId&&w.bId).forEach(w=>{
+    let to=p[w.id],A=p[w.aId],B=p[w.bId];if(!to||!A||!B)return;
+    [['syn',A,w.links&&w.links.syn],['ant',B,w.links&&w.links.ant]].forEach(([kind,from,accepted],ix)=>{
+      let midx=(from.x+to.x)/2,midy=(from.y+to.y)/2,offset=(ix===0?-1:1)*30;
+      let d=`M ${from.x} ${from.y} Q ${midx} ${midy+offset} ${to.x} ${to.y}`;
+      let color=accepted===true?(kind==='syn'?SYN:ANT):FAIL;
+      let dash=accepted===false?' stroke-dasharray="3 7"':accepted===null?' stroke-dasharray="5 5" opacity=".7"':'';
+      let label=kind==='syn'?'≈':'≠';
+      out+=`<path d="${d}" fill="none" stroke="${color}" stroke-width="${accepted===true?3.5:2.2}" stroke-linecap="round"${dash}/>`;
+      if(accepted===false){out+=`<g transform="translate(${midx} ${midy+offset})"><circle r="8" fill="#fffdf8" stroke="${FAIL}" stroke-width="1.2"/><path d="M -3 -3 L 3 3 M 3 -3 L -3 3" stroke="${FAIL}" stroke-width="1.6" stroke-linecap="round"/></g>`}
+      else if(accepted===true){out+=`<text x="${midx}" y="${midy+offset-5}" text-anchor="middle" font-family="Georgia,serif" font-size="14" font-weight="700" fill="${color}">${label}</text>`}
+      else{out+=`<text x="${midx}" y="${midy+offset-5}" text-anchor="middle" font-family="system-ui,sans-serif" font-size="12" fill="${FAIL}">?</text>`}
+    });
+  });
+  // Word beads sit above all strings and links.
+  S.words.forEach(w=>{
+    let q=p[w.id],c=colorOf(w.by),tw=Math.max(62,Math.min(126,w.text.length*8+26)),isA=w.id===pickedA,isB=w.id===pickedB;
+    let stroke=isA?SYN:isB?ANT:c,sw=isA||isB?4:2.2;
+    let pending=!w.seed&&w.links===null;
+    out+=`<g data-word-id="${w.id}" class="word-node" style="cursor:${S.phase==='play'&&isMyTurn()?'pointer':'default'}" filter="url(#shadow)">`;
+    if(isA||isB)out+=`<rect x="${q.x-tw/2-7}" y="${q.y-24}" width="${tw+14}" height="48" rx="19" fill="none" stroke="${stroke}" stroke-width="2" opacity=".55"/>`;
+    out+=`<rect x="${q.x-tw/2}" y="${q.y-17}" width="${tw}" height="34" rx="13" fill="${pending?'#fff8e9':'#fffdf8'}" stroke="${pending?'#b78d52':stroke}" stroke-width="${sw}"/>`;
+    out+=`<text x="${q.x}" y="${q.y+5}" text-anchor="middle" font-family="Georgia,serif" font-size="${w.text.length>13?11:w.text.length>9?13:16}" font-weight="700" fill="#302c25">${esc(w.text)}</text>`;
+    if(isA||isB)out+=`<text x="${q.x+tw/2-5}" y="${q.y-21}" text-anchor="end" font-family="system-ui,sans-serif" font-size="10" font-weight="800" fill="${stroke}">${isA?'A':'B'}</text>`;
+    if(pending)out+=`<text x="${q.x}" y="${q.y+31}" text-anchor="middle" font-family="system-ui,sans-serif" font-size="10" fill="#98713a">checking</text>`;
+    out+='</g>';
+  });
+  if(!S.words.length)out+=`<text x="${W/2}" y="${H/2}" text-anchor="middle" font-family="Georgia,serif" font-size="17" fill="#877d70">The strings are waiting for their first words.</text>`;
+  out+='</svg>';return out;
+}
+function drawBoard(){
+  $('board').innerHTML=svgBoard();
+  $('board').querySelectorAll('[data-word-id]').forEach(g=>g.addEventListener('click',()=>selectNode(+g.dataset.wordId)));
+}
+function renderPlayers(){
+  let ul=$('players');ul.innerHTML='';
+  S.order.forEach(id=>{let li=document.createElement('li');if((S.phase==='seed'||S.phase==='play')&&id===S.turnId)li.className='current';let dot=document.createElement('i');dot.className='dot';dot.style.background=colorOf(id);li.append(dot,document.createTextNode(playerName(id)+(id===S.turnId&&S.phase!=='judge'?' · up next':'')));ul.append(li)});
 }
 function render(){
- $('lobby').classList.toggle('hidden',!!S);$('game').classList.toggle('hidden',!S);
- $('setup').classList.toggle('hidden',mode==='hub');$('start').classList.toggle('hidden',mode==='hub'&&!isHost());
- $('waiting').classList.toggle('hidden',!(mode==='hub'&&!isHost()&&!S));
- if(!S)return;
- let isTurn=myId()===S.turnId;
- $('turn').textContent=S.phase==='resolve'?'Stitch complete — find the linked pair.':(isTurn?'Your turn to add a word.':'Waiting for '+nameOf(S.turnId)+'.');
- $('prompt').textContent=S.phase==='add'?(S.current.length===0?'Start with any word.':S.current.length===1?'One word is down; add the second.':'Two words are down; add the third.'):'';
- $('entry').classList.toggle('hidden',S.phase!=='add'||!isTurn);
- $('resolve').classList.toggle('hidden',S.phase!=='resolve');
- $('currentWords').innerHTML='';
- S.current.forEach((w,i)=>{let d=document.createElement('div');d.className='word';d.innerHTML='<strong>'+esc(w.text)+'</strong><small>'+(S.history.length&&i===0?'carried loose strand':'')+'</small>'; $('currentWords').appendChild(d)});
- $('currentNote').textContent=S.phase==='resolve'?'All three words are in. Decide which two belong together.':S.current.length===1?'The loose strand from the previous stitch is carried forward.':'';
- renderChoices();renderHistory();renderPeople();
- $('new').classList.toggle('hidden',!isHost());
-}
-function renderChoices(){
- let box=$('choices');box.innerHTML='';
- if(!S||S.phase!=='resolve')return;
- [[0,1],[0,2],[1,2]].forEach(pair=>{
-  let label=document.createElement('label');label.className='pairchoice';
-  let radio=document.createElement('input');radio.type='radio';radio.name='pair';radio.value=pair.join(',');
-  if(S.selected===pair.join(','))radio.checked=true;
-  radio.addEventListener('change',()=>{S.selected=pair.join(',')});
-  label.appendChild(radio);label.appendChild(document.createTextNode(S.current[pair[0]].text+' + '+S.current[pair[1]].text));
-  box.appendChild(label);
- });
- let canResolve=mode==='local'||myId()===S.resolver;
- $('confirm').disabled=!canResolve;
- $('reason').disabled=!canResolve;
- $('resolverNote').textContent=canResolve?'Choose the pair and enter the reason.':nameOf(S.resolver)+' is choosing the pair.';
-}
-function renderHistory(){
- let box=$('history');box.innerHTML='';
- S.history.forEach((st,i)=>{
-  let div=document.createElement('div');div.className='stitch';
-  let words=st.words.map((w,j)=>'<div class="word '+(j===st.loose?'loose':'linked')+'"><strong>'+esc(w)+'</strong><small>'+(j===st.loose?'loose strand':'linked pair')+'</small></div>').join('');
-  let linked=st.linked.map(j=>st.words[j]).join(' + ');
-  div.innerHTML='<div class="stitchhead">Stitch '+(i+1)+'</div><div class="wordrow">'+words+'</div><div class="result"><b>'+esc(linked)+'</b> — '+esc(st.reason)+'<br><span class="muted">Loose strand carried forward: <b>'+esc(st.words[st.loose])+'</b></span></div>';
-  box.appendChild(div);
- });
- if(!S.history.length)box.innerHTML='<p class="muted">Your completed stitches will appear here.</p>';
-}
-function renderPeople(){
- let ul=$('people');ul.innerHTML='';
- S.order.forEach(id=>{let li=document.createElement('li');li.textContent=nameOf(id)+(S.phase==='add'&&id===S.turnId?' · up next':'');if(S.phase==='add'&&id===S.turnId)li.className='turn';ul.appendChild(li)});
+  $('lobby').classList.toggle('hidden',!!S);$('game').classList.toggle('hidden',!S);
+  $('start').classList.toggle('hidden',mode==='wait'||(mode==='hub'&&!isHost()));$('waiting').classList.toggle('hidden',!(mode==='hub'&&!S&&!isHost()));
+  if(!S){$('status').textContent=mode==='wait'?'Connecting to the shared table…':'';reportHeight();return}
+  syncPickTurn();
+  let myTurn=isMyTurn(),judgeTurn=S.phase==='judge'&&(mode==='local'||S.judgeId===myId());
+  $('turn').textContent=S.phase==='seed'?(myTurn?'Your turn to lay a seed word.':'Waiting for '+playerName(S.turnId)+' to lay a seed word.'):
+    S.phase==='play'?(myTurn?'Your turn to make a bridge.':'Waiting for '+playerName(S.turnId)+'.'):
+    (judgeTurn?'Check the two links together.':playerName(S.judgeId)+' is checking the links.');
+  $('prompt').textContent=S.phase==='seed'?'Add one word to start your colored string. Everyone adds one seed before the bridge turns begin.':
+    S.phase==='play'?'Find a word that is a synonym of A but an antonym of B. You contribute one word only.':
+    'The new word is “'+(byId(S.pendingId)||{}).text+'”. Decide whether each relationship is real.';
+  $('seedEntry').classList.toggle('hidden',!(S.phase==='seed'&&myTurn));
+  $('playEntry').classList.toggle('hidden',!(S.phase==='play'&&myTurn));
+  $('judging').classList.toggle('hidden',S.phase!=='judge'||!judgeTurn);
+  let A=byId(pickedA),B=byId(pickedB);
+  $('anchorA').textContent=A?A.text:'Choose a word on the braid';$('anchorB').textContent=B?B.text:'Choose a word on another strand';
+  $('addWord').disabled=!(A&&B)&&S.phase==='play'||!A||!B;
+  if(S.phase==='judge'){
+    let w=byId(S.pendingId),a=w&&byId(w.aId),b=w&&byId(w.bId);
+    $('judgePrompt').textContent=w&&a&&b?'“'+w.text+'” · synonym of “'+a.text+'”? · antonym of “'+b.text+'”?':'Check the proposed word.';
+    document.querySelectorAll('[data-kind]').forEach(btn=>{let v=verdict[btn.dataset.kind];btn.classList.toggle('chosen',v===btn.dataset.value);btn.classList.toggle('yes',v==='yes'&&btn.dataset.value==='yes');btn.classList.toggle('no',v==='no'&&btn.dataset.value==='no')});
+    $('confirmJudgment').disabled=!judgeTurn||!verdict.syn||!verdict.ant;
+  }
+  $('new').classList.toggle('hidden',!isHost());
+  $('lobbyBtn').classList.toggle('hidden',!isHost());
+  $('boardHint').textContent=S.phase==='play'&&myTurn?'Click one word for A, then a word on a different string for B. Solid cross-threads mean the link holds; dashed crosses mean it does not.':S.phase==='seed'?'Seed words start each player’s colored string.':S.phase==='judge'?'The pending word is highlighted while the group checks its two links.':'The braid records each word and the two relationships it was tested against.';
+  drawBoard();renderPlayers();reportHeight();
 }
 function exportHtml(){
- if(!S)return;
- let body='<h1>Braid</h1><p>A word game of linked strands and loose ends.</p>';
- S.history.forEach((st,i)=>{body+='<section><h2>Stitch '+(i+1)+'</h2><p>'+st.words.map((w,j)=>'<b>'+esc(w)+'</b>'+(j===st.loose?' (loose strand)':'')).join(' — ')+'</p><p><b>Linked pair:</b> '+esc(st.linked.map(j=>st.words[j]).join(' + '))+'</p><p><b>Why:</b> '+esc(st.reason)+'</p><p><b>Loose strand carried forward:</b> '+esc(st.words[st.loose])+'</p></section>'});
- if(S.current.length)body+='<section><h2>Current stitch in progress</h2><p>'+S.current.map(w=>'<b>'+esc(w.text)+'</b>').join(' — ')+'</p></section>';
- let doc='<!doctype html><html lang="en"><meta charset="utf-8"><meta name="viewport" content="width=device-width"><title>Braid record</title><style>body{max-width:760px;margin:40px auto;padding:0 20px;font:16px/1.6 system-ui;color:#332e26;background:#f5f0e6}section{background:#fffdf8;border:1px solid #d9cfbe;border-radius:12px;padding:18px;margin:16px 0}h1{font: bold 42px Georgia}</style><body>'+body+'</body></html>';
- let blob=new Blob([doc],{type:'text/html'}),url=URL.createObjectURL(blob),a=document.createElement('a');a.href=url;a.download='braid-record.html';a.click();URL.revokeObjectURL(url);
+  if(!S)return;
+  let svg=svgBoard();
+  let rows=S.words.map(w=>{
+    if(w.seed)return `<li><b>${esc(w.text)}</b> — seed word on ${esc(playerName(w.by))}'s strand</li>`;
+    let a=byId(w.aId),b=byId(w.bId),syn=w.links&&w.links.syn,ant=w.links&&w.links.ant;
+    return `<li><b>${esc(w.text)}</b> — ${esc(playerName(w.by))}; synonym of ${esc(a?a.text:'?')}: <b>${syn===null?'pending':syn?'yes':'no'}</b>; antonym of ${esc(b?b.text:'?')}: <b>${ant===null?'pending':ant?'yes':'no'}</b></li>`;
+  }).join('');
+  let html=`<!doctype html><html lang="en"><meta charset="utf-8"><meta name="viewport" content="width=device-width"><title>Braid record</title><style>body{margin:0;padding:28px;background:#f4efe5;color:#302c25;font:15px/1.6 system-ui}main{max-width:1100px;margin:auto}section{background:#fffdf8;border:1px solid #d9cfbd;border-radius:14px;padding:20px;margin:16px 0;overflow:auto}h1{font:600 48px Georgia,serif;margin:0}li{margin:8px 0}.muted{color:#746b5f}</style><main><h1>Braid</h1><p class="muted">A word game of synonyms, antonyms and crossing strings.</p><section><h2>The braid</h2>${svg}</section><section><h2>Word record</h2><ol>${rows}</ol></section></main></html>`;
+  let blob=new Blob([html],{type:'text/html'}),url=URL.createObjectURL(blob),a=document.createElement('a');a.href=url;a.download='braid-record.html';a.click();setTimeout(()=>URL.revokeObjectURL(url),1000);
 }
-$('start').addEventListener('click',()=>{if(mode==='local')localStart();else if(isHost()){let order=Hub.roster.map(p=>p.id),names={};Hub.roster.forEach(p=>names[p.id]=p.name);start(order,names)}});
-$('add').addEventListener('click',()=>{let t=$('wordInput').value;if(!t.trim())return;say('');$('wordInput').value='';act({a:'add',text:t})});
-$('wordInput').addEventListener('keydown',e=>{if(e.key==='Enter')$('add').click()});
-$('confirm').addEventListener('click',()=>{let r=document.querySelector('input[name="pair"]:checked');let reason=$('reason').value.trim();if(!r||!reason){say('Choose a pair and explain the connection.');return}act({a:'resolve',pair:r.value.split(',').map(Number),reason});$('reason').value=''});
+$('start').addEventListener('click',()=>{
+  if(mode==='local')localStart();
+  else if(isHost()){let order=Hub.roster.map(p=>p.id),names={};Hub.roster.forEach(p=>names[p.id]=p.name);if(order.length<2){say('At least two players are needed.');return}start(order,names)}
+});
+$('addSeed').addEventListener('click',()=>{let text=$('seedWord').value.trim();if(!validWord(text)){say('Enter exactly one word.');return}$('seedWord').value='';act({a:'seed',text})});
+$('seedWord').addEventListener('keydown',e=>{if(e.key==='Enter')$('addSeed').click()});
+$('addWord').addEventListener('click',()=>{
+  let text=$('newWord').value.trim();if(!validWord(text)){say('Enter exactly one word.');return}
+  if(!pickedA||!pickedB){say('Choose A and B on the braid first.');return}
+  $('newWord').value='';act({a:'add',text,aId:pickedA,bId:pickedB});
+});
+$('newWord').addEventListener('keydown',e=>{if(e.key==='Enter')$('addWord').click()});
+document.querySelectorAll('[data-kind]').forEach(btn=>btn.addEventListener('click',()=>{if(!S||S.phase!=='judge'||S.judgeId!==myId())return;verdict[btn.dataset.kind]=btn.dataset.value;render()}));
+$('confirmJudgment').addEventListener('click',()=>{if(!verdict.syn||!verdict.ant)return;act({a:'judge',syn:verdict.syn,ant:verdict.ant});verdict={syn:null,ant:null}});
 $('export').addEventListener('click',exportHtml);
 $('new').addEventListener('click',()=>{if(mode==='local')localStart();else if(isHost())act({a:'new'})});
+$('lobbyBtn').addEventListener('click',()=>{if(isHost())act({a:'toLobby'})});
 window.addEventListener('message',e=>{
- let m=e.data;if(!m||m.t!=='gd'||m.game!=='braid')return;
- if(m.k==='roster'){Hub.me=m.p.you;Hub.roster=m.p.roster||[];mode='hub';if(isHost()&&S)Hub.up('state',S);else if(!S)render()}
- if(m.k==='state'&&!(mode==='hub'&&isHost()&&S)){S=m.p;mode='hub';render()}
- if(m.k==='intent'&&isHost()){let a=m.p,from=m.from&&m.from.id;if(a.a==='new'){let order=Hub.roster.map(p=>p.id),names={};Hub.roster.forEach(p=>names[p.id]=p.name);start(order,names)}else apply(a,from);if(S)Hub.up('state',S)}
+  let m=e.data;if(!m||m.t!=='gd'||m.game!=='braid')return;
+  if(m.k==='roster'){
+    Hub.me=m.p.you;Hub.roster=m.p.roster||[];mode='hub';
+    if(isHost()&&S)Hub.up('state',S);else if(!S)render();
+  }else if(m.k==='state'){
+    if(mode==='hub'&&isHost()&&S)return;
+    S=m.p;mode='hub';render();
+  }else if(m.k==='intent'&&isHost()){
+    let err=apply(m.p,m.from&&m.from.id);if(err)Hub.up('denied',{to:m.from&&m.from.id,text:err});
+  }else if(m.k==='denied'&&m.p&&m.p.text){say(m.p.text)}
 });
-mode='local';render();Hub.up('hello');setTimeout(()=>{if(!Hub.me){mode='local';render()}},1200);
+mode='wait';render();Hub.up('hello');
+window.addEventListener('resize',reportHeight);
+document.addEventListener('visibilitychange',()=>{if(!document.hidden&&mode==='hub')Hub.up('hello')});
+setTimeout(()=>{if(!Hub.me){mode='local';render()}},1300);
 })();
 </script>
-</body></html>
+</body>
+</html>
