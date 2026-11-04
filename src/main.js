@@ -15,7 +15,8 @@ import { createRecord } from '../plugins/record.js';
 
 const SKEY = 'bubhub.session.v2';
 const NAME_KEY = 'bubhub.name';
-const THINGS = [];
+const THING_GLOB = import.meta.glob('./things-we-made/*.html', { query: '?url', import: 'default' });
+const things = [];
 
 function loadSession() {
   try { return JSON.parse(sessionStorage.getItem(SKEY) || 'null'); } catch (e) { return null; }
@@ -394,18 +395,34 @@ export async function boot() {
     }
   }
 
+  function thingTitle(path) {
+    const name = String(path || '').split('/').pop().replace(/\.html$/, '');
+    const words = name.split(/[-_]+/).map(function (w) { return w ? w.charAt(0).toUpperCase() + w.slice(1) : w; });
+    return words.join(' ');
+  }
+
+  async function loadThings() {
+    const entries = await Promise.all(Object.entries(THING_GLOB).map(async function (e) {
+      const url = await e[1]();
+      return { title: thingTitle(e[0]), url: url };
+    }));
+    things.length = 0;
+    entries.forEach(function (t) { things.push(t); });
+    renderThings();
+  }
+
   function renderThings() {
     const ul = document.getElementById('things-made-list');
     if (!ul) return;
     ul.innerHTML = '';
-    if (!THINGS.length) {
+    if (!things.length) {
       const li = document.createElement('li');
       li.className = 'text-slate-500 text-xs italic';
       li.textContent = 'Nothing yet — no bubs have made a thing.';
       ul.appendChild(li);
       return;
     }
-    THINGS.forEach(function (t) {
+    things.forEach(function (t) {
       const li = document.createElement('li');
       const b = document.createElement('button');
       b.className = 'btn-bouncy rounded-xl px-3 py-2 text-sm font-bold';
@@ -420,7 +437,7 @@ export async function boot() {
   function openThing(t) {
     const slug = 'show-' + String(t.title || '').toLowerCase().replace(/[^a-z0-9]+/g, '-');
     closeStageOnly();
-    compat.open({ id: slug, title: t.title, file: t.file, fill: false, height: 560 }, t.file);
+    compat.open({ id: slug, title: t.title, file: t.url, fill: false, height: 560 }, t.url);
     const ft = document.getElementById('focus-title');
     if (ft) ft.textContent = t.title;
   }
@@ -1286,6 +1303,7 @@ export async function boot() {
 
     renderButtons();
     renderThings();
+    loadThings();
     renderNameGate();
     renderRoster();
 
