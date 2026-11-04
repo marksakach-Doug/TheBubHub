@@ -640,9 +640,9 @@ export function reduce(state, action, ctx) {
 
   // Back to lobby: the table keeps its seats, the set is cleared. Without
   // this, `over` is terminal until the host starts a new set — the "stuck in
-  // a game you have started" trap.
+  // a game you have started" trap. Always visible, from any phase. Host-only.
   if (kind === 'toLobby') {
-    if (state.phase !== 'over') return noop();
+    if (state.phase === 'lobby') return noop();
     if (!host) return { error: 'Only the host can send the table back to the lobby.' };
     return same(state, {
       epoch: state.epoch + 1,
@@ -831,6 +831,7 @@ const CSS = [
   'padding:6px 14px;border-radius:999px;font-size:13px;opacity:0;transition:opacity .15s;pointer-events:none;white-space:nowrap}',
   '.toast.show{opacity:1}',
   '.mute{background:transparent;border:0;font-size:16px;opacity:.6;padding:2px 4px;color:inherit}',
+  '.top .lobbybtn{font-size:11px;letter-spacing:.04em;border:1px solid #334155;border-radius:6px;padding:4px 8px}',
   '.shk{animation:shk .28s linear}',
   '@keyframes shk{0%{transform:translate(var(--sh),calc(var(--sh)*-1))}25%{transform:translate(calc(var(--sh)*-1),var(--sh))}',
   '50%{transform:translate(var(--sh),var(--sh))}75%{transform:translate(calc(var(--sh)*-.5),calc(var(--sh)*-.5))}100%{transform:none}}',
@@ -1003,6 +1004,12 @@ export function mount(root, api) {
   topBar.appendChild(whoEl);
   topBar.appendChild(clockEl);
   topBar.appendChild(muteBtn);
+  const lobbyBtn = document.createElement('button');
+  lobbyBtn.className = 'mute lobbybtn';
+  lobbyBtn.type = 'button';
+  lobbyBtn.textContent = 'Back to lobby';
+  lobbyBtn.title = 'Back to lobby';
+  topBar.appendChild(lobbyBtn);
 
   const stage = document.createElement('div');
   stage.className = 'stage';
@@ -1904,8 +1911,16 @@ export function mount(root, api) {
     cur.update(view);
   }
 
+  lobbyBtn.addEventListener('click', function () {
+    if (!view || !api) return;
+    api.send({ a: 'toLobby' });
+  });
+
   function topbar() {
     const v = view;
+    const host = v.hostId === myId;
+    const isLobby = v.phase === 'lobby';
+    lobbyBtn.style.display = (!isLobby && host) ? '' : 'none';
     if (v.mode === 'solo-streamer') {
       whoEl.textContent = 'Fugue Solo · Streamer';
       clockEl.textContent = '';

@@ -92,10 +92,8 @@ export function reduce(s, a, ctx) {
   }
   // Back to lobby: the table keeps its seats, the round is cleared. Without
   // this, `over` is terminal until the host deals a new round — the "stuck
-  // in a game you have started" trap.
+  // in a game you have started" trap. Always visible, from any phase. Host-only.
   if (a.a === 'toLobby') {
-    if (s.phase === 'play') return { error: 'The round is still running.' };
-    if (s.phase !== 'vote' && s.phase !== 'reveal') return s;
     if (!isHost) return { error: 'Only the host can send the table back to the lobby.' };
     return { ...deal(s, rng, now), note: 'Back to lobby.' };
   }
@@ -251,10 +249,11 @@ const play = (part, notes) => {
     const voted = Object.keys(v.votes).length;
     // Only the host may re-deal: one player should not pull the pair out from under a table.
     const newGame = seated && api.isHost ? ' <button data-a="newpair">New game</button>' : '';
+    // Always visible: the way out of a game you have started, including mid-round.
     const toLobby = seated && api.isHost ? ' <button data-a="toLobby">Back to lobby</button>' : '';
     $('#game').innerHTML = head + (v.phase === 'play'
       ? `<div class="box"><pre>intro  ${fmt(v.pair.intro.steps, v.scale)}\nhook   ${fmt(hookSteps(v.pair, draft), v.scale)}\noutro  ${fmt(v.pair.outro.steps, v.scale)}</pre>
-          <p>${filled}/${n} slots filled. Tap a column to set its note.  ${newGame}</p>${playsHtml(draft)}</div>
+          <p>${filled}/${n} slots filled. Tap a column to set its note.  ${newGame}${toLobby}</p>${playsHtml(draft)}</div>
         ${seated && !v.locked[v.you] ? `${gridHtml(n)}
           <button data-a="clear">Clear</button> <button data-a="lock">Lock in</button>` : ''}
         <p>${Object.keys(v.locked).length}/${v.order.length} locked in${v.locked[v.you] ? ' (including you)' : ''}</p>`

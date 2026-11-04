@@ -257,7 +257,7 @@ JS_CASES = r"""
   out.push(['toLobby returns to ready', lobbied.phase === 'ready' && lobbied.over === null]);
   out.push(['toLobby keeps seats', lobbied.players.join(',') === 'w1,b1,w2']);
   out.push(['non-host toLobby refused', !!reduce(tick2Done, { a: 'toLobby' }, ctxH('b1')).error]);
-  out.push(['mid-round toLobby refused', !!reduce(started, { a: 'toLobby' }, ctxH('w1')).error]);
+  out.push(['mid-round toLobby returns to ready', reduce(started, { a: 'toLobby' }, ctxH('w1')).phase === 'ready']);
   Date.now = realNow;
 
   return out;

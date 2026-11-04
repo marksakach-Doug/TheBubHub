@@ -119,7 +119,7 @@ button.quiet{border-color:var(--rule);color:var(--ash)}
 
   <section id="t96-game" class="hidden" style="display:flex;flex-direction:column;gap:10px;flex:1;min-height:0">
 
-    <div id="t96-status"><b></b><small></small></div>
+    <div id="t96-status"><b></b><small></small> <button class="quiet" id="t96-lobbtn2">Back to lobby</button></div>
 
     <div class="seats" id="t96-seats"></div>
 
@@ -843,6 +843,7 @@ function render(){
 
     var st = $('t96-status');
     var big = st.querySelector('b'), small = st.querySelector('small');
+    var lob2 = $('t96-lobbtn2'); if (lob2) lob2.style.display = isHost() ? '' : 'none';
     var ch = selChain();
 
     var alive = S.chains.filter(function(c){ return !c.done; }).length;
@@ -1203,6 +1204,7 @@ $('t96-clear').addEventListener('click', function(){
 $('t96-done').addEventListener('click', pushDone);
 $('t96-nextlap').addEventListener('click', function(){ act({ a:'nextlap' }); });
 $('t96-lobbtn').addEventListener('click', function(){ act({ a:'toLobby' }); });
+$('t96-lobbtn2').addEventListener('click', function(){ act({ a:'toLobby' }); });
 $('t96-save').addEventListener('click', saveStory);
 $('t96-chains').addEventListener('click', function(e){
     var t = e.target && e.target.closest ? e.target.closest('[data-chain]') : null;

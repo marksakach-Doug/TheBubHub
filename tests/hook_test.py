@@ -288,7 +288,7 @@ JS_CASES = r"""
   out.push(['toLobby deals a fresh round', lobbyState.phase === 'play' && lobbyState.round === 2]);
   out.push(['toLobby keeps seats', lobbyState.order.join(',') === 'dev,w1']);
   out.push(['non-host toLobby refused', !!reduce(voteState, { a: 'toLobby' }, ctx('w1', rng0, false)).error]);
-  out.push(['mid-round toLobby refused', !!reduce(s0, { a: 'toLobby' }, ctx('dev', rng0, true)).error]);
+  out.push(['mid-round toLobby deals a fresh round', reduce(s0, { a: 'toLobby' }, ctx('dev', rng0, true)).phase === 'play']);
 
   return out;
 }

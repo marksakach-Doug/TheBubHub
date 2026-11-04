@@ -190,10 +190,11 @@ export function reduce(state, action, ctx) {
 
   // Back to lobby: the table keeps its seats, the round is cleared. Without
   // this, `over` is terminal until the host starts a new round — the "stuck
-  // in a game you have started" trap. Host-only, with the solo exception.
+  // in a game you have started" trap. Always visible, from any phase. Host-only,
+  // with the solo exception.
   if (kind === 'toLobby') {
-    if (state.phase === 'play' || state.phase === 'reveal') return { error: 'A round is already running.' };
-    if (state.phase !== 'over') return same({});
+    if (state.phase === 'ready') return same({});
+    // fall through: any non-ready phase clears back to ready
     const alone = players.length < 2;
     if (state.hostId && state.hostId !== id && !alone) {
       return { error: 'Only the host can send the table back to the lobby.' };
@@ -380,6 +381,11 @@ const CSS = [
   'background:#e9e4d8;',
   'transform:translate(-50%,-50%);will-change:transform}',
   '.dr-hud{position:absolute;top:0;left:0;padding:14px 18px;pointer-events:none}',
+  // Back to lobby is outside the overlay (which hides mid-round), so mid-round
+  // tables still have an exit. `pointer-events:none` on the hud block keeps it
+  // click-through except the button.
+  '.dr-lobbybar{position:absolute;top:14px;right:18px;z-index:5}',
+  '.dr-lobbybar .dr-btn{font-size:.85rem;padding:8px 14px;min-height:36px}',
   '.dr-time{font-size:1.15rem;font-weight:600;color:#e9e4d8}',
   '.dr-meta{margin-top:2px;font-size:11px;opacity:.65}',
   // The one thing a watcher most needs to know, and must not have to guess.
@@ -477,6 +483,7 @@ export function mount(root, api) {
     '<div class="dr-reveal"><div class="dr-count"></div><div class="dr-say">Keep the dot inside this circle.</div></div>' +
     '<div class="dr-dot" hidden></div></div>' +
     '<div class="dr-hud"><div class="dr-time">70s</div><div class="dr-meta"></div></div><div class="dr-toast"></div>' +
+    '<div class="dr-lobbybar" hidden><button class="dr-btn alt dr-lobbybar-btn" type="button">Back to lobby</button></div>' +
     '<div class="dr-overlay"><h1 class="dr-title">Focus</h1>' +
     '<p class="dr-body"></p><p class="dr-num" hidden></p>' +
     '<div class="dr-table" hidden></div>' +
@@ -523,11 +530,18 @@ if (showCircleBox) {
   btnSolo.textContent = 'Start solo';
 
   // Back to lobby: the way out of a game you have started, without leaving the
-  // table. Host-only in reduce(); mirrored here as a display toggle.
+  // table. Host-only in reduce(); mirrored here as a display toggle. Lives
+  // outside the overlay so it stays visible mid-round.
   const btnLobby = document.createElement('button');
   btnLobby.className = 'dr-btn alt';
   btnLobby.type = 'button';
   btnLobby.textContent = 'Back to lobby';
+  const lobbybar = wrap.querySelector('.dr-lobbybar');
+  const lobbybarBtn = wrap.querySelector('.dr-lobbybar-btn');
+  if (lobbybar && lobbybarBtn) lobbybarBtn.addEventListener('click', function () {
+    if (!view || !seated()) return;
+    api.send({ a: 'toLobby' });
+  });
 
   let view = null;
   let myId = (api.me && api.me.id) || '';
@@ -922,6 +936,10 @@ if (showCircleBox) {
     // rather than OBSERVING or a countdown that belongs to someone else.
     hud.classList.toggle('watching', watching || waiting);
     hud.style.visibility = (playing || watching) ? 'visible' : 'hidden';
+    if (lobbybar && lobbybarBtn) {
+      lobbybar.hidden = watching;
+      lobbybarBtn.disabled = !(host || alone);
+    }
     if (watching) {
       hudTime.textContent = 'OBSERVING';
       hudMeta.textContent = n + (n === 1 ? ' dot at the table' : ' dots at the table');
@@ -944,22 +962,20 @@ if (showCircleBox) {
     // Buttons are rebuilt per render because who may start depends on the
     // table size, which changes while this screen is up.
     btns.innerHTML = '';
+    const canStart = host || alone;
     const showStart = !playing && !watching;
     if (showStart) {
       // Mirrors reduce()'s gate exactly: the host, or whoever is left holding a
       // table of one. Testing `view.solo` here instead would be wrong — it is
       // frozen at the last round, so a solo round that someone then joined would
       // hand the button to a guest the host is about to refuse.
-      const canStart = host || alone;
       btn.textContent = view.phase === 'over'
         ? (canStart ? 'Play again' : 'Waiting for host')
         : 'Start round';
       btn.disabled = !canStart;
       btns.appendChild(btn);
-      if (view.phase === 'over') {
-        btnLobby.disabled = !canStart;
-        btns.appendChild(btnLobby);
-      }
+      btnLobby.disabled = !canStart || view.phase === 'ready';
+      btns.appendChild(btnLobby);
       // Host, alone, in a room: a table of one is a valid game, so say so
       // rather than greying out the only way forward.
       if (alone && !soloCorner && host && view.phase === 'ready') {
@@ -967,6 +983,9 @@ if (showCircleBox) {
         btnSolo.disabled = false;
         btns.appendChild(btnSolo);
       }
+    } else if (!watching) {
+      btnLobby.disabled = !canStart;
+      btns.appendChild(btnLobby);
     }
 
     if (inPlay) return;
