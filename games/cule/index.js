@@ -1,19 +1,3 @@
-// Cule — a v10 module game built on the Mucking Around sprite/canvas engine.
-//
-// Flow:
-// 1. hallway: All sprites hang out in a lit hallway at the top of the canvas.
-//    Requires 4+ players. One player secretly knows they are the Murderer (🔪).
-// 2. dark: Everyone enters the pitch-black main floor for 8 seconds. Only
-//    floating eyeballs render as players run around.
-// 3. alibi: Lights snap on! An improbable L/Z-shaped drywall room wraps around
-//    two randomly paired players (ignoring where they walked). Each gets an
-//    emoji object (or 🔪 + a decoy picker if the Murderer is inside). They get
-//    90s in a private chat box to invent an alibi while outsiders heckle on
-//    the canvas using Mucking Around speech bubbles and Q-M tricks.
-// 4. vote: The pair's claimed emojis and alibi are revealed with speech-paced
-//    timing. Outside players vote TRUE or LIE.
-// 5. reveal: True objects (and the Murderer) are revealed and recorded.
-
 const W = 400;
 const H = 640;
 const HALL_Y = 150;
@@ -22,6 +6,7 @@ const WALL_R = 44;
 const DARK_MS = 8000;
 const ALIBI_MS = 90000;
 const VOTE_MS = 30000;
+const MATCH_ROUNDS = 5;
 
 const EMOJI_POOL = [
   '🎷', '🪗', '🪕', '🎺', '🎻', '🎹', '🪘', '🪇',
@@ -52,12 +37,6 @@ const ACT = {
   frown: '☹️', jut: '💨', confetti: '🎉'
 };
 
-const FXKEY = {
-  q: 'frown', w: 'flip', e: 'wide', r: 'thin', t: 'bounce', y: 'jut',
-  u: 'legs', i: 'beep', p: 'hat', a: 'jump', s: 'mouth', h: 'color',
-  k: 'horse', l: 'arp', x: 'ears', c: 'mini', v: 'roll', m: 'axe'
-};
-
 const FXD = {
   frown: 900, flip: 2000, bounce: 900, jut: 400, jump: 600,
   confetti: 1000, fall: 900
@@ -76,11 +55,9 @@ export const meta = {
   players: { min: 4, max: 10 },
   color: '#312e81',
   icon: '👀',
-  desc: 'Wander in the dark, get trapped in an improbable room with one partner and two objects, and talk your way out.',
+  desc: 'Wander in the dark, help the murderer invent an alibi, and catch them before they escape. Five-round match.',
   soloable: false
 };
-
-// ---------------------------------------------------------------- helpers ----
 
 function cl(v, a, b) {
   return v < a ? a : (v > b ? b : v);
@@ -165,21 +142,23 @@ function pickUniqueEmojis(rng, count, exclude) {
   return out;
 }
 
-// ------------------------------------------------------------------ state ----
-
 export function init(ctx) {
   const rng = (ctx && ctx.rng) || Math.random;
   const players = tableOf(ctx);
   const sprites = {};
+  const scores = {};
   players.forEach(function (id, idx) {
     sprites[id] = makeSprite(idx);
+    scores[id] = 0;
   });
   const murdererId = players.length >= 4
     ? players[Math.floor(rng() * players.length)]
     : null;
   return {
+    match: 1,
     round: 1,
-    phase: 'hallway', // 'hallway' | 'dark' | 'alibi' | 'vote' | 'reveal'
+    scores: scores,
+    phase: 'hallway',
     phaseEndsAt: 0,
     players: players,
     sprites: sprites,
@@ -198,26 +177,49 @@ export function init(ctx) {
   };
 }
 
-function tallyOutcome(state, votes) {
+function resolveVote(state, votes) {
   const pair = state.spotlightPair || [];
-  const outside = state.players.filter(function (p) { return pair.indexOf(p) < 0; });
-  let trueVotes = 0;
-  let lieVotes = 0;
-  outside.forEach(function (p) {
-    if (votes[p] === 'true') trueVotes++;
-    else if (votes[p] === 'lie') lieVotes++;
+  const murdererId = state.murdererId;
+  const partnerId = pair[0] === murdererId ? pair[1] : pair[0];
+  let votesForMurderer = 0;
+  let votesForPartner = 0;
+  const pointsAwarded = {};
+
+  (state.players || []).forEach(function (pid) {
+    if (pair.indexOf(pid) >= 0) return;
+    if (votes[pid] === murdererId) {
+      votesForMurderer++;
+      pointsAwarded[pid] = (pointsAwarded[pid] || 0) + 1;
+    } else if (votes[pid] === partnerId) {
+      votesForPartner++;
+    }
   });
-  const crowdCalledLie = lieVotes > trueVotes;
-  const hasMurderer = pair.indexOf(state.murdererId) >= 0;
+
+  const caught = votesForMurderer > votesForPartner;
+  if (!caught) {
+    pointsAwarded[murdererId] = (pointsAwarded[murdererId] || 0) + 2;
+    pointsAwarded[partnerId] = (pointsAwarded[partnerId] || 0) + 1;
+  }
+
+  const scores = Object.assign({}, state.scores || {});
+  Object.keys(pointsAwarded).forEach(function (pid) {
+    scores[pid] = (scores[pid] || 0) + pointsAwarded[pid];
+  });
+
   return {
-    hasMurderer: hasMurderer,
-    crowdCalledLie: crowdCalledLie,
-    trueVotes: trueVotes,
-    lieVotes: lieVotes
+    scores: scores,
+    outcome: {
+      caught: caught,
+      murdererId: murdererId,
+      partnerId: partnerId,
+      votesForMurderer: votesForMurderer,
+      votesForPartner: votesForPartner,
+      pointsAwarded: pointsAwarded
+    }
   };
 }
 
-// ----------------------------------------------------------------- reduce ----
+// --------------------------------------------------------------- reduce ----
 
 export function reduce(state, action, ctx) {
   const from = (ctx && ctx.from) || {};
@@ -232,19 +234,20 @@ export function reduce(state, action, ctx) {
 
   if (!id) return bad('No identity — reopen the game.');
 
-  // Late joiners can join during hallway (or get seated on mount).
   if (kind === 'join') {
-    if (state.players.indexOf(id) >= 0) {
-      if (state.players.length >= 4 && !state.murdererId) {
-        const m = state.players[Math.floor(rng() * state.players.length)];
+    if ((state.players || []).indexOf(id) >= 0) {
+      if ((state.players || []).length >= 4 && !state.murdererId) {
+        const m = (state.players || [])[Math.floor(rng() * (state.players || []).length)];
         return same({ murdererId: m });
       }
       return state;
     }
-    if (state.players.length >= 10) return bad('Cule holds at most 10 suspects.');
-    const players = state.players.concat([id]);
+    if ((state.players || []).length >= 10) return bad('Cule holds at most 10 suspects.');
+    const players = (state.players || []).concat([id]);
     const sprites = Object.assign({}, state.sprites);
     sprites[id] = makeSprite(players.length - 1);
+    const scores = Object.assign({}, state.scores || {});
+    scores[id] = 0;
     let murdererId = state.murdererId;
     if (players.length >= 4 && !murdererId) {
       murdererId = players[Math.floor(rng() * players.length)];
@@ -252,13 +255,13 @@ export function reduce(state, action, ctx) {
     return same({
       players: players,
       sprites: sprites,
+      scores: scores,
       murdererId: murdererId
     });
   }
 
-  if (state.players.indexOf(id) < 0) return bad('You are watching — not seated.');
+  if (!state.players || (state.players || []).indexOf(id) < 0) return bad('You are watching — not seated.');
 
-  // Sprite movement, speech bubbles, and Mucking Around tricks
   if (kind === 'pos') {
     const p = state.sprites[id];
     if (!p) return state;
@@ -310,15 +313,14 @@ export function reduce(state, action, ctx) {
     return same({ sprites: sprites });
   }
 
-  // Phase 1 -> Phase 2: Cut the Lights
   if (kind === 'startDark') {
     if (!isHost) return bad('Only the host can cut the lights.');
     if (state.phase !== 'hallway') return bad('Round is already underway.');
-    if (state.players.length < 4) return bad('Need at least 4 suspects to cut the lights.');
+    if ((state.players || []).length < 4) return bad('Need at least 4 suspects to cut the lights.');
 
-    const murdererId = state.murdererId || state.players[Math.floor(rng() * state.players.length)];
+    const murdererId = state.murdererId || (state.players || [])[Math.floor(rng() * (state.players || []).length)];
     const sprites = {};
-    state.players.forEach(function (pid) {
+    (state.players || []).forEach(function (pid) {
       const old = state.sprites[pid] || makeSprite(0);
       sprites[pid] = Object.assign({}, old, {
         x: Math.round(50 + rng() * (W - 100)),
@@ -348,29 +350,18 @@ export function reduce(state, action, ctx) {
     });
   }
 
-  // Phase 2 -> Phase 3: Lights On & Improbable Room Generation
   if (kind === 'lightsOn') {
     if (state.phase !== 'dark') return state;
     if (!isHost && now < state.phaseEndsAt) return bad('Still in the dark.');
 
-    const murdererId = state.murdererId || state.players[0];
-    const innocents = state.players.filter(function (p) { return p !== murdererId; });
-    const trapMurderer = innocents.length > 0 && rng() < 0.5;
+    const murdererId = state.murdererId && (state.players || []).indexOf(state.murdererId) >= 0
+      ? state.murdererId
+      : (state.players || [])[Math.floor(rng() * (state.players || []).length)];
+    const innocents = (state.players || []).filter(function (p) { return p !== murdererId; });
+    const idA = murdererId;
+    const idB = innocents.length > 0 ? innocents[Math.floor(rng() * innocents.length)] : null;
 
-    let idA = '';
-    let idB = '';
-    if (trapMurderer) {
-      idA = murdererId;
-      idB = innocents[Math.floor(rng() * innocents.length)];
-    } else {
-      const pool = innocents.slice();
-      const i1 = Math.floor(rng() * pool.length);
-      idA = pool[i1];
-      pool.splice(i1, 1);
-      idB = pool[Math.floor(rng() * pool.length)];
-    }
-
-    const pair = rng() < 0.5 ? [idA, idB] : [idB, idA];
+    const pair = idB ? (rng() < 0.5 ? [idA, idB] : [idB, idA]) : [];
     const sprites = Object.assign({}, state.sprites);
     const spA = Object.assign({}, sprites[pair[0]] || makeSprite(0));
     const spB = Object.assign({}, sprites[pair[1]] || makeSprite(1));
@@ -394,8 +385,7 @@ export function reduce(state, action, ctx) {
       { x: spB.x, y: spB.y }
     ];
 
-    // Push outside players clear of the improbable room walls
-    state.players.forEach(function (pid) {
+    (state.players || []).forEach(function (pid) {
       if (pair.indexOf(pid) >= 0) return;
       const sp = Object.assign({}, sprites[pid] || makeSprite(2));
       const check = distToPoly(sp.x, sp.y, roomPoly);
@@ -423,27 +413,19 @@ export function reduce(state, action, ctx) {
     const dealt = pickUniqueEmojis(rng, 2, []);
     const trueEmojis = {};
     const claimedEmojis = {};
-    let decoyOptions = [];
-
-    if (pair.indexOf(murdererId) >= 0) {
-      const partnerId = pair[0] === murdererId ? pair[1] : pair[0];
-      trueEmojis[partnerId] = dealt[0];
-      trueEmojis[murdererId] = '🔪';
-      decoyOptions = pickUniqueEmojis(rng, 8, [dealt[0], '🔪']);
-      claimedEmojis[partnerId] = dealt[0];
-      claimedEmojis[murdererId] = decoyOptions[0];
-    } else {
-      trueEmojis[pair[0]] = dealt[0];
-      trueEmojis[pair[1]] = dealt[1];
-      claimedEmojis[pair[0]] = dealt[0];
-      claimedEmojis[pair[1]] = dealt[1];
-    }
+    const partnerId = pair[0] === murdererId ? pair[1] : pair[0];
+    const decoyOptions = pickUniqueEmojis(rng, 8, [dealt[0], '🔪']);
+    trueEmojis[partnerId] = dealt[0];
+    trueEmojis[murdererId] = '🔪';
+    claimedEmojis[partnerId] = dealt[0];
+    claimedEmojis[murdererId] = decoyOptions[0];
 
     const roomName = ROOM_NAMES[Math.floor(rng() * ROOM_NAMES.length)];
 
     return same({
       phase: 'alibi',
       phaseEndsAt: now + ALIBI_MS,
+      murdererId: murdererId,
       spotlightPair: pair,
       roomPoly: roomPoly,
       roomName: roomName,
@@ -459,13 +441,12 @@ export function reduce(state, action, ctx) {
     });
   }
 
-  // Phase 3: Spotlight Room Private Chat, Decoy Emoji Selection, Alibi Submission
   if (kind === 'pairChat') {
     if (state.phase !== 'alibi') return bad('Private chat is closed.');
-    if (state.spotlightPair.indexOf(id) < 0) return bad('Only the two players in the room can whisper.');
+    if ((state.spotlightPair || []).indexOf(id) < 0) return bad('Only the two players in the room can whisper.');
     const t = String(action.t || '').trim().slice(0, 100);
     if (!t) return state;
-    const chat = state.privateChat.concat([{ from: id, text: t }]);
+    const chat = (state.privateChat || []).concat([{ from: id, text: t }]);
     return same({
       privateChat: chat,
       typingTick: (state.typingTick || 0) + 1
@@ -474,10 +455,10 @@ export function reduce(state, action, ctx) {
 
   if (kind === 'pickDecoy') {
     if (state.phase !== 'alibi') return bad('Cannot change object now.');
-    if (state.spotlightPair.indexOf(id) < 0) return bad('You are not in the room.');
-    if (state.spotlightPair.indexOf(state.murdererId) < 0) return bad('Neither of you has the knife.');
+    if ((state.spotlightPair || []).indexOf(id) < 0) return bad('You are not in the room.');
+    if (id !== state.murdererId) return bad('Only the murderer can choose the decoy object.');
     const emoji = String(action.emoji || '');
-    if (state.decoyOptions.indexOf(emoji) < 0) return bad('Pick one of the decoy objects.');
+    if ((state.decoyOptions || []).indexOf(emoji) < 0) return bad('Pick one of the decoy objects.');
     const claimed = Object.assign({}, state.claimedEmojis);
     claimed[state.murdererId] = emoji;
     return same({ claimedEmojis: claimed });
@@ -485,14 +466,14 @@ export function reduce(state, action, ctx) {
 
   if (kind === 'draftAlibi') {
     if (state.phase !== 'alibi') return state;
-    if (state.spotlightPair.indexOf(id) < 0) return bad('Only the trapped pair can draft the alibi.');
+    if ((state.spotlightPair || []).indexOf(id) < 0) return bad('Only the trapped pair can draft the alibi.');
     const t = String(action.t || '').slice(0, 140);
     return same({ alibiText: t });
   }
 
   if (kind === 'submitAlibi' || kind === 'timeUpAlibi') {
     if (state.phase !== 'alibi') return state;
-    if (kind === 'submitAlibi' && state.spotlightPair.indexOf(id) < 0) {
+    if (kind === 'submitAlibi' && (state.spotlightPair || []).indexOf(id) < 0) {
       return bad('Only the trapped pair can submit the alibi.');
     }
     if (kind === 'timeUpAlibi' && !isHost && now < state.phaseEndsAt) {
@@ -510,55 +491,68 @@ export function reduce(state, action, ctx) {
     });
   }
 
-  // Phase 4: Group Vote
   if (kind === 'vote') {
     if (state.phase !== 'vote') return bad('Voting is not open.');
-    if (state.spotlightPair.indexOf(id) >= 0) return bad('Suspects in the spotlight room cannot vote.');
-    const v = action.v === 'true' ? 'true' : (action.v === 'lie' ? 'lie' : '');
-    if (!v) return bad('Vote true or lie.');
+    const pair = state.spotlightPair || [];
+    if (pair.indexOf(id) >= 0) return bad('The two suspects cannot vote.');
+    const rawChoice = String(action.v || '');
+    const partnerId = pair[0] === state.murdererId ? pair[1] : pair[0];
+    const choice = rawChoice === 'lie'
+      ? state.murdererId
+      : (rawChoice === 'truth' ? partnerId : rawChoice);
+    if (pair.indexOf(choice) < 0) return bad('Choose one of the two people in the room.');
 
     const votes = Object.assign({}, state.votes);
-    votes[id] = v;
-
-    const outside = state.players.filter(function (p) {
-      return state.spotlightPair.indexOf(p) < 0;
+    votes[id] = choice;
+    const outside = (state.players || []).filter(function (p) {
+      return pair.indexOf(p) < 0;
     });
-    const allIn = outside.every(function (p) { return !!votes[p]; });
+    const allIn = outside.every(function (p) { return votes[p] !== undefined; });
 
     if (allIn) {
+      const result = resolveVote(state, votes);
       return same({
         phase: 'reveal',
         phaseEndsAt: 0,
         votes: votes,
-        outcome: tallyOutcome(state, votes)
+        outcome: result.outcome,
+        scores: result.scores
       });
     }
     return same({ votes: votes });
   }
 
   if (kind === 'timeUpVote') {
-    if (state.phase !== 'vote') return state;
+    if (state.phase !== 'vote') return bad('Voting is not open.');
     if (!isHost && now < state.phaseEndsAt) return bad('Voting timer is still running.');
+    const result = resolveVote(state, state.votes || {});
     return same({
       phase: 'reveal',
       phaseEndsAt: 0,
-      outcome: tallyOutcome(state, state.votes)
+      votes: state.votes || {},
+      outcome: result.outcome,
+      scores: result.scores
     });
   }
 
-  // Phase 5 -> Next Round
+  // Next round, or reset the five-round match after its final reveal.
   if (kind === 'nextRound') {
-    if (!isHost) return bad('Only the host can start the next round.');
-    if (state.phase !== 'reveal') return bad('Round is not over yet.');
+    if (!isHost) return bad('Only the host can continue the game.');
+    if (state.phase !== 'reveal') return bad('The round is not over yet.');
     const sprites = {};
-    state.players.forEach(function (pid, idx) {
+    (state.players || []).forEach(function (pid, idx) {
       sprites[pid] = makeSprite(idx);
     });
-    const murdererId = state.players.length >= 4
-      ? state.players[Math.floor(rng() * state.players.length)]
+    const newMatch = state.round >= MATCH_ROUNDS;
+    const scores = newMatch ? {} : Object.assign({}, state.scores || {});
+    if (newMatch) (state.players || []).forEach(function (pid) { scores[pid] = 0; });
+    const murdererId = (state.players || []).length >= 4
+      ? (state.players || [])[Math.floor(rng() * (state.players || []).length)]
       : null;
     return same({
-      round: state.round + 1,
+      match: newMatch ? (state.match || 1) + 1 : (state.match || 1),
+      round: newMatch ? 1 : state.round + 1,
+      scores: scores,
       phase: 'hallway',
       phaseEndsAt: 0,
       sprites: sprites,
@@ -586,7 +580,8 @@ export function project(state, playerId, api) {
   const you = playerId || '';
   const isReveal = state.phase === 'reveal';
   const isDark = state.phase === 'dark';
-  const inSpotlight = state.spotlightPair.indexOf(you) >= 0;
+  const inSpotlight = (state.spotlightPair || []).indexOf(you) >= 0;
+  const isMurderer = you === state.murdererId;
 
   const sprites = {};
   Object.keys(state.sprites || {}).forEach(function (id) {
@@ -598,12 +593,20 @@ export function project(state, playerId, api) {
     }
   });
 
+  let visibleTrueEmojis = null;
+  if (isReveal || inSpotlight) {
+    // Both trapped players know the real objects and are working together
+    // to conceal the knife from the investigators outside.
+    visibleTrueEmojis = state.trueEmojis;
+  }
+
   return Object.assign({}, state, {
     you: you,
     sprites: sprites,
-    murdererId: (you === state.murdererId || isReveal) ? state.murdererId : null,
-    trueEmojis: (inSpotlight || isReveal) ? state.trueEmojis : null,
-    decoyOptions: inSpotlight ? state.decoyOptions : [],
+    isMurderer: isMurderer,
+    murdererId: (isMurderer || isReveal) ? state.murdererId : null,
+    trueEmojis: visibleTrueEmojis,
+    decoyOptions: (inSpotlight && isMurderer) ? state.decoyOptions : [],
     privateChat: (inSpotlight || isReveal) ? state.privateChat : null,
     alibiText: (inSpotlight || state.phase === 'vote' || isReveal) ? state.alibiText : '',
     claimedEmojis: (inSpotlight || state.phase === 'vote' || isReveal) ? state.claimedEmojis : null,
@@ -614,36 +617,31 @@ export function project(state, playerId, api) {
 // ------------------------------------------------------------ summarize ----
 
 export function roundId(state) {
-  return 'r' + ((state && state.round) || 1);
+  return 'm' + ((state && state.match) || 1) + 'r' + ((state && state.round) || 1);
 }
 
 export function summarize(state, nameOf) {
   if (!state || state.phase !== 'reveal' || !state.outcome) return null;
-  const pair = state.spotlightPair || [];
-  const a = pair[0] || '';
-  const b = pair[1] || '';
-  const m = state.murdererId || '';
-  if (state.outcome.hasMurderer) {
-    return state.outcome.crowdCalledLie
-      ? 'The crowd caught ' + nameOf(m) + ' hiding the 🔪 in Cule'
-      : nameOf(a) + ' & ' + nameOf(b) + ' got away with the 🔪 in Cule';
-  }
-  return state.outcome.crowdCalledLie
-    ? nameOf(m) + ' framed ' + nameOf(a) + ' & ' + nameOf(b) + ' from outside in Cule'
-    : nameOf(a) + ' & ' + nameOf(b) + '\'s alibi held up in Cule';
+  const m = state.murdererId || state.outcome.murdererId || '';
+  const partner = state.outcome.partnerId || '';
+  return state.outcome.caught
+    ? 'Cule: The crowd caught ' + nameOf(m) + '!'
+    : 'Cule: ' + nameOf(m) + ' fooled the crowd. ' + nameOf(partner) + ' helped the alibi hold.';
 }
 
 export function prune(state, goneId) {
-  if (!state || state.players.indexOf(goneId) < 0) return state;
-  const players = state.players.filter(function (id) { return id !== goneId; });
+  if (!state || (state.players || []).indexOf(goneId) < 0) return state;
+  const players = (state.players || []).filter(function (id) { return id !== goneId; });
   const sprites = Object.assign({}, state.sprites);
   delete sprites[goneId];
   const votes = Object.assign({}, state.votes);
   delete votes[goneId];
+  const scores = Object.assign({}, state.scores || {});
+  delete scores[goneId];
 
   const needReset = state.phase !== 'hallway' && (
     players.length < 4 ||
-    state.spotlightPair.indexOf(goneId) >= 0 ||
+    (state.spotlightPair || []).indexOf(goneId) >= 0 ||
     goneId === state.murdererId
   );
 
@@ -655,6 +653,7 @@ export function prune(state, goneId) {
     return Object.assign({}, state, {
       players: players,
       sprites: resetSprites,
+      scores: scores,
       phase: 'hallway',
       phaseEndsAt: 0,
       murdererId: players.length >= 4 ? players[0] : null,
@@ -672,9 +671,14 @@ export function prune(state, goneId) {
     });
   }
 
+  const murdererId = players.length >= 4
+    ? (players.indexOf(state.murdererId) >= 0 ? state.murdererId : players[0])
+    : null;
   return Object.assign({}, state, {
     players: players,
     sprites: sprites,
+    scores: scores,
+    murdererId: murdererId,
     votes: votes
   });
 }
@@ -709,7 +713,11 @@ const CSS = [
   'button.decoy.on{border:2px solid #fbbf24;background:#312e81}',
   'input{flex:1 1 auto;min-width:0;background:#0f172a;color:#fff;border:1px solid #334155}',
   '.cu-alibi{font-family:"Courier New",monospace;font-size:14px;background:#0f172a;padding:8px;border-radius:6px;color:#fef08a;min-height:22px}',
-  '.cu-hint{font-size:11px;color:#94a3b8;margin:0 2px}'
+  '.cu-hint{font-size:11px;color:#94a3b8;margin:0 2px}',
+  '.cu-scoreboard{display:flex;flex-direction:column;gap:3px;border-top:1px solid #475569;padding-top:6px;margin-top:2px}',
+  '.cu-score-title{font-size:11px;font-weight:700;color:#c7d2fe}',
+  '.cu-score-line{font-size:12px;color:#e2e8f0}',
+  '.cu-note{font-size:12px;color:#cbd5e1;background:#0f172a;border-radius:7px;padding:7px}'
 ].join('');
 
 export function mount(root, api) {
@@ -738,9 +746,7 @@ export function mount(root, api) {
     '  <input id="cu-say" maxlength="90" placeholder="heckle or say something..." autocomplete="off">',
     '  <button type="button" id="cu-saybtn">Say</button>',
     '</div>',
-    '<details class="cu-hint"><summary>Keys & Tricks (Q–M)</summary>',
-    'Walk: tap canvas or Arrow keys · Q frown · W flip · E wider · R thinner · T bounce · Y jut · U legs · I A440 beep · P top hat · A jump · S big mouth · H colour · K horse · L arpeggio · X rabbit ears · C mini · V roll · M axe',
-    '</details>'
+    '<div class="cu-hint">Move: click or tap the floor, or use the arrow keys.</div>'
   ].join('');
   root.appendChild(wrap);
 
@@ -1226,8 +1232,11 @@ export function mount(root, api) {
     } else if (isMurderer) {
       roleEl.textContent = '🔪 MURDERER';
       roleEl.className = 'cu-badge murderer';
+    } else if ((view.phase === 'alibi' || view.phase === 'vote') && view.spotlightPair.indexOf(myId) >= 0) {
+      roleEl.textContent = '🎭 ALIBI PARTNER';
+      roleEl.className = 'cu-badge';
     } else {
-      roleEl.textContent = '🕯️ Innocent';
+      roleEl.textContent = '🕵️ INVESTIGATOR';
       roleEl.className = 'cu-badge';
     }
 
@@ -1235,23 +1244,23 @@ export function mount(root, api) {
       const rem = Math.max(0, Math.ceil((view.phaseEndsAt - now) / 1000));
       clockEl.textContent = rem + 's';
     } else {
-      clockEl.textContent = 'Round ' + view.round;
+      clockEl.textContent = 'Match ' + (view.match || 1) + ' · ' + view.round + '/' + MATCH_ROUNDS;
     }
 
     if (view.phase === 'hallway') {
       statusEl.textContent = view.players.length < 4
-        ? 'Lit Hallway — need ' + (4 - view.players.length) + ' more (' + view.players.length + '/4)'
-        : 'Lit Hallway — ' + view.players.length + ' suspects ready';
+        ? 'Hallway · need ' + (4 - view.players.length) + ' more players'
+        : 'Hallway · ' + view.players.length + ' players ready';
     } else if (view.phase === 'dark') {
-      statusEl.textContent = 'Pitch Dark — only eyeballs visible!';
+      statusEl.textContent = 'LIGHTS OUT · Wander until the lights come back';
     } else if (view.phase === 'alibi') {
       const pA = nameOf(view.spotlightPair[0]);
       const pB = nameOf(view.spotlightPair[1]);
-      statusEl.textContent = pA + ' & ' + pB + ' trapped in ' + view.roomName;
+      statusEl.textContent = pA + ' & ' + pB + ' · ' + view.roomName + ' · build an alibi';
     } else if (view.phase === 'vote') {
-      statusEl.textContent = 'Interrogation — True alibi or counterfeit object?';
+      statusEl.textContent = 'VOTE · Which person is the murderer?';
     } else if (view.phase === 'reveal') {
-      statusEl.textContent = 'Case Closed!';
+      statusEl.textContent = view.outcome && view.outcome.caught ? 'MURDERER CAUGHT' : 'MURDERER ESCAPED';
     }
   }
 
@@ -1274,19 +1283,53 @@ export function mount(root, api) {
     step();
   }
 
+  function appendScoreboard(parent, heading) {
+    const box = document.createElement('div');
+    box.className = 'cu-scoreboard';
+    const title = document.createElement('div');
+    title.className = 'cu-score-title';
+    title.textContent = heading || 'MATCH SCORES';
+    box.appendChild(title);
+    const ordered = (view.players || []).slice().sort(function (a, b) {
+      return ((view.scores && view.scores[b]) || 0) - ((view.scores && view.scores[a]) || 0);
+    });
+    ordered.forEach(function (pid, index) {
+      const line = document.createElement('div');
+      line.className = 'cu-score-line';
+      line.textContent = (index + 1) + '. ' + nameOf(pid) + ' — ' + ((view.scores && view.scores[pid]) || 0);
+      box.appendChild(line);
+    });
+    parent.appendChild(box);
+  }
+
+  function matchWinners() {
+    const players = view.players || [];
+    let high = -1;
+    players.forEach(function (pid) {
+      const score = (view.scores && view.scores[pid]) || 0;
+      if (score > high) high = score;
+    });
+    return players.filter(function (pid) {
+      return ((view.scores && view.scores[pid]) || 0) === high;
+    });
+  }
+
   function renderDrawer() {
     if (!view) return;
     const inSpot = view.spotlightPair.indexOf(myId) >= 0;
     const seated = view.players.indexOf(myId) >= 0 && !api.isSpectator;
     const key = [
+      view.match,
       view.round,
       view.phase,
+      JSON.stringify(view.scores || {}),
+      view.outcome ? JSON.stringify(view.outcome) : '',
       inSpot ? 'spot' : 'out',
       seated ? 'seat' : 'watch',
       view.players.length,
       (view.privateChat ? view.privateChat.length : 0),
       (view.claimedEmojis ? JSON.stringify(view.claimedEmojis) : ''),
-      (view.votes ? Object.keys(view.votes).length : 0)
+      (view.votes && view.votes[myId]) || ''
     ].join('|');
 
     if (key === drawerKey) {
@@ -1301,6 +1344,11 @@ export function mount(root, api) {
 
     if (view.phase === 'hallway') {
       drawer.hidden = false;
+      const note = document.createElement('div');
+      note.className = 'cu-note';
+      note.textContent = 'CULE · Five rounds. One player is secretly the murderer. Everyone wanders for 8 seconds in the dark. When the lights return, the murderer and one random player are trapped together. They invent an alibi; everyone else tries to identify the murderer. Correct votes earn 1 point; an escaping murderer earns 2 and their partner earns 1. Highest score wins.';
+      drawer.appendChild(note);
+
       const row = document.createElement('div');
       row.className = 'cu-row';
       if (!seated && !api.isSpectator) {
@@ -1315,18 +1363,19 @@ export function mount(root, api) {
         sBtn.className = 'pri';
         sBtn.disabled = view.players.length < 4;
         sBtn.textContent = view.players.length < 4
-          ? 'Need 4 Suspects (' + view.players.length + '/4)'
+          ? 'Need 4 Players (' + view.players.length + '/4)'
           : '💡 Cut the Lights';
         sBtn.onclick = function () { api.send({ a: 'startDark' }); };
         row.appendChild(sBtn);
       } else {
         const info = document.createElement('span');
         info.textContent = view.players.length < 4
-          ? 'Waiting for at least 4 suspects to join…'
+          ? 'Waiting for at least 4 players…'
           : 'Waiting for the host to cut the lights…';
         row.appendChild(info);
       }
       drawer.appendChild(row);
+      appendScoreboard(drawer, 'MATCH ' + (view.match || 1) + ' SCORES · ROUND ' + view.round + '/' + MATCH_ROUNDS);
       return;
     }
 
@@ -1339,25 +1388,34 @@ export function mount(root, api) {
       drawer.hidden = false;
       if (inSpot) {
         const [a, b] = view.spotlightPair;
-        const myObj = (view.trueEmojis && view.trueEmojis[myId]) || '';
         const partnerId = a === myId ? b : a;
-        const partnerObj = (view.trueEmojis && view.trueEmojis[partnerId]) || '';
+        const myObj = (view.trueEmojis && view.trueEmojis[myId]) || '';
+        const partnerClaim = (view.claimedEmojis && view.claimedEmojis[partnerId]) || '❓';
 
         const head = document.createElement('div');
-        head.innerHTML = '<b>🔒 Trapped with ' + nameOf(partnerId) + '!</b> Your object: ' + myObj + ' · Partner: ' + partnerObj;
+        head.innerHTML = '<b>🔒 Trapped with ' + nameOf(partnerId) + ' in ' + view.roomName + '</b>';
         drawer.appendChild(head);
+
+        const roleNote = document.createElement('div');
+        roleNote.className = 'cu-note';
+        if (view.isMurderer) {
+          roleNote.textContent = 'You are the murderer. Your real object is 🔪. Choose a fake object below, then work with your partner on a convincing alibi. If the crowd fails to identify you, you score 2 points.';
+        } else {
+          roleNote.textContent = 'You are the innocent partner. Your object is ' + myObj + '. Your partner is the murderer: their real object is 🔪, but they claim ' + partnerClaim + '. Help sell the shared alibi: if the murderer escapes, you score 1 point too.';
+        }
+        drawer.appendChild(roleNote);
 
         if (view.decoyOptions && view.decoyOptions.length > 0) {
           const dLabel = document.createElement('div');
           dLabel.className = 'cu-hint';
-          dLabel.textContent = '🔪 Cover-up! Pick a fake emoji to claim instead of the knife:';
+          dLabel.textContent = 'Choose the fake object you will claim instead of the knife:';
           drawer.appendChild(dLabel);
 
           const dRow = document.createElement('div');
           dRow.className = 'cu-row';
           view.decoyOptions.forEach(function (emo) {
             const bBtn = document.createElement('button');
-            const active = view.claimedEmojis && view.claimedEmojis[view.murdererId] === emo;
+            const active = view.claimedEmojis && view.claimedEmojis[myId] === emo;
             bBtn.className = 'decoy' + (active ? ' on' : '');
             bBtn.textContent = emo;
             bBtn.onclick = function () { api.send({ a: 'pickDecoy', emoji: emo }); };
@@ -1366,6 +1424,16 @@ export function mount(root, api) {
           drawer.appendChild(dRow);
         }
 
+        const claims = document.createElement('div');
+        claims.className = 'cu-hint';
+        claims.textContent = nameOf(myId) + ' claims ' + ((view.claimedEmojis && view.claimedEmojis[myId]) || myObj) +
+          ' · ' + nameOf(partnerId) + ' claims ' + partnerClaim;
+        drawer.appendChild(claims);
+
+        const chatLabel = document.createElement('div');
+        chatLabel.className = 'cu-hint';
+        chatLabel.textContent = 'Private whisper chat — only the two suspects can see it.';
+        drawer.appendChild(chatLabel);
         const chatBox = document.createElement('div');
         chatBox.className = 'cu-chat';
         (view.privateChat || []).forEach(function (m) {
@@ -1374,7 +1442,7 @@ export function mount(root, api) {
           chatBox.appendChild(line);
         });
         if (!view.privateChat || !view.privateChat.length) {
-          chatBox.textContent = 'Private room chat — outsiders cannot read this…';
+          chatBox.textContent = 'No whispers yet…';
         }
         drawer.appendChild(chatBox);
         chatBox.scrollTop = chatBox.scrollHeight;
@@ -1383,7 +1451,7 @@ export function mount(root, api) {
         cRow.className = 'cu-row';
         const cIn = document.createElement('input');
         cIn.maxLength = 100;
-        cIn.placeholder = 'whisper to partner...';
+        cIn.placeholder = 'Whisper to your partner…';
         const cBtn = document.createElement('button');
         cBtn.textContent = 'Whisper';
         const sendChat = function () {
@@ -1398,12 +1466,16 @@ export function mount(root, api) {
         cRow.appendChild(cBtn);
         drawer.appendChild(cRow);
 
+        const alibiLabel = document.createElement('div');
+        alibiLabel.className = 'cu-hint';
+        alibiLabel.textContent = 'Write ONE shared alibi for why you were together in this room with these objects.';
+        drawer.appendChild(alibiLabel);
         const aRow = document.createElement('div');
         aRow.className = 'cu-row';
         const aIn = document.createElement('input');
         aIn.id = 'cu-alibi-in';
         aIn.maxLength = 140;
-        aIn.placeholder = 'Final shared alibi bridging both emojis...';
+        aIn.placeholder = 'Our alibi…';
         aIn.value = view.alibiText || '';
         aIn.oninput = function () { api.send({ a: 'draftAlibi', t: aIn.value }); };
         const subBtn = document.createElement('button');
@@ -1415,8 +1487,9 @@ export function mount(root, api) {
         drawer.appendChild(aRow);
       } else {
         const info = document.createElement('div');
+        info.className = 'cu-note';
         info.textContent = nameOf(view.spotlightPair[0]) + ' and ' + nameOf(view.spotlightPair[1]) +
-          ' are whispering inside ' + view.roomName + '. Walk around and heckle them using Say!';
+                  ' are trapped in ' + view.roomName + '. The murderer is definitely one of these two. You are an investigator: wander around, heckle them with Say, listen to the alibi, then vote for which person is the murderer. A correct vote earns 1 point.';
         drawer.appendChild(info);
       }
       return;
@@ -1428,8 +1501,13 @@ export function mount(root, api) {
       const eA = (view.claimedEmojis && view.claimedEmojis[a]) || '❓';
       const eB = (view.claimedEmojis && view.claimedEmojis[b]) || '❓';
 
+      const instruction = document.createElement('div');
+      instruction.className = 'cu-note';
+      instruction.textContent = 'The two suspects have presented their shared alibi. One of them is the murderer. Choose the person you think is guilty. You earn 1 point for a correct vote.';
+      drawer.appendChild(instruction);
+
       const head = document.createElement('div');
-      head.innerHTML = '<b>' + nameOf(a) + ' (' + eA + ') & ' + nameOf(b) + ' (' + eB + ') claim:</b>';
+      head.textContent = nameOf(a) + ' claims ' + eA + ' · ' + nameOf(b) + ' claims ' + eB;
       drawer.appendChild(head);
 
       const alibiBox = document.createElement('div');
@@ -1442,21 +1520,25 @@ export function mount(root, api) {
         const myVote = view.votes && view.votes[myId];
         const vRow = document.createElement('div');
         vRow.className = 'cu-row';
-        const tBtn = document.createElement('button');
-        tBtn.className = 'good';
-        tBtn.textContent = myVote === 'true' ? '✅ Voted TRUE' : '✅ TRUE (Real Objects)';
-        tBtn.onclick = function () { api.send({ a: 'vote', v: 'true' }); };
-        const lBtn = document.createElement('button');
-        lBtn.className = 'bad';
-        lBtn.textContent = myVote === 'lie' ? '🚨 Voted LIE' : '🚨 LIE (Counterfeit / 🔪)';
-        lBtn.onclick = function () { api.send({ a: 'vote', v: 'lie' }); };
-        vRow.appendChild(tBtn);
-        vRow.appendChild(lBtn);
+        const aBtn = document.createElement('button');
+        const bBtn = document.createElement('button');
+        aBtn.className = myVote === a ? 'good' : '';
+        bBtn.className = myVote === b ? 'good' : '';
+        aBtn.textContent = (myVote === a ? '✓ ' : '') + 'Vote ' + nameOf(a);
+        bBtn.textContent = (myVote === b ? '✓ ' : '') + 'Vote ' + nameOf(b);
+        aBtn.onclick = function () { api.send({ a: 'vote', v: a }); };
+        bBtn.onclick = function () { api.send({ a: 'vote', v: b }); };
+        vRow.appendChild(aBtn);
+        vRow.appendChild(bBtn);
         drawer.appendChild(vRow);
+        const voteStatus = document.createElement('div');
+        voteStatus.className = 'cu-hint';
+        voteStatus.textContent = myVote ? 'Your vote is recorded. You can change it until the crowd has finished voting.' : 'Choose one suspect.';
+        drawer.appendChild(voteStatus);
       } else {
         const wait = document.createElement('div');
         wait.className = 'cu-hint';
-        wait.textContent = 'The crowd outside is voting on your story…';
+        wait.textContent = 'You are one of the suspects and cannot vote. The crowd is deciding whether the murderer fooled them…';
         drawer.appendChild(wait);
       }
       return;
@@ -1467,18 +1549,50 @@ export function mount(root, api) {
       const [a, b] = view.spotlightPair;
       const tA = (view.trueEmojis && view.trueEmojis[a]) || '';
       const tB = (view.trueEmojis && view.trueEmojis[b]) || '';
-      const line = summarize(view, nameOf) || 'Round complete!';
+      const result = view.outcome || {};
 
       const res = document.createElement('div');
-      res.innerHTML = '<b>' + line + '</b><br>True objects in room: ' +
-        nameOf(a) + ' held ' + tA + ' · ' + nameOf(b) + ' held ' + tB +
-        ' · Murderer: <b>' + nameOf(view.murdererId) + '</b>';
+      res.className = 'cu-note';
+      res.textContent = summarize(view, nameOf) || 'Round complete!';
       drawer.appendChild(res);
+
+      const evidence = document.createElement('div');
+      evidence.textContent = 'Real objects: ' + nameOf(a) + ' had ' + tA + ' · ' + nameOf(b) + ' had ' + tB +
+        '. The murderer was ' + nameOf(view.murdererId) + '.';
+      drawer.appendChild(evidence);
+
+      const tally = document.createElement('div');
+      tally.className = 'cu-hint';
+      tally.textContent = 'Votes for murderer: ' + (result.votesForMurderer || 0) +
+        ' · Votes for partner: ' + (result.votesForPartner || 0) +
+        (result.votesForMurderer === result.votesForPartner ? ' · Tie: murderer escapes.' : '');
+      drawer.appendChild(tally);
+
+      const awards = document.createElement('div');
+      awards.className = 'cu-hint';
+      const awarded = Object.keys(result.pointsAwarded || {});
+      awards.textContent = awarded.length
+        ? 'Points this round: ' + awarded.map(function (pid) {
+            return nameOf(pid) + ' +' + result.pointsAwarded[pid];
+          }).join(' · ')
+        : 'No points awarded this round.';
+      drawer.appendChild(awards);
+
+      appendScoreboard(drawer, 'MATCH ' + (view.match || 1) + ' SCOREBOARD · ROUND ' + view.round + '/' + MATCH_ROUNDS);
+
+      if (view.round >= MATCH_ROUNDS) {
+        const winners = matchWinners();
+        const win = document.createElement('div');
+        win.className = 'cu-note';
+        win.textContent = 'MATCH COMPLETE · ' + (winners.length > 1 ? 'Tie: ' : 'Winner: ') +
+          winners.map(nameOf).join(', ') + ' with ' + ((view.scores && view.scores[winners[0]]) || 0) + ' points.';
+        drawer.appendChild(win);
+      }
 
       if (api.isHost) {
         const nBtn = document.createElement('button');
         nBtn.className = 'pri';
-        nBtn.textContent = '🕯️ Next Round';
+        nBtn.textContent = view.round >= MATCH_ROUNDS ? '🔄 Start New Match' : '🕯️ Next Round';
         nBtn.onclick = function () { api.send({ a: 'nextRound' }); };
         drawer.appendChild(nBtn);
       }
@@ -1532,15 +1646,18 @@ export function mount(root, api) {
     if (e.key === 'Enter') { e.preventDefault(); sendSay(); }
   });
 
+  function isTextEntryTarget(target) {
+    if (!target) return false;
+    if (target.isContentEditable) return true;
+    const tag = String(target.tagName || '').toUpperCase();
+    return tag === 'INPUT' || tag === 'TEXTAREA' || tag === 'SELECT';
+  }
+
   function onKeyDown(e) {
-    const tag = e.target && e.target.tagName;
-    if (tag === 'INPUT' || tag === 'TEXTAREA') return;
+    // Never capture typing or cursor-navigation keys inside an editor.
+    if (isTextEntryTarget(e.target)) return;
     const k = e.key.toLowerCase();
-    if (FXKEY[k] && !e.ctrlKey && !e.metaKey && !e.altKey) {
-      e.preventDefault();
-      if (!e.repeat) api.send({ a: 'fx', k: FXKEY[k] });
-      return;
-    }
+    // Arrow keys are reserved for movement only when the game itself has focus.
     if (k.indexOf('arrow') === 0) e.preventDefault();
     keys[k] = 1;
   }
