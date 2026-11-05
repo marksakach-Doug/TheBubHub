@@ -126,7 +126,7 @@ test('conn: linking needs what is on the table, one word per stream, once per wo
   assert.equal(st.round.links[0].vertical, true);
   assert.equal(st.round.links[0].weight, 1);
   assert.ok(act(st, { a: 'link', picks: [{ s: 'b1', i: 0 }, { s: 'b3', i: 0 }] }).error, 'a linked word links once');
-  assert.notEqual(st.round.rel, st.round.links[0].rel, 'relation snaps after every link');
+  assert.equal(st.round.rel, st.round.links[0].rel, 'the relation holds for the whole solo round');
 });
 
 test('conn: the human cannot type, and no stranger sits down mid-game', () => {

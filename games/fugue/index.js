@@ -313,7 +313,8 @@ function soloConnRound(st, now, rng) {
     phase: 'live',
     round: {
       conn: me, streamers: streamers, prompts: {}, words: {}, links: [], used: {},
-      deck: deck.slice(1), rel: deck[0], votes: {},
+      deck: [], rel: deck[0], votes: {},
+      matchMode: 'classic',
       introEndsAt: now, endsAt: now + LIVE_MS, voteEndsAt: 0, tallyEndsAt: 0,
       result: null, aborted: false,
       bot: bot
@@ -599,11 +600,11 @@ export function reduce(state, action, ctx) {
     };
     const used = Object.assign({}, r.used);
     clean.forEach(function (p) { used[p.s + '|' + p.i] = link.n; });
-    // Only Full Fugue (and the solo rounds, which carry no matchMode) snap to a
-    // new relation after a link. Classic holds one relation for the round;
-    // Free Association never had one.
+    // Only Full Fugue snaps to a new relation after a link. Classic holds one
+    // relation for the round; Free Association never had one. Solo connectionist
+    // rounds run classic, so they hold their relation all round.
     let nx = { rel: r.rel, deck: r.deck };
-    if (r.matchMode === 'full' || !r.matchMode) nx = advanceRel(r, rng);
+    if (r.matchMode === 'full') nx = advanceRel(r, rng);
     return same(state, { round: Object.assign({}, r, { links: r.links.concat([link]), used: used, rel: nx.rel, deck: nx.deck }) });
   }
 
@@ -766,7 +767,7 @@ export function project(state, playerId, api) {
       linkCount: r.links.length, mineUsed: mineUsed,
       votes: votes, cast: cast, castTotal: r.links.length * r.streamers.length,
       rel: ((ph === 'intro' || ph === 'live') && role !== 'stream') ? r.rel : '',
-      matchMode: r.matchMode || 'full',
+      matchMode: r.matchMode || ((state.mode === SOLO_CONN) ? 'classic' : 'full'),
       promptUsed: role === 'stream' ? !!(r.swaps || {})[me] : false,
       introEndsAt: r.introEndsAt, endsAt: r.endsAt, voteEndsAt: r.voteEndsAt, tallyEndsAt: r.tallyEndsAt,
       result: (ph === 'tally' || ph === 'over') ? r.result : null,
