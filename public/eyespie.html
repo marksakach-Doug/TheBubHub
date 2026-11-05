@@ -37,16 +37,35 @@
       padding: 0;
       width: 100%;
       height: 100%;
-      height: 100dvh;
-      overflow-x: hidden;
-      overflow-y: auto;
+      overflow: hidden;
+    }
+
+    /* Independent scroll container so scrolling works even inside <iframe scrolling="no"> on bubhub.us */
+    #lobbyScreen:not(.hidden) {
+      position: fixed;
+      inset: 0;
+      width: 100%;
+      height: 100%;
+      overflow-y: auto !important;
+      overflow-x: hidden !important;
       -webkit-overflow-scrolling: touch;
+      overscroll-behavior-y: contain;
+      touch-action: pan-y;
+      display: block;
+    }
+
+    #lobbyScreen:not(.hidden) * {
       touch-action: pan-y;
     }
 
-    #lobbyScreen {
-      -webkit-overflow-scrolling: touch;
-      touch-action: pan-y;
+    #gameScreen:not(.hidden) {
+      position: fixed;
+      inset: 0;
+      width: 100%;
+      height: 100%;
+      overflow: hidden;
+      display: flex;
+      flex-direction: column;
     }
 
     .paper-sheet {
@@ -75,15 +94,15 @@
     }
   </style>
 </head>
-<body class="flex flex-col justify-between">
+<body>
 
   <!-- ==================== SCREEN 1: ULTRA-MINIMAL LOBBY ==================== -->
-  <main id="lobbyScreen" class="flex-1 w-full h-full overflow-y-auto overflow-x-hidden p-4 pb-12 flex flex-col items-center justify-start">
-    <div class="max-w-md mx-auto w-full flex flex-col items-center gap-5 my-auto">
-    
+  <main id="lobbyScreen" class="p-3 sm:p-5 pb-24">
+    <div class="min-h-full w-full max-w-md mx-auto flex flex-col items-center justify-center gap-3 sm:gap-4 py-2">
+      
       <!-- HERO: Custom SVG Replica of Attached Icon + Title ONLY -->
-      <div class="flex flex-col items-center gap-2.5">
-        <div class="w-28 h-28 sm:w-32 sm:h-32 rounded-[26%] bg-[#24344D] border-4 border-[#314766] shadow-2xl overflow-hidden flex items-center justify-center relative">
+      <div class="flex flex-col items-center gap-1.5 sm:gap-2.5 shrink-0">
+        <div class="w-20 h-20 sm:w-28 sm:h-28 rounded-[26%] bg-[#24344D] border-4 border-[#314766] shadow-2xl overflow-hidden flex items-center justify-center relative">
           <svg viewBox="0 0 200 200" class="w-full h-full">
             <!-- Outer Navy Square & Slate Circle -->
             <rect width="200" height="200" rx="44" fill="#24344D"/>
@@ -164,16 +183,16 @@
           </svg>
         </div>
 
-        <h1 class="text-4xl sm:text-5xl font-bold tracking-wide text-[#EFECE6]" style="font-family: 'Fredoka', sans-serif;">
+        <h1 class="text-3xl sm:text-5xl font-bold tracking-wide text-[#EFECE6]" style="font-family: 'Fredoka', sans-serif;">
           EYES <span class="text-[#E5B363]">PIE</span>
         </h1>
       </div>
 
       <!-- COMPACT LOBBY CARD -->
-      <div class="w-full bg-[#314766] border-2 border-[#435E85] rounded-3xl p-4 sm:p-5 shadow-2xl space-y-4">
+      <div class="w-full bg-[#314766] border-2 border-[#435E85] rounded-3xl p-3.5 sm:p-5 shadow-2xl space-y-2.5 sm:space-y-3.5 shrink-0">
         
         <!-- Score Pill (Always clean & compact) -->
-        <div class="flex items-center justify-between bg-[#24344D] px-3.5 py-2 rounded-2xl border border-[#435E85]">
+        <div class="flex items-center justify-between bg-[#24344D] px-3.5 py-1.5 sm:py-2 rounded-2xl border border-[#435E85]">
           <div class="flex items-center gap-3 text-sm font-extrabold tracking-wide">
             <span class="text-[#E5B363]">P1: <span id="lobbyP1Score">0</span></span>
             <span class="text-[#435E85]">|</span>
@@ -185,71 +204,71 @@
         </div>
 
         <!-- 1. Categories (5 Toggle Pills) -->
-        <div class="space-y-1.5">
+        <div class="space-y-1">
           <div class="text-[11px] font-extrabold uppercase tracking-widest text-[#E5B363]">Categories</div>
-          <div class="grid grid-cols-2 sm:grid-cols-3 gap-2">
-            <button type="button" data-cat="numbers" onclick="toggleCat('numbers')" class="cat-pill py-2.5 px-3 rounded-xl font-extrabold text-xs sm:text-sm border-2 transition flex items-center justify-center gap-1.5">
+          <div class="grid grid-cols-2 sm:grid-cols-3 gap-1.5 sm:gap-2">
+            <button type="button" data-cat="numbers" onclick="toggleCat('numbers')" class="cat-pill py-2 px-3 rounded-xl font-extrabold text-xs sm:text-sm border-2 transition flex items-center justify-center gap-1.5">
               <span>Numbers</span>
             </button>
-            <button type="button" data-cat="bigrams" onclick="toggleCat('bigrams')" class="cat-pill py-2.5 px-3 rounded-xl font-extrabold text-xs sm:text-sm border-2 transition flex items-center justify-center gap-1.5">
+            <button type="button" data-cat="bigrams" onclick="toggleCat('bigrams')" class="cat-pill py-2 px-3 rounded-xl font-extrabold text-xs sm:text-sm border-2 transition flex items-center justify-center gap-1.5">
               <span>2 Letters</span>
             </button>
-            <button type="button" data-cat="words" onclick="toggleCat('words')" class="cat-pill py-2.5 px-3 rounded-xl font-extrabold text-xs sm:text-sm border-2 transition flex items-center justify-center gap-1.5">
+            <button type="button" data-cat="words" onclick="toggleCat('words')" class="cat-pill py-2 px-3 rounded-xl font-extrabold text-xs sm:text-sm border-2 transition flex items-center justify-center gap-1.5">
               <span>3 Letters</span>
             </button>
-            <button type="button" data-cat="polygons" onclick="toggleCat('polygons')" class="cat-pill py-2.5 px-3 rounded-xl font-extrabold text-xs sm:text-sm border-2 transition flex items-center justify-center gap-1.5">
+            <button type="button" data-cat="polygons" onclick="toggleCat('polygons')" class="cat-pill py-2 px-3 rounded-xl font-extrabold text-xs sm:text-sm border-2 transition flex items-center justify-center gap-1.5">
               <span>Shapes</span>
             </button>
-            <button type="button" data-cat="icons" onclick="toggleCat('icons')" class="cat-pill col-span-2 sm:col-span-2 py-2.5 px-3 rounded-xl font-extrabold text-xs sm:text-sm border-2 transition flex items-center justify-center gap-1.5">
+            <button type="button" data-cat="icons" onclick="toggleCat('icons')" class="cat-pill col-span-2 sm:col-span-2 py-2 px-3 rounded-xl font-extrabold text-xs sm:text-sm border-2 transition flex items-center justify-center gap-1.5">
               <span>Objects</span>
             </button>
           </div>
         </div>
 
         <!-- 2. Mode (Combined Auto vs Junebug) -->
-        <div class="space-y-1.5">
+        <div class="space-y-1">
           <div class="text-[11px] font-extrabold uppercase tracking-widest text-[#E5B363]">Mode</div>
-          <div class="grid grid-cols-2 gap-2 bg-[#24344D] p-1.5 rounded-2xl border border-[#435E85]">
-            <button type="button" id="modeAutoBtn" onclick="setGameMode('auto')" class="py-2.5 rounded-xl font-extrabold text-xs sm:text-sm transition">
+          <div class="grid grid-cols-2 gap-1.5 sm:gap-2 bg-[#24344D] p-1 sm:p-1.5 rounded-2xl border border-[#435E85]">
+            <button type="button" id="modeAutoBtn" onclick="setGameMode('auto')" class="py-1.5 sm:py-2 rounded-xl font-extrabold text-xs sm:text-sm transition">
               Auto Mode
             </button>
-            <button type="button" id="modeHumanBtn" onclick="setGameMode('junebug')" class="py-2.5 rounded-xl font-extrabold text-xs sm:text-sm transition">
+            <button type="button" id="modeHumanBtn" onclick="setGameMode('junebug')" class="py-1.5 sm:py-2 rounded-xl font-extrabold text-xs sm:text-sm transition">
               Junebug Mode
             </button>
           </div>
         </div>
 
         <!-- 3. Moving Objects (Hard) -->
-        <div class="space-y-1.5">
+        <div class="space-y-1">
           <div class="text-[11px] font-extrabold uppercase tracking-widest text-[#E5B363]">Challenge</div>
-          <div class="grid grid-cols-2 gap-2 bg-[#24344D] p-1.5 rounded-2xl border border-[#435E85]">
-            <button type="button" id="moveOffBtn" onclick="setMoving(false)" class="py-2 rounded-xl font-extrabold text-xs sm:text-sm transition">
+          <div class="grid grid-cols-2 gap-1.5 sm:gap-2 bg-[#24344D] p-1 sm:p-1.5 rounded-2xl border border-[#435E85]">
+            <button type="button" id="moveOffBtn" onclick="setMoving(false)" class="py-1.5 sm:py-2 rounded-xl font-extrabold text-xs sm:text-sm transition">
               Static
             </button>
-            <button type="button" id="moveOnBtn" onclick="setMoving(true)" class="py-2 rounded-xl font-extrabold text-xs sm:text-sm transition">
+            <button type="button" id="moveOnBtn" onclick="setMoving(true)" class="py-1.5 sm:py-2 rounded-xl font-extrabold text-xs sm:text-sm transition">
               Moving
             </button>
           </div>
         </div>
 
         <!-- 4. Density (Easy / Medium / Hard) -->
-        <div class="space-y-1.5">
+        <div class="space-y-1">
           <div class="text-[11px] font-extrabold uppercase tracking-widest text-[#E5B363]">Density</div>
-          <div class="grid grid-cols-3 gap-2 bg-[#24344D] p-1.5 rounded-2xl border border-[#435E85]">
-            <button type="button" id="densEasyBtn" onclick="setDensity('easy')" class="py-2 rounded-xl font-extrabold text-xs sm:text-sm transition">
+          <div class="grid grid-cols-3 gap-1.5 sm:gap-2 bg-[#24344D] p-1 sm:p-1.5 rounded-2xl border border-[#435E85]">
+            <button type="button" id="densEasyBtn" onclick="setDensity('easy')" class="py-1.5 sm:py-2 rounded-xl font-extrabold text-xs sm:text-sm transition">
               Easy
             </button>
-            <button type="button" id="densMedBtn" onclick="setDensity('medium')" class="py-2 rounded-xl font-extrabold text-xs sm:text-sm transition">
+            <button type="button" id="densMedBtn" onclick="setDensity('medium')" class="py-1.5 sm:py-2 rounded-xl font-extrabold text-xs sm:text-sm transition">
               Medium
             </button>
-            <button type="button" id="densHardBtn" onclick="setDensity('hard')" class="py-2 rounded-xl font-extrabold text-xs sm:text-sm transition">
+            <button type="button" id="densHardBtn" onclick="setDensity('hard')" class="py-1.5 sm:py-2 rounded-xl font-extrabold text-xs sm:text-sm transition">
               Hard
             </button>
           </div>
         </div>
 
         <!-- START BUTTON -->
-        <button onclick="startMatchFromLobby()" class="w-full py-4 rounded-2xl bg-[#C9252D] hover:bg-[#d92c35] text-[#EFECE6] font-black text-xl tracking-wider uppercase shadow-lg border-b-4 border-[#8E161C] active:translate-y-0.5 transition">
+        <button onclick="startMatchFromLobby()" class="w-full py-3 sm:py-4 rounded-2xl bg-[#C9252D] hover:bg-[#d92c35] text-[#EFECE6] font-black text-lg sm:text-xl tracking-wider uppercase shadow-lg border-b-4 border-[#8E161C] active:translate-y-0.5 transition">
           START
         </button>
 
@@ -258,8 +277,8 @@
   </main>
 
   <!-- ==================== SCREEN 2: MINIMAL PASS OVERLAY ==================== -->
-  <section id="curtainScreen" class="hidden fixed inset-0 z-50 bg-[#24344D] overflow-y-auto flex flex-col items-center justify-center p-6 text-center">
-    <div class="max-w-xs w-full bg-[#314766] border-2 border-[#435E85] rounded-3xl p-6 shadow-2xl space-y-5 my-auto">
+  <section id="curtainScreen" class="hidden fixed inset-0 z-50 bg-[#24344D] flex flex-col items-center justify-center p-6 text-center">
+    <div class="max-w-xs w-full bg-[#314766] border-2 border-[#435E85] rounded-3xl p-6 shadow-2xl space-y-5">
       <div id="curtainTitle" class="text-2xl font-black text-[#EFECE6] uppercase tracking-wide">
         PASS TO P1
       </div>
@@ -351,8 +370,8 @@
   </section>
 
   <!-- ==================== SCREEN 4: MINIMAL TURN SUMMARY MODAL ==================== -->
-  <section id="summaryModal" class="hidden fixed inset-0 z-50 bg-[#24344D]/90 backdrop-blur-sm overflow-y-auto flex items-center justify-center p-4">
-    <div class="max-w-xs w-full bg-[#314766] border-2 border-[#435E85] rounded-3xl p-6 shadow-2xl space-y-5 text-center my-auto">
+  <section id="summaryModal" class="hidden fixed inset-0 z-50 bg-[#24344D]/90 backdrop-blur-sm flex items-center justify-center p-4">
+    <div class="max-w-xs w-full bg-[#314766] border-2 border-[#435E85] rounded-3xl p-6 shadow-2xl space-y-5 text-center">
       
       <div id="summaryTurnTitle" class="text-xl font-black text-[#E5B363] uppercase">
         P1: +0
@@ -578,10 +597,10 @@
         const key = btn.dataset.cat;
         const active = state.categories[key];
         if (active) {
-          btn.className = "cat-pill py-2.5 px-3 rounded-xl font-extrabold text-xs sm:text-sm border-2 transition flex items-center justify-center gap-1.5 bg-[#E5B363] text-[#2B1D16] border-[#D69847] shadow";
+          btn.className = "cat-pill py-2 px-3 rounded-xl font-extrabold text-xs sm:text-sm border-2 transition flex items-center justify-center gap-1.5 bg-[#E5B363] text-[#2B1D16] border-[#D69847] shadow";
           if (key === "icons") btn.classList.add("col-span-2", "sm:col-span-2");
         } else {
-          btn.className = "cat-pill py-2.5 px-3 rounded-xl font-extrabold text-xs sm:text-sm border-2 transition flex items-center justify-center gap-1.5 bg-[#24344D] text-[#EFECE6]/70 border-[#435E85]";
+          btn.className = "cat-pill py-2 px-3 rounded-xl font-extrabold text-xs sm:text-sm border-2 transition flex items-center justify-center gap-1.5 bg-[#24344D] text-[#EFECE6]/70 border-[#435E85]";
           if (key === "icons") btn.classList.add("col-span-2", "sm:col-span-2");
         }
       });
@@ -590,11 +609,11 @@
       const autoBtn = document.getElementById("modeAutoBtn");
       const humanBtn = document.getElementById("modeHumanBtn");
       if (state.mode === "auto") {
-        autoBtn.className = "py-2.5 rounded-xl font-extrabold text-xs sm:text-sm transition bg-[#E5B363] text-[#2B1D16] shadow";
-        humanBtn.className = "py-2.5 rounded-xl font-extrabold text-xs sm:text-sm transition text-[#EFECE6]/70";
+        autoBtn.className = "py-1.5 sm:py-2 rounded-xl font-extrabold text-xs sm:text-sm transition bg-[#E5B363] text-[#2B1D16] shadow";
+        humanBtn.className = "py-1.5 sm:py-2 rounded-xl font-extrabold text-xs sm:text-sm transition text-[#EFECE6]/70";
       } else {
-        humanBtn.className = "py-2.5 rounded-xl font-extrabold text-xs sm:text-sm transition bg-[#E5B363] text-[#2B1D16] shadow";
-        autoBtn.className = "py-2.5 rounded-xl font-extrabold text-xs sm:text-sm transition text-[#EFECE6]/70";
+        humanBtn.className = "py-1.5 sm:py-2 rounded-xl font-extrabold text-xs sm:text-sm transition bg-[#E5B363] text-[#2B1D16] shadow";
+        autoBtn.className = "py-1.5 sm:py-2 rounded-xl font-extrabold text-xs sm:text-sm transition text-[#EFECE6]/70";
       }
 
       // Density Toggle
@@ -605,9 +624,9 @@
       };
       Object.keys(dMap).forEach(k => {
         if (k === state.densityKey) {
-          dMap[k].className = "py-2 rounded-xl font-extrabold text-xs sm:text-sm transition bg-[#E5B363] text-[#2B1D16] shadow";
+          dMap[k].className = "py-1.5 sm:py-2 rounded-xl font-extrabold text-xs sm:text-sm transition bg-[#E5B363] text-[#2B1D16] shadow";
         } else {
-          dMap[k].className = "py-2 rounded-xl font-extrabold text-xs sm:text-sm transition text-[#EFECE6]/70";
+          dMap[k].className = "py-1.5 sm:py-2 rounded-xl font-extrabold text-xs sm:text-sm transition text-[#EFECE6]/70";
         }
       });
 
@@ -619,11 +638,11 @@
       const moveOff = document.getElementById("moveOffBtn");
       const moveOn = document.getElementById("moveOnBtn");
       if (state.moving) {
-        moveOn.className = "py-2 rounded-xl font-extrabold text-xs sm:text-sm transition bg-[#E5B363] text-[#2B1D16] shadow";
-        moveOff.className = "py-2 rounded-xl font-extrabold text-xs sm:text-sm transition text-[#EFECE6]/70";
+        moveOn.className = "py-1.5 sm:py-2 rounded-xl font-extrabold text-xs sm:text-sm transition bg-[#E5B363] text-[#2B1D16] shadow";
+        moveOff.className = "py-1.5 sm:py-2 rounded-xl font-extrabold text-xs sm:text-sm transition text-[#EFECE6]/70";
       } else {
-        moveOff.className = "py-2 rounded-xl font-extrabold text-xs sm:text-sm transition bg-[#E5B363] text-[#2B1D16] shadow";
-        moveOn.className = "py-2 rounded-xl font-extrabold text-xs sm:text-sm transition text-[#EFECE6]/70";
+        moveOff.className = "py-1.5 sm:py-2 rounded-xl font-extrabold text-xs sm:text-sm transition bg-[#E5B363] text-[#2B1D16] shadow";
+        moveOn.className = "py-1.5 sm:py-2 rounded-xl font-extrabold text-xs sm:text-sm transition text-[#EFECE6]/70";
       }
     }
 
@@ -1357,9 +1376,20 @@
       if (moveRaf) { cancelAnimationFrame(moveRaf); moveRaf = null; }
     }
 
+    function unlockHubIframeScroll() {
+      try {
+        if (window.frameElement) {
+          window.frameElement.setAttribute("scrolling", "yes");
+          window.frameElement.style.overflow = "auto";
+        }
+      } catch (e) {}
+    }
+
     window.addEventListener("DOMContentLoaded", () => {
+      unlockHubIframeScroll();
       syncLobbyUI();
     });
+    window.addEventListener("load", unlockHubIframeScroll);
   </script>
 </body>
 </html>
