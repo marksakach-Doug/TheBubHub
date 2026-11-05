@@ -884,7 +884,7 @@ const CSS = [
   '.b{background:var(--c);color:#0b0d14;border:0;border-radius:999px;padding:6px 13px;min-height:40px;font-weight:800;font-size:15px;',
   'max-width:150px;overflow:hidden;text-overflow:ellipsis;white-space:nowrap;animation:pop .22s}',
   '.b.sel{outline:3px solid #fff;box-shadow:0 0 20px var(--c);transform:scale(1.08)}',
-  '.b.used{opacity:.28;filter:saturate(.3);cursor:default}',
+  '.b.used{font-size:14px;opacity:.28;filter:saturate(.3);cursor:default}',
   '.b.blank{background:transparent;border:1px dashed #334155;color:#475569;cursor:default}',
   '.ghost{width:10px;height:10px;border-radius:50%;background:#1b2133}',
   '.bolts{position:absolute;left:0;top:0;width:100%;height:100%;pointer-events:none;overflow:visible;z-index:2}',
@@ -1763,7 +1763,10 @@ export function mount(root, api) {
         b.textContent = list[i] || '·';
         cell.appendChild(b);
       }
-          b.classList.toggle('used', !!(used[s + '|' + i] || pend[s + '|' + i]));
+          const isUsed = !!used[s + '|' + i];
+          const isPend = !!pend[s + '|' + i];
+          b.classList.toggle('used', isUsed || isPend);
+          b.textContent = isUsed ? '⚡' : (list[i] || '·');
         }
       });
       paintCollapse();

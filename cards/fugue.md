@@ -17,7 +17,7 @@ rules: |
   too: 1 point per locked word, and 4 points for a word blessed by a standing
   link (a #blessed flash marks it at the tally). A streamer may swap their
   prompt once per round during live for 3 points; locked words carry over.
-  Linked words stay in the grid at low opacity; a column with every stream
+  Linked words turn into small lightning bolts; a column with every stream
   full of linked words collapses to a sliver. Afterwards the streamers vote on
   every link. Everyone takes a turn connecting, then the set is compared.
   On a one-player table the lobby offers two solo modes: Stream (timed word
