@@ -49,7 +49,6 @@
       overflow-y: auto !important;
       overflow-x: hidden !important;
       -webkit-overflow-scrolling: touch;
-      overscroll-behavior-y: contain;
       touch-action: pan-y;
       display: block;
     }
@@ -57,6 +56,21 @@
     #lobbyScreen:not(.hidden) * {
       touch-action: pan-y;
     }
+
+
+    /* START always visible: pinned to the bottom of the screen */
+    #lobbyScreen:not(.hidden) #startBtn {
+      position: fixed;
+      left: 50%;
+      transform: translateX(-50%);
+      bottom: max(12px, env(safe-area-inset-bottom));
+      width: calc(100% - 24px);
+      max-width: 28rem;
+      z-index: 40;
+      box-shadow: 0 -10px 24px rgba(36,52,77,.95), 0 8px 16px rgba(0,0,0,.4);
+    }
+    #lobbyScreen:not(.hidden) #startBtn:active { transform: translateX(-50%) translateY(2px); }
+    #lobbyScreen:not(.hidden) { padding-bottom: 104px !important; }
 
     #gameScreen:not(.hidden) {
       position: fixed;
@@ -98,7 +112,7 @@
 
   <!-- ==================== SCREEN 1: ULTRA-MINIMAL LOBBY ==================== -->
   <main id="lobbyScreen" class="p-3 sm:p-5 pb-24">
-    <div class="min-h-full w-full max-w-md mx-auto flex flex-col items-center justify-center gap-3 sm:gap-4 py-2">
+    <div class="w-full max-w-md mx-auto flex flex-col items-center justify-start gap-3 sm:gap-4 py-2">
       
       <!-- HERO: Custom SVG Replica of Attached Icon + Title ONLY -->
       <div class="flex flex-col items-center gap-1.5 sm:gap-2.5 shrink-0">
@@ -267,8 +281,8 @@
           </div>
         </div>
 
-        <!-- START BUTTON -->
-        <button onclick="startMatchFromLobby()" class="w-full py-3 sm:py-4 rounded-2xl bg-[#C9252D] hover:bg-[#d92c35] text-[#EFECE6] font-black text-lg sm:text-xl tracking-wider uppercase shadow-lg border-b-4 border-[#8E161C] active:translate-y-0.5 transition">
+        <!-- START BUTTON (pinned to bottom of viewport so it is always reachable, no scrolling needed) -->
+        <button id="startBtn" onclick="startMatchFromLobby()" class="w-full py-3 sm:py-4 rounded-2xl bg-[#C9252D] hover:bg-[#d92c35] text-[#EFECE6] font-black text-lg sm:text-xl tracking-wider uppercase shadow-lg border-b-4 border-[#8E161C] active:translate-y-0.5 transition">
           START
         </button>
 
