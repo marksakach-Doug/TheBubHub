@@ -58,6 +58,8 @@ window.BUB_GAMES = [
   // fixed 3:2 canvas, not a document that scrolls.
   { id: 'the96game', file: 'the96game.html', title: 'The 96 Game', players: '3-8', color: '#b5541f', fill: true,
     icon: '🖍️', desc: 'One person writes, the next draws, the next writes and so on.' },
+  { id: 'eyespie', file: 'eyespie.html', title: 'Eyes Pie', players: '1-2', color: '#24344D', fill: true, soloable: true,
+    icon: '🥧', desc: 'Spy the pie slice in the jumble and tap it before the clock runs out.' },
       { id: 'Humus', file: 'humus.html', title: 'Humus', players: '1-8', soloable: true, color: '#f4efe6', fill: true, disabled: true,
     icon: '🍲', desc: 'Humanical Terraformation' },
   { id: 'braid', file: 'braid.html', title: 'Braid', players: '2-4', color: '#a45f3b', soloable: true, height: 560,

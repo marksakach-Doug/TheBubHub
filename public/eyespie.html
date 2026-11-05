@@ -1,0 +1,1386 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no" />
+  <title>Eyes Pie</title>
+  <script src="https://cdn.tailwindcss.com"></script>
+  <link rel="preconnect" href="https://fonts.googleapis.com">
+  <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+  <link href="https://fonts.googleapis.com/css2?family=Abril+Fatface&family=Bungee+Inline&family=Caveat:wght@700&family=Cinzel:wght@700;800&family=Courier+Prime:wght@700&family=DM+Sans:wght@700;800;900&family=Fredoka:wght@600;700&family=Libre+Baskerville:ital,wght@0,400;0,700;1,400&family=Playfair+Display:ital,wght@0,700;0,800;1,700&family=Special+Elite&display=swap" rel="stylesheet">
+
+  <style>
+    :root {
+      --bg-navy: #24344D;
+      --bg-slate: #314766;
+      --cream: #EFECE6;
+      --pie-gold: #E5B363;
+      --pie-crust: #D69847;
+      --cherry-red: #C9252D;
+      --stem-green: #4BB543;
+      --ink-brown: #2A1B15;
+      --skin-peach: #F3C69F;
+    }
+
+    * {
+      box-sizing: border-box;
+      -webkit-tap-highlight-color: transparent;
+      user-select: none;
+      -webkit-user-select: none;
+    }
+
+    body {
+      font-family: 'DM Sans', sans-serif;
+      background-color: var(--bg-navy);
+      color: var(--cream);
+      margin: 0;
+      padding: 0;
+      overflow: hidden;
+      height: 100dvh;
+      width: 100vw;
+    }
+
+    .paper-sheet {
+      background-color: var(--cream);
+      box-shadow: 
+        0 18px 40px rgba(0, 0, 0, 0.55),
+        inset 0 0 24px rgba(43, 29, 22, 0.08);
+      border: 3px solid #DFD9CE;
+    }
+
+    .svg-item {
+      cursor: pointer;
+      touch-action: none;
+      transition: opacity 0.1s ease;
+    }
+    .svg-item:active {
+      opacity: 0.55;
+    }
+
+    @keyframes ringPulse {
+      0% { r: 16; opacity: 1; stroke-width: 8; }
+      100% { r: 58; opacity: 0; stroke-width: 2; }
+    }
+    .beacon-circle {
+      animation: ringPulse 0.9s ease-out infinite;
+    }
+  </style>
+</head>
+<body class="flex flex-col justify-between">
+
+  <!-- ==================== SCREEN 1: ULTRA-MINIMAL LOBBY ==================== -->
+  <main id="lobbyScreen" class="flex-1 flex flex-col items-center justify-center p-4 max-w-md mx-auto w-full gap-5">
+    
+    <!-- HERO: Custom SVG Replica of Attached Icon + Title ONLY -->
+    <div class="flex flex-col items-center gap-2.5">
+      <div class="w-28 h-28 sm:w-32 sm:h-32 rounded-[26%] bg-[#24344D] border-4 border-[#314766] shadow-2xl overflow-hidden flex items-center justify-center relative">
+        <svg viewBox="0 0 200 200" class="w-full h-full">
+          <!-- Outer Navy Square & Slate Circle -->
+          <rect width="200" height="200" rx="44" fill="#24344D"/>
+          <circle cx="100" cy="106" r="78" fill="#314766"/>
+          
+          <!-- Cream Shirt & Shoulders -->
+          <path d="M26 200 C30 154 58 144 100 144 C142 144 170 154 174 200 Z" fill="#EFECE6"/>
+          <path d="M52 200 C56 172 64 164 68 160" stroke="#D5D0C5" stroke-width="3.5" stroke-linecap="round" fill="none"/>
+          <path d="M148 200 C144 172 136 164 132 160" stroke="#D5D0C5" stroke-width="3.5" stroke-linecap="round" fill="none"/>
+          
+          <!-- Neck & Collar -->
+          <rect x="83" y="130" width="34" height="22" rx="8" fill="#DDA982"/>
+          <path d="M74 144 Q100 160 126 144" fill="none" stroke="#D5D0C5" stroke-width="5" stroke-linecap="round"/>
+
+          <!-- Ears -->
+          <ellipse cx="49" cy="102" rx="9" ry="14" fill="#F2C6A0"/>
+          <ellipse cx="49" cy="102" rx="4.5" ry="8" fill="#DDA982"/>
+          <ellipse cx="151" cy="102" rx="9" ry="14" fill="#F2C6A0"/>
+          <ellipse cx="151" cy="102" rx="4.5" ry="8" fill="#DDA982"/>
+
+          <!-- Head -->
+          <path d="M52 84 C52 50 148 50 148 84 C150 124 132 144 100 144 C68 144 50 124 52 84 Z" fill="#F2C6A0"/>
+
+          <!-- Spiky Dark Brown Hair -->
+          <path d="M51 90 C48 70 52 58 55 54 L46 47 L66 46 L62 35 L82 40 L94 24 L100 35 L108 20 L118 39 L140 33 L135 46 L154 49 L144 56 C148 66 150 78 149 90 C146 72 136 62 128 58 C110 64 86 64 70 58 C60 64 54 74 51 90 Z" fill="#2B1D16"/>
+          <path d="M76 47 Q90 40 103 44" stroke="#53392D" stroke-width="2.5" stroke-linecap="round" fill="none"/>
+          <path d="M110 44 Q122 40 132 48" stroke="#53392D" stroke-width="2.5" stroke-linecap="round" fill="none"/>
+
+          <!-- Eyebrows -->
+          <path d="M60 72 Q76 69 92 75" stroke="#2B1D16" stroke-width="6.5" stroke-linecap="round" fill="none"/>
+          <path d="M108 71 Q124 63 138 72" stroke="#2B1D16" stroke-width="6.5" stroke-linecap="round" fill="none"/>
+
+          <!-- Blush Cheeks -->
+          <ellipse cx="67" cy="116" rx="10" ry="6" fill="#E59882" opacity="0.75"/>
+          <ellipse cx="133" cy="114" rx="10" ry="6" fill="#E59882" opacity="0.75"/>
+
+          <!-- LEFT PIE SLICE EYE -->
+          <g transform="translate(76, 95) rotate(-6)">
+            <!-- 3D Filling Side -->
+            <polygon points="-22,-2 0,18 22,-2 22,5 0,25 -22,5" fill="#D69847"/>
+            <polygon points="-21,0 0,20 21,0 21,4 0,24 -21,4" fill="#9E1B22"/>
+            <!-- Top Lattice Crust -->
+            <path d="M-23,-2 Q0,-18 23,-2 L0,19 Z" fill="#E5B363" stroke="#D69847" stroke-width="1.5"/>
+            <!-- Berry Lattice Cutouts -->
+            <polygon points="-10,-4 -4,-8 0,-4 -6,0" fill="#9E1B22"/>
+            <polygon points="4,-8 10,-4 6,0 0,-4" fill="#9E1B22"/>
+            <polygon points="-4,2 0,-1 4,2 0,6" fill="#9E1B22"/>
+            <!-- Crust Rim -->
+            <path d="M-23,-2 Q0,-17 23,-2" fill="none" stroke="#ECC37E" stroke-width="4" stroke-linecap="round"/>
+            <!-- Cherry & Green Stem -->
+            <circle cx="0" cy="-2" r="6.5" fill="#C9252D"/>
+            <circle cx="-2" cy="-4" r="1.8" fill="#F29B9E"/>
+            <path d="M0,-7 Q4,-16 11,-17" fill="none" stroke="#38B449" stroke-width="2.5" stroke-linecap="round"/>
+          </g>
+
+          <!-- RIGHT PIE SLICE EYE -->
+          <g transform="translate(125, 95) rotate(6)">
+            <polygon points="-22,-2 0,18 22,-2 22,5 0,25 -22,5" fill="#D69847"/>
+            <polygon points="-21,0 0,20 21,0 21,4 0,24 -21,4" fill="#9E1B22"/>
+            <path d="M-23,-2 Q0,-18 23,-2 L0,19 Z" fill="#E5B363" stroke="#D69847" stroke-width="1.5"/>
+            <polygon points="-10,-4 -4,-8 0,-4 -6,0" fill="#9E1B22"/>
+            <polygon points="4,-8 10,-4 6,0 0,-4" fill="#9E1B22"/>
+            <polygon points="-4,2 0,-1 4,2 0,6" fill="#9E1B22"/>
+            <path d="M-23,-2 Q0,-17 23,-2" fill="none" stroke="#ECC37E" stroke-width="4" stroke-linecap="round"/>
+            <circle cx="0" cy="-2" r="6.5" fill="#C9252D"/>
+            <circle cx="-2" cy="-4" r="1.8" fill="#F29B9E"/>
+            <path d="M0,-7 Q4,-16 11,-17" fill="none" stroke="#38B449" stroke-width="2.5" stroke-linecap="round"/>
+          </g>
+
+          <!-- Nose -->
+          <path d="M97 104 C93 114 97 118 105 115" fill="none" stroke="#8C583A" stroke-width="3" stroke-linecap="round"/>
+
+          <!-- Big Toothy Grin -->
+          <path d="M76 122 Q102 126 127 116 C124 134 110 140 96 139 C84 138 78 130 76 122 Z" fill="#FFFFFF" stroke="#2B1D16" stroke-width="4" stroke-linejoin="round"/>
+          <line x1="91" y1="124" x2="91" y2="137" stroke="#2B1D16" stroke-width="2.8"/>
+          <line x1="103" y1="123" x2="103" y2="138" stroke="#2B1D16" stroke-width="2.8"/>
+          <line x1="115" y1="120" x2="115" y2="135" stroke="#2B1D16" stroke-width="2.8"/>
+        </svg>
+      </div>
+
+      <h1 class="text-4xl sm:text-5xl font-bold tracking-wide text-[#EFECE6]" style="font-family: 'Fredoka', sans-serif;">
+        EYES <span class="text-[#E5B363]">PIE</span>
+      </h1>
+    </div>
+
+    <!-- COMPACT LOBBY CARD -->
+    <div class="w-full bg-[#314766] border-2 border-[#435E85] rounded-3xl p-4 sm:p-5 shadow-2xl space-y-4">
+      
+      <!-- Score Pill (Always clean & compact) -->
+      <div class="flex items-center justify-between bg-[#24344D] px-3.5 py-2 rounded-2xl border border-[#435E85]">
+        <div class="flex items-center gap-3 text-sm font-extrabold tracking-wide">
+          <span class="text-[#E5B363]">P1: <span id="lobbyP1Score">0</span></span>
+          <span class="text-[#435E85]">|</span>
+          <span class="text-[#F2C6A0]">P2: <span id="lobbyP2Score">0</span></span>
+        </div>
+        <button onclick="resetMatchScores()" title="Reset Score" class="text-xs font-bold text-[#EFECE6]/70 hover:text-[#EFECE6] px-2 py-0.5 rounded-lg bg-[#314766]">
+          ↺
+        </button>
+      </div>
+
+      <!-- 1. Categories (5 Toggle Pills) -->
+      <div class="space-y-1.5">
+        <div class="text-[11px] font-extrabold uppercase tracking-widest text-[#E5B363]">Categories</div>
+        <div class="grid grid-cols-2 sm:grid-cols-3 gap-2">
+          <button type="button" data-cat="numbers" onclick="toggleCat('numbers')" class="cat-pill py-2.5 px-3 rounded-xl font-extrabold text-xs sm:text-sm border-2 transition flex items-center justify-center gap-1.5">
+            <span>Numbers</span>
+          </button>
+          <button type="button" data-cat="bigrams" onclick="toggleCat('bigrams')" class="cat-pill py-2.5 px-3 rounded-xl font-extrabold text-xs sm:text-sm border-2 transition flex items-center justify-center gap-1.5">
+            <span>2 Letters</span>
+          </button>
+          <button type="button" data-cat="words" onclick="toggleCat('words')" class="cat-pill py-2.5 px-3 rounded-xl font-extrabold text-xs sm:text-sm border-2 transition flex items-center justify-center gap-1.5">
+            <span>3 Letters</span>
+          </button>
+          <button type="button" data-cat="polygons" onclick="toggleCat('polygons')" class="cat-pill py-2.5 px-3 rounded-xl font-extrabold text-xs sm:text-sm border-2 transition flex items-center justify-center gap-1.5">
+            <span>Shapes</span>
+          </button>
+          <button type="button" data-cat="icons" onclick="toggleCat('icons')" class="cat-pill col-span-2 sm:col-span-2 py-2.5 px-3 rounded-xl font-extrabold text-xs sm:text-sm border-2 transition flex items-center justify-center gap-1.5">
+            <span>Objects</span>
+          </button>
+        </div>
+      </div>
+
+      <!-- 2. Mode (Combined Auto vs Junebug) -->
+      <div class="space-y-1.5">
+        <div class="text-[11px] font-extrabold uppercase tracking-widest text-[#E5B363]">Mode</div>
+        <div class="grid grid-cols-2 gap-2 bg-[#24344D] p-1.5 rounded-2xl border border-[#435E85]">
+          <button type="button" id="modeAutoBtn" onclick="setGameMode('auto')" class="py-2.5 rounded-xl font-extrabold text-xs sm:text-sm transition">
+            Auto Mode
+          </button>
+          <button type="button" id="modeHumanBtn" onclick="setGameMode('junebug')" class="py-2.5 rounded-xl font-extrabold text-xs sm:text-sm transition">
+            Junebug Mode
+          </button>
+        </div>
+      </div>
+
+      <!-- 3. Moving Objects (Hard) -->
+      <div class="space-y-1.5">
+        <div class="text-[11px] font-extrabold uppercase tracking-widest text-[#E5B363]">Challenge</div>
+        <div class="grid grid-cols-2 gap-2 bg-[#24344D] p-1.5 rounded-2xl border border-[#435E85]">
+          <button type="button" id="moveOffBtn" onclick="setMoving(false)" class="py-2 rounded-xl font-extrabold text-xs sm:text-sm transition">
+            Static
+          </button>
+          <button type="button" id="moveOnBtn" onclick="setMoving(true)" class="py-2 rounded-xl font-extrabold text-xs sm:text-sm transition">
+            Moving
+          </button>
+        </div>
+      </div>
+
+      <!-- 4. Density (Easy / Medium / Hard) -->
+      <div class="space-y-1.5">
+        <div class="text-[11px] font-extrabold uppercase tracking-widest text-[#E5B363]">Density</div>
+        <div class="grid grid-cols-3 gap-2 bg-[#24344D] p-1.5 rounded-2xl border border-[#435E85]">
+          <button type="button" id="densEasyBtn" onclick="setDensity('easy')" class="py-2 rounded-xl font-extrabold text-xs sm:text-sm transition">
+            Easy
+          </button>
+          <button type="button" id="densMedBtn" onclick="setDensity('medium')" class="py-2 rounded-xl font-extrabold text-xs sm:text-sm transition">
+            Medium
+          </button>
+          <button type="button" id="densHardBtn" onclick="setDensity('hard')" class="py-2 rounded-xl font-extrabold text-xs sm:text-sm transition">
+            Hard
+          </button>
+        </div>
+      </div>
+
+      <!-- START BUTTON -->
+      <button onclick="startMatchFromLobby()" class="w-full py-4 rounded-2xl bg-[#C9252D] hover:bg-[#d92c35] text-[#EFECE6] font-black text-xl tracking-wider uppercase shadow-lg border-b-4 border-[#8E161C] active:translate-y-0.5 transition">
+        START
+      </button>
+
+    </div>
+  </main>
+
+  <!-- ==================== SCREEN 2: MINIMAL PASS OVERLAY ==================== -->
+  <section id="curtainScreen" class="hidden fixed inset-0 z-50 bg-[#24344D] flex flex-col items-center justify-center p-6 text-center">
+    <div class="max-w-xs w-full bg-[#314766] border-2 border-[#435E85] rounded-3xl p-6 shadow-2xl space-y-5">
+      <div id="curtainTitle" class="text-2xl font-black text-[#EFECE6] uppercase tracking-wide">
+        PASS TO P1
+      </div>
+      <button onclick="onCurtainConfirm()" class="w-full py-4 rounded-2xl bg-[#38B449] hover:bg-[#42c754] text-[#2B1D16] font-black text-xl uppercase tracking-wider shadow-lg border-b-4 border-[#237A30] active:translate-y-0.5 transition">
+        GO
+      </button>
+    </div>
+  </section>
+
+  <!-- ==================== SCREEN 3: ACTIVE GAMEPLAY & SVG JUMBLE ==================== -->
+  <section id="gameScreen" class="hidden flex-1 flex flex-col w-full max-w-4xl mx-auto p-1.5 sm:p-3 gap-1.5 sm:gap-2 h-full overflow-hidden">
+    
+    <!-- COMPACT TOP HUD BAR -->
+    <header class="bg-[#314766] border-2 border-[#435E85] rounded-2xl px-2.5 py-1.5 flex items-center justify-between gap-2 shrink-0 shadow-lg">
+      
+      <!-- Left: Lobby Back + Player Score Pill -->
+      <div class="flex items-center gap-1.5">
+        <button onclick="returnToLobby()" class="w-9 h-9 rounded-xl bg-[#24344D] text-[#EFECE6] font-black flex items-center justify-center border border-[#435E85]">
+          ✕
+        </button>
+        <div class="bg-[#24344D] px-2.5 py-1.5 rounded-xl border border-[#435E85] flex items-center gap-1.5">
+          <span id="hudPlayerTag" class="text-xs font-black text-[#E5B363]">P1</span>
+          <span class="text-xs text-[#435E85]">•</span>
+          <span id="hudTurnScore" class="text-base font-black text-[#4BB543]">0</span>
+        </div>
+      </div>
+
+      <!-- Center: Canonical Target Box OR 15s Pick Counter -->
+      <div class="flex-1 flex items-center justify-center min-w-0">
+        <!-- Hunt Target Badge -->
+        <div id="hudHuntBox" class="bg-[#EFECE6] text-[#2A1B15] px-3.5 py-1 rounded-xl border-2 border-[#D69847] min-h-[42px] flex items-center justify-center gap-2 shadow-inner max-w-full overflow-hidden">
+          <div id="hudCanonicalBadge" class="font-black text-xl sm:text-2xl tracking-wider flex items-center justify-center gap-2 truncate">
+            42
+          </div>
+        </div>
+
+        <!-- 15s Opponent Pick Bar -->
+        <div id="hudPickBox" class="hidden bg-[#24344D] border-2 border-[#E5B363] px-3 py-1.5 rounded-xl flex items-center gap-2.5">
+          <span id="hudPickCount" class="text-xs sm:text-sm font-black text-[#E5B363] uppercase">PICK: 0</span>
+          <button onclick="finishTargetSelectionPhase()" class="px-3 py-1 rounded-lg bg-[#4BB543] text-[#2A1B15] font-black text-xs uppercase">
+            DONE
+          </button>
+        </div>
+      </div>
+
+      <!-- Right: Skip + Countdown OR "TIME'S UP!" -->
+      <div class="flex items-center gap-1.5">
+        <button id="skipBtn" onclick="skipCurrentTarget()" class="px-2.5 py-2 rounded-xl bg-[#24344D] text-[#EFECE6] font-extrabold text-xs border border-[#435E85] active:scale-95 transition">
+          SKIP
+        </button>
+
+        <div id="clockBox" class="bg-[#24344D] border border-[#435E85] rounded-xl px-2.5 py-1.5 min-w-[54px] text-center">
+          <span id="clockText" class="text-sm sm:text-base font-mono font-black text-[#E5B363]">30s</span>
+        </div>
+
+        <button id="timesUpBtn" onclick="triggerHumanTimesUp()" class="hidden px-3 py-2 rounded-xl bg-[#C9252D] text-[#EFECE6] font-black text-xs sm:text-sm uppercase tracking-wider shadow border-b-2 border-[#8E161C] active:scale-95 transition">
+          TIME'S UP!
+        </button>
+      </div>
+
+    </header>
+
+    <!-- RESPONSIVE SVG JUMBLE SHEET (Guaranteed 800x1050 Logical Space) -->
+    <div class="flex-1 w-full flex items-center justify-center overflow-hidden relative">
+      <div class="paper-sheet w-full h-full rounded-2xl flex items-center justify-center overflow-hidden relative">
+        <svg id="jumbleSvg" viewBox="0 0 800 1050" preserveAspectRatio="xMidYMid meet" class="w-full h-full block select-none">
+          <defs>
+            <pattern id="svgStripePattern" width="12" height="12" patternTransform="rotate(45 0 0)" patternUnits="userSpaceOnUse">
+              <line x1="0" y1="0" x2="0" y2="12" stroke="#2A1B15" stroke-width="4.5" />
+            </pattern>
+            <pattern id="svgDotPattern" width="18" height="18" patternUnits="userSpaceOnUse">
+              <circle cx="9" cy="9" r="3.8" fill="#2A1B15" />
+            </pattern>
+          </defs>
+          <!-- Jumble items & feedback rings injected directly here -->
+          <g id="jumbleLayer"></g>
+          <g id="feedbackLayer"></g>
+        </svg>
+
+        <!-- 1s Freeze Lock -->
+        <div id="freezeOverlay" class="hidden absolute inset-0 bg-[#C9252D]/40 backdrop-blur-[1px] flex items-center justify-center">
+          <div class="bg-[#24344D] border-2 border-[#C9252D] text-[#EFECE6] font-black text-lg px-5 py-2.5 rounded-2xl uppercase">
+            WAIT 1s
+          </div>
+        </div>
+      </div>
+    </div>
+
+  </section>
+
+  <!-- ==================== SCREEN 4: MINIMAL TURN SUMMARY MODAL ==================== -->
+  <section id="summaryModal" class="hidden fixed inset-0 z-50 bg-[#24344D]/90 backdrop-blur-sm flex items-center justify-center p-4">
+    <div class="max-w-xs w-full bg-[#314766] border-2 border-[#435E85] rounded-3xl p-6 shadow-2xl space-y-5 text-center">
+      
+      <div id="summaryTurnTitle" class="text-xl font-black text-[#E5B363] uppercase">
+        P1: +0
+      </div>
+
+      <div class="grid grid-cols-2 gap-3 bg-[#24344D] p-3.5 rounded-2xl border border-[#435E85]">
+        <div>
+          <div class="text-xs font-extrabold text-[#E5B363]">P1</div>
+          <div id="sumP1Score" class="text-3xl font-black text-[#EFECE6]">0</div>
+        </div>
+        <div>
+          <div class="text-xs font-extrabold text-[#F2C6A0]">P2</div>
+          <div id="sumP2Score" class="text-3xl font-black text-[#EFECE6]">0</div>
+        </div>
+      </div>
+
+      <div class="flex gap-2.5">
+        <button onclick="returnToLobby()" class="w-1/3 py-3.5 rounded-2xl bg-[#24344D] text-[#EFECE6] font-extrabold text-xs uppercase border border-[#435E85]">
+          LOBBY
+        </button>
+        <button onclick="advanceFromSummary()" class="w-2/3 py-3.5 rounded-2xl bg-[#E5B363] text-[#2B1D16] font-black text-sm uppercase shadow-lg border-b-4 border-[#D69847]">
+          NEXT TURN
+        </button>
+      </div>
+
+    </div>
+  </section>
+
+  <!-- ==================== JAVASCRIPT ENGINE ==================== -->
+  <script>
+    /********************************************************************
+     * 1. KID-FRIENDLY POOLS & DATA
+     ********************************************************************/
+    const UNIQUE_BIGRAMS = [
+      "TH", "HE", "AN", "IN", "ER", "ON", "RE", "ED", "ND", "HA",
+      "AT", "EN", "ES", "OF", "NT", "EA", "TI", "TO", "IO", "LE",
+      "IS", "OU", "AR", "AS", "DE", "RT", "VE", "SH", "CH", "QU",
+      "TR", "BR", "CR", "DR", "FR", "GR", "PL", "CL", "BL", "FL",
+      "GL", "SL", "SP", "ST", "SK", "SM", "SN", "SW", "TW", "WH",
+      "WR", "OR", "IT", "AL", "SE", "CO", "ME", "HI", "RO", "NE",
+      "LI", "LL", "BE", "MA", "CA", "EL", "LA", "FO", "HO", "PE",
+      "PR", "NO", "US", "OT", "SO", "UN", "LO", "WA", "EE", "WI",
+      "PO", "WE", "OW", "PA", "AM", "UP", "GO", "DO", "BY", "MY"
+    ];
+
+    const UNIQUE_WORDS = [
+      "CAT", "DOG", "SUN", "HAT", "PIG", "COW", "BEE", "ANT", "FOX", "OWL",
+      "BUG", "BAT", "HEN", "CUB", "PUP", "CAR", "BUS", "VAN", "JET", "SUB",
+      "PIE", "JAM", "EGG", "NUT", "TEA", "CUP", "MUG", "PAN", "POT", "BOX",
+      "BAG", "KEY", "PEN", "MAP", "BED", "RUG", "FAN", "TOY", "TOP", "NET",
+      "SKI", "BOW", "ICE", "SKY", "SEA", "MUD", "LOG", "WEB", "GEM", "RED",
+      "TAN", "ONE", "TWO", "SIX", "TEN", "MOM", "DAD", "BOY", "PAL", "EYE",
+      "EAR", "ARM", "LEG", "TOE", "LIP", "PAW", "FIN", "HOP", "RUN", "FLY",
+      "HUG", "WIN", "ZIP", "POP"
+    ];
+
+    const AMBIGUOUS_NUMBERS = new Set([6, 9, 66, 68, 69, 86, 89, 96, 98, 99]);
+
+    const FONT_STYLES = [
+      { family: "'DM Sans', sans-serif", weight: "800", style: "normal", outline: false },
+      { family: "'Libre Baskerville', serif", weight: "700", style: "normal", outline: false },
+      { family: "'Playfair Display', serif", weight: "800", style: "normal", outline: false },
+      { family: "'Abril Fatface', cursive", weight: "400", style: "normal", outline: false },
+      { family: "'Courier Prime', monospace", weight: "700", style: "normal", outline: false },
+      { family: "'Cinzel', serif", weight: "800", style: "normal", outline: false },
+      { family: "'Fredoka', sans-serif", weight: "700", style: "normal", outline: false },
+      { family: "'Fredoka', sans-serif", weight: "700", style: "normal", outline: true }
+    ];
+
+    // 12 Kid-Friendly Shapes ONLY
+    const BASE_POLYGONS = [
+      { id: "circle", name: "Circle", path: "M50 10 A40 40 0 1 0 50 90 A40 40 0 1 0 50 10 Z" },
+      { id: "square", name: "Square", path: "M15 15 H85 V85 H15 Z" },
+      { id: "triangle", name: "Triangle", path: "M50 10 L90 86 L10 86 Z" },
+      { id: "star", name: "Star", path: "M50 7 L62 35 L93 36 L68 55 L77 86 L50 68 L23 86 L32 55 L7 36 L38 35 Z" },
+      { id: "heart", name: "Heart", path: "M50 88 C50 88 10 62 10 34 C10 17 25 10 38 15 C45 18 50 26 50 26 C50 26 55 18 62 15 C75 10 90 17 90 34 C90 62 50 88 50 88 Z" },
+      { id: "diamond", name: "Diamond", path: "M50 7 L86 50 L50 93 L14 50 Z" },
+      { id: "oval", name: "Oval", path: "M50 22 A42 28 0 1 0 50 78 A42 28 0 1 0 50 22 Z" },
+      { id: "rectangle", name: "Rectangle", path: "M10 25 H90 V75 H10 Z" },
+      { id: "moon", name: "Moon", path: "M66 10 C35 12 14 34 14 52 C14 73 35 90 66 90 C44 80 38 66 38 50 C38 34 44 20 66 10 Z" },
+      { id: "cross", name: "Cross", path: "M35 10 H65 V35 H90 V65 H65 V90 H35 V65 H10 V35 H35 Z" },
+      { id: "arrow", name: "Arrow", path: "M50 8 L90 48 H66 V90 H34 V48 H10 Z" },
+      { id: "cloud", name: "Cloud", path: "M26 76 H76 C86 76 92 68 92 58 C92 49 85 42 77 41 C75 26 62 16 47 16 C33 16 22 25 19 38 C11 40 6 48 6 57 C6 68 15 76 26 76 Z" }
+    ];
+
+    const POLYGON_MODIFIERS = [
+      { id: "outline", label: "Outline" },
+      { id: "solid", label: "Solid" },
+      { id: "dotted", label: "Dotted" },
+      { id: "striped", label: "Striped" },
+      { id: "double", label: "Double" }
+    ];
+
+    // 36 Kid-Friendly Everyday Objects
+    const EVERYDAY_OBJECTS = [
+      { id: "apple", name: "Apple", svg: `<path d="M50 28 C35 24 16 34 16 56 C16 76 32 90 45 90 C48 90 50 88 50 88 C50 88 52 90 55 90 C68 90 84 76 84 56 C84 34 65 24 50 28 Z" fill="#2A1B15"/><path d="M50 28 Q50 14 60 10" stroke="#2A1B15" stroke-width="6.5" stroke-linecap="round" fill="none"/><path d="M52 20 C62 12 74 16 70 24 C64 28 54 24 52 20 Z" fill="#2A1B15"/>` },
+      { id: "banana", name: "Banana", svg: `<path d="M22 20 C16 56 44 86 84 80 C62 70 42 50 34 16 Z" fill="#2A1B15" stroke="#2A1B15" stroke-width="5" stroke-linejoin="round"/><path d="M22 20 L34 14" stroke="#2A1B15" stroke-width="7" stroke-linecap="round"/>` },
+      { id: "cherries", name: "Cherries", svg: `<circle cx="30" cy="70" r="16" fill="#2A1B15"/><circle cx="70" cy="70" r="16" fill="#2A1B15"/><path d="M30 56 Q44 24 56 14 Q66 32 70 56" stroke="#2A1B15" stroke-width="6.5" stroke-linecap="round" stroke-linejoin="round" fill="none"/>` },
+      { id: "pie", name: "Pie Slice", svg: `<path d="M14 72 L86 72 C84 42 64 20 34 16 Z" fill="#2A1B15"/><path d="M32 14 C66 18 88 42 88 74" stroke="#2A1B15" stroke-width="7.5" stroke-linecap="round" fill="none"/><circle cx="52" cy="36" r="8" fill="#EFECE6"/><circle cx="52" cy="36" r="5" fill="#2A1B15"/>` },
+      { id: "icecream", name: "Ice Cream", svg: `<polygon points="30,48 70,48 50,92" fill="#2A1B15"/><circle cx="50" cy="34" r="22" fill="#2A1B15"/><path d="M28 46 H72" stroke="#EFECE6" stroke-width="4" stroke-linecap="round"/>` },
+      { id: "pizza", name: "Pizza Slice", svg: `<polygon points="50,88 16,22 84,22" fill="none" stroke="#2A1B15" stroke-width="7" stroke-linejoin="round"/><path d="M14 20 Q50 10 86 20" stroke="#2A1B15" stroke-width="9" stroke-linecap="round" fill="none"/><circle cx="44" cy="40" r="6" fill="#2A1B15"/><circle cx="58" cy="52" r="6" fill="#2A1B15"/><circle cx="46" cy="64" r="5" fill="#2A1B15"/>` },
+      { id: "cupcake", name: "Cupcake", svg: `<polygon points="24,54 76,54 68,88 32,88" fill="#2A1B15"/><path d="M20 50 C14 50 14 34 26 34 C28 20 44 16 50 22 C56 16 72 20 74 34 C86 34 86 50 80 50 Z" fill="none" stroke="#2A1B15" stroke-width="6.5" stroke-linejoin="round"/><circle cx="50" cy="14" r="6" fill="#2A1B15"/>` },
+      { id: "fish", name: "Fish", svg: `<path d="M10 50 C26 22 60 22 74 50 C60 78 26 78 10 50 Z" fill="#2A1B15"/><polygon points="70,50 92,26 88,50 92,74" fill="#2A1B15"/><circle cx="26" cy="45" r="4.5" fill="#EFECE6"/>` },
+      { id: "butterfly", name: "Butterfly", svg: `<path d="M46 44 C20 12 8 28 16 46 C22 54 36 52 46 52 C24 58 14 78 30 84 C42 88 48 68 48 58 M54 44 C80 12 92 28 84 46 C78 54 64 52 54 52 C76 58 86 78 70 84 C58 88 52 68 52 58" fill="#2A1B15"/><rect x="46" y="26" width="8" height="52" rx="4" fill="#2A1B15"/>` },
+      { id: "bird", name: "Bird", svg: `<path d="M22 56 C22 36 38 24 56 24 C70 24 80 34 80 46 C80 68 58 80 34 78 L12 82 L24 66 C22 62 22 58 22 56 Z" fill="#2A1B15"/><polygon points="80,38 94,44 80,50" fill="#2A1B15"/><circle cx="66" cy="38" r="4" fill="#EFECE6"/>` },
+      { id: "cat", name: "Cat", svg: `<path d="M18 42 L18 14 L38 30 H62 L82 14 L82 42 C86 64 72 86 50 86 C28 86 14 64 18 42 Z" fill="#2A1B15"/><circle cx="36" cy="52" r="5" fill="#EFECE6"/><circle cx="64" cy="52" r="5" fill="#EFECE6"/><polygon points="45,62 55,62 50,69" fill="#EFECE6"/>` },
+      { id: "bone", name: "Dog Bone", svg: `<path d="M26 36 C16 36 12 24 20 18 C28 12 36 20 36 28 L64 28 C64 20 72 12 80 18 C88 24 84 36 74 36 L74 64 C84 64 88 76 80 82 C72 88 64 80 64 72 L36 72 C36 80 28 88 20 82 C12 76 16 64 26 64 Z" fill="#2A1B15"/>` },
+      { id: "duck", name: "Duck", svg: `<path d="M64 38 C76 38 82 24 70 16 C58 10 46 20 48 34 C48 38 50 42 46 44 C30 44 16 40 12 56 C10 74 28 86 52 86 C74 86 84 72 80 56 C78 46 70 42 64 38 Z" fill="#2A1B15"/><polygon points="75,24 92,28 75,34" fill="#2A1B15"/><circle cx="64" cy="24" r="3.5" fill="#EFECE6"/>` },
+      { id: "crown", name: "Crown", svg: `<path d="M12 76 L18 28 L38 52 L50 20 L62 52 L82 28 L88 76 Z" fill="#2A1B15"/><rect x="12" y="80" width="76" height="9" rx="3" fill="#2A1B15"/>` },
+      { id: "key", name: "Key", svg: `<circle cx="28" cy="50" r="18" stroke="#2A1B15" stroke-width="8" fill="none"/><path d="M46 50 H90 M72 50 V68 M84 50 V64" stroke="#2A1B15" stroke-width="8" stroke-linecap="round"/>` },
+      { id: "scissors", name: "Scissors", svg: `<circle cx="24" cy="30" r="12" stroke="#2A1B15" stroke-width="7" fill="none"/><circle cx="24" cy="70" r="12" stroke="#2A1B15" stroke-width="7" fill="none"/><path d="M34 36 L88 76 M34 64 L88 24" stroke="#2A1B15" stroke-width="8" stroke-linecap="round"/>` },
+      { id: "umbrella", name: "Umbrella", svg: `<path d="M10 52 C10 24 30 12 50 12 C70 12 90 24 90 52 Z" fill="#2A1B15"/><path d="M50 50 V80 C50 88 36 88 36 78" stroke="#2A1B15" stroke-width="7.5" stroke-linecap="round" fill="none"/>` },
+      { id: "bell", name: "Bell", svg: `<path d="M50 12 C32 12 22 26 22 48 L12 72 H88 L78 48 C78 26 68 12 50 12 Z" fill="#2A1B15"/><circle cx="50" cy="82" r="9" fill="#2A1B15"/>` },
+      { id: "mug", name: "Mug", svg: `<path d="M18 24 H68 V66 C68 80 58 88 43 88 C28 88 18 80 18 66 Z" fill="#2A1B15"/><path d="M68 32 H78 C86 32 88 40 88 48 C88 56 84 62 76 62 H68" stroke="#2A1B15" stroke-width="8" fill="none"/>` },
+      { id: "house", name: "House", svg: `<polygon points="50,12 10,48 22,48 22,88 78,88 78,48 90,48" fill="#2A1B15"/><rect x="42" y="58" width="16" height="30" rx="2" fill="#EFECE6"/>` },
+      { id: "car", name: "Car", svg: `<path d="M18 52 L28 30 H72 L82 52 H92 V74 H8 V52 Z" fill="#2A1B15"/><circle cx="26" cy="76" r="11" fill="#2A1B15" stroke="#EFECE6" stroke-width="3"/><circle cx="74" cy="76" r="11" fill="#2A1B15" stroke="#EFECE6" stroke-width="3"/>` },
+      { id: "boat", name: "Sailboat", svg: `<polygon points="48,12 48,64 16,64" fill="#2A1B15"/><polygon points="54,22 54,64 82,64" fill="#2A1B15"/><path d="M12 70 H88 L76 86 H24 Z" fill="#2A1B15"/>` },
+      { id: "rocket", name: "Rocket", svg: `<path d="M50 10 C68 28 70 54 66 72 H34 C30 54 32 28 50 10 Z" fill="#2A1B15"/><polygon points="34,54 16,74 34,72" fill="#2A1B15"/><polygon points="66,54 84,74 66,72" fill="#2A1B15"/><circle cx="50" cy="42" r="7" fill="#EFECE6"/>` },
+      { id: "plane", name: "Airplane", svg: `<path d="M50 10 L58 36 L90 50 L90 60 L58 52 L56 76 L70 84 L70 90 L50 85 L30 90 L30 84 L44 76 L42 52 L10 60 L10 50 L42 36 Z" fill="#2A1B15"/>` },
+      { id: "tree", name: "Tree", svg: `<rect x="42" y="64" width="16" height="26" fill="#2A1B15"/><circle cx="50" cy="34" r="22" fill="#2A1B15"/><circle cx="32" cy="52" r="18" fill="#2A1B15"/><circle cx="68" cy="52" r="18" fill="#2A1B15"/>` },
+      { id: "flower", name: "Flower", svg: `<circle cx="50" cy="24" r="14" fill="#2A1B15"/><circle cx="50" cy="76" r="14" fill="#2A1B15"/><circle cx="24" cy="50" r="14" fill="#2A1B15"/><circle cx="76" cy="50" r="14" fill="#2A1B15"/><circle cx="32" cy="32" r="14" fill="#2A1B15"/><circle cx="68" cy="32" r="14" fill="#2A1B15"/><circle cx="32" cy="68" r="14" fill="#2A1B15"/><circle cx="68" cy="68" r="14" fill="#2A1B15"/><circle cx="50" cy="50" r="12" fill="#EFECE6"/>` },
+      { id: "sun", name: "Sun", svg: `<circle cx="50" cy="50" r="22" fill="#2A1B15"/><path d="M50 8 V20 M50 80 V92 M8 50 H20 M80 50 H92 M20 20 L29 29 M71 71 L80 80 M80 20 L71 29 M29 71 L20 80" stroke="#2A1B15" stroke-width="7.5" stroke-linecap="round"/>` },
+      { id: "bolt", name: "Lightning Bolt", svg: `<polygon points="58,8 20,54 48,54 38,92 80,44 52,44" fill="#2A1B15"/>` },
+      { id: "glasses", name: "Glasses", svg: `<circle cx="26" cy="56" r="17" stroke="#2A1B15" stroke-width="7" fill="none"/><circle cx="74" cy="56" r="17" stroke="#2A1B15" stroke-width="7" fill="none"/><path d="M43 52 Q50 45 57 52 M9 52 L18 32 M91 52 L82 32" stroke="#2A1B15" stroke-width="6.5" stroke-linecap="round" fill="none"/>` },
+      { id: "music", name: "Music Note", svg: `<ellipse cx="28" cy="76" rx="14" ry="10" fill="#2A1B15"/><ellipse cx="72" cy="68" rx="14" ry="10" fill="#2A1B15"/><path d="M38 74 V22 L82 14 V66" stroke="#2A1B15" stroke-width="8" fill="none"/><path d="M38 34 L82 26" stroke="#2A1B15" stroke-width="8"/>` },
+      { id: "balloon", name: "Balloon", svg: `<path d="M50 10 C30 10 18 24 18 42 C18 60 36 72 50 74 C64 72 82 60 82 42 C82 24 70 10 50 10 Z" fill="#2A1B15"/><polygon points="50,72 43,80 57,80" fill="#2A1B15"/><path d="M50 80 Q56 88 46 94" stroke="#2A1B15" stroke-width="5" stroke-linecap="round" fill="none"/>` },
+      { id: "gift", name: "Gift Box", svg: `<rect x="18" y="42" width="64" height="46" rx="4" fill="#2A1B15"/><rect x="14" y="28" width="72" height="14" rx="3" fill="#2A1B15"/><rect x="44" y="28" width="12" height="60" fill="#EFECE6"/><path d="M50 28 C34 12 24 22 36 28 M50 28 C66 12 76 22 64 28" stroke="#2A1B15" stroke-width="6.5" stroke-linecap="round" fill="none"/>` },
+      { id: "pencil", name: "Pencil", svg: `<polygon points="16,84 26,60 68,18 82,32 40,74" fill="#2A1B15"/><polygon points="14,86 28,80 20,72" fill="#EFECE6"/><polygon points="14,86 22,83 17,78" fill="#2A1B15"/>` },
+      { id: "book", name: "Book", svg: `<path d="M12 22 C28 18 44 22 50 28 C56 22 72 18 88 22 V78 C72 74 56 78 50 84 C44 78 28 74 12 78 Z" fill="none" stroke="#2A1B15" stroke-width="7.5" stroke-linejoin="round"/><line x1="50" y1="28" x2="50" y2="84" stroke="#2A1B15" stroke-width="7"/>` },
+      { id: "boot", name: "Boot", svg: `<path d="M28 14 H58 V56 L84 66 C90 68 90 84 82 84 H24 V14 Z" fill="#2A1B15"/>` },
+      { id: "clock", name: "Clock", svg: `<circle cx="50" cy="50" r="38" stroke="#2A1B15" stroke-width="7.5" fill="none"/><path d="M50 26 V50 L68 58" stroke="#2A1B15" stroke-width="7.5" stroke-linecap="round" stroke-linejoin="round" fill="none"/>` }
+    ];
+
+    /********************************************************************
+     * 2. WEB AUDIO SYNTH
+     ********************************************************************/
+    let audioCtx = null;
+    function playTone(type) {
+      try {
+        const AudioContextClass = window.AudioContext || window.webkitAudioContext;
+        if (!audioCtx && AudioContextClass) audioCtx = new AudioContextClass();
+        if (!audioCtx) return;
+        if (audioCtx.state === "suspended") audioCtx.resume();
+        const now = audioCtx.currentTime;
+        const osc = audioCtx.createOscillator();
+        const gain = audioCtx.createGain();
+        osc.connect(gain);
+        gain.connect(audioCtx.destination);
+
+        if (type === "find") {
+          osc.type = "triangle";
+          osc.frequency.setValueAtTime(523.25, now);
+          osc.frequency.setValueAtTime(783.99, now + 0.06);
+          gain.gain.setValueAtTime(0.18, now);
+          gain.gain.exponentialRampToValueAtTime(0.001, now + 0.25);
+          osc.start(now);
+          osc.stop(now + 0.25);
+        } else if (type === "wrong") {
+          osc.type = "sawtooth";
+          osc.frequency.setValueAtTime(150, now);
+          osc.frequency.linearRampToValueAtTime(110, now + 0.12);
+          gain.gain.setValueAtTime(0.12, now);
+          gain.gain.exponentialRampToValueAtTime(0.001, now + 0.13);
+          osc.start(now);
+          osc.stop(now + 0.13);
+        } else if (type === "queue") {
+          osc.type = "sine";
+          osc.frequency.setValueAtTime(660, now);
+          gain.gain.setValueAtTime(0.12, now);
+          gain.gain.exponentialRampToValueAtTime(0.001, now + 0.09);
+          osc.start(now);
+          osc.stop(now + 0.09);
+        } else if (type === "timesup") {
+          osc.type = "square";
+          osc.frequency.setValueAtTime(440, now);
+          osc.frequency.setValueAtTime(280, now + 0.15);
+          gain.gain.setValueAtTime(0.15, now);
+          gain.gain.exponentialRampToValueAtTime(0.001, now + 0.45);
+          osc.start(now);
+          osc.stop(now + 0.45);
+        }
+      } catch (e) {}
+    }
+
+    /********************************************************************
+     * 3. STATE & LOBBY CONTROLS
+     ********************************************************************/
+    const DENSITY_MAP = { easy: 32, medium: 48, hard: 120 };
+
+    const state = {
+      p1TotalScore: 0,
+      p2TotalScore: 0,
+      activeHunter: 1, // 1 or 2
+      phase: "lobby",
+      nextCurtainAction: null,
+
+      categories: {
+        numbers: true,
+        bigrams: true,
+        words: true,
+        polygons: true,
+        icons: true
+      },
+      mode: "auto",       // 'auto' | 'junebug'
+      densityKey: "hard", // 'easy' (32) | 'medium' (48) | 'hard' (64)
+
+      boardItems: [],
+      customTargetQueue: [],
+      usedTargetIds: new Set(),
+      currentTarget: null,
+      turnScore: 0,
+
+      timerInterval: null,
+      timeRemainingMs: 20000,
+      wrongTapStreak: 0,
+      isFrozen: false,
+      moving: false
+    };
+
+    function syncLobbyUI() {
+      // Category Pills
+      document.querySelectorAll(".cat-pill").forEach(btn => {
+        const key = btn.dataset.cat;
+        const active = state.categories[key];
+        if (active) {
+          btn.className = "cat-pill py-2.5 px-3 rounded-xl font-extrabold text-xs sm:text-sm border-2 transition flex items-center justify-center gap-1.5 bg-[#E5B363] text-[#2B1D16] border-[#D69847] shadow";
+          if (key === "icons") btn.classList.add("col-span-2", "sm:col-span-2");
+        } else {
+          btn.className = "cat-pill py-2.5 px-3 rounded-xl font-extrabold text-xs sm:text-sm border-2 transition flex items-center justify-center gap-1.5 bg-[#24344D] text-[#EFECE6]/70 border-[#435E85]";
+          if (key === "icons") btn.classList.add("col-span-2", "sm:col-span-2");
+        }
+      });
+
+      // Mode Toggle
+      const autoBtn = document.getElementById("modeAutoBtn");
+      const humanBtn = document.getElementById("modeHumanBtn");
+      if (state.mode === "auto") {
+        autoBtn.className = "py-2.5 rounded-xl font-extrabold text-xs sm:text-sm transition bg-[#E5B363] text-[#2B1D16] shadow";
+        humanBtn.className = "py-2.5 rounded-xl font-extrabold text-xs sm:text-sm transition text-[#EFECE6]/70";
+      } else {
+        humanBtn.className = "py-2.5 rounded-xl font-extrabold text-xs sm:text-sm transition bg-[#E5B363] text-[#2B1D16] shadow";
+        autoBtn.className = "py-2.5 rounded-xl font-extrabold text-xs sm:text-sm transition text-[#EFECE6]/70";
+      }
+
+      // Density Toggle
+      const dMap = {
+        easy: document.getElementById("densEasyBtn"),
+        medium: document.getElementById("densMedBtn"),
+        hard: document.getElementById("densHardBtn")
+      };
+      Object.keys(dMap).forEach(k => {
+        if (k === state.densityKey) {
+          dMap[k].className = "py-2 rounded-xl font-extrabold text-xs sm:text-sm transition bg-[#E5B363] text-[#2B1D16] shadow";
+        } else {
+          dMap[k].className = "py-2 rounded-xl font-extrabold text-xs sm:text-sm transition text-[#EFECE6]/70";
+        }
+      });
+
+      // Scores
+      document.getElementById("lobbyP1Score").textContent = state.p1TotalScore;
+      document.getElementById("lobbyP2Score").textContent = state.p2TotalScore;
+
+      // Moving Toggle
+      const moveOff = document.getElementById("moveOffBtn");
+      const moveOn = document.getElementById("moveOnBtn");
+      if (state.moving) {
+        moveOn.className = "py-2 rounded-xl font-extrabold text-xs sm:text-sm transition bg-[#E5B363] text-[#2B1D16] shadow";
+        moveOff.className = "py-2 rounded-xl font-extrabold text-xs sm:text-sm transition text-[#EFECE6]/70";
+      } else {
+        moveOff.className = "py-2 rounded-xl font-extrabold text-xs sm:text-sm transition bg-[#E5B363] text-[#2B1D16] shadow";
+        moveOn.className = "py-2 rounded-xl font-extrabold text-xs sm:text-sm transition text-[#EFECE6]/70";
+      }
+    }
+
+    function toggleCat(key) {
+      const activeCount = Object.values(state.categories).filter(Boolean).length;
+      if (state.categories[key] && activeCount <= 1) return; // Keep at least 1 active
+      state.categories[key] = !state.categories[key];
+      syncLobbyUI();
+    }
+
+    function setGameMode(m) {
+      state.mode = m;
+      syncLobbyUI();
+    }
+
+    function setDensity(d) {
+      state.densityKey = d;
+      syncLobbyUI();
+    }
+
+    function setMoving(m) {
+      state.moving = m;
+      syncLobbyUI();
+    }
+
+    function resetMatchScores() {
+      state.p1TotalScore = 0;
+      state.p2TotalScore = 0;
+      state.activeHunter = 1;
+      syncLobbyUI();
+    }
+
+    /********************************************************************
+     * 4. GUARANTEED 800x1000 SVG JUMBLE GENERATOR
+     ********************************************************************/
+    function shuffleArray(arr) {
+      const a = [...arr];
+      for (let i = a.length - 1; i > 0; i--) {
+        const j = Math.floor(Math.random() * (i + 1));
+        [a[i], a[j]] = [a[j], a[i]];
+      }
+      return a;
+    }
+
+    function buildCandidatePool(targetCount) {
+      const pools = [];
+
+      if (state.categories.numbers) {
+        const list = [];
+        for (let n = 1; n <= 99; n++) {
+          list.push({
+            uid: `num_${n}`,
+            category: "number",
+            canonicalText: String(n),
+            boardText: String(n),
+            underline: AMBIGUOUS_NUMBERS.has(n)
+          });
+        }
+        pools.push(shuffleArray(list));
+      }
+
+      if (state.categories.bigrams) {
+        const list = UNIQUE_BIGRAMS.map(bg => {
+          const r = Math.random();
+          const txt = r < 0.35 ? bg.toLowerCase() : (r < 0.7 ? bg[0] + bg[1].toLowerCase() : bg);
+          return {
+            uid: `bi_${bg}`,
+            category: "bigram",
+            canonicalText: bg,
+            boardText: txt,
+            underline: true
+          };
+        });
+        pools.push(shuffleArray(list));
+      }
+
+      if (state.categories.words) {
+        const list = UNIQUE_WORDS.map(w => {
+          const r = Math.random();
+          const txt = r < 0.35 ? w.toLowerCase() : (r < 0.7 ? w[0] + w.slice(1).toLowerCase() : w);
+          return {
+            uid: `word_${w}`,
+            category: "word",
+            canonicalText: w,
+            boardText: txt,
+            underline: true
+          };
+        });
+        pools.push(shuffleArray(list));
+      }
+
+      if (state.categories.polygons) {
+        const list = [];
+        for (const base of BASE_POLYGONS) {
+          for (const mod of POLYGON_MODIFIERS) {
+            list.push({
+              uid: `poly_${base.id}_${mod.id}`,
+              category: "polygon",
+              canonicalText: `${mod.label} ${base.name}`,
+              baseShape: base,
+              modifier: mod
+            });
+          }
+        }
+        pools.push(shuffleArray(list));
+      }
+
+      if (state.categories.icons) {
+        const list = EVERYDAY_OBJECTS.map(ic => ({
+          uid: `icon_${ic.id}`,
+          category: "icon",
+          canonicalText: ic.name,
+          iconData: ic
+        }));
+        pools.push(shuffleArray(list));
+      }
+
+      const selected = [];
+      let idx = 0;
+      while (selected.length < targetCount) {
+        let added = false;
+        for (const p of pools) {
+          if (idx < p.length && selected.length < targetCount) {
+            selected.push(p[idx]);
+            added = true;
+          }
+        }
+        if (!added) break;
+        idx++;
+      }
+
+      return shuffleArray(selected);
+    }
+
+    function getPolygonInnerMarkup(baseShape, modifier) {
+      const strokeW = 7.5;
+      let fill = "none";
+      if (modifier.id === "solid") fill = "#2A1B15";
+      else if (modifier.id === "striped") fill = "url(#svgStripePattern)";
+      else if (modifier.id === "dotted") fill = "url(#svgDotPattern)";
+
+      let extra = "";
+      if (modifier.id === "double") {
+        extra = `<path d="${baseShape.path}" transform="translate(50,50) scale(0.56) translate(-50,-50)" fill="none" stroke="#2A1B15" stroke-width="8.5" stroke-linejoin="round" stroke-linecap="round"/>`;
+      }
+
+      return `<path d="${baseShape.path}" fill="${fill}" stroke="#2A1B15" stroke-width="${strokeW}" stroke-linejoin="round" stroke-linecap="round"/>${extra}`;
+    }
+
+    /**
+     * Builds the visual artwork <g> for an item at origin (0,0) with its rotation & scale.
+     */
+    function buildVisualItemGroup(item, sizeOverride) {
+      const ns = "http://www.w3.org/2000/svg";
+      const sz = sizeOverride || item.size;
+      const g = document.createElementNS(ns, "g");
+      g.setAttribute("transform", `rotate(${item.rot}) scale(${item.sx}, ${item.sy})`);
+
+      if (item.category === "number" || item.category === "bigram" || item.category === "word") {
+        const textEl = document.createElementNS(ns, "text");
+        textEl.setAttribute("x", "0");
+        textEl.setAttribute("y", "0");
+        textEl.setAttribute("text-anchor", "middle");
+        textEl.setAttribute("dominant-baseline", "central");
+        textEl.setAttribute("font-family", item.fontSpec.family);
+        textEl.setAttribute("font-weight", item.fontSpec.weight);
+        textEl.setAttribute("font-style", item.fontSpec.style);
+        textEl.setAttribute("font-size", String(sz));
+
+        if (item.fontSpec.outline) {
+          textEl.setAttribute("fill", "#EFECE6");
+          textEl.setAttribute("stroke", "#2A1B15");
+          textEl.setAttribute("stroke-width", "3");
+        } else {
+          textEl.setAttribute("fill", "#2A1B15");
+        }
+
+        textEl.textContent = item.boardText;
+        g.appendChild(textEl);
+
+        if (item.underline) {
+          const line = document.createElementNS(ns, "line");
+          const halfW = sz * 0.44;
+          const yOff = sz * 0.50;
+          line.setAttribute("x1", String(-halfW));
+          line.setAttribute("y1", String(yOff));
+          line.setAttribute("x2", String(halfW));
+          line.setAttribute("y2", String(yOff));
+          line.setAttribute("stroke", "#2A1B15");
+          line.setAttribute("stroke-width", "4");
+          line.setAttribute("stroke-linecap", "round");
+          g.appendChild(line);
+        }
+      } else if (item.category === "polygon") {
+        const innerG = document.createElementNS(ns, "g");
+        const s = sz / 100;
+        innerG.setAttribute("transform", `scale(${s}) translate(-50, -50)`);
+        innerG.innerHTML = getPolygonInnerMarkup(item.baseShape, item.modifier);
+        g.appendChild(innerG);
+      } else if (item.category === "icon") {
+        const innerG = document.createElementNS(ns, "g");
+        const s = sz / 100;
+        innerG.setAttribute("transform", `scale(${s}) translate(-50, -50)`);
+        innerG.innerHTML = item.iconData.svg;
+        g.appendChild(innerG);
+      }
+
+      return g;
+    }
+
+    /**
+     * Measures the exact rotated Axis-Aligned Bounding Box (AABB) of an item in SVG units
+     * by temporarily mounting it inside #jumbleLayer and combining live getBBox() with analytical bounds.
+     */
+    function measureRotatedItemBounds(item, curSize, layer) {
+      const ns = "http://www.w3.org/2000/svg";
+      const wrapper = document.createElementNS(ns, "g");
+      const visualG = buildVisualItemGroup(item, curSize);
+      wrapper.appendChild(visualG);
+      layer.appendChild(wrapper);
+
+      let bx = 0, by = 0, bw = 0, bh = 0;
+      try {
+        const b = wrapper.getBBox();
+        bx = b.x;
+        by = b.y;
+        bw = b.width;
+        bh = b.height;
+      } catch (e) {}
+      wrapper.remove();
+
+      // Analytical fallback / floor so webfont load timing never under-estimates text width
+      let charW = 1.05;
+      if (item.category === "number") charW = item.boardText.length === 1 ? 0.82 : 1.38;
+      else if (item.category === "bigram") charW = 1.55;
+      else if (item.category === "word") charW = 2.25;
+
+      const rawW = curSize * charW * item.sx;
+      const rawH = curSize * 1.02 * item.sy;
+      const rad = (item.rot * Math.PI) / 180;
+      const cos = Math.abs(Math.cos(rad));
+      const sin = Math.abs(Math.sin(rad));
+      const estW = rawW * cos + rawH * sin;
+      const estH = rawW * sin + rawH * cos;
+
+      const finalW = Math.max(bw, estW);
+      const finalH = Math.max(bh, estH);
+
+      return {
+        halfW: finalW / 2,
+        halfH: finalH / 2
+      };
+    }
+
+    /**
+     * Generates and renders all jumble items inside the fixed 800x1050 SVG coordinate space.
+     * Enforces phone-readable minimums (40 text / 46 shapes & objects) and strict 0% overlap.
+     */
+    function generateAndRenderSvgJumble() {
+      const W = 800;
+      const H = 1050;
+      const targetCount = DENSITY_MAP[state.densityKey] || 64;
+      const candidates = buildCandidatePool(targetCount);
+      const count = candidates.length;
+
+      const layer = document.getElementById("jumbleLayer");
+      const fbLayer = document.getElementById("feedbackLayer");
+      layer.innerHTML = "";
+      fbLayer.innerHTML = "";
+
+      // Phone-readable size distribution (Easy gets slightly larger max sizes)
+      const bonus = count <= 34 ? 8 : (count <= 50 ? 4 : 0);
+
+      const rawItems = candidates.map((item, idx) => {
+        const isGraphic = item.category === "polygon" || item.category === "icon";
+        const minAllowed = isGraphic ? 36 : 32;
+        const maxAllowed = isGraphic ? 64 : 60;
+
+        const ratio = idx / count;
+        let baseSize;
+        if (ratio < 0.16) {
+          baseSize = (isGraphic ? 66 : 58) + Math.random() * 14 + bonus;
+        } else if (ratio < 0.55) {
+          baseSize = (isGraphic ? 54 : 46) + Math.random() * 10 + bonus * 0.5;
+        } else {
+          baseSize = minAllowed + Math.random() * 8;
+        }
+
+        const clampedSize = Math.min(maxAllowed, Math.max(minAllowed, Math.round(baseSize)));
+
+        const velocity = state.moving ? { vx: (Math.random() - 0.5) * 0.8, vy: (Math.random() - 0.5) * 0.8 } : {};
+
+        return {
+          ...item,
+          size: clampedSize,
+          ...velocity,
+          minSize: minAllowed,
+          fontSpec: FONT_STYLES[Math.floor(Math.random() * FONT_STYLES.length)],
+          rot: Math.floor(Math.random() * 360),
+          sx: +(0.94 + Math.random() * 0.14).toFixed(2),
+          sy: +(0.94 + Math.random() * 0.14).toFixed(2)
+        };
+      });
+
+      // Place largest items first
+      rawItems.sort((a, b) => b.size - a.size);
+
+      const placedBoxes = [];
+      const placedItems = [];
+      const outerMargin = 24;
+      const safetyPad = 8; // 8 SVG units padding on all sides between items
+
+      for (const item of rawItems) {
+        let curSize = item.size;
+        let placed = false;
+
+        while (curSize >= item.minSize && !placed) {
+          const { halfW, halfH } = measureRotatedItemBounds(item, curSize, layer);
+          const rx = halfW + safetyPad;
+          const ry = halfH + safetyPad;
+
+          const minX = outerMargin + halfW;
+          const maxX = W - outerMargin - halfW;
+          const minY = outerMargin + halfH;
+          const maxY = H - outerMargin - halfH;
+
+          if (minX < maxX && minY < maxY) {
+            for (let attempt = 0; attempt < 260; attempt++) {
+              const cx = minX + Math.random() * (maxX - minX);
+              const cy = minY + Math.random() * (maxY - minY);
+
+              let hit = false;
+              for (let i = 0; i < placedBoxes.length; i++) {
+                const b = placedBoxes[i];
+                if (Math.abs(cx - b.cx) < (rx + b.halfW) && Math.abs(cy - b.cy) < (ry + b.halfH)) {
+                  hit = true;
+                  break;
+                }
+              }
+
+              if (!hit) {
+                item.size = Math.round(curSize);
+                item.cx = Math.round(cx);
+                item.cy = Math.round(cy);
+                item.hitR = Math.max(28, Math.round(Math.max(halfW, halfH) + 6));
+                placedBoxes.push({ cx, cy, halfW, halfH });
+                placedItems.push(item);
+                placed = true;
+                break;
+              }
+            }
+          }
+
+          if (!placed) {
+            if (curSize === item.minSize) break;
+            curSize = Math.max(item.minSize, curSize - 4);
+          }
+        }
+        // Strictly skip item if no collision-free spot exists at minimum phone-readable size
+      }
+
+      state.boardItems = placedItems;
+      renderSvgItemsToDOM();
+    }
+
+    function renderSvgItemsToDOM() {
+      const layer = document.getElementById("jumbleLayer");
+      const fbLayer = document.getElementById("feedbackLayer");
+      layer.innerHTML = "";
+      fbLayer.innerHTML = "";
+
+      const ns = "http://www.w3.org/2000/svg";
+
+      state.boardItems.forEach(item => {
+        const g = document.createElementNS(ns, "g");
+        g.setAttribute("class", "svg-item");
+        g.setAttribute("transform", `translate(${item.cx}, ${item.cy})`);
+        item.el = g;
+
+        // Invisible generous hit target circle
+        const hitCircle = document.createElementNS(ns, "circle");
+        hitCircle.setAttribute("cx", "0");
+        hitCircle.setAttribute("cy", "0");
+        hitCircle.setAttribute("r", String(item.hitR));
+        hitCircle.setAttribute("fill", "transparent");
+        g.appendChild(hitCircle);
+
+        const visualG = buildVisualItemGroup(item, item.size);
+        g.appendChild(visualG);
+
+        // Queue Selection Badge (for 15s Junebug Mode Opponent Pick)
+        const badgeG = document.createElementNS(ns, "g");
+        badgeG.setAttribute("id", `qbadge_${item.uid}`);
+        badgeG.setAttribute("class", "hidden");
+        badgeG.innerHTML = `
+          <circle cx="0" cy="0" r="24" fill="#C9252D" stroke="#EFECE6" stroke-width="3.5"/>
+          <text id="qtext_${item.uid}" x="0" y="1" text-anchor="middle" dominant-baseline="central" fill="#EFECE6" font-weight="900" font-size="22">1</text>
+        `;
+        g.appendChild(badgeG);
+
+        g.addEventListener("pointerdown", (e) => {
+          e.stopPropagation();
+          onItemTapped(item, g);
+        });
+
+        layer.appendChild(g);
+      });
+    }
+
+    /********************************************************************
+     * 5. GAME FLOW (DIRECT JUMBLE START IN AUTO, 15s PICK IN JUNEBUG)
+     ********************************************************************/
+    function startMatchFromLobby() {
+      document.getElementById("lobbyScreen").classList.add("hidden");
+      document.getElementById("summaryModal").classList.add("hidden");
+      document.getElementById("curtainScreen").classList.add("hidden");
+      document.getElementById("gameScreen").classList.remove("hidden");
+
+      startTurnForActiveHunter(true);
+    }
+
+    function startTurnForActiveHunter(isImmediateFromLobby) {
+      clearActiveTimer();
+      state.customTargetQueue = [];
+      state.usedTargetIds = new Set();
+      state.turnScore = 0;
+      state.wrongTapStreak = 0;
+      state.isFrozen = false;
+
+      // Always generate a fresh jumble immediately
+      generateAndRenderSvgJumble();
+
+      if (state.mode === "junebug") {
+        // Opponent picks targets on the visible jumble for 15 seconds
+        beginOpponentPickPhase();
+      } else {
+        // Auto Mode: if starting straight from Lobby, jump right into hunting so jumble is immediately playable
+        if (isImmediateFromLobby) {
+          beginHuntingPhase();
+        } else {
+          showCurtain(`PASS TO P${state.activeHunter}`, () => beginHuntingPhase());
+        }
+      }
+    }
+
+    function showCurtain(titleText, callback) {
+      clearActiveTimer();
+      state.phase = "curtain";
+      state.nextCurtainAction = callback;
+      document.getElementById("curtainTitle").textContent = titleText;
+      document.getElementById("curtainScreen").classList.remove("hidden");
+    }
+
+    function onCurtainConfirm() {
+      document.getElementById("curtainScreen").classList.add("hidden");
+      if (state.nextCurtainAction) state.nextCurtainAction();
+    }
+
+    function beginOpponentPickPhase() {
+      state.phase = "selecting";
+      state.customTargetQueue = [];
+
+      const pickerNum = state.activeHunter === 1 ? 2 : 1;
+      document.getElementById("hudPlayerTag").textContent = `P${pickerNum} PICK`;
+      document.getElementById("hudTurnScore").textContent = "15s";
+
+      document.getElementById("hudHuntBox").classList.add("hidden");
+      document.getElementById("hudPickBox").classList.remove("hidden");
+      document.getElementById("hudPickCount").textContent = "PICK: 0";
+
+      document.getElementById("skipBtn").classList.add("hidden");
+      document.getElementById("timesUpBtn").classList.add("hidden");
+      document.getElementById("clockBox").classList.remove("hidden");
+
+      state.timeRemainingMs = 15000;
+      const startTs = performance.now();
+      updateClockText(15000);
+
+      state.timerInterval = setInterval(() => {
+        const rem = Math.max(0, 15000 - (performance.now() - startTs));
+        state.timeRemainingMs = rem;
+        updateClockText(rem);
+        if (rem <= 0) finishTargetSelectionPhase();
+      }, 80);
+    }
+
+    function finishTargetSelectionPhase() {
+      clearActiveTimer();
+      // Hide selection badges before handing phone to hunter
+      state.boardItems.forEach(it => {
+        const b = document.getElementById(`qbadge_${it.uid}`);
+        if (b) b.classList.add("hidden");
+      });
+
+      showCurtain(`PASS TO P${state.activeHunter}`, () => beginHuntingPhase());
+    }
+
+    function beginHuntingPhase() {
+      state.phase = "hunting";
+      state.turnScore = 0;
+
+      document.getElementById("hudPlayerTag").textContent = `P${state.activeHunter}`;
+      document.getElementById("hudTurnScore").textContent = "0";
+
+      document.getElementById("hudPickBox").classList.add("hidden");
+      document.getElementById("hudHuntBox").classList.remove("hidden");
+      document.getElementById("skipBtn").classList.remove("hidden");
+
+      if (state.mode === "junebug") {
+        document.getElementById("clockBox").classList.add("hidden");
+        document.getElementById("timesUpBtn").classList.remove("hidden");
+      } else {
+        document.getElementById("timesUpBtn").classList.add("hidden");
+        document.getElementById("clockBox").classList.remove("hidden");
+      }
+
+      advanceToNextTarget();
+
+      clearActiveTimer();
+      startMoving();
+      if (state.mode === "auto") {
+        const startTs = performance.now();
+        state.timeRemainingMs = 30000;
+        updateClockText(30000);
+        state.timerInterval = setInterval(() => {
+          const rem = Math.max(0, 30000 - (performance.now() - startTs));
+          state.timeRemainingMs = rem;
+          updateClockText(rem);
+          if (rem <= 0) endHuntingTurn();
+        }, 80);
+      }
+    }
+
+    function updateClockText(ms) {
+      const s = Math.ceil(ms / 1000);
+      const el = document.getElementById("clockText");
+      el.textContent = `${s}s`;
+      el.style.color = ms <= 5000 ? "#C9252D" : "#E5B363";
+    }
+
+    function advanceToNextTarget() {
+      let nextItem = null;
+
+      while (state.customTargetQueue.length > 0) {
+        const uid = state.customTargetQueue.shift();
+        if (!state.usedTargetIds.has(uid)) {
+          nextItem = state.boardItems.find(it => it.uid === uid);
+          if (nextItem) break;
+        }
+      }
+
+      if (!nextItem) {
+        const pool = state.boardItems.filter(it => !state.usedTargetIds.has(it.uid));
+        if (pool.length === 0) {
+          state.usedTargetIds.clear();
+          nextItem = state.boardItems[Math.floor(Math.random() * state.boardItems.length)];
+        } else {
+          nextItem = pool[Math.floor(Math.random() * pool.length)];
+        }
+      }
+
+      state.currentTarget = nextItem;
+      state.usedTargetIds.add(nextItem.uid);
+      renderCanonicalHUD(nextItem);
+    }
+
+    function renderCanonicalHUD(item) {
+      const badge = document.getElementById("hudCanonicalBadge");
+
+      if (item.category === "number" || item.category === "bigram" || item.category === "word") {
+        badge.innerHTML = `<span class="text-xl sm:text-2xl font-black tracking-wider">${item.canonicalText}</span>`;
+      } else if (item.category === "polygon") {
+        badge.innerHTML = `
+          <svg width="32" height="32" viewBox="0 0 100 100" class="shrink-0">
+            ${getPolygonInnerMarkup(item.baseShape, item.modifier)}
+          </svg>
+          <span class="text-sm sm:text-base font-black uppercase tracking-wide">${item.canonicalText}</span>
+        `;
+      } else if (item.category === "icon") {
+        badge.innerHTML = `
+          <svg width="32" height="32" viewBox="0 0 100 100" class="shrink-0">
+            ${item.iconData.svg}
+          </svg>
+          <span class="text-sm sm:text-base font-black uppercase tracking-wide">${item.canonicalText}</span>
+        `;
+      }
+    }
+
+    /********************************************************************
+     * 6. TAP INTERACTION & END OF TURN
+     ********************************************************************/
+    function onItemTapped(item, gEl) {
+      if (state.phase === "selecting") {
+        const idx = state.customTargetQueue.indexOf(item.uid);
+        if (idx !== -1) {
+          state.customTargetQueue.splice(idx, 1);
+        } else {
+          state.customTargetQueue.push(item.uid);
+          playTone("queue");
+        }
+        refreshPickBadges();
+        document.getElementById("hudPickCount").textContent = `PICK: ${state.customTargetQueue.length}`;
+        return;
+      }
+
+      if (state.phase !== "hunting" || state.isFrozen || !state.currentTarget) return;
+
+      if (item.uid === state.currentTarget.uid) {
+        playTone("find");
+        state.turnScore++;
+        state.wrongTapStreak = 0;
+        document.getElementById("hudTurnScore").textContent = String(state.turnScore);
+        spawnSvgRing(item.cx, item.cy, "#38B449", 450);
+        advanceToNextTarget();
+      } else {
+        playTone("wrong");
+        state.wrongTapStreak++;
+        spawnSvgRing(item.cx, item.cy, "#C9252D", 300);
+
+        if (state.wrongTapStreak >= 3) {
+          state.isFrozen = true;
+          state.wrongTapStreak = 0;
+          const fz = document.getElementById("freezeOverlay");
+          fz.classList.remove("hidden");
+          setTimeout(() => {
+            state.isFrozen = false;
+            fz.classList.add("hidden");
+          }, 1000);
+        }
+      }
+    }
+
+    function refreshPickBadges() {
+      state.boardItems.forEach(item => {
+        const b = document.getElementById(`qbadge_${item.uid}`);
+        const t = document.getElementById(`qtext_${item.uid}`);
+        if (!b || !t) return;
+        const idx = state.customTargetQueue.indexOf(item.uid);
+        if (idx === -1) {
+          b.classList.add("hidden");
+        } else {
+          t.textContent = String(idx + 1);
+          b.classList.remove("hidden");
+        }
+      });
+    }
+
+    function spawnSvgRing(cx, cy, color, durationMs) {
+      const fb = document.getElementById("feedbackLayer");
+      const c = document.createElementNS("http://www.w3.org/2000/svg", "circle");
+      c.setAttribute("cx", String(cx));
+      c.setAttribute("cy", String(cy));
+      c.setAttribute("r", "34");
+      c.setAttribute("fill", "none");
+      c.setAttribute("stroke", color);
+      c.setAttribute("stroke-width", "7");
+      c.setAttribute("class", "beacon-circle");
+      fb.appendChild(c);
+      if (durationMs) setTimeout(() => c.remove(), durationMs);
+      return c;
+    }
+
+    function skipCurrentTarget() {
+      if (state.phase !== "hunting" || state.isFrozen) return;
+      if (state.currentTarget) {
+        spawnSvgRing(state.currentTarget.cx, state.currentTarget.cy, "#E5B363", 600);
+      }
+      advanceToNextTarget();
+    }
+
+    function triggerHumanTimesUp() {
+      if (state.phase !== "hunting") return;
+      endHuntingTurn();
+    }
+
+    function endHuntingTurn() {
+      clearActiveTimer();
+      state.phase = "reveal";
+      playTone("timesup");
+
+      if (state.activeHunter === 1) {
+        state.p1TotalScore += state.turnScore;
+      } else {
+        state.p2TotalScore += state.turnScore;
+      }
+
+      if (state.currentTarget) {
+        spawnSvgRing(state.currentTarget.cx, state.currentTarget.cy, "#C9252D", 1400);
+      }
+
+      setTimeout(() => {
+        showSummaryModal();
+      }, 1200);
+    }
+
+    function showSummaryModal() {
+      state.phase = "summary";
+      document.getElementById("summaryTurnTitle").textContent = `P${state.activeHunter}: +${state.turnScore}`;
+      document.getElementById("sumP1Score").textContent = String(state.p1TotalScore);
+      document.getElementById("sumP2Score").textContent = String(state.p2TotalScore);
+      document.getElementById("summaryModal").classList.remove("hidden");
+    }
+
+    function advanceFromSummary() {
+      document.getElementById("summaryModal").classList.add("hidden");
+      state.activeHunter = state.activeHunter === 1 ? 2 : 1;
+      startTurnForActiveHunter(false);
+    }
+
+    function returnToLobby() {
+      clearActiveTimer();
+      state.phase = "lobby";
+      document.getElementById("gameScreen").classList.add("hidden");
+      document.getElementById("summaryModal").classList.add("hidden");
+      document.getElementById("curtainScreen").classList.add("hidden");
+      document.getElementById("lobbyScreen").classList.remove("hidden");
+      syncLobbyUI();
+    }
+
+    function clearActiveTimer() {
+      if (state.timerInterval) {
+        clearInterval(state.timerInterval);
+        state.timerInterval = null;
+      }
+      stopMoving();
+    }
+
+    let moveRaf = null;
+    function startMoving() {
+      if (moveRaf || !state.moving) return;
+      const W = 800;
+      const H = 1050;
+      const step = () => {
+        if (!state.moving || state.phase !== "hunting") {
+          moveRaf = null;
+          return;
+        }
+        state.boardItems.forEach(item => {
+          if (item.vx == null && item.vy == null) return;
+          item.cx += item.vx;
+          item.cy += item.vy;
+          const r = (item.hitR || 30) + 4;
+          if (item.cx - r < 24) { item.cx = 24 + r; item.vx *= -1; }
+          if (item.cx + r > W - 24) { item.cx = W - 24 - r; item.vx *= -1; }
+          if (item.cy - r < 24) { item.cy = 24 + r; item.vy *= -1; }
+          if (item.cy + r > H - 24) { item.cy = H - 24 - r; item.vy *= -1; }
+          if (item.el) item.el.setAttribute("transform", `translate(${Math.round(item.cx)}, ${Math.round(item.cy)})`);
+        });
+        moveRaf = requestAnimationFrame(step);
+      };
+      moveRaf = requestAnimationFrame(step);
+    }
+    function stopMoving() {
+      if (moveRaf) { cancelAnimationFrame(moveRaf); moveRaf = null; }
+    }
+
+    window.addEventListener("DOMContentLoaded", () => {
+      // Standalone (opened directly, not in the hub iframe): let the page scroll
+      // instead of clipping, so desktop browsers don't force a zoom-out.
+      if (window.parent === window) {
+        document.body.style.overflowY = "auto";
+        document.body.style.overflowX = "hidden";
+        document.body.style.height = "auto";
+        document.body.style.minHeight = "100vh";
+        document.body.style.width = "auto";
+      }
+      syncLobbyUI();
+    });
+  </script>
+</body>
+</html>
