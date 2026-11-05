@@ -29,15 +29,24 @@
       -webkit-user-select: none;
     }
 
-    body {
+    html, body {
       font-family: 'DM Sans', sans-serif;
       background-color: var(--bg-navy);
       color: var(--cream);
       margin: 0;
       padding: 0;
+      width: 100%;
+      height: 100%;
+      height: 100dvh;
+      overflow-x: hidden;
       overflow-y: auto;
-      min-height: 100dvh;
-      width: 100vw;
+      -webkit-overflow-scrolling: touch;
+      touch-action: pan-y;
+    }
+
+    #lobbyScreen {
+      -webkit-overflow-scrolling: touch;
+      touch-action: pan-y;
     }
 
     .paper-sheet {
@@ -69,186 +78,188 @@
 <body class="flex flex-col justify-between">
 
   <!-- ==================== SCREEN 1: ULTRA-MINIMAL LOBBY ==================== -->
-  <main id="lobbyScreen" class="flex-1 flex flex-col items-center justify-center p-4 max-w-md mx-auto w-full gap-5">
+  <main id="lobbyScreen" class="flex-1 w-full h-full overflow-y-auto overflow-x-hidden p-4 pb-12 flex flex-col items-center justify-start">
+    <div class="max-w-md mx-auto w-full flex flex-col items-center gap-5 my-auto">
     
-    <!-- HERO: Custom SVG Replica of Attached Icon + Title ONLY -->
-    <div class="flex flex-col items-center gap-2.5">
-      <div class="w-28 h-28 sm:w-32 sm:h-32 rounded-[26%] bg-[#24344D] border-4 border-[#314766] shadow-2xl overflow-hidden flex items-center justify-center relative">
-        <svg viewBox="0 0 200 200" class="w-full h-full">
-          <!-- Outer Navy Square & Slate Circle -->
-          <rect width="200" height="200" rx="44" fill="#24344D"/>
-          <circle cx="100" cy="106" r="78" fill="#314766"/>
-          
-          <!-- Cream Shirt & Shoulders -->
-          <path d="M26 200 C30 154 58 144 100 144 C142 144 170 154 174 200 Z" fill="#EFECE6"/>
-          <path d="M52 200 C56 172 64 164 68 160" stroke="#D5D0C5" stroke-width="3.5" stroke-linecap="round" fill="none"/>
-          <path d="M148 200 C144 172 136 164 132 160" stroke="#D5D0C5" stroke-width="3.5" stroke-linecap="round" fill="none"/>
-          
-          <!-- Neck & Collar -->
-          <rect x="83" y="130" width="34" height="22" rx="8" fill="#DDA982"/>
-          <path d="M74 144 Q100 160 126 144" fill="none" stroke="#D5D0C5" stroke-width="5" stroke-linecap="round"/>
+      <!-- HERO: Custom SVG Replica of Attached Icon + Title ONLY -->
+      <div class="flex flex-col items-center gap-2.5">
+        <div class="w-28 h-28 sm:w-32 sm:h-32 rounded-[26%] bg-[#24344D] border-4 border-[#314766] shadow-2xl overflow-hidden flex items-center justify-center relative">
+          <svg viewBox="0 0 200 200" class="w-full h-full">
+            <!-- Outer Navy Square & Slate Circle -->
+            <rect width="200" height="200" rx="44" fill="#24344D"/>
+            <circle cx="100" cy="106" r="78" fill="#314766"/>
+            
+            <!-- Cream Shirt & Shoulders -->
+            <path d="M26 200 C30 154 58 144 100 144 C142 144 170 154 174 200 Z" fill="#EFECE6"/>
+            <path d="M52 200 C56 172 64 164 68 160" stroke="#D5D0C5" stroke-width="3.5" stroke-linecap="round" fill="none"/>
+            <path d="M148 200 C144 172 136 164 132 160" stroke="#D5D0C5" stroke-width="3.5" stroke-linecap="round" fill="none"/>
+            
+            <!-- Neck & Collar -->
+            <rect x="83" y="130" width="34" height="22" rx="8" fill="#DDA982"/>
+            <path d="M74 144 Q100 160 126 144" fill="none" stroke="#D5D0C5" stroke-width="5" stroke-linecap="round"/>
 
-          <!-- Ears -->
-          <ellipse cx="49" cy="102" rx="9" ry="14" fill="#F2C6A0"/>
-          <ellipse cx="49" cy="102" rx="4.5" ry="8" fill="#DDA982"/>
-          <ellipse cx="151" cy="102" rx="9" ry="14" fill="#F2C6A0"/>
-          <ellipse cx="151" cy="102" rx="4.5" ry="8" fill="#DDA982"/>
+            <!-- Ears -->
+            <ellipse cx="49" cy="102" rx="9" ry="14" fill="#F2C6A0"/>
+            <ellipse cx="49" cy="102" rx="4.5" ry="8" fill="#DDA982"/>
+            <ellipse cx="151" cy="102" rx="9" ry="14" fill="#F2C6A0"/>
+            <ellipse cx="151" cy="102" rx="4.5" ry="8" fill="#DDA982"/>
 
-          <!-- Head -->
-          <path d="M52 84 C52 50 148 50 148 84 C150 124 132 144 100 144 C68 144 50 124 52 84 Z" fill="#F2C6A0"/>
+            <!-- Head -->
+            <path d="M52 84 C52 50 148 50 148 84 C150 124 132 144 100 144 C68 144 50 124 52 84 Z" fill="#F2C6A0"/>
 
-          <!-- Spiky Dark Brown Hair -->
-          <path d="M51 90 C48 70 52 58 55 54 L46 47 L66 46 L62 35 L82 40 L94 24 L100 35 L108 20 L118 39 L140 33 L135 46 L154 49 L144 56 C148 66 150 78 149 90 C146 72 136 62 128 58 C110 64 86 64 70 58 C60 64 54 74 51 90 Z" fill="#2B1D16"/>
-          <path d="M76 47 Q90 40 103 44" stroke="#53392D" stroke-width="2.5" stroke-linecap="round" fill="none"/>
-          <path d="M110 44 Q122 40 132 48" stroke="#53392D" stroke-width="2.5" stroke-linecap="round" fill="none"/>
+            <!-- Spiky Dark Brown Hair -->
+            <path d="M51 90 C48 70 52 58 55 54 L46 47 L66 46 L62 35 L82 40 L94 24 L100 35 L108 20 L118 39 L140 33 L135 46 L154 49 L144 56 C148 66 150 78 149 90 C146 72 136 62 128 58 C110 64 86 64 70 58 C60 64 54 74 51 90 Z" fill="#2B1D16"/>
+            <path d="M76 47 Q90 40 103 44" stroke="#53392D" stroke-width="2.5" stroke-linecap="round" fill="none"/>
+            <path d="M110 44 Q122 40 132 48" stroke="#53392D" stroke-width="2.5" stroke-linecap="round" fill="none"/>
 
-          <!-- Eyebrows -->
-          <path d="M60 72 Q76 69 92 75" stroke="#2B1D16" stroke-width="6.5" stroke-linecap="round" fill="none"/>
-          <path d="M108 71 Q124 63 138 72" stroke="#2B1D16" stroke-width="6.5" stroke-linecap="round" fill="none"/>
+            <!-- Eyebrows -->
+            <path d="M60 72 Q76 69 92 75" stroke="#2B1D16" stroke-width="6.5" stroke-linecap="round" fill="none"/>
+            <path d="M108 71 Q124 63 138 72" stroke="#2B1D16" stroke-width="6.5" stroke-linecap="round" fill="none"/>
 
-          <!-- Blush Cheeks -->
-          <ellipse cx="67" cy="116" rx="10" ry="6" fill="#E59882" opacity="0.75"/>
-          <ellipse cx="133" cy="114" rx="10" ry="6" fill="#E59882" opacity="0.75"/>
+            <!-- Blush Cheeks -->
+            <ellipse cx="67" cy="116" rx="10" ry="6" fill="#E59882" opacity="0.75"/>
+            <ellipse cx="133" cy="114" rx="10" ry="6" fill="#E59882" opacity="0.75"/>
 
-          <!-- LEFT PIE SLICE EYE -->
-          <g transform="translate(76, 95) rotate(-6)">
-            <!-- 3D Filling Side -->
-            <polygon points="-22,-2 0,18 22,-2 22,5 0,25 -22,5" fill="#D69847"/>
-            <polygon points="-21,0 0,20 21,0 21,4 0,24 -21,4" fill="#9E1B22"/>
-            <!-- Top Lattice Crust -->
-            <path d="M-23,-2 Q0,-18 23,-2 L0,19 Z" fill="#E5B363" stroke="#D69847" stroke-width="1.5"/>
-            <!-- Berry Lattice Cutouts -->
-            <polygon points="-10,-4 -4,-8 0,-4 -6,0" fill="#9E1B22"/>
-            <polygon points="4,-8 10,-4 6,0 0,-4" fill="#9E1B22"/>
-            <polygon points="-4,2 0,-1 4,2 0,6" fill="#9E1B22"/>
-            <!-- Crust Rim -->
-            <path d="M-23,-2 Q0,-17 23,-2" fill="none" stroke="#ECC37E" stroke-width="4" stroke-linecap="round"/>
-            <!-- Cherry & Green Stem -->
-            <circle cx="0" cy="-2" r="6.5" fill="#C9252D"/>
-            <circle cx="-2" cy="-4" r="1.8" fill="#F29B9E"/>
-            <path d="M0,-7 Q4,-16 11,-17" fill="none" stroke="#38B449" stroke-width="2.5" stroke-linecap="round"/>
-          </g>
+            <!-- LEFT PIE SLICE EYE -->
+            <g transform="translate(76, 95) rotate(-6)">
+              <!-- 3D Filling Side -->
+              <polygon points="-22,-2 0,18 22,-2 22,5 0,25 -22,5" fill="#D69847"/>
+              <polygon points="-21,0 0,20 21,0 21,4 0,24 -21,4" fill="#9E1B22"/>
+              <!-- Top Lattice Crust -->
+              <path d="M-23,-2 Q0,-18 23,-2 L0,19 Z" fill="#E5B363" stroke="#D69847" stroke-width="1.5"/>
+              <!-- Berry Lattice Cutouts -->
+              <polygon points="-10,-4 -4,-8 0,-4 -6,0" fill="#9E1B22"/>
+              <polygon points="4,-8 10,-4 6,0 0,-4" fill="#9E1B22"/>
+              <polygon points="-4,2 0,-1 4,2 0,6" fill="#9E1B22"/>
+              <!-- Crust Rim -->
+              <path d="M-23,-2 Q0,-17 23,-2" fill="none" stroke="#ECC37E" stroke-width="4" stroke-linecap="round"/>
+              <!-- Cherry & Green Stem -->
+              <circle cx="0" cy="-2" r="6.5" fill="#C9252D"/>
+              <circle cx="-2" cy="-4" r="1.8" fill="#F29B9E"/>
+              <path d="M0,-7 Q4,-16 11,-17" fill="none" stroke="#38B449" stroke-width="2.5" stroke-linecap="round"/>
+            </g>
 
-          <!-- RIGHT PIE SLICE EYE -->
-          <g transform="translate(125, 95) rotate(6)">
-            <polygon points="-22,-2 0,18 22,-2 22,5 0,25 -22,5" fill="#D69847"/>
-            <polygon points="-21,0 0,20 21,0 21,4 0,24 -21,4" fill="#9E1B22"/>
-            <path d="M-23,-2 Q0,-18 23,-2 L0,19 Z" fill="#E5B363" stroke="#D69847" stroke-width="1.5"/>
-            <polygon points="-10,-4 -4,-8 0,-4 -6,0" fill="#9E1B22"/>
-            <polygon points="4,-8 10,-4 6,0 0,-4" fill="#9E1B22"/>
-            <polygon points="-4,2 0,-1 4,2 0,6" fill="#9E1B22"/>
-            <path d="M-23,-2 Q0,-17 23,-2" fill="none" stroke="#ECC37E" stroke-width="4" stroke-linecap="round"/>
-            <circle cx="0" cy="-2" r="6.5" fill="#C9252D"/>
-            <circle cx="-2" cy="-4" r="1.8" fill="#F29B9E"/>
-            <path d="M0,-7 Q4,-16 11,-17" fill="none" stroke="#38B449" stroke-width="2.5" stroke-linecap="round"/>
-          </g>
+            <!-- RIGHT PIE SLICE EYE -->
+            <g transform="translate(125, 95) rotate(6)">
+              <polygon points="-22,-2 0,18 22,-2 22,5 0,25 -22,5" fill="#D69847"/>
+              <polygon points="-21,0 0,20 21,0 21,4 0,24 -21,4" fill="#9E1B22"/>
+              <path d="M-23,-2 Q0,-18 23,-2 L0,19 Z" fill="#E5B363" stroke="#D69847" stroke-width="1.5"/>
+              <polygon points="-10,-4 -4,-8 0,-4 -6,0" fill="#9E1B22"/>
+              <polygon points="4,-8 10,-4 6,0 0,-4" fill="#9E1B22"/>
+              <polygon points="-4,2 0,-1 4,2 0,6" fill="#9E1B22"/>
+              <path d="M-23,-2 Q0,-17 23,-2" fill="none" stroke="#ECC37E" stroke-width="4" stroke-linecap="round"/>
+              <circle cx="0" cy="-2" r="6.5" fill="#C9252D"/>
+              <circle cx="-2" cy="-4" r="1.8" fill="#F29B9E"/>
+              <path d="M0,-7 Q4,-16 11,-17" fill="none" stroke="#38B449" stroke-width="2.5" stroke-linecap="round"/>
+            </g>
 
-          <!-- Nose -->
-          <path d="M97 104 C93 114 97 118 105 115" fill="none" stroke="#8C583A" stroke-width="3" stroke-linecap="round"/>
+            <!-- Nose -->
+            <path d="M97 104 C93 114 97 118 105 115" fill="none" stroke="#8C583A" stroke-width="3" stroke-linecap="round"/>
 
-          <!-- Big Toothy Grin -->
-          <path d="M76 122 Q102 126 127 116 C124 134 110 140 96 139 C84 138 78 130 76 122 Z" fill="#FFFFFF" stroke="#2B1D16" stroke-width="4" stroke-linejoin="round"/>
-          <line x1="91" y1="124" x2="91" y2="137" stroke="#2B1D16" stroke-width="2.8"/>
-          <line x1="103" y1="123" x2="103" y2="138" stroke="#2B1D16" stroke-width="2.8"/>
-          <line x1="115" y1="120" x2="115" y2="135" stroke="#2B1D16" stroke-width="2.8"/>
-        </svg>
+            <!-- Big Toothy Grin -->
+            <path d="M76 122 Q102 126 127 116 C124 134 110 140 96 139 C84 138 78 130 76 122 Z" fill="#FFFFFF" stroke="#2B1D16" stroke-width="4" stroke-linejoin="round"/>
+            <line x1="91" y1="124" x2="91" y2="137" stroke="#2B1D16" stroke-width="2.8"/>
+            <line x1="103" y1="123" x2="103" y2="138" stroke="#2B1D16" stroke-width="2.8"/>
+            <line x1="115" y1="120" x2="115" y2="135" stroke="#2B1D16" stroke-width="2.8"/>
+          </svg>
+        </div>
+
+        <h1 class="text-4xl sm:text-5xl font-bold tracking-wide text-[#EFECE6]" style="font-family: 'Fredoka', sans-serif;">
+          EYES <span class="text-[#E5B363]">PIE</span>
+        </h1>
       </div>
 
-      <h1 class="text-4xl sm:text-5xl font-bold tracking-wide text-[#EFECE6]" style="font-family: 'Fredoka', sans-serif;">
-        EYES <span class="text-[#E5B363]">PIE</span>
-      </h1>
-    </div>
-
-    <!-- COMPACT LOBBY CARD -->
-    <div class="w-full bg-[#314766] border-2 border-[#435E85] rounded-3xl p-4 sm:p-5 shadow-2xl space-y-4">
-      
-      <!-- Score Pill (Always clean & compact) -->
-      <div class="flex items-center justify-between bg-[#24344D] px-3.5 py-2 rounded-2xl border border-[#435E85]">
-        <div class="flex items-center gap-3 text-sm font-extrabold tracking-wide">
-          <span class="text-[#E5B363]">P1: <span id="lobbyP1Score">0</span></span>
-          <span class="text-[#435E85]">|</span>
-          <span class="text-[#F2C6A0]">P2: <span id="lobbyP2Score">0</span></span>
+      <!-- COMPACT LOBBY CARD -->
+      <div class="w-full bg-[#314766] border-2 border-[#435E85] rounded-3xl p-4 sm:p-5 shadow-2xl space-y-4">
+        
+        <!-- Score Pill (Always clean & compact) -->
+        <div class="flex items-center justify-between bg-[#24344D] px-3.5 py-2 rounded-2xl border border-[#435E85]">
+          <div class="flex items-center gap-3 text-sm font-extrabold tracking-wide">
+            <span class="text-[#E5B363]">P1: <span id="lobbyP1Score">0</span></span>
+            <span class="text-[#435E85]">|</span>
+            <span class="text-[#F2C6A0]">P2: <span id="lobbyP2Score">0</span></span>
+          </div>
+          <button onclick="resetMatchScores()" title="Reset Score" class="text-xs font-bold text-[#EFECE6]/70 hover:text-[#EFECE6] px-2 py-0.5 rounded-lg bg-[#314766]">
+            ↺
+          </button>
         </div>
-        <button onclick="resetMatchScores()" title="Reset Score" class="text-xs font-bold text-[#EFECE6]/70 hover:text-[#EFECE6] px-2 py-0.5 rounded-lg bg-[#314766]">
-          ↺
+
+        <!-- 1. Categories (5 Toggle Pills) -->
+        <div class="space-y-1.5">
+          <div class="text-[11px] font-extrabold uppercase tracking-widest text-[#E5B363]">Categories</div>
+          <div class="grid grid-cols-2 sm:grid-cols-3 gap-2">
+            <button type="button" data-cat="numbers" onclick="toggleCat('numbers')" class="cat-pill py-2.5 px-3 rounded-xl font-extrabold text-xs sm:text-sm border-2 transition flex items-center justify-center gap-1.5">
+              <span>Numbers</span>
+            </button>
+            <button type="button" data-cat="bigrams" onclick="toggleCat('bigrams')" class="cat-pill py-2.5 px-3 rounded-xl font-extrabold text-xs sm:text-sm border-2 transition flex items-center justify-center gap-1.5">
+              <span>2 Letters</span>
+            </button>
+            <button type="button" data-cat="words" onclick="toggleCat('words')" class="cat-pill py-2.5 px-3 rounded-xl font-extrabold text-xs sm:text-sm border-2 transition flex items-center justify-center gap-1.5">
+              <span>3 Letters</span>
+            </button>
+            <button type="button" data-cat="polygons" onclick="toggleCat('polygons')" class="cat-pill py-2.5 px-3 rounded-xl font-extrabold text-xs sm:text-sm border-2 transition flex items-center justify-center gap-1.5">
+              <span>Shapes</span>
+            </button>
+            <button type="button" data-cat="icons" onclick="toggleCat('icons')" class="cat-pill col-span-2 sm:col-span-2 py-2.5 px-3 rounded-xl font-extrabold text-xs sm:text-sm border-2 transition flex items-center justify-center gap-1.5">
+              <span>Objects</span>
+            </button>
+          </div>
+        </div>
+
+        <!-- 2. Mode (Combined Auto vs Junebug) -->
+        <div class="space-y-1.5">
+          <div class="text-[11px] font-extrabold uppercase tracking-widest text-[#E5B363]">Mode</div>
+          <div class="grid grid-cols-2 gap-2 bg-[#24344D] p-1.5 rounded-2xl border border-[#435E85]">
+            <button type="button" id="modeAutoBtn" onclick="setGameMode('auto')" class="py-2.5 rounded-xl font-extrabold text-xs sm:text-sm transition">
+              Auto Mode
+            </button>
+            <button type="button" id="modeHumanBtn" onclick="setGameMode('junebug')" class="py-2.5 rounded-xl font-extrabold text-xs sm:text-sm transition">
+              Junebug Mode
+            </button>
+          </div>
+        </div>
+
+        <!-- 3. Moving Objects (Hard) -->
+        <div class="space-y-1.5">
+          <div class="text-[11px] font-extrabold uppercase tracking-widest text-[#E5B363]">Challenge</div>
+          <div class="grid grid-cols-2 gap-2 bg-[#24344D] p-1.5 rounded-2xl border border-[#435E85]">
+            <button type="button" id="moveOffBtn" onclick="setMoving(false)" class="py-2 rounded-xl font-extrabold text-xs sm:text-sm transition">
+              Static
+            </button>
+            <button type="button" id="moveOnBtn" onclick="setMoving(true)" class="py-2 rounded-xl font-extrabold text-xs sm:text-sm transition">
+              Moving
+            </button>
+          </div>
+        </div>
+
+        <!-- 4. Density (Easy / Medium / Hard) -->
+        <div class="space-y-1.5">
+          <div class="text-[11px] font-extrabold uppercase tracking-widest text-[#E5B363]">Density</div>
+          <div class="grid grid-cols-3 gap-2 bg-[#24344D] p-1.5 rounded-2xl border border-[#435E85]">
+            <button type="button" id="densEasyBtn" onclick="setDensity('easy')" class="py-2 rounded-xl font-extrabold text-xs sm:text-sm transition">
+              Easy
+            </button>
+            <button type="button" id="densMedBtn" onclick="setDensity('medium')" class="py-2 rounded-xl font-extrabold text-xs sm:text-sm transition">
+              Medium
+            </button>
+            <button type="button" id="densHardBtn" onclick="setDensity('hard')" class="py-2 rounded-xl font-extrabold text-xs sm:text-sm transition">
+              Hard
+            </button>
+          </div>
+        </div>
+
+        <!-- START BUTTON -->
+        <button onclick="startMatchFromLobby()" class="w-full py-4 rounded-2xl bg-[#C9252D] hover:bg-[#d92c35] text-[#EFECE6] font-black text-xl tracking-wider uppercase shadow-lg border-b-4 border-[#8E161C] active:translate-y-0.5 transition">
+          START
         </button>
+
       </div>
-
-      <!-- 1. Categories (5 Toggle Pills) -->
-      <div class="space-y-1.5">
-        <div class="text-[11px] font-extrabold uppercase tracking-widest text-[#E5B363]">Categories</div>
-        <div class="grid grid-cols-2 sm:grid-cols-3 gap-2">
-          <button type="button" data-cat="numbers" onclick="toggleCat('numbers')" class="cat-pill py-2.5 px-3 rounded-xl font-extrabold text-xs sm:text-sm border-2 transition flex items-center justify-center gap-1.5">
-            <span>Numbers</span>
-          </button>
-          <button type="button" data-cat="bigrams" onclick="toggleCat('bigrams')" class="cat-pill py-2.5 px-3 rounded-xl font-extrabold text-xs sm:text-sm border-2 transition flex items-center justify-center gap-1.5">
-            <span>2 Letters</span>
-          </button>
-          <button type="button" data-cat="words" onclick="toggleCat('words')" class="cat-pill py-2.5 px-3 rounded-xl font-extrabold text-xs sm:text-sm border-2 transition flex items-center justify-center gap-1.5">
-            <span>3 Letters</span>
-          </button>
-          <button type="button" data-cat="polygons" onclick="toggleCat('polygons')" class="cat-pill py-2.5 px-3 rounded-xl font-extrabold text-xs sm:text-sm border-2 transition flex items-center justify-center gap-1.5">
-            <span>Shapes</span>
-          </button>
-          <button type="button" data-cat="icons" onclick="toggleCat('icons')" class="cat-pill col-span-2 sm:col-span-2 py-2.5 px-3 rounded-xl font-extrabold text-xs sm:text-sm border-2 transition flex items-center justify-center gap-1.5">
-            <span>Objects</span>
-          </button>
-        </div>
-      </div>
-
-      <!-- 2. Mode (Combined Auto vs Junebug) -->
-      <div class="space-y-1.5">
-        <div class="text-[11px] font-extrabold uppercase tracking-widest text-[#E5B363]">Mode</div>
-        <div class="grid grid-cols-2 gap-2 bg-[#24344D] p-1.5 rounded-2xl border border-[#435E85]">
-          <button type="button" id="modeAutoBtn" onclick="setGameMode('auto')" class="py-2.5 rounded-xl font-extrabold text-xs sm:text-sm transition">
-            Auto Mode
-          </button>
-          <button type="button" id="modeHumanBtn" onclick="setGameMode('junebug')" class="py-2.5 rounded-xl font-extrabold text-xs sm:text-sm transition">
-            Junebug Mode
-          </button>
-        </div>
-      </div>
-
-      <!-- 3. Moving Objects (Hard) -->
-      <div class="space-y-1.5">
-        <div class="text-[11px] font-extrabold uppercase tracking-widest text-[#E5B363]">Challenge</div>
-        <div class="grid grid-cols-2 gap-2 bg-[#24344D] p-1.5 rounded-2xl border border-[#435E85]">
-          <button type="button" id="moveOffBtn" onclick="setMoving(false)" class="py-2 rounded-xl font-extrabold text-xs sm:text-sm transition">
-            Static
-          </button>
-          <button type="button" id="moveOnBtn" onclick="setMoving(true)" class="py-2 rounded-xl font-extrabold text-xs sm:text-sm transition">
-            Moving
-          </button>
-        </div>
-      </div>
-
-      <!-- 4. Density (Easy / Medium / Hard) -->
-      <div class="space-y-1.5">
-        <div class="text-[11px] font-extrabold uppercase tracking-widest text-[#E5B363]">Density</div>
-        <div class="grid grid-cols-3 gap-2 bg-[#24344D] p-1.5 rounded-2xl border border-[#435E85]">
-          <button type="button" id="densEasyBtn" onclick="setDensity('easy')" class="py-2 rounded-xl font-extrabold text-xs sm:text-sm transition">
-            Easy
-          </button>
-          <button type="button" id="densMedBtn" onclick="setDensity('medium')" class="py-2 rounded-xl font-extrabold text-xs sm:text-sm transition">
-            Medium
-          </button>
-          <button type="button" id="densHardBtn" onclick="setDensity('hard')" class="py-2 rounded-xl font-extrabold text-xs sm:text-sm transition">
-            Hard
-          </button>
-        </div>
-      </div>
-
-      <!-- START BUTTON -->
-      <button onclick="startMatchFromLobby()" class="w-full py-4 rounded-2xl bg-[#C9252D] hover:bg-[#d92c35] text-[#EFECE6] font-black text-xl tracking-wider uppercase shadow-lg border-b-4 border-[#8E161C] active:translate-y-0.5 transition">
-        START
-      </button>
-
     </div>
   </main>
 
   <!-- ==================== SCREEN 2: MINIMAL PASS OVERLAY ==================== -->
-  <section id="curtainScreen" class="hidden fixed inset-0 z-50 bg-[#24344D] flex flex-col items-center justify-center p-6 text-center">
-    <div class="max-w-xs w-full bg-[#314766] border-2 border-[#435E85] rounded-3xl p-6 shadow-2xl space-y-5">
+  <section id="curtainScreen" class="hidden fixed inset-0 z-50 bg-[#24344D] overflow-y-auto flex flex-col items-center justify-center p-6 text-center">
+    <div class="max-w-xs w-full bg-[#314766] border-2 border-[#435E85] rounded-3xl p-6 shadow-2xl space-y-5 my-auto">
       <div id="curtainTitle" class="text-2xl font-black text-[#EFECE6] uppercase tracking-wide">
         PASS TO P1
       </div>
@@ -340,8 +351,8 @@
   </section>
 
   <!-- ==================== SCREEN 4: MINIMAL TURN SUMMARY MODAL ==================== -->
-  <section id="summaryModal" class="hidden fixed inset-0 z-50 bg-[#24344D]/90 backdrop-blur-sm flex items-center justify-center p-4">
-    <div class="max-w-xs w-full bg-[#314766] border-2 border-[#435E85] rounded-3xl p-6 shadow-2xl space-y-5 text-center">
+  <section id="summaryModal" class="hidden fixed inset-0 z-50 bg-[#24344D]/90 backdrop-blur-sm overflow-y-auto flex items-center justify-center p-4">
+    <div class="max-w-xs w-full bg-[#314766] border-2 border-[#435E85] rounded-3xl p-6 shadow-2xl space-y-5 text-center my-auto">
       
       <div id="summaryTurnTitle" class="text-xl font-black text-[#E5B363] uppercase">
         P1: +0
@@ -762,9 +773,6 @@
       return `<path d="${baseShape.path}" fill="${fill}" stroke="#2A1B15" stroke-width="${strokeW}" stroke-linejoin="round" stroke-linecap="round"/>${extra}`;
     }
 
-    /**
-     * Builds the visual artwork <g> for an item at origin (0,0) with its rotation & scale.
-     */
     function buildVisualItemGroup(item, sizeOverride) {
       const ns = "http://www.w3.org/2000/svg";
       const sz = sizeOverride || item.size;
@@ -823,10 +831,6 @@
       return g;
     }
 
-    /**
-     * Measures the exact rotated Axis-Aligned Bounding Box (AABB) of an item in SVG units
-     * by temporarily mounting it inside #jumbleLayer and combining live getBBox() with analytical bounds.
-     */
     function measureRotatedItemBounds(item, curSize, layer) {
       const ns = "http://www.w3.org/2000/svg";
       const wrapper = document.createElementNS(ns, "g");
@@ -834,17 +838,14 @@
       wrapper.appendChild(visualG);
       layer.appendChild(wrapper);
 
-      let bx = 0, by = 0, bw = 0, bh = 0;
+      let bw = 0, bh = 0;
       try {
         const b = wrapper.getBBox();
-        bx = b.x;
-        by = b.y;
         bw = b.width;
         bh = b.height;
       } catch (e) {}
       wrapper.remove();
 
-      // Analytical fallback / floor so webfont load timing never under-estimates text width
       let charW = 1.05;
       if (item.category === "number") charW = item.boardText.length === 1 ? 0.82 : 1.38;
       else if (item.category === "bigram") charW = 1.55;
@@ -867,10 +868,6 @@
       };
     }
 
-    /**
-     * Generates and renders all jumble items inside the fixed 800x1050 SVG coordinate space.
-     * Enforces phone-readable minimums (40 text / 46 shapes & objects) and strict 0% overlap.
-     */
     function generateAndRenderSvgJumble() {
       const W = 800;
       const H = 1050;
@@ -883,7 +880,6 @@
       layer.innerHTML = "";
       fbLayer.innerHTML = "";
 
-      // Phone-readable size distribution (Easy gets slightly larger max sizes)
       const bonus = count <= 34 ? 8 : (count <= 50 ? 4 : 0);
 
       const rawItems = candidates.map((item, idx) => {
@@ -917,13 +913,12 @@
         };
       });
 
-      // Place largest items first
       rawItems.sort((a, b) => b.size - a.size);
 
       const placedBoxes = [];
       const placedItems = [];
       const outerMargin = 24;
-      const safetyPad = 8; // 8 SVG units padding on all sides between items
+      const safetyPad = 8;
 
       for (const item of rawItems) {
         let curSize = item.size;
@@ -971,7 +966,6 @@
             curSize = Math.max(item.minSize, curSize - 4);
           }
         }
-        // Strictly skip item if no collision-free spot exists at minimum phone-readable size
       }
 
       state.boardItems = placedItems;
@@ -992,7 +986,6 @@
         g.setAttribute("transform", `translate(${item.cx}, ${item.cy})`);
         item.el = g;
 
-        // Invisible generous hit target circle
         const hitCircle = document.createElementNS(ns, "circle");
         hitCircle.setAttribute("cx", "0");
         hitCircle.setAttribute("cy", "0");
@@ -1003,7 +996,6 @@
         const visualG = buildVisualItemGroup(item, item.size);
         g.appendChild(visualG);
 
-        // Queue Selection Badge (for 15s Junebug Mode Opponent Pick)
         const badgeG = document.createElementNS(ns, "g");
         badgeG.setAttribute("id", `qbadge_${item.uid}`);
         badgeG.setAttribute("class", "hidden");
@@ -1042,14 +1034,11 @@
       state.wrongTapStreak = 0;
       state.isFrozen = false;
 
-      // Always generate a fresh jumble immediately
       generateAndRenderSvgJumble();
 
       if (state.mode === "junebug") {
-        // Opponent picks targets on the visible jumble for 15 seconds
         beginOpponentPickPhase();
       } else {
-        // Auto Mode: if starting straight from Lobby, jump right into hunting so jumble is immediately playable
         if (isImmediateFromLobby) {
           beginHuntingPhase();
         } else {
@@ -1101,7 +1090,6 @@
 
     function finishTargetSelectionPhase() {
       clearActiveTimer();
-      // Hide selection badges before handing phone to hunter
       state.boardItems.forEach(it => {
         const b = document.getElementById(`qbadge_${it.uid}`);
         if (b) b.classList.add("hidden");
@@ -1370,15 +1358,6 @@
     }
 
     window.addEventListener("DOMContentLoaded", () => {
-      // Standalone (opened directly, not in the hub iframe): let the page scroll
-      // instead of clipping, so desktop browsers don't force a zoom-out.
-      if (window.parent === window) {
-        document.body.style.overflowY = "auto";
-        document.body.style.overflowX = "hidden";
-        document.body.style.height = "auto";
-        document.body.style.minHeight = "100vh";
-        document.body.style.width = "auto";
-      }
       syncLobbyUI();
     });
   </script>
