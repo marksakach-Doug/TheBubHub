@@ -19,7 +19,7 @@ export const meta = {
   players: '3-8',
   color: '#ff2a6d',
   icon: '👄',
-  desc: 'Say what a friend would say about a word. The line they wish they had thought of scores.',
+  desc: 'Say what a friend would say. Make them wish they had those lips.',
 };
 
 const MIN_SEATS = 3;   // a friend and at least two people writing
@@ -30,8 +30,8 @@ const NEVER = 0;
 const POSSIBLE = 1;
 const WISH = 2;
 const TIERS = [
-  { key: NEVER, label: 'never would say to', color: '#05d9e8' },
-  { key: POSSIBLE, label: 'possible', color: '#ffe14d' },
+  { key: NEVER, label: 'never would say', color: '#05d9e8' },
+  { key: POSSIBLE, label: 'possibly would say', color: '#ffe14d' },
   { key: WISH, label: 'wish i wouldve thought of that', color: '#ff2a6d' },
 ];
 
@@ -101,7 +101,7 @@ export function reduce(state, action, ctx) {
   const from = (ctx && ctx.from) || {};
   const id = from.id || '';
   const rng = (ctx && typeof ctx.rng === 'function') ? ctx.rng : Math.random;
-  if (!id) return { error: 'Sit down at the table first.' };
+  if (!id) return { error: 'Lip down at the table first.' };
   const a = action && action.a;
   if (a === 'join') return join(state, id, from);
   if (a === 'start') return start(state, from, rng);
@@ -123,7 +123,7 @@ function join(state, id, from) {
 function start(state, from, rng) {
   if (!from.host) return { error: 'Only the host starts the next round.' };
   if (state.phase === 'write' || state.phase === 'rank') return { error: 'A round is already running.' };
-  if (state.order.length < MIN_SEATS) return { error: 'Need three at the table: a friend and two people to write.' };
+  if (state.order.length < MIN_SEATS) return { error: 'Need three sets of lips at the table: an amigo and two people to lip.' };
   if (!WORDS.length) return { error: 'The word list is empty.' };
   const s = clone(state);
   s.roundNo = state.phase === 'lobby' ? 0 : state.roundNo + 1;
@@ -140,7 +140,7 @@ function start(state, from, rng) {
 }
 
 function toLobby(state, from) {
-  if (!from.host) return { error: 'Only the host takes the table back to the lobby.' };
+  if (!from.host) return { error: 'Only the host licks the table back to the libby.' };
   return resetToLobby(clone(state), false);
 }
 
@@ -163,16 +163,16 @@ function resetToLobby(s, keepScores) {
 
 function line(state, id, from, action, rng) {
   if (state.phase !== 'write') {
-    return { error: state.phase === 'rank' ? 'The lines are locked. The friend is ranking.' : 'No round is running.' };
+    return { error: state.phase === 'rank' ? 'The lips are locked. The friend is licking those lips.' : 'No round is running.' };
   }
   if (state.writers.indexOf(id) < 0) {
     return { error: id === state.friend
-      ? "You're the friend this round. The others write the line."
+      ? "You're the friend this round. The others lick the lips."
       : "You're sitting this round out. You're in from the next one." };
   }
   const text = clean(action && action.text);
-  if (!text) return { error: 'Write something first.' };
-  if (text.length > MAX_LINE) return { error: 'Keep it under ' + MAX_LINE + ' characters.' };
+  if (!text) return { error: 'Lip something first.' };
+  if (text.length > MAX_LINE) return { error: 'Lip it under ' + MAX_LINE + ' characters.' };
   const s = clone(state);
   s.lines[id] = text;
   s.names[id] = clean(from.name) || s.names[id];
@@ -185,12 +185,12 @@ function line(state, id, from, action, rng) {
 }
 
 function rank(state, id, action) {
-  if (state.phase !== 'rank') return { error: 'There are no lines to rank yet.' };
-  if (id !== state.friend) return { error: 'Only the friend ranks the lines.' };
+  if (state.phase !== 'rank') return { error: 'There are no lips to rank yet.' };
+  if (id !== state.friend) return { error: 'Only the friend ranks the lips.' };
   const tiers = action && action.tiers;
-  if (!Array.isArray(tiers) || tiers.length !== state.shuffle.length) return { error: 'Rank every line first.' };
-  if (!tiers.every((t) => t === NEVER || t === POSSIBLE || t === WISH)) return { error: 'Each line gets one of the three tiers.' };
-  if (tiers.filter((t) => t === WISH).length !== 1) return { error: 'Exactly one line gets "wish i wouldve thought of that".' };
+  if (!Array.isArray(tiers) || tiers.length !== state.shuffle.length) return { error: 'Rank every lip first.' };
+  if (!tiers.every((t) => t === NEVER || t === POSSIBLE || t === WISH)) return { error: 'Each lip gets one of the three tiers.' };
+  if (tiers.filter((t) => t === WISH).length !== 1) return { error: 'Exactly one lip gets "wish i wouldve thought of that".' };
   const s = clone(state);
   s.tiers = tiers.slice();
   s.phase = 'over';
@@ -414,41 +414,41 @@ export function mount(root, api) {
     if (v.phase === 'write') {
       return v.writtenCount + ' of ' + v.writersTotal + ' lines in' + (v.isWriter && v.myLine ? ' · yours is in' : '');
     }
-    if (v.phase === 'rank') return v.isFriend ? 'Rank every line, then crown the top one.' : v.friendName + ' is ranking.';
+    if (v.phase === 'rank') return v.isFriend ? 'Rank every line, then lick the top one.' : v.friendName + ' is ranking.';
     return 'Round over.';
   }
 
   function lobbyBody() {
     const v = view;
     const ready = v.seatCount >= MIN_SEATS;
-    let b = '<div class="tube"><p class="how">One friend gets a word. Everyone else writes the one line that friend '
-      + 'would say about it. The friend ranks the lines blind, and the one they wish they had thought of scores a point. '
-      + 'The friend rotates every round.</p></div>';
+    let b = '<div class="tube"><p class="how">Everyone else writes the one thing that friend '
+      + 'would say about it. The friend ranks the lips, and the one they wish they had thought of scores a point. '
+      + 'The friend rotates every lipround.</p></div>';
     b += '<div class="acts">';
     if (v.canJoin) b += lip('Sit in', 'join');
-    if (api.isHost) b += lip(ready ? 'Start the table' : 'Need three to start', 'start', { big: true, disabled: !ready });
-    else b += '<p class="tag">The host starts the table.</p>';
+    if (api.isHost) b += lip(ready ? 'Start the lips' : 'Need three to start', 'start', { big: true, disabled: !ready });
+    else b += '<p class="tag">The host is licking the lips.</p>';
     return b + '</div>';
   }
 
   function writeBody() {
     const v = view;
     if (v.isFriend) {
-      return '<div class="tube"><p class="how">You are the friend this round. Sit back. The table is writing the line you would say.</p>'
-        + '<p class="tag">' + v.writtenCount + ' of ' + v.writersTotal + ' lines in</p></div>';
+      return '<div class="tube"><p class="how">Everyone is thinking about your lips. You just sit here and wait.</p>'
+        + '<p class="tag">' + v.writtenCount + ' of ' + v.writersTotal + ' lips in</p></div>';
     }
     if (v.isWriter) {
-      return '<div class="tube"><p class="how">Write the one line ' + esc(v.friendName) + ' would say about '
-        + esc(v.word) + '. Keep it short, and make it sound like them.</p>'
-        + '<textarea id="draft" maxlength="' + MAX_LINE + '" rows="2" placeholder="the line they would say"></textarea>'
-        + '<div class="acts">' + lip(v.myLine ? 'Change my line' : 'Say it', 'say', { big: true }) + '</div></div>';
+      return '<div class="tube"><p class="how">What would ' + esc(v.friendName) + ' say about '
+        + esc(v.word) + '? </p>'
+        + '<textarea id="draft" maxlength="' + MAX_LINE + '" rows="2" placeholder="what they would say"></textarea>'
+        + '<div class="acts">' + lip(v.myLine ? 'Change my lips' : 'Lip It', 'say', { big: true }) + '</div></div>';
     }
     if (v.isSeated) {
-      return '<div class="tube"><p class="how">You are sitting this round out. You are in from the next one.</p>'
+      return '<div class="tube"><p class="how">You are lipping this round out. You are in from the next one.</p>'
         + '<p class="tag">' + v.writtenCount + ' of ' + v.writersTotal + ' lines in</p></div>';
     }
-    return '<div class="tube"><p class="how">Watching. Sit in to write from the next round.</p>'
-      + (v.canJoin ? '<div class="acts">' + lip('Sit in', 'join') + '</div>' : '') + '</div>';
+    return '<div class="tube"><p class="how">Watching. Lip in to write from the next round.</p>'
+      + (v.canJoin ? '<div class="acts">' + lip('Put your lips in', 'join') + '</div>' : '') + '</div>';
   }
 
   function rankBody() {
@@ -469,9 +469,9 @@ export function mount(root, api) {
     const hint = c.wishes === 0 ? 'Pick the one you wish you had thought of.'
       : c.wishes > 1 ? 'Only one line can be the wish.'
       : c.set === c.n ? 'Ready.' : 'Ranked ' + c.set + ' of ' + c.n + '.';
-    return '<div class="tube"><p class="how">Rank each line. Exactly one gets "wish i wouldve thought of that".</p></div>'
+    return '<div class="tube"><p class="how">Rank each lip. Only one lip gets "wish i wouldve thought of that".</p></div>'
       + rows
-      + '<div class="acts">' + lip('Crown the top line', 'crown', { big: true, disabled: !ok }) + '</div>'
+      + '<div class="acts">' + lip('Lick the top lip', 'crown', { big: true, disabled: !ok }) + '</div>'
       + '<p class="tag">' + hint + '</p>';
   }
 
@@ -490,8 +490,8 @@ export function mount(root, api) {
     const acts = api.isHost
       ? '<div class="acts">' + lip('Next friend', 'start', { big: true, disabled: v.seatCount < MIN_SEATS })
         + lip('Back to lobby', 'toLobby') + '</div>'
-      : '<p class="tag">The host picks the next friend.</p>';
-    return '<div class="tube"><p class="how">The reveal.</p></div>' + rows + acts;
+      : '<p class="tag">The host lips the next friend.</p>';
+    return '<div class="tube"><p class="how">The lips.</p></div>' + rows + acts;
   }
 
   function scoreBody() {
@@ -523,7 +523,7 @@ export function mount(root, api) {
 
   function render() {
     if (!view) {
-      boardEl.innerHTML = '<div class="status">Warming up the sign…</div>';
+      boardEl.innerHTML = '<div class="status">Warming up the lips…</div>';
       return;
     }
     const rk = view.epoch + ':' + view.roundNo;

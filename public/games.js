@@ -17,18 +17,17 @@ window.BUB_GAMES = [
     icon: '🔔', desc: 'Build a chain-reaction machine together out of parts, then press play and watch it go.' },
   { id: 'daltadka', file: 'daltadka.html', title: 'Dal Tadka', players: 'solo', color: '#d9b26f', solo: true, lobby: true, fill: true,
     icon: '🍲', desc: 'Cook dal.' },
- // { id: 'warp', file: 'warpfront.html', title: 'Warp Front', players: '1-3', color: '#00ffcc', soloable: true,
-   // icon: '🛸', desc: 'A co-op race to save planets. Borg are the bad guys. Get to the planets first.' },
+ { id: 'warp', file: 'warpfront.html', title: 'Warp Front', players: '1-3', color: '#00ffcc', disabled: true, soloable: true, icon: '🛸', desc: 'A co-op race to save planets. Borg are the bad guys. Get to the planets first.' },
   { id: 'lotr', file: 'lotr.html', title: 'LOTR Cards', players: '2-8', color: '#b9c98a',
     // `grow` (not `fill`): the frame is sized to the game and the WHOLE PAGE
     // scrolls as one. `fill` would pin the frame to the viewport and make the
     // game scroll inside it instead, which is a nested scroll on a phone.
     grow: true,
     icon: '🃏', desc: 'Race to Level 15 while monsters hunt whoever is in the lead.' },
- // { id: 'blastoff', file: 'blastoff.html', title: 'Blast Off!', players: '2-8', color: '#00f2ff', soloable: true, disabled: true,
-   // icon: '🚀', desc: 'Pick destinations and maneuver your rocket.' },
-  //{ id: 'grammar', file: 'discover_the_grammar.html', title: 'Discover the Grammar', players: '2-4', color: '#f3f0e8', soloable: true, disabled: true,
-//    icon: '🔤', desc: 'A complex code breaking mind game.' },
+ { id: 'blastoff', file: 'blastoff.html', title: 'Blast Off!', players: '2-8', color: '#00f2ff', soloable: true, disabled: true,
+   icon: '🚀', desc: 'Pick destinations and maneuver your rocket.' },
+  { id: 'grammar', file: 'discover_the_grammar.html', title: 'Discover the Grammar', players: '2-4', color: '#f3f0e8', soloable: true, disabled: true,
+  icon: '🔤', desc: 'A complex code breaking mind game.' },
   // `soloable: true` also runs a real solo table with no room, so it belongs in
   // the pre-room "Solo Corner". Word Bridge has its own solo mode (you play both
   // sides), so it qualifies — it was simply never flagged.
@@ -39,8 +38,8 @@ window.BUB_GAMES = [
   // in the lobby so there is something to play while waiting for others.
   // `fill` lets the stage own the viewport (solo games never report a height,
   // so the hub sizes the frame itself instead of pinning it).
- // { id: 'waltz', file: 'LobbyWaltzEngine.html', title: 'Waltz Engine', players: 'solo', color: '#d9b26f', solo: true, lobby: true, fill: true,
-   // icon: '💃', desc: 'Step, tap, tap.' },
+ { id: 'waltz', file: 'LobbyWaltzEngine.html', title: 'Waltz Engine', players: 'solo', disabled: true, color: '#d9b26f', solo: true, lobby: true, fill: true,
+   icon: '💃', desc: 'Step, tap, tap.' },
   { id: 'truth', file: 'truths.html', title: 'Write Something True', players: 'solo', color: '#b8a77e', solo: true, lobby: true, fill: true, noRecord: true,
     menuLabel: 'Write something true',
     icon: '✍️', desc: 'Write one true thing a day.' },
