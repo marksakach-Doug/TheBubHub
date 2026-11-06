@@ -63,5 +63,7 @@ window.BUB_GAMES = [
    // icon: '🍲', desc: 'Humanical Terraformation' },
   { id: 'braid', file: 'braid.html', title: 'Braid', players: '2-4', color: '#a45f3b', soloable: true, height: 560,
     icon: '🧶', desc: 'Grow a braid of words one link at a time.' },
+  { id: 'branches', file: 'branches.html', title: 'Low Gravity Branch', players: 'solo', color: '#8fbf9f', solo: true, fill: true, noRecord: true,
+    icon: '🌿', desc: 'Click to grow a low-gravity tree.' },
 
 ]

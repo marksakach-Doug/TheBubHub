@@ -1,0 +1,226 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
+<title>Low Gravity Branch</title>
+<style>
+/* The brief is all white with black wood, so these stay fixed in light and dark viewers. */
+:root{--paper:#fff;--ink:#000;--hint:#c4c4c4;--line:#e4e4e4;--soft:#777;color-scheme:light}
+html,body{margin:0;height:100%;background:var(--paper);overflow:hidden;cursor:pointer;user-select:none;-webkit-user-select:none;touch-action:manipulation}
+svg{position:fixed;inset:0;width:100%;height:100%;display:block}
+svg path{fill:var(--ink)}
+#hint{position:fixed;left:0;right:0;bottom:calc(env(safe-area-inset-bottom,0px) + 18px);text-align:center;font:13px/1 Georgia,"Times New Roman",serif;letter-spacing:.3em;color:var(--hint);transition:opacity .8s;pointer-events:none}
+#ui{position:fixed;top:calc(env(safe-area-inset-top,0px) + 10px);right:calc(env(safe-area-inset-right,0px) + 10px);width:216px;font:12px/1.3 Georgia,"Times New Roman",serif;color:var(--soft);cursor:default;text-align:right}
+#ui button{font:inherit;color:var(--soft);background:var(--paper);border:1px solid var(--line);padding:3px 8px;cursor:pointer}
+#ui button:hover,#ui button[aria-pressed=true]{color:var(--ink);border-color:var(--ink)}
+#panel{margin-top:6px;padding:10px 12px 8px;background:rgba(255,255,255,.94);border:1px solid var(--line);text-align:left;max-height:calc(100vh - 74px);overflow:auto}
+#panel[hidden]{display:none}
+#panel label{display:grid;grid-template-columns:1fr auto;column-gap:8px}
+#panel output{color:var(--ink);font-variant-numeric:tabular-nums}
+#panel input{grid-column:1/-1;width:100%;margin:2px 0 8px;accent-color:#000}
+#bt{display:flex;gap:6px;justify-content:space-between;margin-top:4px}
+</style>
+</head>
+<body>
+<svg id="t" xmlns="http://www.w3.org/2000/svg" preserveAspectRatio="xMidYMax meet"></svg>
+<div id="hint">click</div>
+<div id="ui">
+  <button id="tg" aria-expanded="true">levers</button>
+  <div id="panel">
+    <div id="rows"></div>
+    <div id="bt"><button id="auto" aria-pressed="false">auto</button><button id="rs">restart</button><button id="df">defaults</button></div>
+  </div>
+</div>
+<script>
+const NS='http://www.w3.org/2000/svg',svg=document.getElementById('t'),hint=document.getElementById('hint');
+const W=innerWidth,H=innerHeight,PI=Math.PI,TAU=PI*2,C=4,DS=4,D=24,FC=(D/C)*(D/C);
+const COLS=Math.ceil(W/C)+1,ROWS=Math.ceil(H/C)+3,grid=new Int32Array(COLS*ROWS);
+const DC=Math.ceil(W/D)+1,DR=Math.ceil(H/D)+2,dens=new Uint16Array(DC*DR);
+const L0=Math.min(H*.22,W*.4),M=H*.05;
+svg.setAttribute('viewBox','0 0 '+W+' '+H);
+
+/* Levers: key, label, min, max, step, default */
+const LV=[
+['fork','minor forks',0,1,.01,.4],['sides','side shoots',0,2,.01,.55],['spread','branch angle',.3,2,.01,1],
+['wave','wave size',0,2.2,.01,1],['wl','wavelength',40,360,1,130],['curl','hooked tips',0,1,.01,.15],
+['persist','tip persistence',.6,1.05,.01,.84],['minlen','tip min length',10,80,1,22],['revive','revived ends per click',0,40,1,8],
+['space','spacing',3,28,1,15],['steer','dodge',0,1,.01,.6],['crowd','crowd limit',.02,.6,.01,.3],
+['light','light pull',0,.8,.01,.22],['noise','wobble',0,.3,.005,.08],['width','thickness',1,8,.1,3],
+['minw','thinnest',.3,2,.05,.7],['speed','grow time (ms)',150,2000,10,800],['cap','max branches',2000,40000,500,16000]
+];
+const V={};
+document.getElementById('rows').innerHTML=LV.map(([k,l,a,b,s,d])=>{V[k]=d;
+  return '<label><span>'+l+'</span><output id="o_'+k+'">'+d+'</output><input type="range" data-k="'+k+'" min="'+a+'" max="'+b+'" step="'+s+'" value="'+d+'"></label>'}).join('');
+document.getElementById('panel').addEventListener('input',e=>{
+  const k=e.target.dataset.k;if(!k)return;V[k]=+e.target.value;document.getElementById('o_'+k).textContent=e.target.value});
+
+const dA=(t,a)=>Math.atan2(Math.sin(t-a),Math.cos(t-a));
+const rng=s=>()=>{s|=0;s=s+0x6D2B79F5|0;let t=Math.imul(s^s>>>15,1|s);t=t+Math.imul(t^t>>>7,61|t)^t;return((t^t>>>14)>>>0)/4294967296};
+const f1=v=>Math.round(v*10)/10;
+const cell=(x,y)=>{if(x<0||y<0)return-1;const i=x/C|0,j=y/C|0;return i>=COLS||j>=ROWS?-1:j*COLS+i};
+const dn=(x,y)=>{if(x<0||y<0)return 1;const i=x/D|0,j=y/D|0;return i>=DC||j>=DR?1:dens[j*DC+i]/FC};
+function blk(x,y,id,rho){
+  if(x<0||y<0||x>W||y>H+6)return true;
+  const i=x/C|0,j=y/C|0;
+  for(let dj=-rho;dj<=rho;dj++){const jj=j+dj;if(jj<0||jj>=ROWS)continue;
+    for(let di=-rho;di<=rho;di++){const ii=i+di;if(ii<0||ii>=COLS)continue;const v=grid[jj*COLS+ii];if(v&&v!==id)return true}}
+  return false;
+}
+let T=null,anim=null,raf=0,nid=0,total=0,auto=0;
+
+function plant(x){
+  const r=rng(Math.random()*4294967296);
+  return{r,gen:0,dead:[],pending:[{x,y:H+3,a:-PI/2+(r()-.5)*.3,len:L0,w:V.width,d:0}]};
+}
+
+/* Low gravity: no sag and no "up". A limb's shape is its own growth rhythm: long S-waves and the
+   odd hooked tip, with wide intrinsic branch angles. Growth is self-avoiding (occupancy grid),
+   tips dodge limbs they sense ahead, and branching switches off where it is crowded, so the
+   middle stays calm while the ends keep reaching into open space. */
+function branch(o,r,next){
+  const g=o.d,id=++nid,rho=Math.max(1,Math.round(V.space/C)),grace=14+2.4*V.space,maxN=Math.ceil(o.len/DS);
+  const A=(.35+r()*.7)*V.wave,k=TAU/(V.wl*(.6+r()*1.2)),ph=r()*TAU;
+  const turn=g>=2&&o.len>=30&&r()<V.curl?(r()<.5?1:-1)*Math.min(3,.03*o.len):0;
+  let x=o.x,y=o.y,b=o.a,wob=0,hit=false;
+  const X=[x],Y=[y],Hd=[],cells=[];
+  for(let i=1;i<=maxN;i++){
+    const s=i*DS;
+    let ux=0,uy=0;
+    if(x<M)ux=1-x/M;else if(x>W-M)ux=-(1-(W-x)/M);
+    if(y<M)uy=1-y/M;else if(y>H-M)uy=-(1-(H-y)/M);
+    if(ux||uy)b+=.4*Math.min(1,Math.hypot(ux,uy))*dA(Math.atan2(uy,ux),b);
+    wob+=(r()-.5)*V.noise;
+    let h=b+wob+A*Math.sin(k*s+ph)*Math.min(1,s/24);
+    if(turn&&s>o.len*.55){const q=(s-o.len*.55)/(o.len*.45);h+=turn*q*q}
+    if(V.steer>0&&s>grace){
+      const la=V.space+10;
+      if(blk(x+Math.cos(h)*la,y+Math.sin(h)*la,id,rho)){
+        const fl=!blk(x+Math.cos(h-.7)*la,y+Math.sin(h-.7)*la,id,rho),fr=!blk(x+Math.cos(h+.7)*la,y+Math.sin(h+.7)*la,id,rho);
+        if(fl||fr){const d=(fl&&fr?(r()<.5?-1:1):fl?-1:1)*.3*V.steer;b+=d;h+=d}
+      }
+    }
+    x+=Math.cos(h)*DS;y+=Math.sin(h)*DS;
+    const c=cell(x,y);
+    if(c<0||(s>grace&&blk(x,y,id,rho))){hit=true;break}
+    cells.push(c);X.push(x);Y.push(y);Hd.push(h);
+  }
+  const n=X.length-1;
+  if(n<3)return null;
+  total++;
+  const w0=o.w,w1=Math.max(V.minw*.65,w0*.82);
+  const P={n,dl:r()*.35,cx:X,cy:Y,lx:[],ly:[],rx:[],ry:[]};
+  for(let i=0;i<=n;i++){
+    const h=i==0?Hd[0]:i==n?Hd[n-1]:(Hd[i-1]+Hd[i])/2;
+    const hw=(w0+(w1-w0)*i/n)/2,nx=-Math.sin(h)*hw,ny=Math.cos(h)*hw;
+    P.lx.push(X[i]+nx);P.ly.push(Y[i]+ny);P.rx.push(X[i]-nx);P.ry.push(Y[i]-ny);
+  }
+  const kid=(kx,ky,ka,len,w,main)=>{
+    if(main?total>=V.cap*2.5:(total>=V.cap||next.length>900))return;
+    next.push({x:kx,y:ky,a:ka,len:Math.max(V.minlen,len),w:Math.max(V.minw,w),d:g+1});
+  };
+  const ea=Hd[n-1],cw=w1*.88,sp=(.3+r()*.3)*V.spread,d=r()<.5?1:-1;
+  if(!hit&&!turn){
+    kid(X[n],Y[n],ea+d*sp*.35,o.len*V.persist*(.88+r()*.24),cw,1);
+    if(dn(X[n],Y[n])<=V.crowd){
+      if(r()<V.fork)kid(X[n],Y[n],ea-d*(sp+.25+r()*.45),o.len*(.6+r()*.18),cw,0);
+      if(g>1&&r()<V.fork*.3)kid(X[n],Y[n],ea+d*(sp+.7),o.len*(.5+r()*.1),cw*.9,0);
+    }
+  }else{
+    if(T.dead.length>5000)T.dead.splice(r()*5000|0,1);
+    T.dead.push({x:X[n],y:Y[n],a:ea,w:w1,d:g});
+  }
+  const ns=Math.floor((g==0?V.sides*4:V.sides)+r());
+  let sd=r()<.5?1:-1;
+  for(let j=0;j<ns;j++,sd=-sd){
+    const t=g ? .2+r()*.65:.35+r()*.55,kk=Math.max(1,Math.min(n-1,Math.round(t*n)));
+    if(dn(X[kk],Y[kk])>V.crowd)continue;
+    kid(X[kk],Y[kk],Hd[kk-1]+sd*(.55+r()*.7)*V.spread,o.len*(.45+r()*.2),(w0+(w1-w0)*kk/n)*.8,0);
+  }
+  /* committed last, so a branch's own cells never count as crowding */
+  for(const c of cells)if(!grid[c]){grid[c]=id;dens[((c/COLS|0)*C/D|0)*DC+((c%COLS)*C/D|0)]++}
+  return P;
+}
+
+/* Revival: blocked or hooked ends that now sit in open space sprout again, so the outside keeps extending. */
+function revive(r){
+  const out=[],Dd=T.dead;
+  for(let t=0;t<V.revive&&Dd.length;t++){
+    let best=-1,bf=9;
+    for(let q=0;q<14;q++){const j=r()*Dd.length|0,f=dn(Dd[j].x,Dd[j].y);if(f<bf){bf=f;best=j}}
+    if(bf>V.crowd*1.6)continue;
+    const e=Dd[best];Dd[best]=Dd[Dd.length-1];Dd.pop();
+    out.push({x:e.x,y:e.y,a:e.a+(r()<.5?-1:1)*(.5+r()*.9),len:Math.max(V.minlen,40),w:Math.max(V.minw,e.w),d:e.d+1});
+  }
+  return out;
+}
+
+/* Each click grows one more step. The click is the light: new growth bends toward it. */
+function grow(px,py){
+  const r=T.r,g=T.gen++,next=[],bs=[],pend=T.pending.concat(revive(r));
+  for(let i=pend.length-1;i>0;i--){const j=r()*(i+1)|0;const t=pend[i];pend[i]=pend[j];pend[j]=t}
+  for(const o of pend){
+    if(o.d>0&&Math.hypot(px-o.x,py-o.y)>40)o.a+=V.light*dA(Math.atan2(py-o.y,px-o.x),o.a);
+    const P=branch(o,r,next);if(P)bs.push(P);
+  }
+  T.pending=next;
+  if(!bs.length)return null;
+  const path=document.createElementNS(NS,'path');svg.appendChild(path);
+  return{bs,path,dur:g?V.speed:600,t0:performance.now()};
+}
+
+/* Polygon for a branch grown to fraction g, tip tapering to a point while it grows. */
+function pathD(b,g){
+  if(g<=0)return'';
+  const n=b.n,f=g*n,k=Math.min(n-1,f|0),u=f-k;
+  let s='M'+f1(b.lx[0])+' '+f1(b.ly[0]);
+  for(let i=1;i<=k;i++)s+='L'+f1(b.lx[i])+' '+f1(b.ly[i]);
+  const cx=b.cx[k]+(b.cx[k+1]-b.cx[k])*u,cy=b.cy[k]+(b.cy[k+1]-b.cy[k])*u;
+  const lx=b.lx[k]+(b.lx[k+1]-b.lx[k])*u,ly=b.ly[k]+(b.ly[k+1]-b.ly[k])*u;
+  const rx=b.rx[k]+(b.rx[k+1]-b.rx[k])*u,ry=b.ry[k]+(b.ry[k+1]-b.ry[k])*u;
+  s+='L'+f1(cx+(lx-cx)*g)+' '+f1(cy+(ly-cy)*g)+'L'+f1(cx+(rx-cx)*g)+' '+f1(cy+(ry-cy)*g);
+  for(let i=k;i>=0;i--)s+='L'+f1(b.rx[i])+' '+f1(b.ry[i]);
+  return s+'Z';
+}
+function draw(a,p){
+  let d='';
+  for(const b of a.bs){const q=Math.min(1,Math.max(0,(p-b.dl)/.65));d+=pathD(b,1-Math.pow(1-q,3))}
+  a.path.setAttribute('d',d);
+}
+function tick(now){
+  if(!anim){raf=0;return}
+  const p=Math.max(0,Math.min(1,(now-anim.t0)/anim.dur));
+  draw(anim,p);
+  if(p<1)raf=requestAnimationFrame(tick);else{anim=null;raf=0}
+}
+function step(px,py,x0){
+  if(anim){draw(anim,1);anim=null}
+  if(!T)T=plant(Math.max(W*.06,Math.min(W*.94,x0)));
+  anim=grow(px,py);
+  if(anim&&!raf)raf=requestAnimationFrame(tick);
+  hint.style.opacity=0;
+}
+function restart(){anim=null;T=null;grid.fill(0);dens.fill(0);nid=total=0;svg.replaceChildren();hint.style.opacity=1}
+function autoLoop(){
+  if(!auto)return;
+  const t=performance.now();
+  step(W*(.5+.42*Math.sin(t/2900)),H*(.4+.3*Math.cos(t/2100)),W/2);
+  setTimeout(autoLoop,V.speed+120);
+}
+
+addEventListener('pointerdown',e=>{
+  if(e.button>0)return;
+  const p=new DOMPoint(e.clientX,e.clientY).matrixTransform(svg.getScreenCTM().inverse());
+  step(p.x,p.y,p.x);
+});
+document.getElementById('ui').addEventListener('pointerdown',e=>e.stopPropagation());
+addEventListener('keydown',e=>{if(e.key==='r'||e.key==='R')restart()});
+const panel=document.getElementById('panel'),tg=document.getElementById('tg'),au=document.getElementById('auto');
+tg.onclick=()=>{panel.hidden=!panel.hidden;tg.setAttribute('aria-expanded',!panel.hidden)};
+if(W<700){panel.hidden=true;tg.setAttribute('aria-expanded','false')}
+document.getElementById('rs').onclick=restart;
+document.getElementById('df').onclick=()=>{for(const[k,,,,,d]of LV){V[k]=d;document.querySelector('[data-k='+k+']').value=d;document.getElementById('o_'+k).textContent=d}};
+au.onclick=()=>{auto^=1;au.setAttribute('aria-pressed',!!auto);if(auto)autoLoop()};
+</script>
+</body>
+</html>
