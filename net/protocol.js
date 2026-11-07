@@ -9,6 +9,7 @@ export const T = {
   CHAT: 'chat',         // all -> host -> all: { id, name, text }
   RENAME: 'rename',     // host -> all: { id, name } (dedupe result)
   PRESENCE: 'presence', // all -> host -> all: { id, game }
+  GOTO: 'goto',         // host -> all: { game } — move everyone to this game; null = waiting screen
   INTENT: 'intent',     // guest -> host: { game, action, from }
   STATE: 'state',       // host -> guests: { game, view, from? }
   SNAPSHOT: 'snapshot', // guest -> host: "I just opened { game } — send me the table"

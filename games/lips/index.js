@@ -31,6 +31,7 @@ export const meta = {
 
 const MIN_SEATS = 3;   // a friend and at least two people writing
 const MAX_SEATS = 8;
+const MATCH_ROUNDS = 6;     // rounds in a match; most points after this wins
 const MAX_LINE = 90;
 const WRITE_SECONDS = 60;   // how long everyone has to write
 const HEADS = 3;            // mannequin heads on the shelf
@@ -157,8 +158,9 @@ export function init(ctx) {
   seatAll(order, names, ctx && ctx.atTable);
   return {
     epoch: 0,
-    phase: 'lobby',          // lobby | write | rank | over
+    phase: 'lobby',          // lobby | write | rank | roundover | gameover
     roundNo: 0,
+    matchRounds: MATCH_ROUNDS,
     dealNo: 0,               // bumps whenever the clock restarts inside a round
     redeals: 0,              // times this round was re-dealt because nobody wrote
     order,                   // seated players, in seat order
@@ -174,6 +176,7 @@ export function init(ctx) {
     rankOrder: null,         // shuffle indices in the order the friend placed them
     doodle: [],              // the friend's mannequin lips (hidden until the reveal)
     result: null,            // { word, friend, winner } once the round is over
+    winnerIds: [],           // match winner id(s), set at game over
   };
 }
 
@@ -209,7 +212,7 @@ function join(state, id, from) {
 }
 
 function start(state, from, rng, ctx) {
-  if (!from.host) return { error: 'Only the host starts the next round.' };
+  if (!from.host) return { error: 'Only the host can start the game.' };
   if (state.phase === 'write' || state.phase === 'rank') return { error: 'A round is already running.' };
   if (!WORDS.length) return { error: 'The word list is empty.' };
   const s = clone(state);
@@ -221,7 +224,14 @@ function start(state, from, rng, ctx) {
     return { error: 'Only ' + s.order.length + ' seated (' + who + '). Need ' + MIN_SEATS
       + ': an amigo and two people to lip. Anyone missing should press "Sit in".' };
   }
-  s.roundNo = state.phase === 'lobby' ? 0 : state.roundNo + 1;
+  if (state.phase === 'lobby' || state.phase === 'gameover') {
+    s.matchRounds = MATCH_ROUNDS;
+    s.scores = {};
+    s.winnerIds = [];
+    s.roundNo = 0;
+  } else {
+    s.roundNo = state.roundNo + 1;
+  }
   s.dealNo = 0;
   s.redeals = 0;
   s.friend = s.order[s.roundNo % s.order.length];
@@ -232,6 +242,7 @@ function start(state, from, rng, ctx) {
   s.rankOrder = null;
   s.doodle = [];
   s.result = null;
+  s.winnerIds = [];
   dealWord(s, rng);
   s.phase = 'write';
   return s;
@@ -248,6 +259,7 @@ function resetToLobby(s, keepScores) {
   s.epoch += 1;
   s.phase = 'lobby';
   s.roundNo = 0;
+  s.matchRounds = MATCH_ROUNDS;
   s.dealNo = 0;
   s.redeals = 0;
   s.friend = null;
@@ -259,6 +271,7 @@ function resetToLobby(s, keepScores) {
   s.doodle = [];
   s.result = null;
   s.word = null;
+  s.winnerIds = [];
   if (!keepScores) s.scores = {};
   return s;
 }
@@ -338,10 +351,17 @@ function rank(state, id, action) {
   const s = clone(state);
   s.tiers = tiers.slice();
   s.rankOrder = order.slice();
-  s.phase = 'over';
   const winner = state.shuffle[tiers.indexOf(WISH)];
   s.scores[winner] = (s.scores[winner] || 0) + 1;
   s.result = { word: state.word, friend: state.friend, winner };
+  if (s.roundNo + 1 >= s.matchRounds) {
+    const best = Math.max(0, ...s.order.map((x) => s.scores[x] || 0));
+    s.winnerIds = s.order.filter((x) => (s.scores[x] || 0) === best);
+    s.phase = 'gameover';
+  } else {
+    s.winnerIds = [];
+    s.phase = 'roundover';
+  }
   return s;
 }
 
@@ -376,7 +396,8 @@ export function project(state, playerId) {
 
   const posOf = {};
   (state.rankOrder || []).forEach((idx, p) => { posOf[idx] = p; });
-  const reveal = (state.phase === 'over' && state.shuffle && state.tiers)
+  const showReveal = state.phase === 'roundover' || state.phase === 'gameover';
+  const reveal = (showReveal && state.shuffle && state.tiers)
     ? state.shuffle.map((wid, i) => ({
       key: i,
       text: state.lines[wid],
@@ -391,6 +412,7 @@ export function project(state, playerId) {
     phase: state.phase,
     epoch: state.epoch,
     roundNo: state.roundNo,
+    matchRounds: state.matchRounds,
     dealNo: state.dealNo,
     redeals: state.redeals,
     writeSec: WRITE_SECONDS,
@@ -410,7 +432,9 @@ export function project(state, playerId) {
     rankLines,
     reveal,
     // The friend always sees their own heads; everyone else waits for the reveal.
-    doodle: (isFriend || state.phase === 'over') ? state.doodle : [],
+    doodle: (isFriend || showReveal) ? state.doodle : [],
+    winnerIds: state.winnerIds || [],
+    winnerNames: (state.winnerIds || []).map((x) => names[x] || '…'),
     shuffleKey: state.epoch + ':' + state.roundNo + ':' + state.dealNo + ':' + (state.shuffle ? state.shuffle.length : 0),
   };
 }
@@ -457,7 +481,7 @@ export function roundId(state) {
 }
 
 export function summarize(state, nameOf) {
-  if (state.phase !== 'over' || !state.result) return null;
+  if ((state.phase !== 'roundover' && state.phase !== 'gameover') || !state.result) return null;
   const r = state.result;
   return nameOf(r.winner) + "'s line about \"" + r.word + '\" was the one ' + nameOf(r.friend) + ' wished they had thought of.';
 }
@@ -534,6 +558,19 @@ const DRIFT = DRIFT_SPOTS.map(([x, y, c, d]) =>
   '<svg style="left:' + x + '%;top:' + y + '%;--c:' + c + ';animation-delay:' + d + 's" viewBox="0 0 200 100" preserveAspectRatio="none">'
   + '<path class="lf" d="' + LIP_D + '"/></svg>'
 ).join('');
+
+const CONFETTI_SPOTS = [
+  [2, 2.8, 28, '#ff2a6d', 0], [8, 3.4, 22, '#05d9e8', .3], [14, 2.6, 32, '#ffe14d', .8], [20, 3.8, 24, '#b967ff', .1],
+  [26, 3.1, 30, '#ff9ec4', 1.1], [32, 2.9, 20, '#39ff88', .5], [38, 3.6, 34, '#ff2a6d', 1.5], [44, 2.7, 26, '#05d9e8', .2],
+  [50, 3.3, 22, '#ffe14d', .9], [56, 2.5, 30, '#b967ff', 1.3], [62, 3.7, 24, '#ff9ec4', .4], [68, 2.8, 28, '#39ff88', 1.7],
+  [74, 3.2, 20, '#ff2a6d', .6], [80, 2.6, 32, '#05d9e8', 1.0], [86, 3.5, 26, '#ffe14d', .15], [92, 2.9, 22, '#b967ff', 1.4],
+  [5, 3.0, 18, '#39ff88', 1.9], [17, 3.9, 36, '#ff2a6d', .7], [29, 2.4, 24, '#05d9e8', 1.6], [41, 3.4, 28, '#ffe14d', 1.2],
+  [53, 2.7, 20, '#b967ff', 2.0], [65, 3.6, 34, '#ff9ec4', .45], [77, 2.8, 22, '#ff2a6d', 1.8], [89, 3.1, 30, '#39ff88', .85], [97, 3.3, 26, '#05d9e8', 2.2],
+];
+const CONFETTI = '<div class="confetti" aria-hidden="true">' + CONFETTI_SPOTS.map(([x, dur, w, c, d]) =>
+  '<svg style="left:' + x + '%;--dur:' + dur + 's;--w:' + w + 'px;--c:' + c + ';animation-delay:' + d + 's" viewBox="0 0 200 100" preserveAspectRatio="none">'
+  + '<path class="lf" d="' + LIP_D + '"/><path class="ll" d="' + MOUTH_D + '"/></svg>'
+).join('') + '</div>';
 
 const CSS = `
 *{box-sizing:border-box}
@@ -631,13 +668,22 @@ textarea::placeholder{color:#8f7aa0;font-weight:400}
 .fctl [disabled]{opacity:.35;cursor:not-allowed}
 .fctl input[type=range]{flex:1;min-width:130px;accent-color:#ff2a6d}
 .fctl input[type=color]{width:36px;height:30px;padding:0;border:2px solid #05d9e8;background:#000}
-@media (prefers-reduced-motion:reduce){.title,.plus,.drift svg,.timer.hot .tnum{animation:none}.tfill{transition:none}}
+.confetti{position:absolute;inset:0;pointer-events:none;z-index:3;overflow:hidden}
+.confetti svg{position:absolute;top:-12%;width:var(--w);height:auto;opacity:.95;filter:drop-shadow(0 0 6px var(--c));animation:lipfall var(--dur) linear infinite}
+.confetti .lf{fill:var(--c);stroke:rgba(255,255,255,.35);stroke-width:3;vector-effect:non-scaling-stroke}
+.confetti .ll{fill:none;stroke:rgba(0,0,0,.28);stroke-width:2;vector-effect:non-scaling-stroke}
+@keyframes lipfall{0%{transform:translateY(-10vh) rotate(0deg)}25%{transform:translateY(28vh) translateX(10px) rotate(90deg)}50%{transform:translateY(62vh) translateX(-10px) rotate(180deg)}75%{transform:translateY(96vh) translateX(8px) rotate(270deg)}100%{transform:translateY(125vh) translateX(-6px) rotate(360deg)}}
+.matchwin{border-color:#ffe14d;box-shadow:0 0 16px #ffe14d,inset 0 0 18px rgba(255,225,77,.14);text-align:center}
+.winnername{margin:2px 0 6px;font-size:clamp(26px,7vw,40px);line-height:1.1;color:#ffe14d;text-shadow:0 0 10px #ffe14d,0 0 24px #ff2a6d}
+.goal{font-size:12px;letter-spacing:.08em;text-transform:uppercase;color:#c9b7d6}
+@media (prefers-reduced-motion:reduce){.title,.plus,.drift svg,.timer.hot .tnum,.confetti svg{animation:none}.tfill{transition:none}.confetti svg{top:auto;bottom:8%;opacity:.5}}
 `;
 
 export function mount(root, api) {
   root.innerHTML = '<style>' + CSS + '</style>'
-    + '<div class="sign"><div class="drift" aria-hidden="true">' + DRIFT + '</div><div class="board"></div></div>';
+    + '<div class="sign"><div class="drift" aria-hidden="true">' + DRIFT + '</div><div id="lips-confetti"></div><div class="board"></div></div>';
   const boardEl = root.querySelector('.board');
+  const confettiEl = root.querySelector('#lips-confetti');
   const signEl = root.querySelector('.sign');
   const doc = root.ownerDocument || document;
   const win = doc.defaultView || window;
@@ -826,34 +872,38 @@ export function mount(root, api) {
 
   // ------------------------------------------------------------ bodies
 
+  function roundLabel() {
+    return 'Round ' + (view.roundNo + 1) + ' of ' + view.matchRounds;
+  }
+
   function statusText() {
     const v = view;
     if (v.phase === 'lobby') {
-      return v.seatCount + ' seated' + (v.seatCount < MIN_SEATS ? ' · need ' + MIN_SEATS + ' to start' : ' · ready');
+      return v.seatCount + ' seated' + (v.seatCount < MIN_SEATS ? ' · need ' + MIN_SEATS + ' to start' : ' · ready for ' + v.matchRounds + ' liprounds');
     }
     if (v.phase === 'write') {
-      return v.writtenCount + ' of ' + v.writersTotal + ' lines in' + (v.isWriter && v.myLine ? ' · yours is in' : '');
+      return 'LipRound ' + (view.roundNo + 1) + ' of ' + view.matchRounds + ' · ' + v.writtenCount + ' of ' + v.writersTotal + ' lips in [· yours is in]';
     }
-    if (v.phase === 'rank') return v.isFriend ? 'Drag every line into a tier, then lick the top one.' : v.friendName + ' is ranking.';
-    return 'Round over.';
+    if (v.phase === 'rank') return 'LipRound ' + (view.roundNo + 1) + ' of ' + view.matchRounds + ' · ' + (v.isFriend ? 'Drag every lip into a tier, then lick the top one.' : view.friendName + ' is ranking.');
+    if (v.phase === 'roundover') return 'LipRound ' + (v.roundNo + 1) + ' of ' + view.matchRounds + ' complete.';
+    if (v.phase === 'gameover') return 'Flapping complete · ' + view.matchRounds + ' liprounds played.';
+    return '';
   }
 
-  function lobbyBody() {
+function lobbyBody() {
     const v = view;
     const ready = v.seatCount >= MIN_SEATS;
-    let b = '<div class="tube"><p class="how">Everyone else writes the one thing that friend '
-      + 'would say about it, against the clock. The friend drags the lips into a tier list, and the one they wish they had '
-      + 'thought of scores a point. The friend rotates every lipround.</p></div>';
+    let b = '<div class="tube"><p class="how">The table plays <b>' + v.matchRounds + ' liprounds</b>. Each lipround, everyone lips the one lip one friend would lip about a word. The friend ranks the lips. The lip they wish they had thought of gets <b>1 point</b>. After ' + v.matchRounds + ' liprounds, the most lips wins.</p></div>';
     const who = v.seated.map((p) => '<span class="chip' + (p.you ? ' you' : '') + '">' + lipSvg('mini') + esc(p.name)
       + (p.you ? ' <em>you</em>' : '') + '</span>').join('');
-    b += '<div class="tube"><div class="tag" style="margin:0 0 6px">Seated · ' + v.seatCount + ' of ' + MIN_SEATS + ' needed</div>'
+    b += '<div class="tube"><div class="tag" style="margin:0 0 6px">Seated · ' + v.seatCount + ' of ' + MIN_SEATS + ' needed · Goal: most lips after ' + v.matchRounds + ' liprounds</div>'
       + (who || '<span class="tag">nobody yet</span>')
       + (ready ? '' : '<p class="tag">Anyone at the table who is not listed here should press "Sit in".</p>') + '</div>';
     b += '<div class="acts">';
     if (v.canJoin) b += lip('Sit in', 'join');
     if (api.isHost) {
-      b += lip(ready ? 'Start the lips' : 'Need ' + (MIN_SEATS - v.seatCount) + ' more', 'start', { big: true, disabled: !ready });
-    } else b += '<p class="tag">The host is licking the lips.</p>';
+      b += lip(ready ? 'Start flapping the lips (' + v.matchRounds + ' liprounds)' : 'Need ' + (MIN_SEATS - v.seatCount) + ' more', 'start', { big: true, disabled: !ready });
+    } else b += '<p class="tag">The host will start the lipflaps.</p>';
     return b + '</div>';
   }
 
@@ -906,44 +956,83 @@ export function mount(root, api) {
       + '<p class="tag">' + hint + '</p>';
   }
 
-  function overBody() {
+  function revealBoard() {
     const v = view;
     const by = { 0: [], 1: [], 2: [] };
     (v.reveal || []).slice().sort((a, b) => a.pos - b.pos).forEach((l) => by[l.tier].push(l));
-    const board = tierRows((t) => by[t].map((l) => '<div class="tchip rv' + (t === WISH ? ' top' : '') + '">'
+    return tierRows((t) => by[t].map((l) => '<div class="tchip rv' + (t === WISH ? ' top' : '') + '">'
       + lipSvg('kiss') + esc(l.text) + '<span class="au">' + esc(l.authorName)
       + (t === WISH ? ' · +1 point' : '') + '</span></div>').join(''), false);
-    const heads = (v.doodle && v.doodle.length)
+  }
+
+  function revealHeads() {
+    const v = view;
+    return (v.doodle && v.doodle.length)
       ? '<div class="tube"><p class="how">' + esc(v.friendName) + ' lipped the mannequins while they waited.</p>'
         + sceneHtml(v.doodle, -1) + '</div>'
       : '';
+  }
+
+  function roundOverBody() {
+    const v = view;
+    const left = v.matchRounds - (v.roundNo + 1);
     const acts = api.isHost
-      ? '<div class="acts">' + lip('Next friend', 'start', { big: true, disabled: v.seatCount < MIN_SEATS })
+      ? '<div class="acts">' + lip(left === 1 ? 'Final lipround' : 'Next lipround', 'start', { big: true, disabled: v.seatCount < MIN_SEATS })
         + lip('Back to lobby', 'toLobby') + '</div>'
-      : '<p class="tag">The host lips the next friend.</p>';
-    return '<div class="tube"><p class="how">The lips.</p></div>' + board + heads + acts;
+      : '<p class="tag">The host will start the next lipround.</p>';
+    return '<div class="tube"><p class="how"><b>LipRound ' + (v.roundNo + 1) + ' of ' + v.matchRounds + ' complete.</b> '
+      + left + (left === 1 ? ' lipround' : ' liprounds') + ' left. Most points after ' + v.matchRounds + ' liprounds wins.</p></div>'
+      + revealBoard() + revealHeads() + acts;
+  }
+
+  function winnerText() {
+    const names = view.winnerNames || [];
+    if (names.length === 1) return esc(names[0]) + ' wins the match!';
+    if (names.length > 1) return 'Lip tie! ' + esc(names.join(' and ')) + ' win!';
+    return 'Match complete!';
+  }
+
+  function gameOverBody() {
+    const v = view;
+    const acts = api.isHost
+      ? '<div class="acts">' + lip('Play again (' + v.matchRounds + ' liprounds)', 'start', { big: true, disabled: v.seatCount < MIN_SEATS })
+        + lip('Back to lippy', 'toLobby') + '</div>'
+      : '<p class="tag">The host can play again or go back to the lippy.</p>';
+    return '<div class="tube matchwin"><p class="goal">After ' + v.matchRounds + ' liprounds</p>'
+      + '<div class="winnername">' + winnerText() + '</div>'
+      + '<p class="how" style="margin:0">Final lips are on the lip table below.</p></div>'
+      + revealBoard() + revealHeads() + acts;
   }
 
   function scoreBody() {
     const v = view;
     if (!v.board.length) return '';
-    const chips = v.board.map((p) => '<span class="chip' + (p.seated ? '' : ' out') + '">'
+    const winSet = {};
+    if (v.phase === 'gameover') (v.winnerIds || []).forEach((id) => { winSet[id] = true; });
+    const chips = v.board.map((p) => '<span class="chip' + (p.seated ? '' : ' out') + (winSet[p.id] ? ' you' : '') + '">'
       + lipSvg('mini') + esc(p.name)
-      + (p.friend && v.phase !== 'lobby' ? ' <em>friend</em>' : '')
+      + (p.friend && v.phase !== 'lobby' && v.phase !== 'gameover' ? ' <em>friend</em>' : '')
+      + (winSet[p.id] ? ' <em>flap winner</em>' : '')
       + ' <b>' + p.points + '</b></span>').join('');
-    return '<div class="tube scores"><div class="tag">Table · points</div>' + chips + '</div>';
+    const goal = v.phase === 'lobby' ? 'Goal: most lips after ' + v.matchRounds + ' liprounds'
+      : v.phase === 'gameover' ? 'Final score after ' + v.matchRounds + ' liprounds'
+      : 'LipRound ' + (v.roundNo + 1) + ' of ' + v.matchRounds + ' · Goal: most lips wins';
+    return '<div class="tube scores"><div class="tag">' + esc(goal) + '</div>' + chips + '</div>';
   }
 
   function page() {
     const v = view;
-    const phrase = v.word
+    const phrase = v.phase === 'gameover'
+      ? 'Match complete after <b>' + v.matchRounds + '</b> liprounds.'
+      : v.word
       ? 'Say what <b>' + esc(v.friendName || '…') + '</b> would say about <span class="w">' + esc(v.word) + '</span>.'
       : 'Say what <b>______</b> would say about <span class="w">______</span>.';
     let body = '';
     if (v.phase === 'lobby') body = lobbyBody();
     else if (v.phase === 'write') body = writeBody();
     else if (v.phase === 'rank') body = rankBody();
-    else if (v.phase === 'over') body = overBody();
+    else if (v.phase === 'roundover') body = roundOverBody();
+    else if (v.phase === 'gameover') body = gameOverBody();
     const status = note ? '<div class="status warn">' + esc(note) + '</div>'
       : '<div class="status">' + esc(statusText()) + '</div>';
     return '<h1 class="title"><span>I\'m your</span> <span class="lipsw">lips</span></h1>'
@@ -956,9 +1045,10 @@ export function mount(root, api) {
   function render() {
     if (!view) {
       boardEl.innerHTML = '<div class="status">Warming up the lips…</div>';
+      if (confettiEl) confettiEl.innerHTML = '';
       return;
     }
-    const rk = view.epoch + ':' + view.roundNo;
+    const rk = view.epoch + ':' + view.roundNo + ':' + view.phase;
     if (rk !== roundKey) {
       roundKey = rk;
       draft = null;
@@ -977,6 +1067,7 @@ export function mount(root, api) {
     const sel = (hadFocus && old) ? [old.selectionStart, old.selectionEnd] : null;
 
     boardEl.innerHTML = page();
+    if (confettiEl) confettiEl.innerHTML = view.phase === 'gameover' ? CONFETTI : '';
     const ta = boardEl.querySelector('#draft');
     if (ta) {
       ta.value = draft == null ? (view.myLine || '') : draft;

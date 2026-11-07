@@ -254,6 +254,7 @@ export async function boot() {
     if (!box) return;
     box.innerHTML = '';
     const s = store.state;
+    if (s.curated && !s.isHost) return;
     if (!s.inRoom) return;
     const t = tables();
     Object.keys(t.groups).forEach(function (gid) {
@@ -495,6 +496,10 @@ export async function boot() {
       saveSession(store.state);
       return;
     }
+    if (s.curated.on && !s.isHost && id !== s.curated.game) {
+      setStatus('host-status', 'The host is choosing games.');
+      return;
+    }
     // Switching tables in place. openGame used to set presence for the game
     // being ENTERED and never for the one being left, so a host who moved to
     // another table stayed seated in the first one's state and any round
@@ -543,6 +548,7 @@ export async function boot() {
 
   // handle for the currently mounted Shadow DOM module (null for iframe games)
   let moduleHandle = null;
+  let pendingCuration = false;
 
   function mountGame(g) {
     closeStageOnly();
@@ -760,7 +766,8 @@ export async function boot() {
       hideBanner();
       if (redialTimer) { clearTimeout(redialTimer); redialTimer = null; }
       redialDelay = 1500;
-      store.openRoom(p.room, true);
+      store.openRoom(p.room, true, pendingCuration);
+      pendingCuration = false;
       store.upsertMember({ id: s.me.id, name: s.me.name, host: true, game: s.openGame });
       noteSeen(s.me.id);
       startHeartbeat();
@@ -861,6 +868,17 @@ export async function boot() {
       showRoom();
       renderRoster();
       pushRosterToGames();
+      // process curated mode for this guest
+      if (m.p.curated && m.p.curated.on) {
+        store.setCurated(true, m.p.curated.game);
+        if (m.p.curated.game) {
+          openGame(m.p.curated.game);
+          pendingGame = null;
+        }
+        document.getElementById('multiplayer-section').classList.add('hidden');
+        document.getElementById('solo-section').classList.add('hidden');
+        document.getElementById('game-invites').classList.add('hidden');
+      }
       // open pending invite game once
       if (pendingGame) {
         const g = pendingGame;
@@ -880,6 +898,28 @@ export async function boot() {
       }
       renderRoster();
       pushRosterToGames();
+      // process curated mode from roster update
+      if (m.p.curated && m.p.curated.on) {
+        store.setCurated(true, m.p.curated.game);
+        if (m.p.curated.game) {
+          if (s.openGame && s.openGame !== m.p.curated.game) {
+            leaveOpenGame();
+          }
+          openGame(m.p.curated.game);
+        }
+        document.getElementById('multiplayer-section').classList.add('hidden');
+        document.getElementById('solo-section').classList.add('hidden');
+        document.getElementById('game-invites').classList.add('hidden');
+        setStatus('host-status', 'Curation mode: host is choosing games.');
+      }
+    } else if (m.type === T.GOTO) {
+      const game = m.p && m.p.game;
+      store.setCurated(true, game || null);
+      if (game) {
+        openGame(game);
+      } else {
+        leaveOpenGame();
+      }
     } else if (m.type === T.CHAT) {
       chat.onNetMessage(m);
     } else if (m.type === T.RENAME) {
@@ -1213,6 +1253,7 @@ export async function boot() {
     if (!nameConfirmed) { setStatus('host-status', 'Confirm your name first (✓).'); return; }
     if (store.state.inRoom) { setStatus('host-status', 'You are already in room ' + store.state.roomId + ' — leave it first.'); return; }
     const want = (document.getElementById('host-id-input').value || '').trim() || randomRoom();
+    const curated = document.getElementById('host-curation')?.checked || false;
     const keepGame = store.state.openGame;
     setStatus('host-status', 'Creating ' + want + '…');
     try {
@@ -1353,7 +1394,7 @@ export async function boot() {
     document.addEventListener('keydown', function (e) {
       if (e.key === 'Escape') {
         if (document.body.classList.contains('drawer-open')) document.body.classList.remove('drawer-open');
-        else if (stageRoot && !stageRoot.classList.contains('stage-idle')) {
+        else if (stageRoot && !stageRoot.classList.contains('stage-idle') && !(store.state.curated && !store.state.isHost)) {
           leaveOpenGame();
         }
       }
@@ -1367,6 +1408,18 @@ export async function boot() {
     store.subscribe(function () {
       renderRoster();
       renderHeaderRoom();
+      const multiplayerSection = document.getElementById('multiplayer-section');
+      const soloSection = document.getElementById('solo-section');
+      const gameInvites = document.getElementById('game-invites');
+      if (store.state.curated && store.state.curated.on) {
+        if (multiplayerSection) multiplayerSection.classList.add('hidden');
+        if (soloSection) soloSection.classList.add('hidden');
+        if (gameInvites) gameInvites.classList.add('hidden');
+      } else {
+        if (multiplayerSection) multiplayerSection.classList.remove('hidden');
+        if (soloSection) soloSection.classList.remove('hidden');
+        if (gameInvites) gameInvites.classList.remove('hidden');
+      }
     });
 
     // NOTE: no resume bar by design — rejoining is an explicit act

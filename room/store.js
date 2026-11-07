@@ -28,7 +28,8 @@ export function createStore() {
     // for. s.seats mirrors the currently open game's map for old callers.
     seatsByGame: {},
     lastState: {}, // gameId -> latest host state/view (for late joiners)
-    openGame: null
+    openGame: null,
+    curated: { on: false, game: null }
   };
 
   function emit() { listeners.forEach(function (fn) { try { fn(s); } catch (e) {} }); }
@@ -65,9 +66,10 @@ export function createStore() {
     setMe(id, name) { s.me.id = id; s.me.name = name; emit(); },
     setName(name) { s.me.name = name; emit(); },
 
-    openRoom(roomId, isHost) {
+    openRoom(roomId, isHost, curated) {
       s.roomId = roomId; s.inRoom = true; s.isHost = isHost;
       s.hostId = isHost ? s.me.id : '';
+      s.curated = curated || { on: false, game: null };
       emit();
     },
     // Solo is a room of one: not in a room, but still the host. This has to be
@@ -79,11 +81,12 @@ export function createStore() {
     // and reportResult() returned early: nothing was recorded.
     openSolo() {
       s.roomId = ''; s.inRoom = false; s.isHost = true; s.hostId = s.me.id;
+      s.curated = { on: false, game: null };
       emit();
     },
     closeRoom() {
       s.roomId = ''; s.inRoom = false; s.isHost = false; s.hostId = '';
-      s.roster = []; s.seats = {}; s.seatsByGame = {}; s.openGame = null;
+      s.roster = []; s.seats = {}; s.seatsByGame = {}; s.openGame = null; s.curated = { on: false, game: null };
       // lastState is a cache of HOST state and must not outlive the room it
       // came from: mountGame prefers a cached view over a freshly created
       // table, so a stale entry from the previous room is what a player got
@@ -92,6 +95,7 @@ export function createStore() {
       emit();
     },
     setHostId(id) { s.hostId = id; emit(); },
+    setCurated(on, game) { s.curated = { on, game }; emit(); },
 
     upsertMember(m) {
       const i = s.roster.findIndex(function (x) { return x.id === m.id; });

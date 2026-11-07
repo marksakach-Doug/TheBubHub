@@ -105,7 +105,7 @@ details p{max-width:78ch;font-size:14px}
 
     <section class="card">
       <h2>Players</h2><ul id="players" class="playerlist"></ul>
-      <div class="actions"><button id="new" class="hidden">New braid</button><button id="lobbyBtn" class="hidden">Back to lobby</button></div>
+      <div class="actions"><button id="saveBraid" class="hidden">Save final braid</button><button id="new" class="hidden">New braid</button><button id="lobbyBtn" class="hidden">Back to lobby</button></div>
     </section>
   </main>
 
@@ -503,6 +503,7 @@ function render(){
     });
   }
 
+  $('saveBraid').classList.toggle('hidden',!(S && S.phase==='gameover'));
   $('new').classList.toggle('hidden',!isHost());
   $('lobbyBtn').classList.toggle('hidden',!isHost());
   drawBoard();renderPlayers();reportHeight();
@@ -540,6 +541,77 @@ document.querySelectorAll('[data-kind]').forEach(btn=>btn.addEventListener('clic
     act({a:'judge',syn,ant});
   }
 }));
+function saveBraid(){
+  if(!S||!S.words||!S.words.length){say('No braid to save yet.');return}
+  var date = new Date();
+  var stamp = date.getFullYear() + '-' + String(date.getMonth()+1).padStart(2,'0') + '-' + String(date.getDate()).padStart(2,'0');
+  var svg = svgBoard();
+  var winner = S.winnerId ? playerName(S.winnerId) : '';
+  var crossings = S.words.filter(function(w){return !w.seed}).length;
+  var parts = [];
+  parts.push('<!DOCTYPE html><html lang="en"><head><meta charset="utf-8">');
+  parts.push('<meta name="viewport" content="width=device-width, initial-scale=1">');
+  parts.push('<meta name="color-scheme" content="light">');
+  parts.push('<title>Braid — final braid</title>');
+  parts.push('<style>');
+  parts.push('body{margin:0;padding:24px;background:#f4efe5;color:#302c25;font:15px/1.5 "Segoe UI",system-ui,-apple-system,Arial,sans-serif}');
+  parts.push('.wrap{max-width:980px;margin:0 auto}');
+  parts.push('.card{background:#fffdf8;border:1px solid #d9cfbd;border-radius:15px;padding:18px 20px;box-shadow:0 2px 4px #332e2610,0 10px 26px #332e260d;margin:0 0 14px}');
+  parts.push('h1{font:600 42px/1 Georgia,"Times New Roman",serif;margin:0 0 4px;color:#3d3328}');
+  parts.push('h2{font:600 21px Georgia,"Times New Roman",serif;margin:0 0 8px;color:#60452f}');
+  parts.push('.muted{color:#746b5f;font-size:14px}');
+  parts.push('.meta{display:flex;gap:8px;flex-wrap:wrap;margin:10px 0 0}');
+  parts.push('.pill{display:inline-block;padding:4px 10px;border-radius:999px;background:#eee6d8;border:1px solid #d9cfbd;font-size:13px}');
+  parts.push('.winner{background:#f3ead7;border-color:#c9b07c;color:#6d4d12;font-weight:700}');
+  parts.push('.board{overflow:auto;border:1px solid #d9cfbd;border-radius:13px;background:linear-gradient(180deg,#fffefa,#f8f2e8);padding:8px}');
+  parts.push('.board svg{display:block;max-width:none}');
+  parts.push('table{width:100%;border-collapse:collapse;font-size:14px}');
+  parts.push('th,td{text-align:left;padding:8px 10px;border-bottom:1px solid #e6ddcd;vertical-align:top}');
+  parts.push('th{color:#746b5f;font-size:12px;text-transform:uppercase;letter-spacing:.04em}');
+  parts.push('tr:last-child td{border-bottom:0}');
+  parts.push('.seed{color:#3f7778;font-weight:700}');
+  parts.push('.out{text-decoration:line-through;color:#746b5f}');
+  parts.push('@media print{body{padding:0;background:#fff}.card{box-shadow:none}}');
+  parts.push('</style></head><body><div class="wrap">');
+  parts.push('<section class="card"><h1>Braid</h1><p class="muted">Final braid · saved ' + esc(date.toLocaleString()) + '</p><div class="meta">');
+  if(winner) parts.push('<span class="pill winner">Winner: ' + esc(winner) + '</span>');
+  parts.push('<span class="pill">' + crossings + ' crossing' + (crossings===1?'':'s') + '</span>');
+  parts.push('<span class="pill">' + S.words.length + ' word' + (S.words.length===1?'':'s') + '</span>');
+  parts.push('</div></section>');
+  parts.push('<section class="card"><h2>The braid</h2><div class="board">' + svg + '</div></section>');
+  parts.push('<section class="card"><h2>Players</h2><div class="meta">');
+  (S.order||[]).forEach(function(id){
+    var isOut=(S.eliminated||[]).indexOf(id)>=0;
+    var isWin=id===S.winnerId;
+    var cls='pill'+(isWin?' winner':'')+(isOut&&!isWin?' out':'');
+    var suffix=isWin?' · winner':(isOut?' · out':'');
+    parts.push('<span class="' + cls + '">' + esc(playerName(id) + suffix) + '</span>');
+  });
+  parts.push('</div></section>');
+  parts.push('<section class="card"><h2>Words</h2><table><thead><tr><th>#</th><th>Word</th><th>Kind</th><th>Player</th><th>Bridge</th></tr></thead><tbody>');
+  S.words.forEach(function(w,i){
+    var who=esc(playerName(w.by));
+    var kind=w.seed?'<span class="seed">Seed ('+esc(SLOT_NAMES[w.strand]||'')+' strand)</span>':'Crossing '+esc(String(w.step||'' ));
+    var bridge='';
+    if(!w.seed){
+      var aWord=byId(w.aId), bWord=byId(w.bId);
+      bridge='associated with “'+esc(aWord?aWord.text:'?')+'”, not associated with “'+esc(bWord?bWord.text:'?')+'”';
+    }
+    parts.push('<tr><td>'+(i+1)+'</td><td><strong>'+esc(w.text)+'</strong></td><td>'+kind+'</td><td>'+who+'</td><td class="muted">'+bridge+'</td></tr>');
+  });
+  parts.push('</tbody></table></section>');
+  parts.push('</div></body></html>');
+  var blob = new Blob(parts, {type:'text/html'});
+  var url = URL.createObjectURL(blob);
+  var a = document.createElement('a');
+  a.href = url;
+  a.download = 'braid-final-' + stamp + '.html';
+  document.body.appendChild(a);
+  a.click();
+  setTimeout(function(){ URL.revokeObjectURL(url); if(a.parentNode) a.parentNode.removeChild(a); }, 2000);
+}
+
+$('saveBraid').addEventListener('click', saveBraid);
 $('new').addEventListener('click',()=>{if(mode==='local')localStart();else if(isHost())act({a:'new'})});
 $('lobbyBtn').addEventListener('click',()=>{if(isHost())act({a:'toLobby'})});
 setInterval(updateTimerDisplay,200);

@@ -41,14 +41,13 @@ button.quiet{border-color:var(--rule);color:var(--ash)}
 /* ---------- chain strip ---------- */
 #t96-chains{display:flex;gap:8px;flex-wrap:wrap}
 .chaincard{display:flex;flex-direction:column;gap:2px;align-items:flex-start;min-width:118px;text-align:left;
-  background:var(--card);border:2px solid var(--rule);border-radius:12px;padding:8px 10px;cursor:pointer;min-height:52px}
+  background:var(--card);border:2px solid var(--rule);border-radius:12px;padding:8px 10px;min-height:52px}
 .chaincard .who{font-weight:800;font-size:13px}
 .chaincard .job{font-size:11px;color:var(--ash)}
 .chaincard .left{font-size:11px;font-variant-numeric:tabular-nums;color:var(--ash)}
 .chaincard.done{opacity:.55}
 .chaincard.yours{border-color:var(--accent);box-shadow:0 0 0 3px rgba(181,84,31,.25);animation:pulse 1.3s ease-in-out infinite}
 .chaincard.now{border-color:var(--accent2)}
-.chaincard:hover{background:#fff}
 @keyframes pulse{0%,100%{box-shadow:0 0 0 3px rgba(181,84,31,.25)}50%{box-shadow:0 0 0 6px rgba(181,84,31,.4)}}
 @media (prefers-reduced-motion:reduce){.chaincard.yours{animation:none}}
 
@@ -110,7 +109,7 @@ button.quiet{border-color:var(--rule);color:var(--ash)}
 
   <section id="t96-setup" class="card hidden">
     <h1>The <span class="q">96</span> Game</h1>
-    <p class="muted tiny" style="margin-top:6px">Everyone writes their own sentence. Then the next player draws it, the next describes it, and so on. Every chain runs at once — everyone is always playing. Two minutes per turn. Make sure you're having fun, Bucko.</p>
+    <p class="muted tiny" style="margin-top:6px">Everyone writes their own sentence. Then the next player draws it, the next describes it, and so on. The whole table moves together through each turn with one shared timer. Make sure you're having fun, Bucko.</p>
     <p id="t96-setup-note" class="tiny muted" style="margin-top:10px"></p>
     <div class="seats" id="t96-setup-seats" style="margin:10px 0"></div>
     <button class="go" id="t96-start">Start the game</button>
@@ -125,26 +124,28 @@ button.quiet{border-color:var(--rule);color:var(--ash)}
 
     <div id="t96-chains"></div>
 
-    <div id="t96-stage">
-      <canvas id="t96-canvas" width="900" height="600"></canvas>
-      <div id="t96-idle" class="hidden"><div>
-        <span class="big"></span>
-        <span class="small"></span>
-      </div></div>
-    </div>
+    <div id="t96-playarea">
+      <div id="t96-stage">
+        <canvas id="t96-canvas" width="900" height="600"></canvas>
+        <div id="t96-idle" class="hidden"><div>
+          <span class="big"></span>
+          <span class="small"></span>
+        </div></div>
+      </div>
 
-    <div id="t96-tools" class="hidden">
-      <div id="t96-swatches"></div>
-      <span style="flex:1"></span>
-      <button class="quiet tool" id="t96-undo">Undo</button>
-      <button class="quiet tool" id="t96-clear">Clear</button>
-      <button class="go" id="t96-done">Done</button>
-    </div>
+      <div id="t96-tools" class="hidden">
+        <div id="t96-swatches"></div>
+        <span style="flex:1"></span>
+        <button class="quiet tool" id="t96-undo">Undo</button>
+        <button class="quiet tool" id="t96-clear">Clear</button>
+        <button class="go" id="t96-done">Done</button>
+      </div>
 
-    <div id="t96-write" class="hidden">
-      <textarea id="t96-say" maxlength="120" placeholder="Write a sentence someone could draw…"></textarea>
-      <div class="row" style="margin-top:8px;justify-content:flex-end">
-        <button class="go" id="t96-send">Send it</button>
+      <div id="t96-write" class="hidden">
+        <textarea id="t96-say" maxlength="120" placeholder="Write a sentence someone could draw…"></textarea>
+        <div class="row" style="margin-top:8px;justify-content:flex-end">
+          <button class="go" id="t96-send">Send it</button>
+        </div>
       </div>
     </div>
 
@@ -226,57 +227,82 @@ function sh(id, on){ var n = $(id); if (n) n.classList.toggle('hidden', !on); }
 
 // ---------- public state ----------
 // Contains NO sentences and NO pixels during a lap. `chain` is filled in only
-// at the reveal. `chains` is public: who is playing what step is public.
-// Each chain object: { id, starter, step, startedAt, done }
+// at the reveal. The whole table moves in lockstep: one global turn number and
+// one shared timer. `turn` is the current step index for every chain.
+// `submitted` is a map of player id -> true for players who finished this turn.
+// Each chain object: { id, starter }
 var S = null;
 
 // ---------- host-only, never broadcast ----------
 var hostText = {};      // stepKey -> sentence
 var hostCanvas = {};    // stepKey -> [strokes]
 var hostSkip = {};      // stepKey -> true if the timer skipped it
-var turnTimer = {};     // chainId -> timeout id (host only)
+var turnTimer = null;   // single shared timer (host only)
 
 // ---------- local-only ----------
-var myArt = null;       // my private input this step: {k:'text'|'canvas', chain:stepKey…}
+var myArt = null;       // my private input this step: {k:'text'|'canvas', key:stepKey}
 var briefs = {};        // stepKey -> brief, for briefs that arrive before their turn
 var myStrokes = [];     // my own drawing, optimistic
 var draft = null;       // stroke in progress
 var drawing = false;
 var penColour = COLOURS[0];
+var submittedLocal = false;
 var lastKey = '';
 var reported = false;
 var canvas = null, ctx = null;
 var toastT = null;
-var selected = 0;       // chain index the stage is bound to
-var tickT = null;       // rAF/interval for countdowns
+var tickT = null;
 
 function stepKey(lap, chain, step){ return lap + ':' + chain + ':' + step; }
-function chainKey(c){ return stepKey(S.lap, c, S.chains[c].step); }
 function stepKind(i){ i = (i == null ? 0 : i); return (i % 2 === 0) ? 'text' : 'draw'; }
 function seatIndex(id){ return S.order.indexOf(id); }
-// Who acts in a chain at a given step. THE one place turns are computed.
 function actorOf(ch, step){
-    var k = (step == null ? ch.step : step);
+    var k = (step == null ? (S ? S.turn : 0) : step);
     var at = seatIndex(ch.starter);
     if (at < 0) return null;
     return S.order[(at + k) % S.order.length];
 }
-function isActor(ch, id){ return !!ch && actorOf(ch) === id; }
-function myPending(){
-    if (!S || S.phase !== 'play') return [];
-    var me = myId(), out = [];
+function myChainIndex(){
+    if (!S || S.phase !== 'play') return -1;
+    var me = myId();
     for (var i = 0; i < S.chains.length; i++){
-        var ch = S.chains[i];
-        if (ch.done) continue;
-        if (actorOf(ch) === me) out.push(i);
+        if (actorOf(S.chains[i], S.turn) === me) return i;
     }
-    return out;
+    return -1;
 }
-function selChain(){ return S && S.chains[selected]; }
+function myChain(){ var i = myChainIndex(); return i >= 0 ? S.chains[i] : null; }
+function myStepKey(){
+    var ch = myChain();
+    return ch ? stepKey(S.lap, ch.id, S.turn) : '';
+}
 function iAmActor(){
-    var ch = selChain();
-    return !!S && S.phase === 'play' && ch && !ch.done && actorOf(ch) === myId();
+    if (!S || S.phase !== 'play') return false;
+    var me = myId();
+    return !!(S.submitted && !S.submitted[me] && myChainIndex() >= 0);
 }
+function activeActorIds(){
+    var ids = [], seen = {};
+    if (!S) return ids;
+    for (var i = 0; i < S.chains.length; i++){
+        var a = actorOf(S.chains[i], S.turn);
+        if (a && S.order.indexOf(a) >= 0 && !seen[a]){ seen[a] = true; ids.push(a); }
+    }
+    return ids;
+}
+function normalizeSubmitted(){
+    if (!S) return;
+    if (!S.submitted || typeof S.submitted !== 'object') S.submitted = {};
+    var keep = {};
+    activeActorIds().forEach(function(id){ if (S.submitted[id]) keep[id] = true; });
+    S.submitted = keep;
+}
+function allSubmitted(){
+    var ids = activeActorIds();
+    if (!ids.length) return true;
+    for (var i = 0; i < ids.length; i++){ if (!S.submitted || !S.submitted[ids[i]]) return false; }
+    return true;
+}
+function markSubmitted(id){ if (S && id){ if (!S.submitted) S.submitted = {}; S.submitted[id] = true; } }
 
 // ---------- setup ----------
 function fresh(){
@@ -287,65 +313,76 @@ function fresh(){
     S = { inst: now + '-' + Math.floor(Math.random()*1e6),
           order: ids, names: names,
           lap: 0, phase: 'play', lapsPlayed: 0, startedAt: now,
-          chains: ids.map(function(id, i){
-              return { id: i, starter: id, step: 0, startedAt: now, done: false };
-          }),
+          turn: 0, turnStartedAt: now, submitted: {},
+          chains: ids.map(function(id, i){ return { id: i, starter: id }; }),
           chain: null };
     hostText = {}; hostCanvas = {}; hostSkip = {}; briefs = {};
     clearTimers();
     reported = false;
     lastKey = '';
-    selected = 0;
-    for (var i = 0; i < S.chains.length; i++) armTimer(i);
+    submittedLocal = false;
+    armTurnTimer();
     broadcast();
+    deliverTurnBriefs();
 }
 
-// ---------- timers (host authoritative) ----------
+// ---------- timers (host authoritative, one shared turn timer) ----------
 function clearTimers(){
-    for (var k in turnTimer){ if (turnTimer.hasOwnProperty(k)) clearTimeout(turnTimer[k]); }
-    turnTimer = {};
+    if (turnTimer){ clearTimeout(turnTimer); turnTimer = null; }
 }
-function armTimer(c){
-    if (!isHost() || !S) return;
-    if (turnTimer[c]) clearTimeout(turnTimer[c]);
-    var ch = S.chains[c];
-    var left = (ch.startedAt + TURN_MS) - Date.now();
+function armTurnTimer(){
+    if (!isHost() || !S || S.phase !== 'play') return;
+    if (turnTimer) clearTimeout(turnTimer);
+    var left = (S.turnStartedAt + TURN_MS) - Date.now();
     if (left < 0) left = 0;
-    turnTimer[c] = setTimeout(function(){ expireStep(c); }, left + 25);
+    turnTimer = setTimeout(function(){ expireTurn(); }, left + 25);
 }
-function expireStep(c){
-    if (!S || S.phase !== 'play' || !S.chains[c] || S.chains[c].done) return;
-    var ch = S.chains[c], k = chainKey(c);
-    if (stepKind(ch.step) === 'text') hostText[k] = '(time)';
-    else hostCanvas[k] = [];
-    hostSkip[k] = true;
-    skipTo(actorOf(ch), k);
-    advanceChain(c);
+function fillMissingForTurn(){
+    if (!S) return;
+    var ids = activeActorIds();
+    for (var i = 0; i < ids.length; i++){
+        var id = ids[i];
+        if (S.submitted && S.submitted[id]) continue;
+        var c = -1;
+        for (var j = 0; j < S.chains.length; j++){ if (actorOf(S.chains[j], S.turn) === id){ c = j; break; } }
+        if (c < 0) continue;
+        var k = stepKey(S.lap, S.chains[c].id, S.turn);
+        if (hostSkip[k]){ markSubmitted(id); continue; }
+        if (stepKind(S.turn) === 'text') hostText[k] = '(time)';
+        else hostCanvas[k] = [];
+        hostSkip[k] = true;
+        skipTo(id, k);
+        markSubmitted(id);
+    }
+}
+function expireTurn(){
+    if (!S || S.phase !== 'play') return;
+    fillMissingForTurn();
+    advanceTurn();
 }
 
-// ---------- the lap ----------
-// Each chain advances on its own cursor. `skipTo` lets the table know when a
-// turn dies on the clock instead of quietly vanishing.
 function skipTo(id, key){
     if (!isHost() || !id) return;
     pushTo(id, PFX_S + key + '|skipped');
 }
 
 function stepBrief(c){
-    // Hand exactly one artifact to exactly one player. Self-delivery is
-    // short-circuited in pushTo; state went out first in broadcast().
-    if (!isHost()) return;
+    if (!isHost() || !S) return;
     var ch = S.chains[c];
-    if (ch.step === 0) return;
-    var a = actorOf(ch);
+    if (!ch || S.turn === 0) return;
+    var a = actorOf(ch, S.turn);
     if (!a) return;
-    var prev = stepKey(S.lap, c, ch.step - 1);
-    var tag = chainKey(c);
-    if (stepKind(ch.step) === 'text'){
+    var prev = stepKey(S.lap, ch.id, S.turn - 1);
+    var tag = stepKey(S.lap, ch.id, S.turn);
+    if (stepKind(S.turn) === 'text'){
         pushTo(a, PFX_C + tag + '|' + JSON.stringify(hostCanvas[prev] || []));
     } else {
         pushTo(a, PFX_T + tag + '|' + (hostText[prev] || ''));
     }
+}
+function deliverTurnBriefs(){
+    if (!isHost() || !S || S.phase !== 'play') return;
+    for (var i = 0; i < S.chains.length; i++) stepBrief(i);
 }
 
 function broadcast(){
@@ -354,39 +391,19 @@ function broadcast(){
     Hub.up('state', S);
 }
 
-function beginStep(c){
-    var ch = S.chains[c];
-    ch.startedAt = Date.now();
-    armTimer(c);
-    broadcast();
-    stepBrief(c);
-}
-
-function advanceChain(c){
-    var ch = S.chains[c];
-    if (!ch) return;
-    ch.step++;
-    // A chain must never wait on a player who is no longer at the table.
-    while (ch.step < S.order.length){
-        var a = actorOf(ch);
-        if (a !== null && S.order.indexOf(a) >= 0) break;
-        var k = chainKey(c);
-        if (stepKind(ch.step) === 'text') hostText[k] = '(that player left)';
-        else hostCanvas[k] = [];
-        hostSkip[k] = true;
-        ch.step++;
-    }
-    if (ch.step >= S.order.length){
-        ch.done = true;
-        if (turnTimer[c]) { clearTimeout(turnTimer[c]); turnTimer[c] = null; }
-        if (S.chains.every(function(x){ return x.done; })){ revealLap(); return; }
-        broadcast();
+function advanceTurn(){
+    if (!S || S.phase !== 'play') return;
+    clearTimers();
+    S.turn++;
+    if (S.turn >= S.order.length){
+        revealLap();
         return;
     }
-    ch.startedAt = Date.now();
-    armTimer(c);
+    S.turnStartedAt = Date.now();
+    S.submitted = {};
+    armTurnTimer();
     broadcast();
-    stepBrief(c);
+    deliverTurnBriefs();
 }
 
 function revealLap(){
@@ -422,15 +439,15 @@ function nextLap(){
     S.order = ids; S.names = names;
     S.lap++;
     S.phase = 'play'; S.chain = null; S.startedAt = now;
-    S.chains = ids.map(function(id, i){
-        return { id: i, starter: id, step: 0, startedAt: now, done: false };
-    });
+    S.turn = 0; S.turnStartedAt = now; S.submitted = {};
+    S.chains = ids.map(function(id, i){ return { id: i, starter: id }; });
     hostText = {}; hostCanvas = {}; hostSkip = {}; briefs = {};
     clearTimers();
     lastKey = '';
-    selected = 0;
-    for (var i = 0; i < S.chains.length; i++) armTimer(i);
+    submittedLocal = false;
+    armTurnTimer();
     broadcast();
+    deliverTurnBriefs();
 }
 
 function pushTo(id, payload){
@@ -438,19 +455,17 @@ function pushTo(id, payload){
     Hub.up('denied', { to: id, text: payload });
 }
 
-// A brief is addressed to the step it is FOR, and can land before the state
-// that creates that step. Park and pick up by key, then drop stale ones.
 function applyBrief(){
-    var k = chainKey(selected);
-    var me = myId();
+    var me = myId(), i = myChainIndex();
     myArt = null;
-    var ch = selChain();
-    if (ch && actorOf(ch) === me && briefs[k]) myArt = briefs[k];
-    // Keep every live chain's brief for me; everything else is moved past.
+    if (i >= 0){
+        var k = stepKey(S.lap, S.chains[i].id, S.turn);
+        if (briefs[k]) myArt = briefs[k];
+    }
     var mine = {};
-    for (var i = 0; i < (S ? S.chains.length : 0); i++){
-        var key = S.chains[i] ? stepKey(S.lap, i, S.chains[i].step) : '';
-        if (briefs[key]) mine[key] = briefs[key];
+    if (S && S.phase === 'play' && i >= 0){
+        var live = stepKey(S.lap, S.chains[i].id, S.turn);
+        if (briefs[live]) mine[live] = briefs[live];
     }
     Object.keys(briefs).forEach(function(key){ if (!mine[key]) delete briefs[key]; });
 }
@@ -466,8 +481,10 @@ function onDenied(text){
     var key = text.slice(pfx.length, i);
     if (!/^\d+:\d+:\d+$/.test(key)) return;
     if (isSkip){
-        // The clock took your turn. Nothing to act on — just tell them.
-        toast('Time was up — your turn in that story passed.');
+        submittedLocal = true;
+        applyBrief();
+        render();
+        toast('Time was up — that turn passed for everyone.');
         return;
     }
     if (isText){
@@ -482,51 +499,51 @@ function onDenied(text){
 }
 
 // ---------- host validation ----------
-// Every action runs through here, for local input AND remote intents.
-function needActor(d, from){
+function assignedChainIndex(fromId){
+    if (!S || !fromId) return -1;
+    for (var i = 0; i < S.chains.length; i++){ if (actorOf(S.chains[i], S.turn) === fromId) return i; }
+    return -1;
+}
+function needTurn(d, from, wantKind){
     if (!S) return 'There is no table yet.';
     if (S.phase !== 'play') return 'That lap is already finished.';
     if (!from || !from.id) return 'Who are you?';
     if (S.order.indexOf(from.id) === -1) return 'You are not at this table.';
-    var c = d.chain;
-    if (typeof c !== 'number' || c !== Math.floor(c) || !S.chains[c]) return 'No such story.';
-    var ch = S.chains[c];
-    if (ch.done) return 'That story is finished.';
-    if (actorOf(ch) !== from.id) return 'It is not your turn in that story.';
     if (paused()) return 'The host has left. Waiting for them.';
-    return null;
-}
-function freshCheck(d, err){
-    if (err) return err;
-    var ch = S.chains[d.chain];
-    if (d.lap !== S.lap || d.step !== ch.step) return 'That turn has moved on.';
+    if (d.lap !== S.lap || d.turn !== S.turn) return 'That turn has moved on.';
+    var i = assignedChainIndex(from.id);
+    if (i < 0) return 'It is not your turn right now.';
+    if (d.chain != null && d.chain !== S.chains[i].id) return 'That is not your story for this turn.';
+    if (S.submitted && S.submitted[from.id]) return 'You already finished this turn.';
+    if (wantKind && stepKind(S.turn) !== wantKind) return wantKind === 'text' ? 'It is a drawing turn.' : 'It is a writing turn.';
+    d.chainIndex = i;
+    d.chainId = S.chains[i].id;
     return null;
 }
 
 function handleText(d, from){
-    var e = needActor(d, from);
+    var e = needTurn(d, from, 'text');
     if (e) return e;
-    if (stepKind(S.chains[d.chain].step) !== 'text') return 'It is your turn to draw, not to write.';
-    e = freshCheck(d); if (e) return e;
+    if (S.submitted && S.submitted[from.id]) return 'You already finished this turn.';
     var t = String(d.t == null ? '' : d.t).trim().slice(0, MAXLEN);
     if (!t) return 'Write something first.';
-    hostText[chainKey(d.chain)] = t;
-    advanceChain(d.chain);
+    hostText[stepKey(S.lap, d.chainId, S.turn)] = t;
+    markSubmitted(from.id);
+    if (allSubmitted()) advanceTurn(); else broadcast();
     return null;
 }
 function handleStroke(d, from){
-    var e = needActor(d, from);
+    var e = needTurn(d, from, 'draw');
     if (e) return e;
-    var ch = S.chains[d.chain];
-    if (stepKind(ch.step) !== 'draw') return 'It is your turn to write, not to draw.';
-    e = freshCheck(d); if (e) return e;
+    if (S.submitted && S.submitted[from.id]) return 'You already finished this turn.';
+    var k = stepKey(S.lap, d.chainId, S.turn);
 
     if (d.type === 'fill'){
         if (COLOURS.indexOf(d.c) === -1 && d.c !== PAPER) return 'Bad colour.';
         var x = Math.round(+d.x), y = Math.round(+d.y);
         if (!(x >= 0 && x < W && y >= 0 && y < H)) return 'That fill landed off the page.';
-        var fills = hostCanvas[chainKey(d.chain)];
-        if (!fills) fills = hostCanvas[chainKey(d.chain)] = [];
+        var fills = hostCanvas[k];
+        if (!fills) fills = hostCanvas[k] = [];
         if (fills.length >= MAXSTROKES) return 'Board full — undo or clear.';
         fills.push({ t: 'fill', c: d.c, x: x, y: y });
         return null;
@@ -542,39 +559,39 @@ function handleStroke(d, from){
         if (!(px >= 0 && px <= W && py >= 0 && py <= H)) return 'That drifted off the page.';
         clean.push({ x: px, y: py });
     }
-    var arr = hostCanvas[chainKey(d.chain)];
-    if (!arr) arr = hostCanvas[chainKey(d.chain)] = [];
+    var arr = hostCanvas[k];
+    if (!arr) arr = hostCanvas[k] = [];
     if (arr.length >= MAXSTROKES) return 'Board full — undo or clear.';
     arr.push({ c: d.c, w: (+d.w === ERASER_W) ? ERASER_W : PEN_W, pts: clean });
     return null;
 }
 function handleUndo(d, from){
-    var e = needActor(d, from);
+    var e = needTurn(d, from, 'draw');
     if (e) return e;
-    if (stepKind(S.chains[d.chain].step) !== 'draw') return 'Nothing to undo.';
-    e = freshCheck(d); if (e) return e;
-    var arr = hostCanvas[chainKey(d.chain)];
+    if (S.submitted && S.submitted[from.id]) return 'You already finished this turn.';
+    var arr = hostCanvas[stepKey(S.lap, d.chainId, S.turn)];
     if (arr && arr.length) arr.pop();
     return null;
 }
 function handleClear(d, from){
-    var e = needActor(d, from);
+    var e = needTurn(d, from, 'draw');
     if (e) return e;
-    if (stepKind(S.chains[d.chain].step) !== 'draw') return 'Nothing to clear.';
-    e = freshCheck(d); if (e) return e;
-    hostCanvas[chainKey(d.chain)] = [];
+    if (S.submitted && S.submitted[from.id]) return 'You already finished this turn.';
+    hostCanvas[stepKey(S.lap, d.chainId, S.turn)] = [];
     return null;
 }
 function handleDone(d, from){
-    var e = needActor(d, from);
+    var e = needTurn(d, from, null);
     if (e) return e;
-    e = freshCheck(d); if (e) return e;
-    var k = chainKey(d.chain);
-    if (!hostText[k] && hostCanvas[k] && hostCanvas[k].length === 0 && !hostSkip[k]){
-        if (stepKind(S.chains[d.chain].step) === 'text') hostText[k] = '(nothing written)';
-        else hostText[k] = '(nothing drawn)';
+    if (S.submitted && S.submitted[from.id]) return 'You already finished this turn.';
+    var k = stepKey(S.lap, d.chainId, S.turn);
+    if (stepKind(S.turn) === 'text'){
+        if (!hostText[k]) hostText[k] = '(nothing written)';
+    } else {
+        if (!hostCanvas[k]) hostCanvas[k] = [];
     }
-    advanceChain(d.chain);
+    markSubmitted(from.id);
+    if (allSubmitted()) advanceTurn(); else broadcast();
     return null;
 }
 function handleNextLap(d, from){
@@ -613,8 +630,9 @@ function deny(to, text){ Hub.up('denied', { to: to, text: text }); }
 function act(d){
     if (!S) return;
     d.lap = S.lap;
-    d.chain = selected;
-    d.step = S.chains[selected] ? S.chains[selected].step : 0;
+    d.turn = S.turn;
+    var i = myChainIndex();
+    if (i >= 0) d.chain = S.chains[i].id;
     if (isHost()){
         var me = { id: myId(), name: myName() }, err = null;
         if (d.a === 'text') err = handleText(d, me);
@@ -624,18 +642,20 @@ function act(d){
         else if (d.a === 'nextlap') err = handleNextLap(d, me);
         else if (d.a === 'toLobby') err = handleToLobby(d, me);
         if (err) toast(err);
+        else if ((d.a === 'text' || d.a === 'done') && S && S.submitted && S.submitted[myId()]) submittedLocal = true;
         render();
     } else {
         Hub.up('intent', d);
+        if (d.a === 'text' || d.a === 'done') submittedLocal = true;
         render();
     }
 }
 
 function pushStroke(pts){
     if (!pts || pts.length < 2) return;
-    var ch = selChain(); if (!ch) return;
+    var ch = myChain(); if (!ch) return;
     var d = { a:'stroke', c: penColour, w: (penColour === PAPER) ? ERASER_W : PEN_W,
-              pts: pts, lap: S.lap, chain: selected, step: ch.step };
+              pts: pts, lap: S.lap, turn: S.turn, chain: ch.id };
     if (isHost()){
         var err = handleStroke(d, { id: myId(), name: myName() });
         if (err) toast(err);
@@ -657,9 +677,9 @@ function pushClear(){
     render();
 }
 function pushBucket(p){
-    var ch = selChain(); if (!ch) return;
+    var ch = myChain(); if (!ch) return;
     var x = Math.round(p.x), y = Math.round(p.y);
-    var d = { a:'stroke', type:'fill', c: penColour, x: x, y: y, lap: S.lap, chain: selected, step: ch.step };
+    var d = { a:'stroke', type:'fill', c: penColour, x: x, y: y, lap: S.lap, turn: S.turn, chain: ch.id };
     if (isHost()){
         var err = handleStroke(d, { id: myId(), name: myName() });
         if (err) toast(err);
@@ -737,21 +757,19 @@ function applyFill(c2, s){
     c2.putImageData(img, 0, 0);
 }
 function myList(){
-    if (!S || S.phase !== 'play') return [];
-    var ch = selChain();
-    if (!ch || ch.done) return [];
-    if (stepKind(ch.step) !== 'draw') return [];
-    if (actorOf(ch) !== myId()) return [];
-    return isHost() ? (hostCanvas[chainKey(selected)] || []) : myStrokes;
+    if (!S || S.phase !== 'play' || stepKind(S.turn) !== 'draw') return [];
+    if (S.submitted && S.submitted[myId()]) return [];
+    var i = myChainIndex();
+    if (i < 0) return [];
+    return isHost() ? (hostCanvas[stepKey(S.lap, S.chains[i].id, S.turn)] || []) : myStrokes;
 }
 function viewList(){
     if (!S || S.phase !== 'play') return [];
-    var ch = selChain();
-    if (!ch || ch.done) return [];
     applyBrief();
-    if (stepKind(ch.step) === 'draw') return myList();
-    // A describer sees the drawing they must describe, and nothing else.
-    if (actorOf(ch) === myId() && myArt && myArt.k === 'canvas' && myArt.key === chainKey(selected)) return myArt.c;
+    if (submittedLocal || (S.submitted && S.submitted[myId()])) return [];
+    if (stepKind(S.turn) === 'draw') return myList();
+    var k = myStepKey();
+    if (myArt && myArt.k === 'canvas' && myArt.key === k) return myArt.c;
     return [];
 }
 function drawBoard(){
@@ -765,7 +783,7 @@ function bindPointer(){
     canvas = $('t96-canvas'); ctx = canvas.getContext('2d');
     canvas.addEventListener('pointerdown', function(e){
         Hub.up('hello');
-        if (!iAmActor() || stepKind(selChain() && selChain().step) !== 'draw' || paused()) return;
+        if (!iAmActor() || stepKind(S.turn) !== 'draw' || paused() || submittedLocal) return;
         var p = toWorld(e);
         if (p.x < 0 || p.x > W || p.y < 0 || p.y > H) return;
         if (bucketOn){ pushBucket(p); e.preventDefault(); return; }
@@ -799,25 +817,27 @@ function bindPointer(){
 }
 
 // ---------- timers display ----------
+function timeLeftText(){
+    if (!S || S.phase !== 'play') return '';
+    var left = Math.max(0, (S.turnStartedAt + TURN_MS) - Date.now());
+    var s = Math.ceil(left / 1000);
+    return Math.floor(s / 60) + ':' + ('0' + (s % 60)).slice(-2) + ' left';
+}
 function paintTimers(){
     if (!S) return;
-    var now = Date.now();
-    var pending = myPending();
+    var t = S.phase === 'play' ? timeLeftText() : '';
+    var global = $('t96-turn-left');
+    if (global) global.textContent = t;
     for (var i = 0; i < S.chains.length; i++){
-        var ch = S.chains[i];
         var el = $('t96-left-' + i);
         if (!el) continue;
-        if (ch.done){ el.textContent = 'done'; continue; }
-        var left = Math.max(0, (ch.startedAt + TURN_MS) - now);
-        var s = Math.ceil(left / 1000);
-        el.textContent = Math.floor(s / 60) + ':' + ('0' + (s % 60)).slice(-2) + ' left';
+        el.textContent = S.phase === 'play' ? t : (S.phase === 'reveal' ? 'done' : '');
     }
 }
 function startTick(){
     if (tickT) return;
     tickT = setInterval(paintTimers, 500);
 }
-// (no stop — the interval is cheap and hidden tabs throttle it anyway)
 
 // ---------- render ----------
 function render(){
@@ -841,109 +861,116 @@ function render(){
         return;
     }
 
+    var inReveal = S.phase === 'reveal';
+    var inPlay = S.phase === 'play';
+    sh('t96-playarea', !inReveal);
+    sh('t96-chains', !inReveal);
+
     var st = $('t96-status');
     var big = st.querySelector('b'), small = st.querySelector('small');
     var lob2 = $('t96-lobbtn2'); if (lob2) lob2.style.display = isHost() ? '' : 'none';
-    var ch = selChain();
+    var i = myChainIndex();
+    var ch = i >= 0 ? S.chains[i] : null;
+    var kind = inPlay ? stepKind(S.turn) : 'text';
+    var mine = inPlay && iAmActor();
+    var myDone = inPlay && !mine && i >= 0;
+    var remaining = 0;
+    if (inPlay){
+        var ids = activeActorIds();
+        for (var r = 0; r < ids.length; r++){ if (!(S.submitted && S.submitted[ids[r]])) remaining++; }
+    }
 
-    var alive = S.chains.filter(function(c){ return !c.done; }).length;
-
-    if (S.phase === 'reveal'){
+    if (inReveal){
         big.textContent = 'Lap ' + (S.lap + 1) + ' — that is what the table made of it.';
         small.textContent = 'Every story finished. Save them, then start the next lap.';
     } else if (paused()){
         big.textContent = 'Paused';
         small.textContent = 'The host disconnected. It resumes when they return.';
-    } else if (iAmActor()){
-        var sk = stepKind(ch.step);
-        if (sk === 'text'){
-            big.textContent = ch.step === 0 ? 'Your turn to start the story' : 'Describe what you can see';
-            small.textContent = ch.step === 0 ? 'One sentence. Something a person could draw. You will not see it again.'
-                                              : 'Describe ONLY the drawing in front of you. You cannot see the original sentence — do not guess at it.';
+    } else if (mine){
+        if (kind === 'text'){
+            big.textContent = (S.turn === 0 ? 'Turn 1' : 'Turn ' + (S.turn + 1)) + ' — ' + (S.turn === 0 ? 'write your sentence' : 'describe what you can see');
+            small.textContent = S.turn === 0 ? 'One sentence. Something a person could draw. Everyone moves on together when the timer ends.'
+                                             : 'Describe ONLY the drawing in front of you. ' + timeLeftText() + ' for everyone.';
         } else {
-            big.textContent = (myArt && myArt.t) ? '"' + myArt.t + '"' : 'Draw what they described';
-            small.textContent = (myArt && myArt.t) ? 'Draw this sentence on the canvas below.' : 'Waiting for the sentence…';
+            big.textContent = (myArt && myArt.t) ? '"' + myArt.t + '"' : 'Turn ' + (S.turn + 1) + ' — draw what they described';
+            small.textContent = (myArt && myArt.t) ? 'Draw this sentence. ' + timeLeftText() + ' for everyone.' : 'Waiting for the sentence… ' + timeLeftText() + ' for everyone.';
         }
-    } else if (myPending().length){
-        var mpn = myPending().length;
-        big.textContent = mpn === 1 ? 'Your move is waiting on another chain' : 'Your moves are waiting (' + mpn + ')';
-        small.textContent = 'They are highlighted below. Two minutes a turn — the clock keeps honest.';
+    } else if (myDone){
+        big.textContent = 'Turn ' + (S.turn + 1) + ' — waiting for the table';
+        small.textContent = 'You are done for this turn. ' + remaining + (remaining === 1 ? ' person' : ' people') + ' still going · ' + timeLeftText() + '.';
     } else {
-        big.textContent = 'Everyone is playing';
-        small.textContent = alive + (alive === 1 ? ' story' : ' stories') + ' still running — your next turn lights up when a chain reaches you.';
+        big.textContent = 'Turn ' + (S.turn + 1) + ' of ' + S.order.length;
+        small.textContent = 'Everyone moves together. ' + timeLeftText() + ' for everyone.';
     }
 
-    // seat strip: who has a pending move, who am I
     var seats = $('t96-seats'); clear(seats);
-    S.order.forEach(function(id){
-        var mine = hasPending(id);
-        var c = 'seat' + (mine ? ' now' : '') + (id === myId() ? ' me' : '');
-        var label = nm(id) + (id === myId() ? ' (you)' : '');
-        if (mine) label += ' · their move';
-        seats.appendChild(el('span', c, label));
-    });
+    if (S && S.order){
+        S.order.forEach(function(id){
+            var waiting = inPlay && !(S.submitted && S.submitted[id]) && activeActorIds().indexOf(id) >= 0;
+            var c = 'seat' + (waiting ? ' now' : '') + (id === myId() ? ' me' : '');
+            var label = nm(id) + (id === myId() ? ' (you)' : '');
+            if (inPlay) label += waiting ? ' · working' : ' · done';
+            seats.appendChild(el('span', c, label));
+        });
+    }
 
-    // chain strip
     var strip = $('t96-chains'); clear(strip);
-    S.chains.forEach(function(ch, i){
-        var card = el('button', 'chaincard' + (ch.done ? ' done' : '')
-            + (actorOf(ch) === myId() && !ch.done ? ' yours' : '')
-            + (i === selected ? ' now' : ''));
-        card.type = 'button';
-        card.setAttribute('data-chain', String(i));
-        card.appendChild(el('span', 'who', 'chain by ' + nm(ch.starter)));
-        var job;
-        if (ch.done) job = 'finished';
-        else {
-            var a = actorOf(ch), k = stepKind(ch.step);
-            job = (a ? nm(a) : '?') + (k === 'text' ? (ch.step === 0 ? ' is starting it' : ' is writing') : ' is drawing')
-                + ' · ' + (ch.step + 1) + '/' + S.order.length;
-        }
-        card.appendChild(el('span', 'job', job));
-        var left = el('span', 'left'); left.id = 't96-left-' + i;
-        card.appendChild(left);
-        strip.appendChild(card);
-    });
+    if (!inReveal){
+        S.chains.forEach(function(chain, ci){
+            var a = actorOf(chain, S.turn);
+            var isMine = a === myId();
+            var card = el('div', 'chaincard' + (isMine && !submittedLocal ? ' yours' : ''));
+            card.appendChild(el('span', 'who', 'chain by ' + nm(chain.starter)));
+            var job = (a ? nm(a) : '?') + (kind === 'text' ? (S.turn === 0 ? ' is starting it' : ' is writing') : ' is drawing')
+                + ' · Turn ' + (S.turn + 1) + '/' + S.order.length;
+            if (S.submitted && a && S.submitted[a]) job = (a ? nm(a) : '?') + ' is done for this turn';
+            card.appendChild(el('span', 'job', job));
+            var left = el('span', 'left'); left.id = 't96-left-' + ci;
+            card.appendChild(left);
+            strip.appendChild(card);
+        });
+    }
 
-    var mine = iAmActor();
-    var kind = ch ? stepKind(ch.step) : 'text';
     var writing = mine && kind === 'text';
     var drawing2 = mine && kind === 'draw';
-    sh('t96-tools', drawing2);
-    sh('t96-write', writing);
-    sh('t96-reveal', S.phase === 'reveal');
+    sh('t96-tools', drawing2 && !submittedLocal);
+    sh('t96-write', writing && !submittedLocal);
+    sh('t96-reveal', inReveal);
 
     var idle = $('t96-idle');
-    var list = viewList();
-    var showIdle = (S.phase !== 'reveal') && !(list && list.length);
-    sh('t96-idle', showIdle);
-    if (showIdle && ch){
-        var bs = idle.querySelector('.big'), ss = idle.querySelector('.small');
-        if (S.phase === 'reveal'){ bs.textContent = ''; ss.textContent = ''; }
-        else if (ch.done){ bs.textContent = 'That story is finished'; ss.textContent = 'Watch the rest finish, or save the lap when it all lands.'; }
-        else if (actorOf(ch) === myId()){
-            if (kind === 'text'){
-                bs.textContent = ch.step === 0 ? 'Your sentence starts this story' : 'Describe what you can see';
-                ss.textContent = ch.step === 0 ? 'One sentence. Something a person could draw.'
-                                               : 'Describe ONLY the drawing in front of you. You cannot see the original sentence.';
+    if (inReveal){
+        sh('t96-idle', false);
+    } else {
+        var list = viewList();
+        var showIdle = !(list && list.length);
+        sh('t96-idle', showIdle);
+        if (showIdle){
+            var bs = idle.querySelector('.big'), ss = idle.querySelector('.small');
+            if (paused()){ bs.textContent = 'Paused'; ss.textContent = 'The host disconnected. It resumes when they return.'; }
+            else if (mine){
+                if (kind === 'text'){
+                    bs.textContent = S.turn === 0 ? 'Your sentence starts this story' : 'Describe what you can see';
+                    ss.textContent = S.turn === 0 ? 'One sentence. Something a person could draw.'
+                                                   : 'Describe ONLY the drawing in front of you. You cannot see the original sentence.';
+                } else {
+                    bs.textContent = (myArt && myArt.t) ? '"' + myArt.t + '"' : 'Draw what they described';
+                    ss.textContent = (myArt && myArt.t) ? 'Draw this sentence on the canvas below.' : 'Waiting for the words…';
+                }
             } else {
-                bs.textContent = (myArt && myArt.t) ? '"' + myArt.t + '"' : 'Draw what they described';
-                ss.textContent = (myArt && myArt.t) ? 'Draw this sentence on the canvas below.' : 'Waiting for the words…';
+                bs.textContent = 'Waiting for Turn ' + (S.turn + 1);
+                ss.textContent = myDone ? 'You finished this turn. Everyone moves on together when the timer ends or all are done.'
+                                        : 'Everyone moves together. ' + timeLeftText() + ' left in this turn.';
             }
-        } else {
-            var a = actorOf(ch);
-            bs.textContent = (a ? nm(a) : 'Somebody') + (kind === 'text' ? ' is writing' : ' is drawing');
-            ss.textContent = 'Nothing to see here until the reveal.';
         }
     }
 
-    if (writing && ch && ch.step === 0){
+    if (writing && S.turn === 0){
         $('t96-send').textContent = 'Send it';
     } else if (writing){
         $('t96-send').textContent = 'Send the description';
     }
 
-    if (S.phase === 'reveal') renderChain();
+    if (inReveal) renderChain();
 
     drawBoard();
     paintTimers();
@@ -951,11 +978,7 @@ function render(){
 }
 
 function hasPending(id){
-    for (var i = 0; i < S.chains.length; i++){
-        var ch = S.chains[i];
-        if (!ch.done && actorOf(ch) === id) return true;
-    }
-    return false;
+    return !!(S && S.phase === 'play' && !(S.submitted && S.submitted[id]) && activeActorIds().indexOf(id) >= 0);
 }
 
 function renderChain(){
@@ -1095,32 +1118,10 @@ function syncTable(){
     var ids = Hub.roster.map(function(m){ return m.id; });
     var kept = S.order.filter(function(id){ return ids.indexOf(id) !== -1; });
     if (kept.length === S.order.length) return changed;
-    if (!kept.length){
-        S.order = kept;
-        S.chains.forEach(function(ch){ ch.done = true; });
-        return true;
-    }
+    if (!kept.length){ S.order = kept; revealLap(); return true; }
     S.order = kept;
-    // Re-drive whichever chains were parked on a departed player.
-    for (var i = 0; i < S.chains.length; i++){
-        var ch = S.chains[i];
-        if (ch.done) continue;
-        var skipped = false, guard = 0;
-        while (guard++ < 64){
-            var a = actorOf(ch);
-            if (a === null) break;
-            if (S.order.indexOf(a) >= 0) break;
-            var k = chainKey(i);
-            if (stepKind(ch.step) === 'text') hostText[k] = '(that player left)';
-            else hostCanvas[k] = [];
-            hostSkip[k] = true;
-            skipped = true;
-            ch.step++;
-            if (ch.step >= S.order.length){ ch.done = true; break; }
-        }
-        if (skipped && !ch.done){ ch.startedAt = Date.now(); armTimer(i); }
-    }
-    if (S.chains.every(function(x){ return x.done; })){ revealLap(); return true; }
+    fillMissingForTurn();
+    if (allSubmitted()){ advanceTurn(); return true; }
     return true;
 }
 
@@ -1136,17 +1137,23 @@ function onRoster(){
 function onState(st){
     if (!st) return;
     S = st;
-    var k = S.lap + ':' + (S.chains ? S.chains.map(function(c){ return c.step + (c.done ? 'x' : ''); }).join(',') : '') + ':' + S.phase;
+    if (S.phase === 'play'){
+        if (S.turn == null) S.turn = 0;
+        if (!S.turnStartedAt) S.turnStartedAt = Date.now();
+        if (!S.submitted) S.submitted = {};
+    }
+    var doneMap = (S.submitted && typeof S.submitted === 'object') ? Object.keys(S.submitted).sort().join(',') : '';
+    var k = S.lap + ':' + (S.turn == null ? '' : S.turn) + ':' + S.phase + ':' + doneMap;
     if (k !== lastKey){
         lastKey = k;
         myStrokes = []; draft = null; drawing = false;
-        $('t96-say').value = '';
+        submittedLocal = !!(S.submitted && S.submitted[myId()]);
+        var ta = $('t96-say'); if (ta) ta.value = '';
+        applyBrief();
+    } else if (S.submitted && S.submitted[myId()]) {
+        submittedLocal = true;
     }
-    if (selected >= S.chains.length) selected = 0;
-    // Snap the stage to a chain waiting on me, but never yank it away from
-    // one I am actively playing.
-    var act = myPending();
-    if (act.length && act.indexOf(selected) < 0) selected = act[0];
+    if (isHost() && S.phase === 'play') normalizeSubmitted();
     render();
 }
 function reportResult(){
@@ -1158,7 +1165,7 @@ function doReset(){
     reportResult();
     clearTimers();
     S = null; hostText = {}; hostCanvas = {}; hostSkip = {}; briefs = {};
-    myArt = null; myStrokes = []; draft = null; lastKey = ''; reported = false;
+    myArt = null; myStrokes = []; draft = null; lastKey = ''; reported = false; submittedLocal = false;
     render();
 }
 function toast(msg){
@@ -1206,13 +1213,7 @@ $('t96-nextlap').addEventListener('click', function(){ act({ a:'nextlap' }); });
 $('t96-lobbtn').addEventListener('click', function(){ act({ a:'toLobby' }); });
 $('t96-lobbtn2').addEventListener('click', function(){ act({ a:'toLobby' }); });
 $('t96-save').addEventListener('click', saveStory);
-$('t96-chains').addEventListener('click', function(e){
-    var t = e.target && e.target.closest ? e.target.closest('[data-chain]') : null;
-    if (!t || !S) return;
-    selected = +t.getAttribute('data-chain') || 0;
-    applyBrief();
-    render();
-});
+
 window.addEventListener('resize', reportHeight);
 document.addEventListener('visibilitychange', function(){
     if (!document.hidden && Hub.me) Hub.up('hello');

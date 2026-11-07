@@ -116,25 +116,27 @@ test('ranking must place exactly one wish, one line per tier entry', () => {
   assert.ok(send(s, 'b', { a: 'rank', tiers: [2, 0, 1] }).error, 'only the friend ranks');
 });
 
-test('a valid ranking gives the wish-line author one point and reveals', () => {
+test('a valid ranking gives the wish-line author one point and reveals the round', () => {
   const s0 = writeAll(started(), ['b-line', 'c-line', 'd-line']);
   // shuffle index 1 is the wish
   const wishWriter = s0.shuffle[1];
   const tiers = [0, 0, 0];
   tiers[1] = 2;
   const s = rankAsFriend(s0, tiers);
-  assert.equal(s.phase, 'over');
+  assert.equal(s.phase, 'roundover');
   assert.equal(s.scores[wishWriter], 1);
   assert.equal(Object.values(s.scores).reduce((x, y) => x + y, 0), 1);
   assert.equal(project(s0, 'b').reveal, null, 'no reveal while ranking');
   const rv = project(s, 'c').reveal;
   assert.equal(rv.length, 3);
   assert.ok(rv.some((l) => l.tier === 2 && l.authorName === PEOPLE.find((p) => p.id === wishWriter).name));
+  assert.ok(project(s, 'c').matchRounds >= 1);
 });
 
 test('rounds rotate the friend and keep the word deck moving', () => {
   const tiers = [1, 2, 0];   // exactly one wish, at shuffle index 1
   let s = rankAsFriend(writeAll(started(), ['1', '2', '3']), tiers);
+  assert.equal(s.phase, 'roundover');
   const next = send(s, 'a', { a: 'start' }, { host: true, rng: seeded(9) });
   assert.equal(next.phase, 'write');
   assert.equal(next.roundNo, 1);
@@ -161,6 +163,7 @@ test('only the host can take the table back to the lobby; it clears the round an
   assert.equal(lobby.phase, 'lobby');
   assert.deepEqual(lobby.scores, {});
   assert.equal(lobby.epoch, s.epoch + 1);
+  assert.deepEqual(lobby.winnerIds, []);
 });
 
 test('a late joiner sits out the current round and writes from the next', () => {
@@ -234,6 +237,55 @@ test('a finished game with no winner text never leaks a raw line into the record
   s = rankAsFriend(s, [2, 0, 1]);
   const sentence = summarize(s, (x) => x);
   assert.ok(!sentence.includes('SECRET'), 'record shows the word, not the line');
+});
+
+test('match ends after the set number of rounds with a winner and lip confetti state', () => {
+  let s = started();
+  s.matchRounds = 2;
+  s = rankAsFriend(writeAll(s, ['1', '2', '3']), [1, 2, 0]); // round 1, wish -> shuffle[1]
+  assert.equal(s.phase, 'roundover');
+  const firstWinner = s.shuffle[1];
+  s = send(s, 'a', { a: 'start' }, { host: true, rng: seeded(12) });
+  assert.equal(s.phase, 'write');
+  s = rankAsFriend(writeAll(s, ['4', '5', '6']), [1, 2, 0]); // round 2, wish -> shuffle[1]
+  assert.equal(s.phase, 'gameover');
+  assert.ok(Array.isArray(s.winnerIds) && s.winnerIds.length >= 1);
+  assert.ok(s.winnerIds.includes(s.shuffle[1]));
+  const v = project(s, 'b');
+  assert.equal(v.phase, 'gameover');
+  assert.deepEqual(v.winnerIds, s.winnerIds);
+  assert.ok(Array.isArray(v.winnerNames));
+  assert.equal(v.reveal.length, 3);
+  assert.ok(v.doodle !== undefined);
+  assert.ok(summarize(s, (x) => x), 'final round summary remains available');
+});
+
+test('a tie at match end names all winners', () => {
+  let s = started();
+  s.matchRounds = 2;
+  s = rankAsFriend(writeAll(s, ['1', '2', '3']), [2, 0, 1]); // wish -> shuffle[0]
+  const w1 = s.shuffle[0];
+  s = send(s, 'a', { a: 'start' }, { host: true, rng: seeded(13) });
+  s = rankAsFriend(writeAll(s, ['4', '5', '6']), [0, 2, 1]); // wish -> shuffle[1]
+  const w2 = s.shuffle[1];
+  assert.equal(s.phase, 'gameover');
+  assert.equal(s.scores[w1], 1);
+  assert.equal(s.scores[w2], 1);
+  assert.deepEqual(s.winnerIds.slice().sort(), [w1, w2].sort());
+});
+
+test('host can play again after game over; it starts a fresh match with cleared scores', () => {
+  let s = started();
+  s.matchRounds = 1;
+  s = rankAsFriend(writeAll(s, ['1', '2', '3']), [2, 0, 1]);
+  assert.equal(s.phase, 'gameover');
+  assert.ok(send(s, 'b', { a: 'start' }).error);
+  const next = send(s, 'a', { a: 'start' }, { host: true, rng: seeded(14) });
+  assert.equal(next.phase, 'write');
+  assert.equal(next.roundNo, 0);
+  assert.deepEqual(next.winnerIds, []);
+  assert.equal(Object.values(next.scores).reduce((x, y) => x + y, 0), 0);
+  assert.equal(next.matchRounds, 6);
 });
 
 console.log('\n' + passed + ' passed' + (process.exitCode ? ' (failures above)' : ''));
