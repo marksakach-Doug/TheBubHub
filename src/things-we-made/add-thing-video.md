@@ -30,6 +30,7 @@ git push                      # pushes main -> deploys to https://bubhub.us
 
 ## Never do
 - Commit a raw `.mov` larger than ~100 MB (GitHub hard limit) — convert to MP4 first
+- Push a video over ~20 MiB — Cloudflare Workers caps static assets at 25 MiB, so wrangler deploy will fail and the site stays on the last good deploy. Re-encode smaller (lower crf, 720p) if needed.
 - Commit `dist/`, `node_modules/`, `.wrangler/`, or the Cloudflare token
 - Regenerate `bun.lock` with anything but bun 1.2.15
 - Add an `.html` wrapper per video (obsolete; the hub plays videos directly now)
