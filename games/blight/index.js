@@ -504,8 +504,9 @@ export function summarize(state, nameOf) {
  *  Drawing glue. The generators live in trees.js (self-contained, tested on their own);
  *  this file only turns their output into markup.
  * ==================================================================================== */
-const LEAF = 'M0 0C3.4-2.5 3.6-7.5 0-13C-3.6-7.5-3.4-2.5 0 0Z';
-const PET = (() => { let s = ''; for (let i = 0; i < 5; i++) { const a = i * 1.2566, cx = Math.cos(a) * 2.8, cy = Math.sin(a) * 2.8; s += `M${Math.round((cx - 2.3) * 10) / 10} ${Math.round(cy * 10) / 10}a2.3 2.3 0 1 0 4.6 0a2.3 2.3 0 1 0-4.6 0`; } return s; })();
+const LEAF = 'M0 0C3.8-2.6 4-7.8 0-13.5C-4-7.8-3.8-2.6 0 0ZM0-1.8L.45-5.5L0-10.5L-.45-5.5Z';
+const PET = (() => { let s = ''; for (let i = 0; i < 5; i++) { const a = i * 1.2566, cx = Math.cos(a) * 2.9, cy = Math.sin(a) * 2.9; s += `M${Math.round((cx - 2.45) * 10) / 10} ${Math.round(cy * 10) / 10}a2.45 2.45 0 1 0 4.9 0a2.45 2.45 0 1 0-4.9 0`; } return s; })();
+const STEMS = ['#2d6a2e', '#387d35', '#46923c', '#58a644', '#6cb84d'];
 const BC = new Map();                                                 // border cache: key -> svg text
 const TAB = { P: '#3f7d34', D: '#2a2623' };                           // plant / dead-tree colour code for your private pips and edge tabs
 
@@ -556,7 +557,7 @@ const DARK = '--bg:#1a140e;--pa:#2a2118;--dim:#17120c;--hov:#38291b;--fg:#efe6d3
 const CSS = `
 .bl{--bg:#efe6d3;--pa:#f7f1e3;--dim:#ddd0b6;--hov:#e9dcc0;--fg:#3b2a1d;--mut:#6b5845;--root:#c8b690;--chipbg:#8a7352;--rtl:#e6d8bb;--cface:#f4ecd8;--back:#dac9a5;--rb:#bba37a;--stem:#3f8f3a;--dead:#171615;--dcard:#e8e4da;--moss:#5f7a3a;color-scheme:light;
   --chrome:0px;--H:max(320px,calc(100dvh - var(--chrome)));
-  --oh:clamp(24px,calc(var(--H) * .066),60px);--mh:clamp(36px,calc(var(--H) * .102),84px);--hh:clamp(44px,calc(var(--H) * .118),96px);
+  --oh:clamp(32px,calc(var(--H) * .088),76px);--mh:clamp(48px,calc(var(--H) * .138),112px);--hh:clamp(58px,calc(var(--H) * .165),128px);
   --step:7px;--dx:2px;--fs:clamp(11px,calc(var(--H) * .02),14px);
   position:relative;isolation:isolate;overflow:hidden;overflow:clip;box-sizing:border-box;width:100%;max-width:1000px;height:var(--H);margin:0 auto;
   display:grid;grid-template-rows:minmax(0,28fr) minmax(0,44fr) minmax(0,28fr);
@@ -587,8 +588,24 @@ const CSS = `
 .art path{fill:var(--stem)}.art.dd path{fill:var(--dead)}.art.rt path{fill:var(--rb)}
 .c.P .art{animation:sway 6s ease-in-out infinite;animation-delay:var(--sw,0s);transform-origin:50% 100%}
 .c .tab{position:absolute;left:0;right:0;bottom:0;height:var(--step);background:var(--tabc)}
-.gr{animation:gr .6s cubic-bezier(.2,.9,.3,1.15) both;transform-origin:0 0}
-@keyframes gr{from{transform:scale(0)}to{transform:scale(1)}}
+.gr{animation:gr .65s cubic-bezier(.16,.84,.32,1) both;transform-origin:0 0}
+.grf{animation:grf .6s cubic-bezier(.22,1.35,.36,1) both;transform-origin:0 0}
+@keyframes gr{
+  0%{transform:scale(0) rotate(-12deg);opacity:0}
+  35%{opacity:1}
+  70%{transform:scale(1.03) rotate(2deg)}
+  100%{transform:scale(1) rotate(0deg);opacity:1}
+}
+@keyframes grl{
+  0%{transform:scale(0,0) rotate(-28deg);opacity:0}
+  65%{transform:scale(.9,1.12) rotate(5deg);opacity:1}
+  100%{transform:scale(1,1) rotate(0deg);opacity:1}
+}
+@keyframes grf{
+  0%{transform:scale(0) rotate(-65deg);opacity:0}
+  70%{transform:scale(1.18) rotate(8deg);opacity:1}
+  100%{transform:scale(1) rotate(0deg);opacity:1}
+}
 @keyframes sprout{0%{transform:translateY(14px) scale(.55);opacity:0}60%{transform:translateY(-3px) scale(1.06);opacity:1}100%{transform:none}}
 @keyframes jolt{0%{transform:scale(.6) rotate(-6deg);opacity:0}25%{transform:scale(1.14) rotate(4deg);opacity:1}45%{transform:translateX(-4px) rotate(-3deg)}65%{transform:translateX(4px) rotate(2deg)}85%{transform:translateX(-2px)}100%{transform:none}}
 @keyframes sway{0%,100%{transform:rotate(-1.4deg)}50%{transform:rotate(1.4deg)}}
@@ -637,12 +654,9 @@ const CSS = `
 #mid{display:flex;flex-direction:column;align-items:center;justify-content:space-between;gap:2px}
 #felt{position:absolute;inset:2% 3%;pointer-events:none}
 #felt .bd{z-index:1}
-#hero{text-align:center;width:min(92%,540px);margin-top:2px}
-#hero .kick{font-size:.84em;color:var(--mut);letter-spacing:.02em}
-#hero .big{font-weight:700;font-size:clamp(15px,calc(var(--H) * .028),21px);line-height:1.15;margin:1px 0}
-#hero .sub{font-size:.95em}
-#hero .tick{font-size:.84em;color:var(--mut);margin-top:2px}
-#hero.compact .sub,#hero.compact .tick{display:none}
+#hero{text-align:center;width:min(92%,540px);margin-top:4px}
+#hero .kick{font-size:clamp(13px,calc(var(--H) * .022),16px);color:var(--mut);letter-spacing:.03em;font-weight:600}
+#hero .big{font-weight:700;font-size:clamp(18px,calc(var(--H) * .036),28px);line-height:1.15;margin:2px 0}
 #flips{--h:var(--mh);--w:calc(var(--mh) * .71);--bw:3px;display:flex;justify-content:center;align-items:flex-end;gap:5px;max-width:96%;min-height:0}
 #flips:empty{display:none}
 .fp{display:flex;flex-direction:column;align-items:center;min-width:0}
@@ -683,6 +697,17 @@ const CSS = `
 }
 @media (max-height:620px){.lob p{display:none}}
 @media (min-width:700px){#top{gap:10px}.opp{padding:5px 6px 3px}}
+.bl[data-phase="bid"] #felt .bd path{fill:#b8862d;transition:fill .3s}
+.bl[data-phase="bid"] #hero .big{color:var(--moss);transform:scale(1.06);transition:transform .2s}
+.bl[data-phase="bid"] .chip:not(.f){background:#b8862d;box-shadow:0 0 8px rgba(184,134,45,.45)}
+
+#vic{position:fixed;inset:0;width:100vw;height:100dvh;z-index:9999;pointer-events:none;display:flex; flex-direction:column;align-items:center;justify-content:center;background:rgba(26,20,14,.38);backdrop-filter:blur(2px)}
+#vic:empty{display:none}
+#vic .vic-svg{position:absolute;inset:0;width:100%;height:100%;overflow:visible}
+#vic .stem-p{fill:var(--stem)}
+#vic .vic-ban{pointer-events:auto;position:relative;z-index:5;background:var(--pa);padding:18px 28px;text-align:center;box-shadow:0 8px 32px rgba(0,0,0,.45);animation:bud .5s cubic-bezier(.2,.9,.3,1.2) both}
+#vic .vic-ban .big{font-size:clamp(22px,calc(var(--H) * .042),34px);font-weight:700;margin-bottom:10px}
+#vic .vic-ban .row{display:flex;gap:10px;justify-content:center;margin-top:12px}
 `;
 /* ======================================================================================
  *  mount
@@ -712,13 +737,16 @@ export function mount(root, api) {
   const prompt = $el('div'); prompt.id = 'prompt'; prompt.className = 'tx'; prompt.setAttribute('role', 'status');
   const acts = $el('div'); acts.id = 'acts';
   const lobby = $el('div'); lobby.id = 'lobby';
+  const vic = $el('div'); vic.id = 'vic';
 
   mid.appendChild(felt); mid.appendChild(hero); mid.appendChild(flips); mid.appendChild(mine);
   bot.appendChild(handCont); bot.appendChild(prompt); bot.appendChild(acts);
   bl.appendChild(top); bl.appendChild(mid); bl.appendChild(bot); bl.appendChild(lobby);
+  bl.appendChild(vic);
   root.appendChild(bl);
 
   let view = null, joinTries = 0, BGK = '', toastTok = 0, busyTok = 0, holdTok = 0, toastMsg = '', destroyed = false, heldAt = 0;
+  let vicKey = '';
   const ui = { mode: null, key: '', n: null, lo: 1, hi: 1, spread: false };
   const CST = new Map();
   const cst = (id) => { let s = CST.get(id); if (!s) { if (CST.size > 700) CST.clear(); s = { t0: null, tb: null, art: null, rt: null }; CST.set(id, s); } return s; };
@@ -780,22 +808,25 @@ export function mount(root, api) {
     const g = $svg('g'); g.setAttribute('transform', 'translate(' + tf.x + ' ' + tf.y + ') scale(' + tf.s + ')');
     for (const b of A.br) {
       const p = $svg('path'); p.setAttribute('d', b.d);
-      if (an) { p.setAttribute('class', 'gr'); p.style.cssText = 'transform-origin:' + b.ox + 'px ' + b.oy + 'px;animation-delay:' + dl(b.dl) + 's'; }
+      const col = c.k === 'P' ? 'fill:' + STEMS[Math.min(b.dp || 0, 4)] + ';' : '';
+      if (an) { p.setAttribute('class', 'gr'); p.style.cssText = col + 'transform-origin:' + b.ox + 'px ' + b.oy + 'px;animation-delay:' + dl(b.dl); }
+      else if (col) p.style.cssText = col;
       g.appendChild(p);
     }
     for (const l of A.lv) {
       const gg = $svg('g'); gg.setAttribute('transform', 'translate(' + l.x + ' ' + l.y + ') rotate(' + l.a + ') scale(' + l.s + ')');
-      const p = $svg('path'); p.setAttribute('d', LEAF);
-      p.style.cssText = 'fill:' + l.c + (an ? ';animation:gr .6s cubic-bezier(.2,.9,.3,1.15) ' + dl(l.dl) + 's both;transform-origin:0 0' : '');
+      const p = $svg('path'); p.setAttribute('d', LEAF); p.setAttribute('fill-rule', 'evenodd');
+      p.style.cssText = 'fill:' + l.c + (an ? ';animation:grl .55s cubic-bezier(.2,.9,.3,1.2) ' + dl(l.dl) + ' both;transform-origin:0 0' : '');
       gg.appendChild(p); g.appendChild(gg);
     }
     for (const f of A.fl) {
       const gg = $svg('g'); gg.setAttribute('transform', 'translate(' + f.x + ' ' + f.y + ') rotate(' + f.a + ') scale(' + f.s + ')');
       const inner = $svg('g');
-      if (an) { inner.setAttribute('class', 'gr'); inner.style.cssText = 'animation-delay:' + dl(f.dl) + 's'; }
+      if (an) { inner.setAttribute('class', 'grf'); inner.style.cssText = 'animation-delay:' + dl(f.dl); }
       const p = $svg('path'); p.setAttribute('d', PET); p.style.cssText = 'fill:' + f.c;
-      const ci = $svg('circle'); ci.setAttribute('r', '1.5'); ci.style.cssText = 'fill:' + f.c2;
-      inner.appendChild(p); inner.appendChild(ci); gg.appendChild(inner); g.appendChild(gg);
+      const halo = $svg('circle'); halo.setAttribute('r', '2.3'); halo.style.cssText = 'fill:' + f.c2 + ';opacity:.45';
+      const ci = $svg('circle'); ci.setAttribute('r', '1.4'); ci.style.cssText = 'fill:' + f.c2;
+      inner.appendChild(p); inner.appendChild(halo); inner.appendChild(ci); gg.appendChild(inner); g.appendChild(gg);
     }
     svg.appendChild(g);
     return svg;
@@ -888,28 +919,25 @@ export function mount(root, api) {
   function renderTop(now) { clearNode(top); view.players.filter((p) => p.id !== view.you).forEach((p) => top.appendChild(oppTile(p, now))); }
 
   function renderMid(now) {
-    const v = view, ch = v.challenger ? lab(v.challenger) : '', last = v.log.length ? v.log[v.log.length - 1] : '';
+    const v = view, ch = v.challenger ? lab(v.challenger) : '';
     const me = v.you, turnMe = v.turn === me;
-    let kick = '', big = '', sub = '';
+    let kick = '', big = '';
     switch (v.phase) {
-      case 'plant': kick = 'Round ' + v.round + ' · Planting'; big = turnMe ? 'Your turn to plant' : lab(v.turn) + ' is planting'; sub = 'Everyone plants one card face down, once round the table.'; break;
-      case 'grow': kick = 'Round ' + v.round + ' · Growing'; big = turnMe ? 'Add a card, or start the bid' : lab(v.turn) + ' is deciding…'; sub = 'Add more cards, or bid on how many Living Plants you can reveal.'; break;
-      case 'bid': kick = 'Round ' + v.round + ' · Bidding (up to ' + v.max + ')'; big = 'Bid: ' + v.bid.cur + ' by ' + lab(v.bid.high); sub = lab(v.bid.high) + ' must reveal ' + v.bid.cur + ' Living Plant' + (v.bid.cur > 1 ? 's' : '') + '. Fold = out of the bidding until next round.'; break;
-      case 'challenge': kick = 'Round ' + v.round + ' · Revealing'; big = ch + ' must find ' + v.need + ' — has ' + v.count; sub = 'Top card of a stack flips first. Their own stack goes first, then others.'; break;
-      case 'lose': kick = 'Round ' + v.round + ' · Dead Tree!'; big = ch + ' must lose a card'; sub = last; break;
+      case 'plant': kick = 'Round ' + v.round + ' · Planting'; big = turnMe ? 'Your turn to plant' : lab(v.turn) + ' is planting'; break;
+      case 'grow': kick = 'Round ' + v.round + ' · Growing'; big = turnMe ? 'Add a card or bid' : lab(v.turn) + ' is deciding…'; break;
+      case 'bid': kick = 'Round ' + v.round + ' · Bidding (up to ' + v.max + ')'; big = 'Bid: ' + v.bid.cur + ' by ' + lab(v.bid.high); break;
+      case 'challenge': kick = 'Round ' + v.round + ' · Revealing'; big = ch + ': ' + v.count + ' / ' + v.need + ' Living Plants'; break;
+      case 'lose': kick = 'Round ' + v.round + ' · Dead Tree!'; big = ch + ' loses a card'; break;
       case 'result': {
         const c = v.players.find((x) => x.id === v.challenger), won = !!c && c.tag === 'Won round';
-        kick = 'Round ' + v.round + ' · Over'; big = won ? ch + ' won the round (' + c.wins + '/' + WINS + ')' : ch + ' failed the challenge'; sub = 'Every card goes back to its owner’s hand for the next round.'; break;
+        kick = 'Round ' + v.round + ' · Complete'; big = won ? ch + ' won the round (' + c.wins + '/' + WINS + ')' : ch + ' failed the challenge'; break;
       }
-      case 'over': kick = 'Game over'; big = lab(v.winner) + ' win' + (v.winner === me ? '' : 's') + ' the game!'; sub = last; break;
+      case 'over': kick = 'Game over'; big = lab(v.winner) + ' win' + (v.winner === me ? '' : 's') + ' the game!'; break;
     }
+    bl.setAttribute('data-phase', v.phase);
     clearNode(hero);
-    hero.className = v.flips.length ? 'compact' : '';
     const kickEl = $el('div'); kickEl.className = 'tx kick'; kickEl.textContent = kick; hero.appendChild(kickEl);
     const bigEl = $el('div'); bigEl.className = 'tx big'; bigEl.textContent = big; hero.appendChild(bigEl);
-    if (sub) { const s = $el('div'); s.className = 'tx sub'; s.textContent = sub; hero.appendChild(s); }
-    const tick = v.phase === 'result' || v.phase === 'over' ? v.log.slice(-3, -1) : v.log.slice(-2);
-    const tickEl = $el('div'); tickEl.className = 'tx tick'; tickEl.textContent = tick.map(esc).join(' · '); hero.appendChild(tickEl);
     clearNode(flips);
     v.flips.forEach((f, i) => {
       const fp = $el('div'); fp.className = 'fp';
@@ -934,10 +962,10 @@ export function mount(root, api) {
 
   function stepper(lo, hi, label, confirmAct, def) {
     if (ui.n == null) ui.n = def; ui.lo = lo; ui.hi = hi; ui.n = Math.max(lo, Math.min(hi, ui.n));
-    const out = [btn('−', 'stepdn', null, 'stp')];
-    const num = $el('span'); num.className = 'tx num'; num.setAttribute('aria-live', 'polite'); num.textContent = ui.n; out.push(num);
-    out.push(btn(label + ' ' + ui.n, confirmAct, null, 'go'));
-    return out;
+    const dn = btn('−', 'stepdn', null, 'stp'); if (ui.n <= lo) dn.disabled = true;
+    const up = btn('+', 'stepup', null, 'stp'); if (ui.n >= hi) up.disabled = true;
+    const num = $el('span'); num.className = 'tx num'; num.setAttribute('aria-live', 'polite'); num.textContent = ui.n;
+    return [dn, num, up, btn(label + ' ' + ui.n, confirmAct, null, 'go')];
   }
 
   function botHTML() {
@@ -960,13 +988,13 @@ export function mount(root, api) {
     const own = p.stack.length;
     let res;
     switch (v.phase) {
-      case 'plant': res = mine ? { t: 'Your turn — pick a card to plant face down.', a: kinds('place'), tap: 'place' } : waitFor(); break;
+      case 'plant': res = mine ? { t: 'Your turn — tap a card in your hand to plant.', a: [], tap: 'place' } : waitFor(); break;
       case 'grow':
         if (!mine) res = waitFor();
-        else if (!v.hand.length) res = { t: 'No cards left in hand — you must bid. How many Living Plants can you reveal?', a: stepper(1, stackTotal(), 'Bid', 'bid', Math.max(1, own)) };
-        else if (ui.mode === 'addkind') res = { t: 'Which card will you add to your stack?', a: kinds('add').concat([btn('Back', 'back')]), tap: 'add' };
-        else if (ui.mode === 'open') res = { t: 'Start the bid: how many Living Plants can you reveal?', a: stepper(1, stackTotal(), 'Bid', 'bid', Math.max(1, own)).concat([btn('Back', 'back')]) };
-        else res = { t: 'Your turn — add another card, or start the bid.', a: [btn('Add another card', 'addmode'), btn('Start the bid', 'openmode')] };
+        else if (!v.hand.length) res = { t: 'No cards left in hand — you must bid.', a: stepper(1, stackTotal(), 'Bid', 'bid', Math.max(1, own)) };
+        else if (ui.mode === 'addkind') res = { t: 'Tap a card in your hand to add to your stack.', a: [btn('Back', 'back')], tap: 'add' };
+        else if (ui.mode === 'open') res = { t: 'Start the bid: how many Living Plants?', a: stepper(1, stackTotal(), 'Bid', 'bid', Math.max(1, own)).concat([btn('Back', 'back')]) };
+        else res = { t: 'Your turn — add a card, or start the bid.', a: [btn('Add another card', 'addmode'), btn('Start the bid', 'openmode')] };
         break;
       case 'bid':
         if (!mine) res = waitFor();
@@ -1055,6 +1083,27 @@ export function mount(root, api) {
     } else {
       clearNode(lobby); felt.style.visibility = '';
       renderTop(now); renderMid(now); renderBot(now);
+    }
+    if (v.phase === 'over' && v.winner) {
+      const vk = v.epoch + '|' + v.winner;
+      if (vicKey !== vk) {
+        vicKey = vk; clearNode(vic);
+        const w = win.innerWidth || bl.offsetWidth || 400, h = win.innerHeight || bl.offsetHeight || 700;
+        vic.appendChild(trees.victoryDOM(hash('win|' + vk), w, h, LEAF, PET));
+        const ban = $el('div'); ban.className = 'vic-ban'; ban.setAttribute('data-bd', 'vicban');
+        const title = $el('div'); title.className = 'tx big';
+        title.textContent = v.winner === v.you ? 'You win the game!' : lab(v.winner) + ' wins the game!';
+        ban.appendChild(title);
+        if (ctrlUI()) {
+          const row = $el('div'); row.className = 'row';
+          row.appendChild(btn('Play again', 'start', null, 'go'));
+          row.appendChild(btn('Back to lobby', 'toLobby'));
+          ban.appendChild(row);
+        }
+        vic.appendChild(ban);
+      }
+    } else if (vicKey) {
+      vicKey = ''; clearNode(vic);
     }
     decorate(); bgRoots();
   }

@@ -225,7 +225,7 @@ export function makeTrees() {
     var T = build(c.s, P), art = { br: [], lv: [], fl: [], total: 0 }, i;
     for (i = 0; i < T.length; i++) {
       var b = T[i]; b.dl = b.d * .28;
-      art.br.push({ d: poly(b), ox: f1(b.X[0]), oy: f1(b.Y[0]), dl: b.dl });
+      art.br.push({ d: poly(b), ox: f1(b.X[0]), oy: f1(b.Y[0]), dl: b.dl, dp: b.d });
       art.total = Math.max(art.total, b.dl);
     }
     if (!dead) {
@@ -364,7 +364,66 @@ export function makeTrees() {
     return best;
   }
 
-  return { hash: hash, seeded: seeded, build: build, poly: poly, border: border, borderDOM: borderDOM, draw: draw, score: score, terms: terms, art: art, roots: roots, bgroots: bgroots, bgrootsDOM: bgrootsDOM, TAU: TAU, FLOOR: FLOOR, MAXTRY: MAXTRY, BLOOMS: BLOOMS, GREENS: GREENS, shade: shade };
+  // Swirling inward spiral vines for the full-screen victory overlay (3.5x scale).
+  function victoryDOM(seed, w, h, leafPath, petPath) {
+    var r = seeded(seed ^ 0x5f3759df), rc = seeded(seed ^ 0x7f4a7c15);
+    var bloom = BLOOMS[rc() * BLOOMS.length | 0];
+    var svg = document.createElementNS('http://www.w3.org/2000/svg', 'svg');
+    svg.setAttribute('class', 'vic-svg');
+    svg.setAttribute('viewBox', '0 0 ' + w + ' ' + h);
+    var cx = w / 2, cy = h / 2, minD = Math.min(w, h) * 0.22, maxD = Math.hypot(cx, cy);
+    var corners = [[0, 0], [w, 0], [w, h], [0, h], [w * 0.5, 0], [w * 0.5, h], [0, h * 0.5], [w, h * 0.5]];
+    for (var v = 0; v < corners.length; v++) {
+      var sx = corners[v][0], sy = corners[v][1];
+      var baseA = Math.atan2(cy - sy, cx - sx) + 0.65; // spiral tangent inward
+      var q = [{ x: sx, y: sy, a: baseA, len: maxD * 0.85, w: 15, d: 0, dl: v * 0.12 }];
+      while (q.length) {
+        var o = q.shift(), st = 8, n = Math.ceil(o.len / st);
+        var x = o.x, y = o.y, X = [x], Y = [y], H = [], wob = 0;
+        for (var i = 1; i <= n; i++) {
+          var dx = cx - x, dy = cy - y, dist = Math.hypot(dx, dy);
+          if (dist < minD) break; // frame the central banner without covering it
+          var inwardA = Math.atan2(dy, dx) + 0.58; // bezier/spiral curve around center
+          wob += (r() - 0.5) * 0.14;
+          var hAng = inwardA + wob + 0.25 * Math.sin(i * 0.18 + v);
+          x += Math.cos(hAng) * st; y += Math.sin(hAng) * st;
+          X.push(x); Y.push(y); H.push(hAng);
+        }
+        var m = X.length - 1; if (m < 2) continue;
+        var br = { X: X, Y: Y, H: H, w0: o.w, w1: Math.max(2, o.w * 0.55) };
+        var p = document.createElementNS('http://www.w3.org/2000/svg', 'path');
+        p.setAttribute('d', poly(br));
+        p.setAttribute('class', 'gr stem-p');
+        p.setAttribute('style', 'transform-origin:' + f1(X[0]) + 'px ' + f1(Y[0]) + 'px;animation-delay:' + o.dl.toFixed(2) + 's');
+        svg.appendChild(p);
+        if (o.d < 2) {
+          var mid = Math.floor(m * (0.35 + r() * 0.35));
+          q.push({ x: X[mid], y: Y[mid], a: H[mid - 1] + (r() < 0.5 ? -0.7 : 0.7), len: o.len * 0.55, w: o.w * 0.65, d: o.d + 1, dl: o.dl + 0.25 });
+        }
+        for (var j = 2; j <= m; j += 3) {
+          var lScale = f1(2.8 + r() * 1.4), lAng = Math.round((H[j - 1] + (j % 2 ? 0.9 : -0.9)) * 57.3 + 90);
+          var lg = document.createElementNS('http://www.w3.org/2000/svg', 'g');
+          lg.setAttribute('transform', 'translate(' + f1(X[j]) + ' ' + f1(Y[j]) + ') rotate(' + lAng + ') scale(' + lScale + ')');
+          var lp = document.createElementNS('http://www.w3.org/2000/svg', 'path');
+          lp.setAttribute('d', leafPath);
+          lp.setAttribute('style', 'fill:' + shade(GREENS[rc() * GREENS.length | 0], (rc() - 0.5) * 0.2) + ';animation:gr .6s cubic-bezier(.2,.9,.3,1.15) ' + (o.dl + j * 0.03).toFixed(2) + 's both;transform-origin:0 0');
+          lg.appendChild(lp); svg.appendChild(lg);
+        }
+        var fg = document.createElementNS('http://www.w3.org/2000/svg', 'g');
+        fg.setAttribute('transform', 'translate(' + f1(X[m]) + ' ' + f1(Y[m]) + ') rotate(' + Math.floor(r() * 72) + ') scale(' + f1(3.2 + r() * 1.0) + ')');
+        var fin = document.createElementNS('http://www.w3.org/2000/svg', 'g');
+        fin.setAttribute('class', 'gr'); fin.setAttribute('style', 'animation-delay:' + (o.dl + 0.45).toFixed(2) + 's');
+        var fp = document.createElementNS('http://www.w3.org/2000/svg', 'path');
+        fp.setAttribute('d', petPath); fp.setAttribute('style', 'fill:' + shade(bloom.c, (rc() - 0.45) * 0.4));
+        var fc = document.createElementNS('http://www.w3.org/2000/svg', 'circle');
+        fc.setAttribute('r', '1.5'); fc.setAttribute('style', 'fill:' + bloom.ctr);
+        fin.appendChild(fp); fin.appendChild(fc); fg.appendChild(fin); svg.appendChild(fg);
+      }
+    }
+    return svg;
+  }
+
+  return { hash: hash, seeded: seeded, build: build, poly: poly, border: border, borderDOM: borderDOM, draw: draw, score: score, terms: terms, art: art, roots: roots, bgroots: bgroots, bgrootsDOM: bgrootsDOM, TAU: TAU, FLOOR: FLOOR, MAXTRY: MAXTRY, BLOOMS: BLOOMS, GREENS: GREENS, shade: shade, victoryDOM: victoryDOM };
 }
 
 export const trees = makeTrees();
