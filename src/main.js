@@ -15,7 +15,8 @@ import { createRecord } from '../plugins/record.js';
 
 const SKEY = 'bubhub.session.v2';
 const NAME_KEY = 'bubhub.name';
-const THING_GLOB = import.meta.glob('./things-we-made/*.{html,mp4,webm,ogv}', { query: '?url', import: 'default' });
+const THING_GLOB = import.meta.glob('./things-we-made/*.{html,mp4,webm,ogv,svg,png,jpg,jpeg,webp,gif}', { query: '?url', import: 'default' });
+const MD_GLOB = import.meta.glob('./things-we-made/*.md', { query: '?raw', import: 'default' });
 const things = [];
 
 function loadSession() {
@@ -418,18 +419,30 @@ export async function boot() {
   }
 
   function thingTitle(path) {
-    const name = String(path || '').split('/').pop().replace(/\.(html|mp4|webm|ogv)$/i, '');
+    const name = String(path || '').split('/').pop().replace(/\.(html|mp4|webm|ogv|svg|png|jpe?g|webp|gif|md)$/i, '');
     const words = name.split(/[-_]+/).map(function (w) { return w ? w.charAt(0).toUpperCase() + w.slice(1) : w; });
     return words.join(' ');
   }
 
+  function kindOf(path) {
+    const ext = String(path || '').split('/').pop().split('.').pop().toLowerCase();
+    if (ext === 'md') return 'markdown';
+    if (/^(mp4|webm|ogv)$/.test(ext)) return 'video';
+    if (/^(svg|png|jpe?g|webp|gif)$/.test(ext)) return 'image';
+    return 'html';
+  }
+
   async function loadThings() {
-    const entries = await Promise.all(Object.entries(THING_GLOB).map(async function (e) {
+    const urlEntries = await Promise.all(Object.entries(THING_GLOB).map(async function (e) {
       const url = await e[1]();
-      return { title: thingTitle(e[0]), url: url };
+      return { title: thingTitle(e[0]), url: url, kind: kindOf(e[0]) };
+    }));
+    const mdEntries = await Promise.all(Object.entries(MD_GLOB).map(async function (e) {
+      const text = await e[1]();
+      return { title: thingTitle(e[0]), text: text, kind: 'markdown' };
     }));
     things.length = 0;
-    entries.forEach(function (t) { things.push(t); });
+    urlEntries.concat(mdEntries).forEach(function (t) { things.push(t); });
     renderThings();
   }
 
@@ -456,12 +469,16 @@ export async function boot() {
     });
   }
 
-  function isThingVideo(t) { return /\.(mp4|webm|ogv)$/i.test(String(t && t.url || '')); }
+  function isThingVideo(t) { return t && t.kind === 'video'; }
+  function isThingImage(t) { return t && t.kind === 'image'; }
+  function isThingMarkdown(t) { return t && t.kind === 'markdown'; }
 
   function openThing(t) {
     const slug = 'show-' + String(t.title || '').toLowerCase().replace(/[^a-z0-9]+/g, '-');
     closeStageOnly();
     if (isThingVideo(t)) { openVideo(t, slug); return; }
+    if (isThingImage(t)) { openImage(t, slug); return; }
+    if (isThingMarkdown(t)) { openMarkdown(t, slug); return; }
     compat.open({ id: slug, title: t.title, file: t.url, fill: false, height: 560 }, t.url);
     const ft = document.getElementById('focus-title');
     if (ft) ft.textContent = t.title;
@@ -484,6 +501,39 @@ export async function boot() {
         shadow.appendChild(v);
         v.play().catch(function () {});
         return { destroy: function () { try { v.pause(); v.src = ''; } catch (e) {} } };
+      }
+    };
+    stage.mount({ id: slug, title: t.title, fill: false }, mod, {});
+  }
+
+  function openImage(t, slug) {
+    const ft = document.getElementById('focus-title');
+    if (ft) ft.textContent = t.title;
+    const mod = {
+      mount: function (shadow, api) {
+        shadow.host.style.minHeight = '420px';
+        const img = document.createElement('img');
+        img.src = t.url;
+        img.alt = t.title;
+        img.style.cssText = 'max-width:100%;max-height:100%;display:block;margin:auto;background:#000';
+        shadow.appendChild(img);
+        return { destroy: function () { img.src = ''; } };
+      }
+    };
+    stage.mount({ id: slug, title: t.title, fill: false }, mod, {});
+  }
+
+  function openMarkdown(t, slug) {
+    const ft = document.getElementById('focus-title');
+    if (ft) ft.textContent = t.title;
+    const mod = {
+      mount: function (shadow, api) {
+        shadow.host.style.minHeight = '420px';
+        const el = document.createElement('div');
+        el.style.cssText = 'max-width:76ch;line-height:1.6;font:16px/1.6 system-ui;color:#e2e8f0;background:#0b1021;padding:24px;border-radius:12px;white-space:pre-wrap;overflow:auto';
+        el.textContent = t.text || '';
+        shadow.appendChild(el);
+        return { destroy: function () {} };
       }
     };
     stage.mount({ id: slug, title: t.title, fill: false }, mod, {});
