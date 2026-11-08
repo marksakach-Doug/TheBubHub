@@ -304,6 +304,7 @@ export async function boot() {
     r.classList.remove('hidden'); r.classList.add('flex');
     document.body.classList.add('in-room');
     renderHeaderRoom();
+    renderButtons();
     saveSession(store.state);
   }
 
@@ -361,7 +362,15 @@ export async function boot() {
       b.appendChild(document.createElement('br'));
       b.appendChild(tag);
     }
-    b.addEventListener('click', function () { openGame(g.meta.id); });
+    b.addEventListener('click', function () {
+      const s = store.state;
+      const isCurateHost = s.inRoom && s.isHost && s.curated && s.curated.on;
+      if (isCurateHost) store.setCurated(true, g.meta.id);
+      openGame(g.meta.id);
+      if (isCurateHost) {
+        ensureNet().broadcast(msg(T.GOTO, { game: g.meta.id }));
+      }
+    });
     return b;
   }
 
@@ -388,6 +397,28 @@ export async function boot() {
         wrap.appendChild(row);
         mb.appendChild(wrap);
       });
+      const s = store.state;
+      const toggleBtn = document.createElement('button');
+      toggleBtn.className = 'btn-bouncy rounded-xl px-3 py-2 text-sm font-bold mb-2';
+      toggleBtn.style.display = 'block';
+      toggleBtn.style.background = (s.curated && s.curated.on) ? '#7c3aed' : '#334155';
+      toggleBtn.textContent = 'Curation: ' + (s.curated && s.curated.on ? 'ON' : 'OFF') + ' — host controls tables';
+      toggleBtn.addEventListener('click', function () {
+        const now = !(s.curated && s.curated.on);
+        store.setCurated(now, now ? s.curated.game : null);
+      });
+      mb.appendChild(toggleBtn);
+      if (s.inRoom && s.isHost && s.curated && s.curated.on) {
+        const clearBtn = document.createElement('button');
+        clearBtn.className = 'btn-bouncy rounded-xl px-3 py-2 text-sm font-bold';
+        clearBtn.style.background = '#dc2626';
+        clearBtn.textContent = 'Waiting screen — clear tables';
+        clearBtn.addEventListener('click', function () {
+          store.setCurated(true, null);
+          ensureNet().broadcast(msg(T.GOTO, { game: null }));
+        });
+        mb.appendChild(clearBtn);
+      }
     }
     const sb = document.getElementById('solo-game-buttons');
     if (sb) {
@@ -839,10 +870,9 @@ export async function boot() {
         room: s.roomId,
         roster: store.rosterList(),
         seats: Object.assign({}, s.seats),
-        // Every table's seat map, so a guest's local mirror matches the host's
-        // for all of them and not just whichever game is open right now.
         seatMaps: store.seatMaps(),
-        states: s.lastState
+        states: s.lastState,
+        curated: s.curated
       }));
       if (name !== want) ensureNet().sendTo(slotId, msg(T.RENAME, { id: slotId, name: name }));
       broadcastRoster();
@@ -871,9 +901,9 @@ export async function boot() {
       // process curated mode for this guest
       if (m.p.curated && m.p.curated.on) {
         store.setCurated(true, m.p.curated.game);
-        if (m.p.curated.game) {
+        pendingGame = null;
+        if (m.p.curated.game && s.openGame !== m.p.curated.game) {
           openGame(m.p.curated.game);
-          pendingGame = null;
         }
         document.getElementById('multiplayer-section').classList.add('hidden');
         document.getElementById('solo-section').classList.add('hidden');
@@ -901,10 +931,7 @@ export async function boot() {
       // process curated mode from roster update
       if (m.p.curated && m.p.curated.on) {
         store.setCurated(true, m.p.curated.game);
-        if (m.p.curated.game) {
-          if (s.openGame && s.openGame !== m.p.curated.game) {
-            leaveOpenGame();
-          }
+        if (m.p.curated.game && s.openGame !== m.p.curated.game) {
           openGame(m.p.curated.game);
         }
         document.getElementById('multiplayer-section').classList.add('hidden');
@@ -915,9 +942,9 @@ export async function boot() {
     } else if (m.type === T.GOTO) {
       const game = m.p && m.p.game;
       store.setCurated(true, game || null);
-      if (game) {
+      if (game && s.openGame !== game) {
         openGame(game);
-      } else {
+      } else if (!game && s.openGame) {
         leaveOpenGame();
       }
     } else if (m.type === T.CHAT) {
@@ -1116,7 +1143,8 @@ export async function boot() {
     ensureNet().broadcast(msg(T.ROSTER, {
       roster: store.rosterList(),
       seats: Object.assign({}, s.seats),
-      seatMaps: store.seatMaps()
+      seatMaps: store.seatMaps(),
+      cur: s.curated
     }));
   }
 
@@ -1411,7 +1439,8 @@ export async function boot() {
       const multiplayerSection = document.getElementById('multiplayer-section');
       const soloSection = document.getElementById('solo-section');
       const gameInvites = document.getElementById('game-invites');
-      if (store.state.curated && store.state.curated.on) {
+      const s = store.state;
+      if (s.curated && s.curated.on && !s.isHost) {
         if (multiplayerSection) multiplayerSection.classList.add('hidden');
         if (soloSection) soloSection.classList.add('hidden');
         if (gameInvites) gameInvites.classList.add('hidden');
