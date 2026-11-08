@@ -21,3 +21,7 @@ CLOUDFLARE_API_TOKEN
 node_modules/
 dist/
 .wrangler/
+
+# Phone video sources — too large for GitHub; keep locally, serve the .mp4 instead
+src/things-we-made/*.MOV
+src/things-we-made/*.mov
