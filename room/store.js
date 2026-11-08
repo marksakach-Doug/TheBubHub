@@ -29,7 +29,7 @@ export function createStore() {
     seatsByGame: {},
     lastState: {}, // gameId -> latest host state/view (for late joiners)
     openGame: null,
-    curated: { on: false, game: null }
+    curated: { on: false, game: null, thing: null }
   };
 
   function emit() { listeners.forEach(function (fn) { try { fn(s); } catch (e) {} }); }
@@ -69,7 +69,7 @@ export function createStore() {
     openRoom(roomId, isHost, curated) {
       s.roomId = roomId; s.inRoom = true; s.isHost = isHost;
       s.hostId = isHost ? s.me.id : '';
-      s.curated = curated || { on: false, game: null };
+      s.curated = curated || { on: false, game: null, thing: null };
       emit();
     },
     // Solo is a room of one: not in a room, but still the host. This has to be
@@ -81,12 +81,12 @@ export function createStore() {
     // and reportResult() returned early: nothing was recorded.
     openSolo() {
       s.roomId = ''; s.inRoom = false; s.isHost = true; s.hostId = s.me.id;
-      s.curated = { on: false, game: null };
+      s.curated = { on: false, game: null, thing: null };
       emit();
     },
     closeRoom() {
       s.roomId = ''; s.inRoom = false; s.isHost = false; s.hostId = '';
-      s.roster = []; s.seats = {}; s.seatsByGame = {}; s.openGame = null; s.curated = { on: false, game: null };
+      s.roster = []; s.seats = {}; s.seatsByGame = {};       s.openGame = null; s.curated = { on: false, game: null, thing: null };
       // lastState is a cache of HOST state and must not outlive the room it
       // came from: mountGame prefers a cached view over a freshly created
       // table, so a stale entry from the previous room is what a player got
@@ -95,7 +95,7 @@ export function createStore() {
       emit();
     },
     setHostId(id) { s.hostId = id; emit(); },
-    setCurated(on, game) { s.curated = { on, game }; emit(); },
+    setCurated(on, game, thing) { s.curated = { on, game, thing }; emit(); },
 
     upsertMember(m) {
       const i = s.roster.findIndex(function (x) { return x.id === m.id; });

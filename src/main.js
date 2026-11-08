@@ -400,13 +400,23 @@ export async function boot() {
       });
       const s = store.state;
       if (s.inRoom && s.isHost && s.curated && s.curated.on) {
+        const th = document.createElement('div');
+        const hh = document.createElement('h3');
+        hh.className = 'text-teal-300 text-xs font-extrabold uppercase tracking-wide mb-1';
+        hh.textContent = 'Send guests to a thing';
+        th.appendChild(hh);
+        const row = document.createElement('div');
+        row.className = 'flex flex-wrap gap-2';
+        things.forEach(function (t) { row.appendChild(thingButton(t)); });
+        th.appendChild(row);
+        mb.appendChild(th);
         const clearBtn = document.createElement('button');
         clearBtn.className = 'btn-bouncy rounded-xl px-3 py-2 text-sm font-bold';
         clearBtn.style.background = '#dc2626';
         clearBtn.textContent = 'Waiting screen — clear tables';
         clearBtn.addEventListener('click', function () {
-          store.setCurated(true, null);
-          ensureNet().broadcast(msg(T.GOTO, { game: null }));
+          store.setCurated(true, null, null);
+          ensureNet().broadcast(msg(T.GOTO, { game: null, thing: null }));
         });
         mb.appendChild(clearBtn);
       }
@@ -444,6 +454,7 @@ export async function boot() {
     things.length = 0;
     urlEntries.concat(mdEntries).forEach(function (t) { things.push(t); });
     renderThings();
+    renderButtons();
   }
 
   function renderThings() {
@@ -472,6 +483,23 @@ export async function boot() {
   function isThingVideo(t) { return t && t.kind === 'video'; }
   function isThingImage(t) { return t && t.kind === 'image'; }
   function isThingMarkdown(t) { return t && t.kind === 'markdown'; }
+
+  function thingButton(t) {
+    const b = document.createElement('button');
+    b.className = 'btn-bouncy rounded-xl px-3 py-2 text-sm font-bold';
+    b.style.background = '#0f766e';
+    b.textContent = t.title;
+    b.addEventListener('click', function () {
+      const s = store.state;
+      const isCurateHost = s.inRoom && s.isHost && s.curated && s.curated.on;
+      openThing(t);
+      if (isCurateHost) {
+        store.setCurated(true, null, t.title);
+        ensureNet().broadcast(msg(T.GOTO, { game: null, thing: t.title }));
+      }
+    });
+    return b;
+  }
 
   function openThing(t) {
     const slug = 'show-' + String(t.title || '').toLowerCase().replace(/[^a-z0-9]+/g, '-');
@@ -965,9 +993,12 @@ export async function boot() {
       pushRosterToGames();
       // process curated mode for this guest
       if (m.p.curated && m.p.curated.on) {
-        store.setCurated(true, m.p.curated.game);
+        store.setCurated(true, m.p.curated.game, m.p.curated.thing);
         pendingGame = null;
-        if (m.p.curated.game && s.openGame !== m.p.curated.game) {
+        if (m.p.curated.thing) {
+          const t = things.find(function (x) { return x.title === m.p.curated.thing; });
+          if (t) openThing(t);
+        } else if (m.p.curated.game && s.openGame !== m.p.curated.game) {
           openGame(m.p.curated.game);
         }
         document.getElementById('multiplayer-section').classList.add('hidden');
@@ -995,8 +1026,11 @@ export async function boot() {
       pushRosterToGames();
       // process curated mode from roster update
       if (m.p.curated && m.p.curated.on) {
-        store.setCurated(true, m.p.curated.game);
-        if (m.p.curated.game && s.openGame !== m.p.curated.game) {
+        store.setCurated(true, m.p.curated.game, m.p.curated.thing);
+        if (m.p.curated.thing) {
+          const t = things.find(function (x) { return x.title === m.p.curated.thing; });
+          if (t) openThing(t);
+        } else if (m.p.curated.game && s.openGame !== m.p.curated.game) {
           openGame(m.p.curated.game);
         }
         document.getElementById('multiplayer-section').classList.add('hidden');
@@ -1006,10 +1040,14 @@ export async function boot() {
       }
     } else if (m.type === T.GOTO) {
       const game = m.p && m.p.game;
-      store.setCurated(true, game || null);
-      if (game && s.openGame !== game) {
+      const thingName = (m.p && m.p.thing) || null;
+      store.setCurated(true, game || null, thingName);
+      if (thingName) {
+        const t = things.find(function (x) { return x.title === thingName; });
+        if (t) openThing(t);
+      } else if (game && s.openGame !== game) {
         openGame(game);
-      } else if (!game && s.openGame) {
+      } else if (!game && !thingName) {
         leaveOpenGame();
       }
     } else if (m.type === T.CHAT) {

@@ -30,6 +30,16 @@ Drop `.png`/`.jpg`/`.webp`/`.gif`/`.svg` directly. Keep files reasonable (a few 
 
 Drop a `.md` file. Its filename becomes the menu title (`a-short-poem.md` → "A Short Poem"). Use dashes/underscores for multi-word titles. Line breaks are preserved, so it works well for poems.
 
+## Curation mode (host sends guests to a thing)
+
+When the host checks **Curation** and hosts a room, the lobby game buttons become "send everyone to this table" controls. Things now appear there too, so the host can send all guests to a video, image, or poem:
+
+- Open the room, turn on **Curation**, and a **"Send guests to a thing"** group appears under the game tables with one button per thing.
+- Clicking a thing opens it on the host, sets curation to that thing, and broadcasts it to every guest so they open the same thing.
+- Click **Waiting screen — clear tables** to clear the curation (guests leave the thing).
+
+Guests can't open tables while curated — the host drives what everyone sees.
+
 ## Verify
 
 ```bash
