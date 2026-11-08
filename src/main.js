@@ -15,7 +15,7 @@ import { createRecord } from '../plugins/record.js';
 
 const SKEY = 'bubhub.session.v2';
 const NAME_KEY = 'bubhub.name';
-const THING_GLOB = import.meta.glob('./things-we-made/*.html', { query: '?url', import: 'default' });
+const THING_GLOB = import.meta.glob('./things-we-made/*.{html,mp4,webm,ogv}', { query: '?url', import: 'default' });
 const things = [];
 
 function loadSession() {
@@ -418,7 +418,7 @@ export async function boot() {
   }
 
   function thingTitle(path) {
-    const name = String(path || '').split('/').pop().replace(/\.html$/, '');
+    const name = String(path || '').split('/').pop().replace(/\.(html|mp4|webm|ogv)$/i, '');
     const words = name.split(/[-_]+/).map(function (w) { return w ? w.charAt(0).toUpperCase() + w.slice(1) : w; });
     return words.join(' ');
   }
@@ -456,12 +456,37 @@ export async function boot() {
     });
   }
 
+  function isThingVideo(t) { return /\.(mp4|webm|ogv)$/i.test(String(t && t.url || '')); }
+
   function openThing(t) {
     const slug = 'show-' + String(t.title || '').toLowerCase().replace(/[^a-z0-9]+/g, '-');
     closeStageOnly();
+    if (isThingVideo(t)) { openVideo(t, slug); return; }
     compat.open({ id: slug, title: t.title, file: t.url, fill: false, height: 560 }, t.url);
     const ft = document.getElementById('focus-title');
     if (ft) ft.textContent = t.title;
+  }
+
+  function openVideo(t, slug) {
+    const ft = document.getElementById('focus-title');
+    if (ft) ft.textContent = t.title;
+    const mod = {
+      mount: function (shadow, api) {
+        shadow.host.style.minHeight = '560px';
+        const v = document.createElement('video');
+        v.controls = true;
+        v.playsInline = true;
+        v.src = t.url;
+        v.style.width = '100%';
+        v.style.height = '100%';
+        v.style.display = 'block';
+        v.style.background = '#000';
+        shadow.appendChild(v);
+        v.play().catch(function () {});
+        return { destroy: function () { try { v.pause(); v.src = ''; } catch (e) {} } };
+      }
+    };
+    stage.mount({ id: slug, title: t.title, fill: false }, mod, {});
   }
 
   // ---------- opening games ----------
