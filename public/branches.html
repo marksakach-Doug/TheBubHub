@@ -12,8 +12,9 @@ svg{position:fixed;inset:0;width:100%;height:100%;display:block}
 svg path{fill:var(--ink)}
 #hint{position:fixed;left:0;right:0;bottom:calc(env(safe-area-inset-bottom,0px) + 18px);text-align:center;font:13px/1 Georgia,"Times New Roman",serif;letter-spacing:.3em;color:var(--hint);transition:opacity .8s;pointer-events:none}
 #ui{position:fixed;top:calc(env(safe-area-inset-top,0px) + 10px);right:calc(env(safe-area-inset-right,0px) + 10px);width:216px;font:12px/1.3 Georgia,"Times New Roman",serif;color:var(--soft);cursor:default;text-align:right}
-#ui button,#ui select{font:inherit;color:var(--soft);background:var(--paper);border:1px solid var(--line);padding:3px 8px;cursor:pointer}
-#ui button:hover,#ui button[aria-pressed=true],#ui select:hover{color:var(--ink);border-color:var(--ink)}
+#ui button,#ui select,#rst{font:inherit;color:var(--soft);background:var(--paper);border:1px solid var(--line);padding:3px 8px;cursor:pointer}
+#rst:hover,#ui button:hover,#ui button[aria-pressed=true],#ui select:hover{color:var(--ink);border-color:var(--ink)}
+#rst{position:fixed;top:calc(env(safe-area-inset-top,0px) + 10px);left:calc(env(safe-area-inset-left,0px) + 10px);z-index:5;font:12px/1.3 Georgia,"Times New Roman",serif}
 #panel{margin-top:6px;padding:10px 12px 8px;background:rgba(255,255,255,.94);border:1px solid var(--line);text-align:left;max-height:calc(100vh - 74px);overflow:auto}
 #panel[hidden]{display:none}
 #pre{width:100%;margin-bottom:6px;padding:4px 6px}
@@ -27,12 +28,13 @@ svg path{fill:var(--ink)}
 <body>
 <svg id="t" xmlns="http://www.w3.org/2000/svg" preserveAspectRatio="xMidYMax meet"></svg>
 <div id="hint">click</div>
+<button id="rst" title="restart (R)">restart</button>
 <div id="ui">
   <button id="tg" aria-expanded="true">levers</button>
   <div id="panel">
     <select id="pre" aria-label="preset"></select>
     <div id="rows"></div>
-    <div id="bt"><button id="auto" aria-pressed="false">auto</button><button id="rs">restart</button><button id="df">defaults</button><button id="sv">save svg</button></div>
+    <div id="bt"><button id="auto" aria-pressed="false">auto</button><button id="df">defaults</button><button id="sv">save svg</button></div>
   </div>
 </div>
 <script>
@@ -44,23 +46,34 @@ const DC=Math.ceil(W/D)+1,DR=Math.ceil(H/D)+2,dens=new Uint16Array(DC*DR);
 svg.setAttribute('viewBox','0 0 '+W+' '+H);
 
 /* One engine, many looks. A look is just a set of values (a preset). Levers: key, label, min, max, step. */
-const LV=[['seed'],['stem','stem from bottom',0,1,1],['rays','rays from click',0,16,1],['shells','shell rings',0,1,1],['len0','seed length',20,500,1],
-['path'],['ds','step length',3,16,1],['wave','wave size',0,2.2,.01],['wl','wavelength',40,360,1],['jag','jaggedness',0,1.5,.01],['stiff','stiffness',0,.4,.01],['noise','wobble',0,.3,.005],['curl','hooked tips',0,1,.01],['snap','lattice angles (0 = off)',0,12,1],['tilt','tilt',0,.3,.005],['light','light pull',0,1,.01],['wall','wall push',0,1,.01],
+const LV=[['seed'],['stem','stem from bottom',0,1,1],['rays','rays from click',0,16,1],['shells','shell rings',0,1,1],['len0','seed length',20,500,1],['sym','symmetry: copies around click',0,16,1],['mirror','mirror the copies',0,1,1],
+['path'],['ds','step length',3,16,1],['wave','wave size',0,2.2,.01],['wl','wavelength',40,360,1],['jag','jaggedness / wobble',0,1.5,.01],['stiff','stiffness',0,.4,.01],['curl','hooked tips',0,1,.01],['curve','spiral: turn per branch',0,1.5,.01],['pull','pull toward click',0,1,.01],['snap','lattice angles (0 = off)',0,12,1],['tilt','tilt',0,.3,.005],['light','light pull',0,1,.01],['wall','wall push',0,1,.01],
 ['branching'],['fork','tip forks',0,1,.01],['sides','side shoots',0,2,.01],['spread','branch angle',.3,2,.01],['sidelen','side length',.2,1,.01],['persist','tip persistence',0,1.1,.01],['minlen','tip min length',10,200,1],['hair','hairlines per click',0,40,1],['revive','revived ends per click',0,40,1],
 ['contact'],['contact','on contact: 0 pass, 1 avoid, 2 join',0,2,1],['space','spacing',3,28,1],['steer','dodge',0,1,.01],['crowd','crowd limit',.02,.6,.01],
-['shape'],['width','thickness',1,8,.1],['taper','taper',.5,1,.01],['minw','thinnest',.3,2,.05],['rough','edge roughness',0,1.2,.01],['prism','prism shape',0,1,1],['aspect','prism width',.04,.4,.01],
+['shape'],['width','thickness',1,8,.1],['taper','taper',.5,1,.01],['minw','thinnest',.3,2,.05],['rough','edge roughness',0,1.2,.01],['aspect','prism width (0 = off)',0,.4,.01],
 ['shells'],['gap','shell spacing',14,80,1],['cell','lattice cell',6,40,1],['rjit','jitter',0,.8,.01],['twist','shell twist',0,1,.01],['struts','struts: 0 none, 1 one, 2 mesh',0,2,1],['open','pores',0,.8,.01],['spines','spines per shell',0,40,1],['spineL','spine length',10,220,1],['spiral','spiral',0,1,.01],['sag','sag between rays',0,1,.01],
 ['general'],['speed','grow time (ms)',150,2000,10],['cap','max pieces',2000,40000,500]];
-const BASE={stem:0,rays:0,shells:0,len0:110,ds:4,wave:0,wl:130,jag:0,stiff:0,noise:0,curl:0,snap:0,tilt:.03,light:.22,wall:0,fork:0,sides:0,spread:1,sidelen:.55,persist:.84,minlen:22,hair:0,revive:0,contact:1,space:8,steer:0,crowd:.3,width:3,taper:.82,minw:.7,rough:0,prism:0,aspect:.1,gap:34,cell:18,rjit:.25,twist:.5,struts:2,open:.2,spines:12,spineL:90,spiral:0,sag:0,speed:800,cap:16000};
+const BASE={stem:0,rays:0,shells:0,sym:0,mirror:0,len0:110,ds:4,wave:0,wl:130,jag:0,stiff:0,curl:0,curve:0,pull:0,snap:0,tilt:.03,light:.22,wall:0,fork:0,sides:0,spread:1,sidelen:.55,persist:.84,minlen:22,hair:0,revive:0,contact:1,space:8,steer:0,crowd:.3,width:3,taper:.82,minw:.7,rough:0,aspect:0,gap:34,cell:18,rjit:.25,twist:.5,struts:2,open:.2,spines:12,spineL:90,spiral:0,sag:0,speed:800,cap:16000};
 const PRESETS={
-tree:{stem:1,len0:176,wave:1,noise:.08,curl:.15,wall:1,fork:.4,sides:.55,revive:8,space:15,steer:.6},
+tree:{stem:1,len0:176,wave:1,jag:.08,curl:.15,wall:1,fork:.4,sides:.55,revive:8,space:15,steer:.6},
 lightning:{stem:1,len0:190,ds:6,jag:1.1,stiff:.1,light:.7,wall:1,fork:.35,sides:.8,spread:.45,sidelen:.6,persist:.95,minlen:18,space:9,crowd:.35,width:2.4,taper:.85,minw:.6},
 radiolarian:{shells:1,contact:0,ds:8,light:0,persist:.85,minlen:24,fork:.45},
 spiderweb:{rays:14,len0:330,ds:12,contact:0,persist:0,light:0,rjit:.04,shells:1,gap:22,cell:9,twist:0,struts:0,spines:0,spiral:1,sag:.6,width:2.2,taper:.9},
 crack:{rays:5,len0:110,ds:9,jag:.9,stiff:.07,light:.09,sides:.5,sidelen:.85,persist:1,minlen:20,hair:10,contact:2,space:5,width:4.5,taper:.8,rough:.5},
-crystal:{rays:6,len0:99,snap:6,prism:1,aspect:.1,fork:.5,sides:.6,sidelen:.7,persist:.8,minlen:18,light:.25,revive:8,space:10},
-coral:{rays:1,len0:220,wave:.6,wl:90,jag:.2,noise:.12,light:.15,wall:1,fork:.1,sides:.12,sidelen:.8,persist:1,minlen:140,revive:6,space:9,steer:1,crowd:.5,width:2.2,taper:.95,minw:.9},
-veins:{rays:4,len0:90,ds:5,wave:.6,wl:70,jag:.5,stiff:.05,noise:.1,light:.3,fork:.6,sides:1.2,spread:.9,sidelen:.6,persist:.9,minlen:16,hair:14,contact:2,space:6,width:2.2,taper:.85,minw:.5,rough:.15}
+crystal:{rays:6,len0:99,snap:6,aspect:.1,fork:.5,sides:.6,sidelen:.7,persist:.8,minlen:18,light:.25,revive:8,space:10},
+coral:{rays:1,len0:220,wave:.6,wl:90,jag:.23,light:.15,wall:1,fork:.1,sides:.12,sidelen:.8,persist:1,minlen:140,revive:6,space:9,steer:1,crowd:.5,width:2.2,taper:.95,minw:.9},
+veins:{rays:4,len0:90,ds:5,wave:.6,wl:70,jag:.51,stiff:.05,light:.3,fork:.6,sides:1.2,spread:.9,sidelen:.6,persist:.9,minlen:16,hair:14,contact:2,space:6,width:2.2,taper:.85,minw:.5,rough:.15},
+jellyfish:{shells:1,gap:60,cell:26,twist:.3,struts:1,open:.4,light:0,spines:24,spineL:200,wave:1.2,wl:140,jag:.1,persist:.9,fork:.2,contact:1,steer:.6,space:8,width:2.4,taper:.9,minw:.6},
+mandala:{rays:12,shells:1,len0:300,contact:0,persist:0,light:0,sag:1,twist:0,struts:2,open:.3,spines:12,spineL:70,gap:26,cell:12,rjit:.02,width:2,minw:.6},
+shards:{snap:5,rays:5,len0:150,aspect:.14,contact:1,space:6,fork:.6,sides:.3,persist:.72,minlen:12,light:0,revive:2},
+circuit:{snap:4,rays:1,len0:230,contact:0,fork:1,sides:0,persist:.78,minlen:6,light:0,width:3.2,taper:.88,minw:.6},
+snowflake:{sym:6,mirror:1,snap:6,rays:1,len0:90,contact:1,space:7,fork:.5,sides:.9,persist:.85,minlen:12,width:1.8,taper:.9,minw:.6,light:0,cap:40000},
+kaleidoscope:{sym:6,mirror:1,rays:1,len0:110,wave:.3,wl:100,jag:.12,contact:1,steer:.8,space:7,fork:.5,sides:.9,spread:.9,persist:.9,minlen:12,width:1.8,taper:.9,minw:.6,light:.1,cap:40000},
+bloom:{sym:8,mirror:1,rays:2,len0:140,wave:1,wl:120,jag:.1,persist:.95,fork:.3,sides:.6,contact:1,steer:.8,space:7,width:2,taper:.9,minw:.6,light:.2,cap:40000},
+triskelion:{sym:3,rays:1,len0:200,curve:.7,persist:.85,fork:.3,sides:.5,spread:.8,contact:1,steer:.5,space:6,width:2.6,taper:.9,minw:.6,light:0,cap:40000},
+pinwheel:{sym:5,rays:2,len0:140,curve:.35,wave:1,wl:130,jag:.1,persist:.95,fork:.35,sides:.6,contact:1,steer:.8,space:7,width:2,taper:.9,minw:.6,light:.2,cap:40000},
+fiddleheads:{stem:1,len0:230,sides:1.5,sidelen:.6,fork:.15,persist:.9,curve:.3,wave:.4,jag:.05,contact:1,steer:1,space:10,width:3,taper:.9,wall:1,light:.3,revive:4},
+tendrils:{rays:14,len0:140,pull:.6,wave:.5,wl:140,jag:.1,persist:1,fork:.3,sides:.5,contact:0,width:2,taper:.93,minw:.7,light:0}
 };
 const V={},rowsEl=document.getElementById('rows'),sel=document.getElementById('pre');
 let preset='tree';
@@ -104,16 +117,31 @@ function mk(X,Y,Wd,dl){
   }
   return P;
 }
+/* Symmetry: every walker is simulated once, then drawn (and marked as an obstacle) again rotated, and optionally mirrored, around the first click. */
+function xfs(){
+  const N=Math.round(V.sym),o=[];
+  if(!T||(N<2&&!(N>=1&&V.mirror>0)))return o;
+  for(let k=0;k<N;k++){
+    const t=k*TAU/N;if(k)o.push([Math.cos(t),-Math.sin(t),Math.sin(t),Math.cos(t)]);
+    if(V.mirror>0){const a=2*(T.b0+k*PI/N);o.push([Math.cos(a),Math.sin(a),Math.sin(a),-Math.cos(a)])}
+  }
+  return o;
+}
+function xfP(P,m){
+  const f=(X,Y)=>{const nx=[],ny=[];for(let i=0;i<X.length;i++){const dx=X[i]-T.x,dy=Y[i]-T.y;nx.push(T.x+m[0]*dx+m[1]*dy);ny.push(T.y+m[2]*dx+m[3]*dy)}return[nx,ny]};
+  const[cx,cy]=f(P.cx,P.cy),[lx,ly]=f(P.lx,P.ly),[rx,ry]=f(P.rx,P.ry);
+  return{n:P.n,dl:P.dl,cx,cy,lx,ly,rx,ry};
+}
 let T=null,anim=null,raf=0,nid=0,total=0,auto=0;
 
 /* Seed: a stem from the bottom, rays from the click, and/or a set of shell rings around it. */
 function plant(px,py){
   const r=rng(Math.random()*4294967296),S=SN(),pend=[],rm=.42*Math.min(W,H);
   const cl=(v,L)=>rm*2>=L?L/2:Math.max(rm,Math.min(L-rm,v));
-  const cx=V.shells?cl(px,W):px,cy=V.shells?cl(py,H):py,n=Math.round(V.rays),b0=r()*TAU;
+  const cx=V.shells?cl(px,W):px,cy=V.shells?cl(py,H):py,n=Math.round(V.rays),b0=r()*TAU,N=Math.round(V.sym),SY=N>=2||(N>=1&&V.mirror>0),dom=(V.mirror>0?PI:TAU)/Math.max(1,N);
   T={r,gen:0,pending:pend,dead:[],pool:[],hold:[],x:cx,y:cy,lx:px,ly:py,b0,shell:0,rlast:0,rmax:rm,prev:null,sdone:false};
-  if(V.stem)pend.push({x:Math.max(W*.06,Math.min(W*.94,px)),y:H+3,a:-PI/2+(r()-.5)*.3,len:V.len0*U,w:V.width,d:0,wr:1});
-  for(let i=0;i<n;i++)pend.push({x:cx,y:cy,a:b0+i*TAU/n+(S?0:(r()-.5)*V.rjit*2),len:V.len0*U,w:V.width,d:0,wr:1});
+  if(V.stem)pend.push({x:Math.max(W*.06,Math.min(W*.94,px)),y:H+3,a:-PI/2+(r()-.5)*.3,len:V.len0*U,w:V.width,d:0,wr:1,cs:1,nr:1});
+  for(let i=0;i<n;i++)pend.push({x:cx,y:cy,a:SY?b0+i*dom/n:b0+i*TAU/n+(S?0:(r()-.5)*V.rjit*2),len:V.len0*U,w:V.width,d:0,wr:1,cs:1});
 }
 
 /* The walker. It follows a heading that waves, jags, or locks to a lattice; it avoids, ignores or
@@ -123,7 +151,7 @@ function walk(o,r,next){
   const A=(.35+r()*.7)*V.wave,k=TAU/(V.wl*(.6+r()*1.2)),ph=r()*TAU,ml=V.minlen*U;
   const turn=!S&&o.d>=2&&o.len>=30&&r()<V.curl?(r()<.5?1:-1)*Math.min(3,.03*o.len):0;
   const a0=S?o.a+(r()-.5)*V.tilt:o.a;
-  let x=o.x,y=o.y,b=a0,wob=0,hit=false;
+  let x=o.x,y=o.y,b=a0,hit=false;const cs=o.cs||1;
   const X=[x],Y=[y],Hd=[];
   for(let i=1;i<=maxN&&!hit;i++){
     const s=i*ds;let h=a0;
@@ -135,8 +163,9 @@ function walk(o,r,next){
         if(y<M)uy=1-y/M;else if(y>H-M)uy=-(1-(H-y)/M);
         if(ux||uy)b+=.4*V.wall*Math.min(1,Math.hypot(ux,uy))*dA(Math.atan2(uy,ux),b);
       }
-      wob+=(r()-.5)*V.noise;
-      h=b+wob+A*Math.sin(k*s+ph)*Math.min(1,s/24);
+      if(V.curve>0)b+=cs*V.curve*PI*ds/o.len;
+      if(V.pull>0){const dx=T.lx-x,dy=T.ly-y;if(dx*dx+dy*dy>900)b+=V.pull*.05*dA(Math.atan2(dy,dx),b)}
+      h=b+A*Math.sin(k*s+ph)*Math.min(1,s/24);
       if(turn&&s>o.len*.55){const q=(s-o.len*.55)/(o.len*.45);h+=turn*q*q}
       if(V.contact==1&&V.steer>0&&s>grace){
         const la=V.space+10;
@@ -164,27 +193,27 @@ function walk(o,r,next){
   const w0=o.w,w1=Math.max(V.minw*.65,w0*V.taper),ex=X[n],ey=Y[n],ea=S?o.a:Hd[n-1],sp=(.3+r()*.3)*V.spread,d=r()<.5?1:-1;
   const out=o.sp&&!T.sdone?T.hold:next,dead=hit||turn;
   const sgn=(b0,px,py)=>{const g=Math.atan2(T.ly-py,T.lx-px),st=S||1;return r()<Math.min(1,V.light*2.4)?(Math.abs(dA(g,b0+st))<Math.abs(dA(g,b0-st))?1:-1):(r()<.5?1:-1)};
-  const kid=(kx,ky,ka,len,w,main,wr)=>{
+  const kid=(kx,ky,ka,len,w,main,wr,c2)=>{
     if(main?total>=V.cap*2.5:(total>=V.cap||out.length>900))return;
     if(o.hair&&len<10)return;
-    out.push({x:kx,y:ky,a:ka,len:o.hair?len:Math.max(ml,len),w:Math.max(V.minw,w),d:o.d+1,wr,sp:o.sp,hair:o.hair});
+    out.push({x:kx,y:ky,a:ka,len:o.hair?len:Math.max(ml,len),w:Math.max(V.minw,w),d:o.d+1,wr,cs:c2,sp:o.sp,hair:o.hair,nr:o.nr});
   };
-  if(!dead&&V.persist>.05)kid(ex,ey,S?o.a:ea+d*sp*.35,o.len*(o.hair?.75:V.persist*(.88+r()*.24)),w1*.88,1,o.wr*.92);
+  if(!dead&&V.persist>.05)kid(ex,ey,S?o.a:ea+d*sp*.35,o.len*(o.hair?.75:V.persist*(.88+r()*.24)),w1*.88,1,o.wr*.92,cs);
   if(!o.hair&&!dead&&dn(ex,ey)<=V.crowd){
-    if(r()<V.fork)kid(ex,ey,S?o.a+sgn(o.a,ex,ey)*S:ea-d*(sp+.25+r()*.45),o.len*(.6+r()*.18),w1*.88,0,o.wr*.85);
-    if(!S&&o.d>1&&r()<V.fork*.3)kid(ex,ey,ea+d*(sp+.7),o.len*(.5+r()*.1),w1*.8,0,o.wr*.8);
+    if(r()<V.fork)kid(ex,ey,S?o.a+sgn(o.a,ex,ey)*S:ea-d*(sp+.25+r()*.45),o.len*(.6+r()*.18),w1*.88,0,o.wr*.85,-d);
+    if(!S&&o.d>1&&r()<V.fork*.3)kid(ex,ey,ea+d*(sp+.7),o.len*(.5+r()*.1),w1*.8,0,o.wr*.8,d);
   }
-  if(dead){if(T.dead.length>4000)T.dead.splice(r()*4000|0,1);T.dead.push({x:ex,y:ey,a:ea,w:w1,d:o.d,wr:o.wr})}
+  if(dead){if(T.dead.length>4000)T.dead.splice(r()*4000|0,1);T.dead.push({x:ex,y:ey,a:ea,w:w1,d:o.d,wr:o.wr,cs,nr:o.nr})}
   const ns=o.hair||n<2?0:Math.floor(V.sides*(o.d==0?2:1)+r());
   let sd=r()<.5?1:-1;
   for(let j=0;j<ns;j++,sd=-sd){
     const t=o.d>0?.2+r()*.65:.35+r()*.55,kk=Math.max(1,Math.min(n-1,Math.round(t*n)));
     if(dn(X[kk],Y[kk])>V.crowd)continue;
-    kid(X[kk],Y[kk],S?o.a+sgn(o.a,X[kk],Y[kk])*S:Hd[kk-1]+sd*(.55+r()*.7)*V.spread,o.len*V.sidelen*(.82+r()*.36),(w0+(w1-w0)*kk/n)*.8,0,o.wr*.8);
+    kid(X[kk],Y[kk],S?o.a+sgn(o.a,X[kk],Y[kk])*S:Hd[kk-1]+sd*(.55+r()*.7)*V.spread,o.len*V.sidelen*(.82+r()*.36),(w0+(w1-w0)*kk/n)*.8,0,o.wr*.8,sd);
   }
-  if(V.hair>0)for(let i=1;i<n;i+=2){if(T.pool.length>5000)T.pool.shift();T.pool.push({x:X[i],y:Y[i],a:Hd[i-1],w:Math.max(.3,w0+(w1-w0)*i/n)})}
+  if(V.hair>0)for(let i=1;i<n;i+=2){if(T.pool.length>5000)T.pool.shift();T.pool.push({x:X[i],y:Y[i],a:Hd[i-1],w:Math.max(.3,w0+(w1-w0)*i/n),nr:o.nr})}
   mark(X,Y,id);
-  if(V.prism){
+  if(V.aspect>0){
     const len=Math.hypot(ex-X[0],ey-Y[0]),w=Math.max(V.minw*2,len*V.aspect*o.wr);
     return mk([X[0],X[0]+(ex-X[0])*.7,ex],[Y[0],Y[0]+(ey-Y[0])*.7,ey],[w,w,.5],r()*.4);
   }
@@ -225,25 +254,26 @@ function shells(bs,pend,r){
 
 /* One click: revive blocked ends, sprout hairlines, add a shell, then run every pending walker. */
 function grow(px,py){
-  const r=T.r,next=[],bs=[],pend=T.pending.slice(),S=SN(),Dd=T.dead,pl=T.pool,ml=V.minlen*U;
+  const r=T.r,next=[],bs=[],pend=T.pending.slice(),S=SN(),Dd=T.dead,pl=T.pool,ml=V.minlen*U,XF=xfs();
   T.gen++;T.lx=px;T.ly=py;
   for(let t=0;t<V.revive&&Dd.length;t++){
     let best=-1,bf=9;
     for(let q=0;q<14;q++){const j=r()*Dd.length|0,f=dn(Dd[j].x,Dd[j].y);if(f<bf){bf=f;best=j}}
     if(bf>V.crowd*1.6)continue;
     const e=Dd[best];Dd[best]=Dd[Dd.length-1];Dd.pop();
-    pend.push({x:e.x,y:e.y,a:e.a+(r()<.5?-1:1)*(S?S*(1+(r()<.3?1:0)):.5+r()*.9),len:Math.max(ml,40*U),w:Math.max(V.minw,e.w),d:e.d+1,wr:e.wr});
+    pend.push({x:e.x,y:e.y,a:e.a+(r()<.5?-1:1)*(S?S*(1+(r()<.3?1:0)):.5+r()*.9),len:Math.max(ml,40*U),w:Math.max(V.minw,e.w),d:e.d+1,wr:e.wr,cs:e.cs,nr:e.nr});
   }
   for(let t=0;t<V.hair&&pl.length;t++){
     const j=r()*pl.length|0,e=pl[j];pl[j]=pl[pl.length-1];pl.pop();
-    pend.push({x:e.x,y:e.y,a:e.a+(r()<.5?-1:1)*(1.1+r()*.6),len:(25+r()*55)*U,w:Math.max(V.minw,e.w*.5),d:3,wr:1,hair:1});
+    pend.push({x:e.x,y:e.y,a:e.a+(r()<.5?-1:1)*(1.1+r()*.6),len:(25+r()*55)*U,w:Math.max(V.minw,e.w*.5),d:3,wr:1,hair:1,cs:j&1?1:-1,nr:e.nr});
   }
   if(V.shells)shells(bs,pend,r);
   for(let i=pend.length-1;i>0;i--){const j=r()*(i+1)|0;const t=pend[i];pend[i]=pend[j];pend[j]=t}
   for(const o of pend){
     if(o.sp&&Math.hypot(o.x-T.x,o.y-T.y)<T.rlast-20*U)continue;
     if(o.d>0&&!S&&V.light>0&&Math.hypot(px-o.x,py-o.y)>40)o.a+=V.light*dA(Math.atan2(py-o.y,px-o.x),o.a);
-    const P=walk(o,r,next);if(P)bs.push(P);
+    const P=walk(o,r,next);
+    if(P){bs.push(P);if(XF.length&&!o.sp&&!o.nr)for(const m of XF){const Q=xfP(P,m);bs.push(Q);total++;mark(Q.cx,Q.cy,++nid)}}
   }
   T.pending=next;
   if(!bs.length)return null;
@@ -320,7 +350,7 @@ const panel=document.getElementById('panel'),tg=document.getElementById('tg'),au
 tg.onclick=()=>{panel.hidden=!panel.hidden;tg.setAttribute('aria-expanded',!panel.hidden)};
 if(W<700){panel.hidden=true;tg.setAttribute('aria-expanded','false')}
 sel.onchange=()=>{load(sel.value);restart()};
-document.getElementById('rs').onclick=restart;
+const rst=document.getElementById('rst');rst.onclick=restart;rst.addEventListener('pointerdown',e=>e.stopPropagation());
 document.getElementById('df').onclick=()=>load(preset);
 document.getElementById('sv').onclick=saveSvg;
 au.onclick=()=>{auto^=1;au.setAttribute('aria-pressed',!!auto);if(auto)autoLoop()};

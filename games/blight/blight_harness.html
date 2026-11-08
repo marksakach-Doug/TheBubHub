@@ -1,0 +1,57 @@
+<!doctype html>
+<html><head><meta charset="utf-8"><meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Blight harness</title>
+<style>html,body{margin:0;background:#fff;font:14px sans-serif}.cell{margin:0 0 12px}.cell h4{margin:2px 6px;font-weight:600}.bar{background:#223;color:#fff;display:flex;align-items:center;padding:0 10px;box-sizing:border-box}body.lock .cell{margin:0}body.lock .cell h4{display:none}</style></head>
+<body><div id="app"></div>
+<script type="module">
+// A stand-in for the hub: one authoritative state, the REAL reduce()/project(), one Shadow DOM per player.
+import * as G from '../games/blight/index.js';
+const q = new URLSearchParams(location.search);
+const names = (q.get('users') || 'Ann').split(',');
+const users = names.map((n, i) => ({ id: 'u' + i, name: n, host: i === 0 }));
+const clients = {};
+let state = G.init({ seats: users, atTable: users.slice(0, +(q.get('seated') || users.length)), options: {} });
+const errors = [];
+const barH = +(q.get('bar') || 0);
+if (barH || users.length === 1) document.body.classList.add('lock');
+if (barH) { const b = document.createElement('div'); b.className = 'bar'; b.style.height = barH + 'px'; b.textContent = 'hub header'; document.body.prepend(b); }
+addEventListener('error', (e) => errors.push(String(e.message)));
+function pushAll() { for (const id in clients) clients[id].mod.update(G.project(state, id)); }
+function sendFrom(id, action) {
+  const u = users.find((x) => x.id === id);
+  const r = G.reduce(state, action, { from: { id, name: u.name, host: u.host }, rng: Math.random });
+  if (r && r.error) { const c = clients[id]; if (c && c.mod.denied) c.mod.denied(r.error); return; }
+  state = r; pushAll();
+}
+function mountClient(u, opts = {}) {
+  const cell = document.createElement('div'); cell.className = 'cell'; cell.dataset.client = u.id;
+  const h4 = document.createElement('h4'); h4.textContent = u.name; cell.append(h4); document.getElementById('app').append(cell);
+  const host = document.createElement('div'); cell.append(host);
+  const root = host.attachShadow({ mode: 'open' });
+  const api = {
+    me: { id: u.id, name: u.name }, isHost: !!u.host, isSpectator: !!opts.spectator, isInRoom: true, root, seats: {}, roster: users, atTable: users,
+    send: (a) => sendFrom(u.id, a), setTimeout: (f, ms) => setTimeout(f, ms), setInterval: (f, ms) => setInterval(f, ms),
+    raf: (f) => requestAnimationFrame(f), cancelRaf: (i) => cancelAnimationFrame(i),
+  };
+  const mod = G.mount(root, api);
+  clients[u.id] = { mod, root, api };
+  mod.update(G.project(state, u.id));
+}
+users.forEach((u, i) => mountClient(u, { spectator: q.get('spec') && i === users.length - 1 }));
+window.H = {
+  users, errors, G,
+  state: () => JSON.parse(JSON.stringify(state)),
+  send: (id, a) => sendFrom(id, a),
+  // test-only: edit the authoritative state in place, then push every client's view
+  patch: (src) => { new Function('S', src)(state); pushAll(); },
+  mountLate: (id, name) => { const u = { id, name, host: false }; users.push(u); mountClient(u); },
+  prune: (id) => { state = G.prune(state, id); delete clients[id]; document.querySelector('[data-client="' + id + '"]')?.remove(); pushAll(); },
+  root: (id) => clients[id].root,
+  html: (id) => clients[id].root.innerHTML,
+  actions: (id) => [...clients[id].root.querySelectorAll('[data-act]')].map((b) => ({ act: b.dataset.act, label: b.textContent.trim(), disabled: b.disabled })),
+  click: (id, act, pick) => {
+    const bs = [...clients[id].root.querySelectorAll('[data-act="' + act + '"]')]; if (!bs.length) return false;
+    (pick == null ? bs[0] : bs[Math.min(pick, bs.length - 1)]).click(); return true;
+  },
+};
+</script></body></html>
