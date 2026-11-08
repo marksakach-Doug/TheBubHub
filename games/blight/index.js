@@ -694,7 +694,8 @@ export function mount(root, api) {
   const doc = root.ownerDocument || document;
   const win = typeof window !== 'undefined' ? window : globalThis;
   const $el = (tag) => doc.createElement(tag);
-  const $svg = (tag) => doc.createElement(tag);
+  const SVG_NS = 'http:' + '//www.w3.org/2000/svg';
+  const $svg = (tag) => doc.createElementNS(SVG_NS, tag);
   const $ = (s) => root.querySelector(s);
 
   const style = $el('style'); style.textContent = CSS; root.appendChild(style);
@@ -774,7 +775,7 @@ export function mount(root, api) {
     if (!st.art) st.art = trees.art(c);
     if (st.t0 == null) st.t0 = now;
     const el = (now - st.t0) / 1000, A = st.art, an = el < A.total, dl = (d) => (d - el).toFixed(2) + 's', tf = A.tf;
-    const svg = $svg('svg'); svg.className = 'art' + (c.k === 'D' ? ' dd' : '');
+    const svg = $svg('svg'); svg.setAttribute('class', 'art' + (c.k === 'D' ? ' dd' : ''));
     svg.setAttribute('viewBox', '0 0 100 140'); svg.setAttribute('preserveAspectRatio', 'xMidYMax meet');
     const g = $svg('g'); g.setAttribute('transform', 'translate(' + tf.x + ' ' + tf.y + ') scale(' + tf.s + ')');
     for (const b of A.br) {
@@ -804,7 +805,7 @@ export function mount(root, api) {
     if (!st.rt) st.rt = trees.roots(c);
     if (st.tb == null) st.tb = now;
     const el = (now - st.tb) / 1000, an = el < 1.4;
-    const svg = $svg('svg'); svg.className = 'art rt';
+    const svg = $svg('svg'); svg.setAttribute('class', 'art rt');
     svg.setAttribute('viewBox', '0 0 100 140'); svg.setAttribute('preserveAspectRatio', 'xMidYMax meet');
     for (const b of st.rt) {
       const p = $svg('path'); p.setAttribute('d', b.d);
