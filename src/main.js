@@ -398,16 +398,6 @@ export async function boot() {
         mb.appendChild(wrap);
       });
       const s = store.state;
-      const toggleBtn = document.createElement('button');
-      toggleBtn.className = 'btn-bouncy rounded-xl px-3 py-2 text-sm font-bold mb-2';
-      toggleBtn.style.display = 'block';
-      toggleBtn.style.background = (s.curated && s.curated.on) ? '#7c3aed' : '#334155';
-      toggleBtn.textContent = 'Curation: ' + (s.curated && s.curated.on ? 'ON' : 'OFF') + ' — host controls tables';
-      toggleBtn.addEventListener('click', function () {
-        const now = !(s.curated && s.curated.on);
-        store.setCurated(now, now ? s.curated.game : null);
-      });
-      mb.appendChild(toggleBtn);
       if (s.inRoom && s.isHost && s.curated && s.curated.on) {
         const clearBtn = document.createElement('button');
         clearBtn.className = 'btn-bouncy rounded-xl px-3 py-2 text-sm font-bold';
@@ -1281,7 +1271,7 @@ export async function boot() {
     if (!nameConfirmed) { setStatus('host-status', 'Confirm your name first (✓).'); return; }
     if (store.state.inRoom) { setStatus('host-status', 'You are already in room ' + store.state.roomId + ' — leave it first.'); return; }
     const want = (document.getElementById('host-id-input').value || '').trim() || randomRoom();
-    const curated = document.getElementById('host-curation')?.checked || false;
+    pendingCuration = { on: document.getElementById('host-curation')?.checked || false, game: null };
     const keepGame = store.state.openGame;
     setStatus('host-status', 'Creating ' + want + '…');
     try {
