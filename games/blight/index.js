@@ -749,7 +749,7 @@ export function mount(root, api) {
   let vicKey = '';
   const ui = { mode: null, key: '', n: null, lo: 1, hi: 1, spread: false };
   const CST = new Map();
-  const cst = (id) => { let s = CST.get(id); if (!s) { if (CST.size > 700) CST.clear(); s = { t0: null, tb: null, art: null, rt: null }; CST.set(id, s); } return s; };
+  const cst = (key) => { let s = CST.get(key); if (!s) { if (CST.size > 700) CST.clear(); s = { t0: null, tb: null, art: null, rt: null }; CST.set(key, s); } return s; };
   const bdEl = new WeakMap();
 
   const applyTheme = () => {
@@ -848,7 +848,7 @@ export function mount(root, api) {
 
   function card(c, face, o, now) {
     o = o || {};
-    const st = cst(c.id), a = face ? artEl(c, st, now) : backEl(c, st, now), t = (now - (face ? st.t0 : st.tb)) / 1000;
+    const st = cst(c.id + '|' + c.k + '|' + c.s), a = face ? artEl(c, st, now) : backEl(c, st, now), t = (now - (face ? st.t0 : st.tb)) / 1000;
     const s = $el('span'); s.className = 'c ' + (face ? c.k : 'b') + (o.act ? ' act' : '') + (o.top ? ' top' : '');
     s.setAttribute('data-id', esc(c.id));
     if (o.act) { s.setAttribute('data-act', o.act); s.setAttribute('data-k', o.k); }

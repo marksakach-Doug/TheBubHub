@@ -56,7 +56,8 @@ export const meta = {
   color: '#312e81',
   icon: '👀',
   desc: 'Wander in the dark, help the murderer invent an alibi, and catch them before they escape. Five-round match.',
-  soloable: false
+  soloable: false,
+  fill: true
 };
 
 function cl(v, a, b) {
@@ -686,7 +687,7 @@ export function prune(state, goneId) {
 // ----------------------------------------------------------------- mount ----
 
 const CSS = [
-  '.cu-wrap{max-width:520px;height:100dvh;max-height:860px;margin:0 auto;padding:6px;',
+  '.cu-wrap{max-width:min(94vw,1120px);height:100%;margin:0 auto;padding:6px;',
   'box-sizing:border-box;display:flex;flex-direction:column;gap:6px;',
   'font:13px/1.35 system-ui,-apple-system,Segoe UI,sans-serif;color:#e2e8f0;',
   'background:#0f172a;user-select:none;-webkit-user-select:none}',
@@ -695,7 +696,7 @@ const CSS = [
   '.cu-badge{font-weight:700;padding:3px 8px;border-radius:6px;background:#334155;color:#f8fafc}',
   '.cu-badge.murderer{background:#7f1d1d;color:#fecaca}',
   '.cu-clock{font-variant-numeric:tabular-nums;font-weight:700;color:#fde68a}',
-  '.cu-stage{position:relative;flex:1 1 0;min-height:180px;display:flex;justify-content:center;background:#090d16;border-radius:14px;overflow:hidden}',
+  '.cu-stage{position:relative;flex:1 1 0;min-height:0;display:flex;justify-content:center;background:#090d16;border-radius:14px;overflow:hidden}',
   'canvas{width:100%;height:100%;object-fit:contain;touch-action:none;display:block}',
   '.cu-card{background:#1e293b;border:1px solid #475569;border-radius:10px;padding:8px;display:flex;flex-direction:column;gap:6px}',
   '.cu-card[hidden]{display:none!important}',
@@ -734,7 +735,7 @@ export function mount(root, api) {
     '  <span id="cu-status">Waiting in the Lit Hallway…</span>',
     '  <span class="cu-clock" id="cu-clock"></span>',
     '</div>',
-    '<div class="cu-stage"><canvas id="cu-cv" width="800" height="1280"></canvas></div>',
+    '<div class="cu-stage"><canvas id="cu-cv" width="1200" height="1920"></canvas></div>',
     '<div class="cu-card" id="cu-drawer" hidden></div>',
     '<div class="cu-grid4" id="cu-tricks">',
     '  <button type="button" data-fx="wave">👋 Wave</button>',
@@ -755,7 +756,7 @@ export function mount(root, api) {
   const clockEl = wrap.querySelector('#cu-clock');
   const cv = wrap.querySelector('#cu-cv');
   const ctx = cv.getContext('2d');
-  ctx.scale(2, 2);
+  ctx.scale(3, 3);
   const drawer = wrap.querySelector('#cu-drawer');
   const sayInput = wrap.querySelector('#cu-say');
   const sayBtn = wrap.querySelector('#cu-saybtn');

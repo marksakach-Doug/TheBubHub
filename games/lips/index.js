@@ -690,9 +690,14 @@ textarea::placeholder{color:#8f7aa0;font-weight:400}
 .trow{display:flex;border-bottom:3px solid #07030d}
 .trow:last-child{border-bottom:0}
 .tlabel{flex:0 0 96px;display:flex;align-items:center;justify-content:center;padding:8px 6px;background:var(--neon);color:#07030d;font-size:12px;line-height:1.15;letter-spacing:.04em;text-transform:uppercase;text-align:center}
+.oneslot{display:block;font-size:10px;line-height:1;text-transform:none;letter-spacing:0;opacity:.85;margin-top:2px}
 .zone{flex:1;min-width:0;min-height:76px;display:flex;flex-wrap:wrap;gap:8px;align-content:flex-start;padding:8px;transition:background .12s,box-shadow .12s}
 .zone.hot{background:rgba(255,255,255,.1);box-shadow:inset 0 0 16px var(--neon,#fff)}
 .zone.pool{min-height:64px;padding:8px 0 0}
+.zone.top{max-height:128px;overflow:hidden}
+.zone.top.full{border-color:#fff;box-shadow:0 0 14px #fff;background:rgba(255,255,255,.1)}
+.zone.top.empty{border:2px dashed #ffe14d;box-shadow:0 0 14px #ffe14d;animation:pulse 2s ease-in-out infinite}
+@keyframes pulse{0%,100%{opacity:1}50%{opacity:.6}}
 .tchip{position:relative;max-width:100%;padding:8px 10px;border:2px solid var(--neon,#b967ff);background:rgba(20,2,12,.94);box-shadow:0 0 6px var(--neon,#b967ff);font:700 15px/1.25 system-ui,-apple-system,"Segoe UI",sans-serif;color:#fff;overflow-wrap:anywhere;touch-action:none;user-select:none;-webkit-user-select:none;cursor:grab}
 .tchip.dragging{opacity:.3}
 .tchip.picked{outline:2px dashed #fff;outline-offset:2px}
@@ -832,11 +837,15 @@ export function mount(root, api) {
     return '<div class="tchip' + (picked === i ? ' picked' : '') + '" data-i="' + i + '">' + lipSvg('kiss') + esc(text) + '</div>';
   }
 
-  function tierRows(chipsFor, editable) {
+  function tierRows(chipsFor, editable, full, empty) {
+    full = full || new Set();
     return '<div class="tierlist">' + TIER_ORDER.map((t) => {
       const T = TIERS[t];
-      return '<div class="trow" style="--neon:' + T.color + '"><div class="tlabel">' + esc(T.label) + '</div>'
-        + '<div class="zone"' + (editable ? ' data-zone="' + t + '"' : '') + '>' + chipsFor(t) + '</div></div>';
+      const label = editable && t === WISH ? esc(T.label) + ' <span class="oneslot">one slot only</span>' : esc(T.label);
+      const wishFull = t === WISH && full.has(t);
+      const wishEmpty = t === WISH && empty;
+      return '<div class="trow" style="--neon:' + T.color + '"><div class="tlabel">' + label + '</div>'
+        + '<div class="zone top' + (wishFull ? ' full' : '') + (wishEmpty ? ' empty' : '') + '"' + (editable ? ' data-zone="' + t + '"' : '') + '>' + chipsFor(t) + '</div></div>';
     }).join('') + '</div>';
   }
 
@@ -1012,12 +1021,15 @@ function lobbyBody() {
     if (!tl) tl = freshTL((v.rankLines || []).length);
     const text = {};
     (v.rankLines || []).forEach((l) => { text[l.key] = l.text; });
-    const board = tierRows((t) => tl.rows[t].map((i) => chipHtml(i, text[i])).join(''), true);
+    const full = new Set();
+    const empty = c.wishes === 0;
+    if (tl.rows[WISH].length) full.add(WISH);
+    const board = tierRows((t) => tl.rows[t].map((i) => chipHtml(i, text[i])).join(''), true, full, empty);
     const pool = '<div class="tube"><div class="tag" style="margin:0">Unranked · drag each line up into a tier</div>'
       + '<div class="zone pool" data-zone="pool">' + tl.pool.map((i) => chipHtml(i, text[i])).join('') + '</div></div>';
     const c = rankCounts();
     const ok = c.set === c.n && c.wishes === 1;
-    const hint = c.wishes === 0 ? 'Put the one you wish you had thought of in the top tier.'
+    const hint = c.wishes === 0 ? 'The top lip hasn\'t been licked. Flip a lip up there. You can’t lip-tinue until there is a lip up there that you wish you licked.'
       : c.set === c.n ? 'Ready.' : 'Ranked ' + c.set + ' of ' + c.n + '.';
     return '<div class="tube"><p class="how">Drag each line into a tier. The top tier holds just one. '
       + 'You can also tap a line, then tap a tier.</p></div>'
