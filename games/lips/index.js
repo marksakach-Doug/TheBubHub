@@ -1023,13 +1023,13 @@ function lobbyBody() {
     if (!tl) tl = freshTL((v.rankLines || []).length);
     const text = {};
     (v.rankLines || []).forEach((l) => { text[l.key] = l.text; });
+    const c = rankCounts();
     const full = new Set();
     const empty = c.wishes === 0;
     if (tl.rows[WISH].length) full.add(WISH);
     const board = tierRows((t) => tl.rows[t].map((i) => chipHtml(i, text[i])).join(''), true, full, empty);
     const pool = '<div class="tube"><div class="tag" style="margin:0">Unranked · drag each line up into a tier</div>'
       + '<div class="zone pool" data-zone="pool">' + tl.pool.map((i) => chipHtml(i, text[i])).join('') + '</div></div>';
-    const c = rankCounts();
     const ok = c.set === c.n && c.wishes === 1;
     const hint = c.wishes === 0 ? 'The top lip hasn\'t been licked. Flip a lip up there. You can’t lip-tinue until there is a lip up there that you wish you licked.'
       : c.set === c.n ? 'Ready.' : 'Ranked ' + c.set + ' of ' + c.n + '.';

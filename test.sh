@@ -235,6 +235,11 @@ BROWSER_SUITES=(
   # which could only ever SyntaxError — a suite that has never once passed.
   "minigo|minigo_test.mjs"
   "clicker|clicker_test.mjs"
+  # Mounts the lips module in a real browser with a fake clock and proves the
+  # write-phase timer still runs and the friend can call time, including while
+  # fidgeting with the mannequins (the `busy` guard). Catches the rankBody
+  # temporal-dead-zone crash that froze the friend after lines were entered.
+  "lips play|lips_play.py"
 )
 
 for entry in "${OFFLINE_SUITES[@]}"; do
