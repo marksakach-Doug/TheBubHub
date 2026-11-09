@@ -278,6 +278,35 @@ test('a tie at match end enters sudden death; the friend picks one winner', () =
   assert.deepEqual(resolved.winnerIds, [w1], 'sudden death names a single winner');
 });
 
+test('timeUp moves to rank with only the writers who wrote, when not everyone wrote', () => {
+  let s = started();
+  s = send(s, 'b', { a: 'line', text: 'b-line' });
+  s = send(s, 'c', { a: 'line', text: 'c-line' });
+  // d has not written; friend 'a' calls time
+  const after = send(s, 'a', { a: 'timeUp' }, { rng: seeded(5) });
+  assert.equal(after.phase, 'rank');
+  assert.deepEqual(after.writers, ['b', 'c']);
+  assert.equal(after.shuffle.length, 2);
+  assert.ok(!after.shuffle.includes('d'));
+});
+
+test('timeUp can be called by any seated player, not just host or friend', () => {
+  let s = started();
+  s = send(s, 'b', { a: 'line', text: 'b-line' });
+  // writer 'c' (not host, not friend) calls time
+  const after = send(s, 'c', { a: 'timeUp' }, { rng: seeded(5) });
+  assert.equal(after.phase, 'rank');
+  assert.deepEqual(after.writers, ['b']);
+});
+
+test('timeUp with nobody written deals a fresh word and stays in write', () => {
+  const s = started();
+  const after = send(s, 'a', { a: 'timeUp' }, { rng: seeded(5) });
+  assert.equal(after.phase, 'write');
+  assert.equal(after.redeals, 1);
+  assert.deepEqual(after.lines, {});
+});
+
 test('sudden death can only be triggered by the friend on a tied candidate', () => {
   let s = started();
   s.matchRounds = 2;

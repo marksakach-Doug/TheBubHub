@@ -309,7 +309,7 @@ function line(state, id, from, action, rng) {
 // time. A late or repeated call changes nothing.
 function timeUp(state, id, from, rng) {
   if (state.phase !== 'write') return state;
-  if (!from.host && id !== state.friend) return { error: 'Only the host or the friend calls time.' };
+  if (!from.host && id !== state.friend && state.order.indexOf(id) < 0) return { error: 'Only the host, the friend, or a player at the table can call time.' };
   const s = clone(state);
   const wrote = s.writers.filter((w) => has(s.lines, w));
   if (!wrote.length) {
@@ -980,6 +980,7 @@ function lobbyBody() {
       return timerHtml() + again
         + '<div class="tube"><p class="how">Everyone is thinking about your lips. You just sit here and wait.</p>'
         + '<p class="tag">' + v.writtenCount + ' of ' + v.writersTotal + ' lips in</p></div>'
+        + '<div class="acts">' + lip('Call time', 'calltime', { big: true }) + '</div>'
         + '<div id="fidget-slot"></div>';
     }
     if (v.isWriter) {
@@ -1204,16 +1205,14 @@ function lobbyBody() {
     if (box) box.classList.toggle('hot', left <= 10000);
     if (left > 0) return;
 
-    // Out of time: whatever is typed but unsent goes in, then the host calls it.
+    // Out of time: whatever is typed but unsent goes in.
     if (view.isWriter && !autoSent) {
       autoSent = true;
       const t = clean(draft == null ? '' : draft).slice(0, MAX_LINE);
-      if (t && t !== view.myLine) api.send({ a: 'line', text: t });
+      if (t && t !== view.myLine) { try { api.send({ a: 'line', text: t }); } catch (e) {} }
     }
-    if (!timeUpSent && (api.isHost || view.isFriend) && spent - total >= (api.isHost ? 1500 : 4000)) {
-      timeUpSent = true;
-      api.send({ a: 'timeUp' });
-    }
+    // Anyone at the table can call time once the clock has run out; retry until the phase changes.
+    if ((api.isHost || view.isFriend) && spent - total >= (api.isHost ? 1500 : 1000)) { try { api.send({ a: 'timeUp' }); } catch (e) {} }
   }
 
   // ------------------------------------------------------------ seating
@@ -1432,6 +1431,7 @@ function lobbyBody() {
       else if (act === 'crown') crown();
       else if (act === 'savelines') saveWinningLines();
       else if (act === 'suddenwin') api.send({ a: 'sudden', winner: btn.getAttribute('data-v') });
+      else if (act === 'calltime') api.send({ a: 'timeUp' });
       return;
     }
     // Tap fallback: a picked-up line goes wherever the next tier is tapped.
