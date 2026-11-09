@@ -260,7 +260,7 @@ test('match ends after the set number of rounds with a winner and lip confetti s
   assert.ok(summarize(s, (x) => x), 'final round summary remains available');
 });
 
-test('a tie at match end names all winners', () => {
+test('a tie at match end enters sudden death; the friend picks one winner', () => {
   let s = started();
   s.matchRounds = 2;
   s = rankAsFriend(writeAll(s, ['1', '2', '3']), [2, 0, 1]); // wish -> shuffle[0]
@@ -268,10 +268,26 @@ test('a tie at match end names all winners', () => {
   s = send(s, 'a', { a: 'start' }, { host: true, rng: seeded(13) });
   s = rankAsFriend(writeAll(s, ['4', '5', '6']), [0, 2, 1]); // wish -> shuffle[1]
   const w2 = s.shuffle[1];
-  assert.equal(s.phase, 'gameover');
+  assert.equal(s.phase, 'sudden', 'a tie goes to sudden death');
   assert.equal(s.scores[w1], 1);
   assert.equal(s.scores[w2], 1);
-  assert.deepEqual(s.winnerIds.slice().sort(), [w1, w2].sort());
+  assert.deepEqual((s.sudden || {}).candidates.slice().sort(), [w1, w2].sort());
+  assert.equal(s.winnerIds.length, 0, 'no match winner yet');
+  const resolved = send(s, s.friend, { a: 'sudden', winner: w1 }, { rng: seeded(3) });
+  assert.equal(resolved.phase, 'gameover');
+  assert.deepEqual(resolved.winnerIds, [w1], 'sudden death names a single winner');
+});
+
+test('sudden death can only be triggered by the friend on a tied candidate', () => {
+  let s = started();
+  s.matchRounds = 2;
+  s = rankAsFriend(writeAll(s, ['1', '2', '3']), [2, 0, 1]);
+  const w1 = s.shuffle[0];
+  s = send(s, 'a', { a: 'start' }, { host: true, rng: seeded(13) });
+  s = rankAsFriend(writeAll(s, ['4', '5', '6']), [0, 2, 1]);
+  const w2 = s.shuffle[1];
+  assert.ok(send(s, 'a', { a: 'sudden', winner: w1 }).error, 'only the friend breaks the tie');
+  assert.ok(send(s, s.friend, { a: 'sudden', winner: 'nobody' }).error, 'must pick a tied candidate');
 });
 
 test('host can play again after game over; it starts a fresh match with cleared scores', () => {

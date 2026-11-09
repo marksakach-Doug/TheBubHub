@@ -175,7 +175,8 @@ export function init(ctx) {
     tiers: null,             // tier per shuffle index, set at the reveal
     rankOrder: null,         // shuffle indices in the order the friend placed them
     doodle: [],              // the friend's mannequin lips (hidden until the reveal)
-    result: null,            // { word, friend, winner } once the round is over
+    history: [],             // { roundNo, word, friend, winner, line, winnerName, friendName } per completed round
+    result: null,            // { word, friend, winner, line } once the round is over
     winnerIds: [],           // match winner id(s), set at game over
   };
 }
@@ -192,6 +193,7 @@ export function reduce(state, action, ctx) {
   if (a === 'line') return line(state, id, from, action, rng);
   if (a === 'timeUp') return timeUp(state, id, from, rng);
   if (a === 'rank') return rank(state, id, action);
+  if (a === 'sudden') return suddenWin(state, id, action);
   if (a === 'doodle') return doodle(state, id, action);
   return { error: 'That is not a move in this game.' };
 }
@@ -228,6 +230,7 @@ function start(state, from, rng, ctx) {
     s.matchRounds = MATCH_ROUNDS;
     s.scores = {};
     s.winnerIds = [];
+    s.history = [];
     s.roundNo = 0;
   } else {
     s.roundNo = state.roundNo + 1;
@@ -352,12 +355,32 @@ function rank(state, id, action) {
   s.tiers = tiers.slice();
   s.rankOrder = order.slice();
   const winner = state.shuffle[tiers.indexOf(WISH)];
+  const wline = state.lines[winner] || '';
   s.scores[winner] = (s.scores[winner] || 0) + 1;
-  s.result = { word: state.word, friend: state.friend, winner };
+  s.result = { word: state.word, friend: state.friend, winner, line: wline };
+  s.history = (state.history || []).slice();
+  s.history.push({
+    roundNo: state.roundNo,
+    word: state.word,
+    friend: state.friend,
+    winner,
+    line: wline,
+    winnerName: state.names[winner] || '…',
+    friendName: state.names[state.friend] || '…',
+  });
   if (s.roundNo + 1 >= s.matchRounds) {
     const best = Math.max(0, ...s.order.map((x) => s.scores[x] || 0));
-    s.winnerIds = s.order.filter((x) => (s.scores[x] || 0) === best);
-    s.phase = 'gameover';
+    const tied = s.order.filter((x) => (s.scores[x] || 0) === best);
+    if (tied.length > 1) {
+      // Sudden death: the friend re-ranks the tied players' winning lines.
+      s.winnerIds = [];
+      s.phase = 'sudden';
+      s.sudden = { candidates: tied.slice(), lines: {} };
+      tied.forEach((wid) => { s.sudden.lines[wid] = lastWin(s.history, wid) || state.lines[wid] || ''; });
+    } else {
+      s.winnerIds = tied;
+      s.phase = 'gameover';
+    }
   } else {
     s.winnerIds = [];
     s.phase = 'roundover';
@@ -365,7 +388,26 @@ function rank(state, id, action) {
   return s;
 }
 
+// Most recent line a player won a point with (for sudden-death tiebreak).
+function lastWin(history, id) {
+  for (let i = (history || []).length - 1; i >= 0; i--) {
+    if ((history[i] || {}).winner === id) return history[i].line;
+  }
+  return null;
+}
+
 // The friend's mannequin lips. Saved as one whole list every time.
+function suddenWin(state, id, action) {
+  if (state.phase !== 'sudden') return { error: 'There is no tie to break.' };
+  if (id !== state.friend) return { error: 'Only the friend breaks the tie.' };
+  const winner = action && action.winner;
+  if (!state.sudden.candidates.includes(winner)) return { error: 'Pick one of the tied players.' };
+  const s = clone(state);
+  s.winnerIds = [winner];
+  s.phase = 'gameover';
+  return s;
+}
+
 function doodle(state, id, action) {
   if (state.phase === 'lobby' || id !== state.friend) return { error: 'Only the friend plays with the mannequins.' };
   const lips = cleanLips(action && action.lips);
@@ -436,6 +478,10 @@ export function project(state, playerId) {
     winnerIds: state.winnerIds || [],
     winnerNames: (state.winnerIds || []).map((x) => names[x] || '…'),
     shuffleKey: state.epoch + ':' + state.roundNo + ':' + state.dealNo + ':' + (state.shuffle ? state.shuffle.length : 0),
+    history: state.history || [],
+    sudden: (state.phase === 'sudden' && isFriend)
+      ? state.sudden.candidates.map((wid) => ({ key: wid, text: state.sudden.lines[wid] || '', authorName: names[wid] || '…' }))
+      : null,
   };
 }
 
@@ -446,6 +492,13 @@ export function prune(state, goneId) {
 
   const s = clone(state);
   s.order = s.order.filter((x) => x !== goneId);
+  if (s.phase === 'sudden') {
+    s.sudden.candidates = s.sudden.candidates.filter((x) => x !== goneId);
+    if (state.friend === goneId || s.sudden.candidates.length < 1 || s.order.length < MIN_SEATS) {
+      return resetToLobby(s, true);
+    }
+    return s;
+  }
   if (s.phase !== 'write' && s.phase !== 'rank') return s;   // lobby and results keep their shape
   if (s.order.length < MIN_SEATS) return resetToLobby(s, true);
 
@@ -534,8 +587,9 @@ function headSvg(h) {
     + '</g>';
 }
 
-function sceneHtml(list, sel) {
-  let s = '<svg class="scene" viewBox="0 0 600 256" role="img" aria-label="Three mannequin heads with googly eyes">';
+function sceneHtml(list, sel, scale) {
+  scale = scale == null ? 1 : scale;
+  let s = '<svg class="scene" viewBox="0 0 600 256" width="' + (600 * scale) + '" height="' + (256 * scale) + '" role="img" aria-label="Three mannequin heads with googly eyes">';
   for (let h = 0; h < HEADS; h++) s += headSvg(h);
   list.forEach((l, k) => { s += lipGroup(l, k, k === sel); });
   return s + '</svg>';
@@ -590,11 +644,14 @@ const CSS = `
 .tube{border:3px solid #05d9e8;box-shadow:0 0 10px #05d9e8,inset 0 0 14px rgba(5,217,232,.2);background:rgba(5,217,232,.04);padding:12px 14px;margin:10px 0}
 .how{margin:0;font-family:system-ui,-apple-system,"Segoe UI",sans-serif;font-size:15px;line-height:1.45;color:#fff5fa}
 .tag{margin:8px 0 0;font-size:12px;letter-spacing:.08em;text-transform:uppercase;color:#c9b7d6}
-textarea{display:block;width:100%;margin:10px 0 4px;min-height:84px;padding:12px;border-radius:0;font:700 18px/1.3 system-ui,-apple-system,"Segoe UI",sans-serif;color:#fff5fa;background:#000;border:3px solid #ffe14d;box-shadow:0 0 10px #ffe14d;outline:none;resize:vertical}
+textarea{display:block;width:100%;margin:10px 0 4px;min-height:84px;padding:12px;border-radius:0;font:700 18px/1.3 system-ui,-apple-system,"Segoe UI",sans-serif;color:#fff5fa;background:#000;border:3px solid #ffe14d;box-shadow:0 0 10px #ffe14d;outline:none;resize:vertical;touch-action:manipulation}
 textarea:focus{box-shadow:0 0 20px #ffe14d,0 0 4px #fff}
 textarea::placeholder{color:#8f7aa0;font-weight:400}
+.count{font:700 13px/1 system-ui,-apple-system,"Segoe UI",sans-serif;color:#c9b7d6;margin:0 0 8px 0;text-align:right}
+.count.at{color:#ffe14d;text-shadow:0 0 6px #ffe14d}
+@media (max-width:600px){textarea{min-height:150px}.sign{padding-bottom:34px}}
 .acts{display:flex;flex-wrap:wrap;gap:0 10px;align-items:center;margin-top:6px}
-.lip{position:relative;display:inline-block;min-width:150px;min-height:64px;margin:4px 0;padding:0;border:0;background:transparent;color:#fff5fa;font:inherit;cursor:pointer;-webkit-tap-highlight-color:transparent;--neon:#ff2a6d}
+.lip{position:relative;display:inline-block;min-width:150px;min-height:64px;margin:4px 0;padding:0;border:0;background:transparent;color:#fff5fa;font:inherit;cursor:pointer;-webkit-tap-highlight-color:transparent;touch-action:manipulation;--neon:#ff2a6d}
 .lip.big{min-height:84px}
 .lip.big .lt{font-size:20px;padding:20px 32px}
 .lipbg{position:absolute;inset:0;width:100%;height:100%;overflow:visible;filter:drop-shadow(0 0 3px var(--neon)) drop-shadow(0 0 9px var(--neon))}
@@ -659,7 +716,7 @@ textarea::placeholder{color:#8f7aa0;font-weight:400}
 .liphole{fill:#2a0614}
 .fctl{display:flex;flex-wrap:wrap;gap:8px 12px;align-items:center;margin-top:6px}
 .fgroup{display:flex;flex-wrap:wrap;gap:6px;align-items:center}
-.fbtn,.sbtn,.swatch{font:inherit;cursor:pointer;color:#fff5fa;background:#000;border:2px solid #05d9e8;box-shadow:0 0 6px #05d9e8}
+.fbtn,.sbtn,.swatch{font:inherit;cursor:pointer;color:#fff5fa;background:#000;border:2px solid #05d9e8;box-shadow:0 0 6px #05d9e8;touch-action:manipulation}
 .fbtn{padding:8px 12px;font-size:12px;letter-spacing:.05em;text-transform:uppercase}
 .sbtn{width:48px;height:32px;padding:3px}
 .sbtn svg{display:block;width:100%;height:100%}
@@ -805,7 +862,7 @@ export function mount(root, api) {
   function fidgetRender() {
     fidgetEl.innerHTML = '<div class="tube"><p class="how">While you wait: stick lips on the mannequins. '
       + 'Drag them anywhere, even the forehead. Everyone sees them at the reveal.</p>'
-      + sceneHtml(lips, selLip) + controlsHtml() + '</div>';
+      + sceneHtml(lips, selLip, 0.5) + controlsHtml() + '</div>';
   }
 
   function ensureFidget() {
@@ -921,6 +978,7 @@ function lobbyBody() {
         + '<div class="tube"><p class="how">What would ' + esc(v.friendName) + ' say about '
         + esc(v.word) + '? </p>'
         + '<textarea id="draft" maxlength="' + MAX_LINE + '" rows="2" placeholder="what they would say"></textarea>'
+        + '<div id="linecount" class="count">0/' + MAX_LINE + '</div>'
         + '<div class="acts">' + lip(v.myLine ? 'Change my lips' : 'Lip It', 'say', { big: true }) + '</div></div>';
     }
     if (v.isSeated) {
@@ -935,6 +993,18 @@ function lobbyBody() {
 
   function rankBody() {
     const v = view;
+    if (v.phase === 'sudden') {
+      if (!v.isFriend) {
+        return '<div class="tube"><p class="how">LipRound complete with a tie at the top. '
+          + esc(v.friendName) + ' is breaking it.</p></div>';
+      }
+      const list = (v.sudden || []).map((c) =>
+        '<button class="lip big" data-act="suddenwin" data-v="' + c.key + '">'
+        + esc(c.text) + ' <span class="au">— ' + esc(c.authorName) + '</span></button>').join('');
+      const names = (v.sudden || []).map((c) => esc(c.authorName)).join(' and ');
+      return '<div class="tube"><p class="how">Sudden death: tied between ' + names
+        + '. Pick the line you wish you had thought of.</p></div>' + list;
+    }
     if (!v.isFriend) {
       return '<div class="tube"><p class="how">' + esc(v.friendName)
         + ' is ranking the lines. They stay hidden until the reveal.</p></div>';
@@ -969,7 +1039,7 @@ function lobbyBody() {
     const v = view;
     return (v.doodle && v.doodle.length)
       ? '<div class="tube"><p class="how">' + esc(v.friendName) + ' lipped the mannequins while they waited.</p>'
-        + sceneHtml(v.doodle, -1) + '</div>'
+        + sceneHtml(v.doodle, -1, 1) + '</div>'
       : '';
   }
 
@@ -998,10 +1068,26 @@ function lobbyBody() {
       ? '<div class="acts">' + lip('Play again (' + v.matchRounds + ' liprounds)', 'start', { big: true, disabled: v.seatCount < MIN_SEATS })
         + lip('Back to lippy', 'toLobby') + '</div>'
       : '<p class="tag">The host can play again or go back to the lippy.</p>';
+    const dl = '<div class="acts"><button class="lip big" data-act="savelines">Save winning lines as .txt</button></div>';
     return '<div class="tube matchwin"><p class="goal">After ' + v.matchRounds + ' liprounds</p>'
       + '<div class="winnername">' + winnerText() + '</div>'
       + '<p class="how" style="margin:0">Final lips are on the lip table below.</p></div>'
-      + revealBoard() + revealHeads() + acts;
+      + dl + revealBoard() + revealHeads() + acts;
+  }
+
+  function saveWinningLines() {
+    const hs = view.history || [];
+    if (!hs.length) { note = 'No winning lines to save.'; render(); return; }
+    const para = hs.map((h) => esc(h.winnerName) + ' got ' + esc(h.friendName)
+      + ' to wish they said "' + esc(h.line) + '".').join(' ');
+    const blob = new Blob([para], { type: 'text/plain' });
+    const url = URL.createObjectURL(blob);
+    const a = doc.createElement('a');
+    a.href = url; a.download = 'lips-winning-lines.txt';
+    boardEl.appendChild(a); a.click(); a.remove();
+    win.setTimeout(() => URL.revokeObjectURL(url), 5000);
+    note = 'Saved winning lines to lips-winning-lines.txt.';
+    render();
   }
 
   function scoreBody() {
@@ -1071,6 +1157,11 @@ function lobbyBody() {
     const ta = boardEl.querySelector('#draft');
     if (ta) {
       ta.value = draft == null ? (view.myLine || '') : draft;
+      const ce = boardEl.querySelector('#linecount');
+      if (ce) {
+        ce.textContent = ta.value.length + '/' + MAX_LINE;
+        ce.classList.toggle('at', ta.value.length >= MAX_LINE);
+      }
       if (hadFocus) {
         ta.focus();
         if (sel) ta.setSelectionRange(sel[0], sel[1]);
@@ -1327,6 +1418,8 @@ function lobbyBody() {
       else if (act === 'toLobby') api.send({ a: 'toLobby' });
       else if (act === 'say') submitLine();
       else if (act === 'crown') crown();
+      else if (act === 'savelines') saveWinningLines();
+      else if (act === 'suddenwin') api.send({ a: 'sudden', winner: btn.getAttribute('data-v') });
       return;
     }
     // Tap fallback: a picked-up line goes wherever the next tier is tapped.
