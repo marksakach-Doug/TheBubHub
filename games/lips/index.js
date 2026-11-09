@@ -779,6 +779,7 @@ export function mount(root, api) {
   let lastPtr = null;
   let ticker = null;
   let scroller = null;
+  let renderedPhase = null;
 
   // ------------------------------------------------------------ pieces
 
@@ -1147,6 +1148,7 @@ function lobbyBody() {
       if (confettiEl) confettiEl.innerHTML = '';
       return;
     }
+    renderedPhase = view.phase;
     const rk = view.epoch + ':' + view.roundNo + ':' + view.phase;
     if (rk !== roundKey) {
       roundKey = rk;
@@ -1212,7 +1214,10 @@ function lobbyBody() {
       if (t && t !== view.myLine) { try { api.send({ a: 'line', text: t }); } catch (e) {} }
     }
     // Anyone at the table can call time once the clock has run out; retry until the phase changes.
-    if ((api.isHost || view.isFriend) && spent - total >= (api.isHost ? 1500 : 1000)) { try { api.send({ a: 'timeUp' }); } catch (e) {} }
+    if ((api.isHost || view.isFriend) && spent - total >= (api.isHost ? 1500 : 1000)) {
+      note = 'Calling time…';
+      try { api.send({ a: 'timeUp' }); } catch (e) {}
+    }
   }
 
   // ------------------------------------------------------------ seating
@@ -1236,6 +1241,7 @@ function lobbyBody() {
     busy = false;
     if (dirty || force) {
       dirty = false;
+      renderedPhase = view ? view.phase : null;
       render();
     }
   }
@@ -1364,7 +1370,6 @@ function lobbyBody() {
     if (chip && view && view.phase === 'rank' && view.isFriend && tl && !drag) { startChipDrag(e, chip); return; }
     const lg = t.closest('.lipg[data-k]');
     if (lg && fidgetEl && fidgetEl.contains(lg) && !drag) { startLipDrag(e, lg); return; }
-    if (fidgetEl && fidgetEl.contains(t)) holdBusy();   // a slider or swatch: hold off re-renders until the finger lifts
   }
 
   function onPointerMove(e) {
@@ -1482,9 +1487,15 @@ function lobbyBody() {
       }
       if (!v.canJoin && v.isSeated) joinTries = 0;
       ensureSeat();
-      // Never rebuild the page under someone's finger. If the hold gets stuck, let go after a few seconds.
-      if (busy && Date.now() - busySince < 8000) { dirty = true; return; }
-      busy = false;
+      // Never rebuild the page under someone's finger. If the hold gets stuck, let go after a moment.
+      if (busy) {
+        dirty = true;
+        const phaseChanged = v.phase !== renderedPhase;
+        if (Date.now() - busySince < 1000 && !phaseChanged) return;
+        busy = false;
+        if (phaseChanged) renderedPhase = v.phase;
+      }
+      renderedPhase = v.phase;
       render();
     },
     destroy() {
