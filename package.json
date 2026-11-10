@@ -12,7 +12,10 @@
     "test:syntax": "./test.sh --skip-browser",
     "check:game": "node scripts/check-game.mjs",
     "new:game": "node scripts/new-game.mjs",
-    "gate:test": "node tests/gate_test.mjs"
+    "gate:test": "node tests/gate_test.mjs",
+    "games": "node scripts/game-visibility.mjs list",
+    "hide": "node scripts/game-visibility.mjs hide",
+    "show": "node scripts/game-visibility.mjs show"
   },
   "dependencies": {
     "peerjs": "^1.5.2"

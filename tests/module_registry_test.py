@@ -244,8 +244,11 @@ def main():
     solo_module_ids = [g.parent.name for g in GAMES
                        if re.search(r"\bsolo:\s*true\b", g.read_text(encoding="utf-8"))]
     # Which of those declare `hidden: true` in their own meta — read, not listed.
+    hm = re.search(r"const HIDDEN_GAMES = \[(.*?)\];", raw, re.S)
+    reg_hidden = set(re.findall(r"'([A-Za-z0-9_-]+)'", hm.group(1))) if hm else set()
     hidden_module_ids = [g.parent.name for g in GAMES
-                         if re.search(r"\bhidden:\s*true\b", g.read_text(encoding="utf-8"))]
+                         if g.parent.name in reg_hidden
+                         or re.search(r"\bhidden:\s*true\b", g.read_text(encoding="utf-8"))]
 
     with sync_playwright() as p:
         br = p.chromium.launch()

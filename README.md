@@ -430,6 +430,33 @@ counts are pluralised correctly (`1 lap`, not `1 laps`).
 
 ---
 
+## Hiding & Showing Games
+
+You can hide any game from the BubHub main page menus (while keeping it playable via direct invite links like `?game=blight`) in either of two ways:
+
+### Option 1: Edit the list at the top of `src/registry.js` (Manual)
+Open `src/registry.js` — right at the top is `HIDDEN_GAMES`:
+
+```js
+const HIDDEN_GAMES = [
+  'blight',
+];
+```
+
+* **To hide a game:** Add its ID to `HIDDEN_GAMES` (e.g. `'blight',`).
+* **To show a game:** Delete its line (or put `//` in front of it).
+* Run `bun run build` when finished.
+
+### Option 2: One-line terminal commands
+```bash
+bun run games          # See which games are SHOWN or HIDDEN
+bun run hide blight    # Hide a game from the main page
+bun run show blight    # Show a game on the main page again
+bun run build          # Rebuild dist/
+```
+
+---
+
 ## Registry reference
 
 For **module games** this is `meta` in `games/<id>/index.js`. For **legacy

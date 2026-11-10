@@ -463,25 +463,32 @@ const STYLE = `
   .sas .clock { font-variant-numeric: tabular-nums; }
   .sas .clock.over { color: #d1495b; }
   .sas .notice { color: #d1495b; min-height: 1em; margin: 0 0 6px; }
-  .sas .stories { display: grid; gap: 10px; grid-template-columns: 1fr; }
-  @media (min-width: 640px) { .sas .stories { grid-template-columns: 1fr 1fr; } }
-  .sas .story { border: 1px solid rgba(127,127,127,.4); border-radius: 10px; padding: 10px 12px; }
+  .sas .stories { display: grid; gap: 10px; grid-template-columns: 1fr; align-items: start; }
+  @media (min-width: 640px) {
+    .sas .stories { grid-template-columns: 1fr 1fr; }
+    .sas .stories.focus-0 { grid-template-columns: 1.45fr 0.75fr; }
+    .sas .stories.focus-1 { grid-template-columns: 0.75fr 1.45fr; }
+  }
+  .sas .story { border: 1px solid rgba(127,127,127,.4); border-radius: 0; padding: 10px 12px; transition: all .18s ease; }
+  .sas .story.target { border: 2px solid #f4d35e; background: rgba(244, 211, 94, .12); padding: 14px 16px; font-size: 16px; }
+  .sas .story.target h3 { color: #f4d35e; font-size: 16px; }
+  .sas .story.other { opacity: .6; transform: scale(.94); transform-origin: top center; font-size: 13px; background: rgba(127, 127, 127, .05); }
   .sas .story h3 { margin: 0 0 6px; font-size: 15px; }
   .sas .sent { margin: 0 0 6px; padding-left: 8px; border-left: 4px solid transparent; }
   .sas .sent.t0 { border-color: #e76f51; }
   .sas .sent.t1 { border-color: #2a9d8f; }
-  .sas .panel, .sas .ideas { border: 1px solid rgba(127,127,127,.4); border-radius: 10px; padding: 10px 12px; margin-top: 10px; }
+  .sas .panel, .sas .ideas { border: 1px solid rgba(127,127,127,.4); border-radius: 0; padding: 10px 12px; margin-top: 10px; }
   .sas p { margin: 0 0 8px; }
   .sas .muted { opacity: .7; font-size: 14px; }
   .sas .secret { font-weight: 600; }
   .sas .theme { font-style: italic; }
   .sas .verdict { font-weight: 700; font-size: 16px; }
   .sas .row { display: flex; gap: 8px; align-items: center; flex-wrap: wrap; margin-bottom: 6px; }
-  .sas button { min-height: 40px; min-width: 40px; padding: 0 14px; border-radius: 8px; border: 1px solid currentColor; background: transparent; color: inherit; font: inherit; cursor: pointer; margin: 2px 6px 2px 0; }
+  .sas button { min-height: 40px; min-width: 40px; padding: 0 14px; border-radius: 0; border: 1px solid currentColor; background: transparent; color: inherit; font: inherit; cursor: pointer; margin: 2px 6px 2px 0; }
   .sas button.primary { background: #f4d35e; color: #222; border-color: #f4d35e; }
   .sas button.on { background: rgba(127,127,127,.3); font-weight: 700; }
   .sas button:disabled { opacity: .45; cursor: not-allowed; }
-  .sas input, .sas textarea { flex: 1 1 200px; box-sizing: border-box; min-height: 40px; font: inherit; color: inherit; background: transparent; border: 1px solid rgba(127,127,127,.5); border-radius: 8px; padding: 8px; }
+  .sas input, .sas textarea { flex: 1 1 200px; box-sizing: border-box; min-height: 40px; font: inherit; color: inherit; background: transparent; border: 1px solid rgba(127,127,127,.5); border-radius: 0; padding: 8px; }
   .sas textarea { width: 100%; min-height: 70px; margin-bottom: 6px; }
   .sas .idea { margin: 4px 0; font-size: 14px; }
   .sas .status { opacity: .75; font-size: 13px; min-height: 1.2em; }
@@ -506,17 +513,17 @@ export function mount(root, api) {
   root.innerHTML = `<style>${STYLE}</style>
     <div class="sas">
       <h2></h2>
-      <p class="how">Two teams write two stories, one sentence at a time. Each team steers both stories toward its own secret theme. Two games later, another table judges the stories without knowing who wrote them.</p>
+      <p class="how">Two teams write two stories, a sentence at a time. Each team steers the stories toward their own secret theme.</p>
       <div class="bar"><span class="phase"></span><span class="clock"></span></div>
       <p class="notice"></p>
       <div class="stories" hidden></div>
       <div class="panel"></div>
       <div class="ideas" hidden>
-        <p class="muted">Ideas for your team. Only your team sees these. The writer decides.</p>
+        <p class="muted">Chat (Your Team Only)</p>
         <div class="ideas-list"></div>
         <div class="row">
           <input class="idea-input" maxlength="${MAX_IDEA}" placeholder="Suggest an idea">
-          <button class="idea-send">Suggest</button>
+          <button class="idea-send">Send</button>
         </div>
       </div>
       <p class="status"></p>
@@ -651,13 +658,17 @@ export function mount(root, api) {
     const show = judging || ['setup', 'writing', 'over'].includes(v.phase);
     ui.stories.hidden = !show;
     if (!show) return;
+    const hasTarget = !judging && (v.myStory === 0 || v.myStory === 1);
+    ui.stories.className = hasTarget ? `stories focus-${v.myStory}` : 'stories';
     const data = judging ? v.judge.stories : v.stories;
     const labels = judging ? ['Story A', 'Story B'] : ['Story 1', 'Story 2'];
     ui.stories.replaceChildren(...data.map((sents, s) => {
+      const isTarget = hasTarget && s === v.myStory;
+      const isOther = hasTarget && s !== v.myStory;
       const card = document.createElement('article');
-      card.className = 'story';
+      card.className = isTarget ? 'story target' : (isOther ? 'story other' : 'story');
       const h = document.createElement('h3');
-      h.textContent = labels[s];
+      h.textContent = isTarget ? `${labels[s]} ← Your team's story` : labels[s];
       card.append(h);
       if (!sents.length) card.append(para('(nothing written yet)', 'muted'));
       // Judges must not see who wrote what, so judging shows no team colours.
@@ -799,7 +810,7 @@ export function mount(root, api) {
         text('👁 watching the setup.', 'muted');
       }
     } else if (v.phase === 'writing') {
-      text(`Sentence ${v.round} of ${v.rounds}. Each team adds one sentence this round, to the story it was just handed.`);
+      text(`Sentence ${v.round} of ${v.rounds}.`);
       if (v.team >= 0) text(`Your team’s secret theme: “${v.ownTheme}”`, 'secret');
       text(`Writing this round: Team 1, ${nameOf(v.writers[0])}; Team 2, ${nameOf(v.writers[1])}.`, 'muted');
       if (v.isWriter) {

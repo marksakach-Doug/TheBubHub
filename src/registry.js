@@ -2,6 +2,20 @@
 // New modules in games/*/index.js are auto-registered via import.meta.glob
 // (Vite). Old iframe games from window.BUB_GAMES stay playable through
 // src/compat.js and are flagged compat:'iframe'.
+// ============================================================================
+// HIDDEN GAMES — Edit this list to hide or show games on the BubHub main page.
+//   • To HIDE a game: add its id below (e.g. 'blight',).
+//   • To SHOW a game: delete or comment out (//) its line, then run: bun run build
+// Hidden games stay in the registry so direct invite links (?game=<id>) still work.
+// ============================================================================
+const HIDDEN_GAMES = [
+  'blight',
+];
+
+function isHiddenId(id, metaHidden) {
+  return !!metaHidden || HIDDEN_GAMES.indexOf(id) >= 0;
+}
+
 export async function loadRegistry() {
   const fresh = [];
   try {
@@ -15,7 +29,10 @@ export async function loadRegistry() {
     for (let i = 0; i < entries.length; i++) {
       try {
         const m = await entries[i][1]();
-        if (m && m.meta) fresh.push({ kind: 'module', path: entries[i][0], module: m, meta: m.meta });
+        if (m && m.meta) {
+          const meta = Object.assign({}, m.meta, { hidden: isHiddenId(m.meta.id, m.meta.hidden) });
+          fresh.push({ kind: 'module', path: entries[i][0], module: m, meta: meta });
+        }
       } catch (e) {
         console.warn('game module failed:', entries[i][0], e);
       }
@@ -38,7 +55,8 @@ export async function loadRegistry() {
           solo: !!g.solo, soloable: !!g.soloable, lobby: !!g.lobby,
           fill: !!g.fill, grow: !!g.grow, height: g.height || 0,
           noRecord: !!g.noRecord, activityRecord: !!g.activityRecord,
-          menuLabel: g.menuLabel || null
+          menuLabel: g.menuLabel || null,
+          hidden: isHiddenId(g.id, g.hidden)
         },
         entry: g
       };
@@ -52,7 +70,7 @@ export async function loadRegistry() {
 // It stays in the registry — an invite link (?game=<id>) can still open it —
 // but no button lists it.
 function listed(reg) {
-  return reg.filter(function (g) { return !g.meta.hidden; });
+  return reg.filter(function (g) { return !isHiddenId(g.meta.id, g.meta.hidden); });
 }
 
 export function soloCorner(reg) {
