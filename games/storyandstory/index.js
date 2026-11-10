@@ -49,7 +49,7 @@ export const meta = {
 // ---------- pure helpers ----------
 
 function archiveUrl() {
-  return (typeof globalThis !== 'undefined' && globalThis.BUB_STORY_ARCHIVE) || '';
+  return (typeof globalThis !== 'undefined' && globalThis.BUB_STORY_ARCHIVE) || 'https://script.google.com/macros/s/AKfycbwE6I_zS_MgHWa60avHbzxbcFZQFLDHmG1mVajHEiC_qbgwckzcHnB2Rk72yrihERav/exec';
 }
 
 const clean = (s) => String(s == null ? '' : s).replace(/\s+/g, ' ').trim();
