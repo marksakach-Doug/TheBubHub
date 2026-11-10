@@ -178,6 +178,8 @@ OFFLINE_SUITES=(
   "fugue rules|fugue_rules.mjs"
   "fugue solo (streamer + connectionist)|fugue_solo.mjs"
   "lips rules|lips_rules_test.mjs"
+  "story and story rules|storyandstory_rules.mjs"
+  "story and story dom smoke|storyandstory_dom_smoke.mjs"
   # The samples Clicker plays has to be in tune. They are extracted from a
   # SoundFont and committed, so nothing else would notice if one of them
   # ended up in the wrong key.

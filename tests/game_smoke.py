@@ -128,8 +128,16 @@ def open_game_button(pg, id_):
     A solo game sits in the pre-room Solo Corner (`btn-lobby-<id>`). A game that
     needs two players is only in the in-room list, so it needs an actual room —
     `BubHub.hostRoom()` is the hub's own entry point, and using it here means this
-    test never invents a way in.
+    test never invents a way in. A game with `hidden: true` in its meta has no
+    button by design, so it opens through the hub's own API instead and the smoke
+    test still covers its first paint.
     """
+    hidden = pg.evaluate(
+        "(id) => (window.BubHub && BubHub.registry || [])"
+        ".some((g) => g.meta.id === id && g.meta.hidden)", id_)
+    if hidden:
+        pg.evaluate("(id) => BubHub.openGame(id)", id_)
+        return True
     lobby = pg.locator(f"#btn-lobby-{id_}")
     if lobby.count():
         lobby.first.click()

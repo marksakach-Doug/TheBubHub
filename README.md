@@ -453,6 +453,7 @@ ignored for modules.
 | `height` | legacy only | Minimum stage height (px) for an iframe game. |
 | `menuLabel` | – | Button text only (title/invites/chat/record untouched). For things that are not really "played". |
 | `noRecord` | – | `true` → never write to BubHub Record. |
+| `hidden` | – | `true` → shipped but listed in no menu. Stays in the registry, so an invite link (`?game=<id>`) still opens it. |
 
 Sections are derived: a game that is neither `solo` nor `soloable` nor `lobby`
 appears only in the in-room multiplayer list, never pre-room. Buttons are

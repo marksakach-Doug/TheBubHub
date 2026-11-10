@@ -30,6 +30,7 @@ export const meta = {
   icon: '🌿',
   desc: 'Hide Living Plants and Dead Trees, then bid how many plants you can reveal. Win two rounds or outlast everyone. Bots fill empty seats.',
   soloable: true,
+  hidden: true,
 };
 
 const MAXP = 6, MINP = 3, WINS = 2, LOGMAX = 16;

@@ -185,7 +185,7 @@ INSPECT = r"""
       return {
         modules: ids((g) => g.kind === 'module'),
         legacy: ids((g) => g.kind === 'iframe'),
-        soloCorner: ids((g) => g.meta.solo || g.meta.soloable || g.meta.lobby),
+        soloCorner: soloCorner(full).map((g) => g.meta.id),
         roomList: ids((g) => !g.meta.solo),
         dupes: all.filter((id, i) => all.indexOf(id) !== i),
         order: roomLists(full).multi.map((g) => g.meta.id),
@@ -243,6 +243,9 @@ def main():
     # Which of those are `solo: true` in their own source — read, not listed.
     solo_module_ids = [g.parent.name for g in GAMES
                        if re.search(r"\bsolo:\s*true\b", g.read_text(encoding="utf-8"))]
+    # Which of those declare `hidden: true` in their own meta — read, not listed.
+    hidden_module_ids = [g.parent.name for g in GAMES
+                         if re.search(r"\bhidden:\s*true\b", g.read_text(encoding="utf-8"))]
 
     with sync_playwright() as p:
         br = p.chromium.launch()
@@ -255,6 +258,7 @@ def main():
         pg.set_content("<!DOCTYPE html><html><body></body></html>")
         pg.evaluate("() => { window.BUB_GAMES = " + json.dumps(LEGACY) + "; }")
         pg.evaluate("(ids) => { window.__soloIds = ids; }", solo_module_ids)
+        pg.evaluate("(ids) => { window.__hiddenIds = ids; }", hidden_module_ids)
         pg.evaluate("(ids) => { window.__pinned = ids; }", PINNED_FOR_MENU)
         # real loader *functions*, not JSON strings — a string would throw
         # inside the registry and be swallowed as "game module failed"
@@ -270,12 +274,15 @@ def main():
             dotreturn: '2-8', eggs: '2-8', hook: '2-8', minigo: '2'
           };
           const SOLO = new Set(window.__soloIds || []);
+          const HIDDEN = new Set(window.__hiddenIds || []);
           window.__loaded = {};
           ids.forEach((id) => {
             window.__loaded['../games/' + id + '/index.js'] = () => Promise.resolve({
-              meta: SOLO.has(id)
-                ? { id: id, title: id, players: 'solo', solo: true }
-                : { id: id, title: id, players: RANGES[id] || '2-8', soloable: true }
+              meta: Object.assign(
+                SOLO.has(id)
+                  ? { id: id, title: id, players: 'solo', solo: true }
+                  : { id: id, title: id, players: RANGES[id] || '2-8', soloable: true },
+                HIDDEN.has(id) ? { hidden: true } : {})
             });
           });
         }""", game_ids)
@@ -329,6 +336,10 @@ def main():
          got["dupes"] == []),
         ("Dot Return is in the pre-room Solo Corner",
          "dotreturn" in got["soloCorner"]),
+        ("no hidden module game reaches a menu",
+         all(h not in got["soloCorner"] and h not in got["order"]
+             and h not in got["small"] and h not in got["wide"]
+             for h in hidden_module_ids)),
         ("Dot Return keeps its real count in the in-room list",
          "dotreturn" in got["roomList"]),
         ("without Vite it falls back to the legacy list instead of throwing",

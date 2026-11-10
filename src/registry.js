@@ -48,8 +48,15 @@ export async function loadRegistry() {
   return fresh.concat(legacy.filter(function (l) { return !seen.has(l.meta.id); }));
 }
 
+// A shipped game can be kept out of every menu with `hidden: true` in its meta.
+// It stays in the registry — an invite link (?game=<id>) can still open it —
+// but no button lists it.
+function listed(reg) {
+  return reg.filter(function (g) { return !g.meta.hidden; });
+}
+
 export function soloCorner(reg) {
-  return reg.filter(function (g) {
+  return listed(reg).filter(function (g) {
     return g.meta.solo || g.meta.soloable || g.meta.lobby;
   });
 }
@@ -118,7 +125,7 @@ export function playerLabel(meta) {
 // trailing section rather than being dropped.
 export function multiplayerSections(reg) {
   const small = [], wide = [];
-  menuOrder(reg.filter(function (g) { return !g.meta.solo; })).forEach(function (g) {
+  menuOrder(listed(reg).filter(function (g) { return !g.meta.solo; })).forEach(function (g) {
     const r = playerRange(g.meta);
     // Two groups, as asked for: the games that are only ever two or three
     // people, and everything else. Not "min <= 2 && max >= 8" — The 96 Game
@@ -134,7 +141,7 @@ export function multiplayerSections(reg) {
 
 export function roomLists(reg) {
   return {
-    multi: menuOrder(reg.filter(function (g) { return !g.meta.solo; })),
-    solo: reg.filter(function (g) { return !!g.meta.solo; })
+    multi: menuOrder(listed(reg).filter(function (g) { return !g.meta.solo; })),
+    solo: listed(reg).filter(function (g) { return !!g.meta.solo; })
   };
 }
