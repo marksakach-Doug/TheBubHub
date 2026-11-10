@@ -102,6 +102,21 @@ button.good{background:linear-gradient(180deg,#8fd1a0,#5fae78); border-color:#3f
   .status{min-width:100%; order:-1}
   button{padding:11px 12px}
 }
+
+.sq.danger{box-shadow:inset 0 0 0 5px #ef6b52}
+.sq.warn{box-shadow:inset 0 0 0 5px #e9b84a}
+.sq.free{box-shadow:inset 0 0 0 5px #6fd08c}
+.sq.pulse::after{background:rgba(255,225,90,.75);animation:pu 1s ease-in-out infinite}
+@keyframes pu{50%{opacity:.25}}
+.dot.bad{background:rgba(224,90,66,.8)} .ring.bad{border-color:rgba(224,90,66,.85)}
+button.on{background:linear-gradient(180deg,#8fd1a0,#5fae78);border-color:#3f8a5a}
+#coach{display:flex;flex-direction:column;gap:6px}
+#cq{margin:0;padding-left:20px;font-size:13px;color:var(--dim);line-height:1.6}
+#cq li.act{color:var(--cream);font-weight:800}
+#say{font-size:13px;min-height:18px;line-height:1.4}
+.crow{display:flex;gap:8px;flex-wrap:wrap}
+.lvrow button{padding:8px 12px;font-size:13px}
+.chk{font-size:12px;color:var(--dim)}
 </style>
 </head>
 <body>
@@ -112,7 +127,10 @@ button.good{background:linear-gradient(180deg,#8fd1a0,#5fae78); border-color:#3f
     <div class="row">
       <button id="btn-solo">Play the bot</button>
       <button id="btn-two" class="ghost">Play a friend</button>
+      <button id="btn-puz" class="ghost">Puzzles</button>
     </div>
+    <div class="row lvrow"><button class="ghost" data-lv="gentle">Gentle bot</button><button class="ghost" data-lv="friend">Friend bot</button><button class="ghost" data-lv="sharp">Sharp bot</button></div>
+    <label class="chk"><input type="checkbox" id="hq"> Bot starts without its queen</label>
     <div id="note"></div>
   </div>
 
@@ -123,6 +141,11 @@ button.good{background:linear-gradient(180deg,#8fd1a0,#5fae78); border-color:#3f
         <div class="status" id="status">White to move</div>
         <div class="pname"><span id="pn2">Bot</span><span class="dotc" style="width:9px;height:9px;border-radius:50%;background:#2b1a0d;display:inline-block"></span></div>
       </div>
+    </div>
+    <div class="card" id="coach">
+      <ol id="cq"><li>What did they just do?</li><li>What can they take now?</li><li>Is where I'm going safe?</li></ol>
+      <div id="say"></div>
+      <div class="crow"><button id="btn-look">👀 Look</button><button id="btn-pznext" class="good hidden">Next puzzle ▸</button></div>
     </div>
     <div id="boardwrap"><div id="board"></div></div>
     <div class="card">
@@ -228,7 +251,7 @@ function kingSq(st, c){
 function attackedBy(st, sq, by){
   const f0 = sq % 8, r0 = sq >> 3;
   // pawns
-  const pr = r0 + (by === WHITE ? -1 : 1);
+  const pr = r0 + (by === WHITE ? 1 : -1);
   for (const df of [-1, 1]){
     const f = f0 + df;
     if (f < 0 || f > 7 || pr < 0 || pr > 7) continue;
@@ -458,10 +481,17 @@ function evalFor(st, c){
   }
   return v;
 }
-function botMove(st, c){
+function botMove(st, c, lv){
   const ms = legal(st, c);
   if (!ms.length) return null;
   const o = opponent(c);
+  if (lv === 'gentle' || (lv === 'friend' && Math.random() < 0.12)){
+    if (lv === 'gentle' && Math.random() < 0.25) return ms[Math.floor(Math.random() * ms.length)];
+    if (lv === 'friend') return ms[Math.floor(Math.random() * ms.length)];
+    let gb = null, gs = -Infinity;           // gentle: looks one move ahead only, with lots of wobble
+    for (const m of ms){ const ns = copy(st); applyMove(ns, m); const v = evalFor(ns, c) + Math.random() * 1.6; if (v > gs){ gs = v; gb = m; } }
+    return gb;
+  }
   let best = null, bestSc = -Infinity;
   for (const m of ms){
     const ns = copy(st);
@@ -491,7 +521,7 @@ function botMove(st, c){
         if (sc < bestSc - 0.3) break;                       // can't beat the best so far
       }
     }
-    sc += Math.random() * 0.2;                              // variety between games
+    sc += Math.random() * (lv === 'friend' ? 0.8 : 0.2);                              // variety between games
     if (sc > bestSc){ bestSc = sc; best = m; }
   }
   return best;
@@ -544,7 +574,52 @@ let offer = null;        // {by}
 let botT = null;
 let flashT = null;
 let reported = false;    // one 'result' per game, ever
-let chessInst = 0;       // result instance id, so the hub can tell two games apart
+let chessInst = 0;
+let botLevel = 'gentle', handicapQ = false, lookStep = 0, botSay = '', pzI = 0, pz = { done:false, msg:'' };
+const NAME = { P:'pawn', N:'knight', B:'bishop', R:'rook', Q:'queen', K:'king' };
+/*PUZ*/
+const ix = (n) => (8 - (+n[1])) * 8 + FILES.indexOf(n[0]);
+const mated = (ns) => !legal(ns, BLACK).length && inCheck(ns, BLACK);
+const PUZ = [
+ { t:'Free piece! Take something that nothing can take back.', b:['....k...','........','........','n.......','........','........','........','R...K...'],
+   hint:"Ask: if I take, what could take me back?", yes:'Nothing protected that knight, so it was free.', ok:(m)=>m.to===ix('a5') },
+ { t:'Your knight is in danger! Move it where nothing can take it.', b:['....k...','........','....p...','..p.....','...N....','........','........','....K...'],
+   hint:"Press Look: what attacks the knight, and which squares are safe?", yes:'You found a square they could not reach.',
+   ok:(m,ns)=>!attackedBy(ns, m.from===ix('d4') ? m.to : ix('d4'), BLACK) },
+ { t:"Their queen is hanging! Can you see how to take it?", b:['......k.','........','.......q','........','........','........','........','..B...K.'],
+   hint:"Follow the bishop's diagonal with your eyes.", yes:'The queen was left alone. Looking first found it!', ok:(m)=>m.to===ix('h6') },
+ { t:'Two things to take. One is a trap. Which is really free?', b:['......k.','........','....p...','...b....','........','........','........','n..R..K.'],
+   hint:"Before taking the bishop: what could take your rook back?", yes:'The pawn guarded the bishop. The knight was free!', ok:(m)=>m.to===ix('a1') },
+ { t:'Checkmate in one! Their king has no escape squares.', b:['......k.','.....ppp','........','........','........','........','........','R.....K.'],
+   hint:"Their own pawns box the king in. Where can your rook check along the top?", yes:'Checkmate! The pawns trapped their own king.', ok:(m,ns)=>mated(ns) },
+ { t:'Checkmate in one with the queen!', b:['.......k','........','......K.','........','........','........','........','...Q....'],
+   hint:"Your king guards two squares. Check from the far side.", yes:'Checkmate! King and queen worked together.', ok:(m,ns)=>mated(ns) }
+];
+/*ENDPUZ*/
+function loadPuzzle(i){
+  pzI = i; S = makeState(); S.b = PUZ[i].b.join('').split(''); S.cw = { w:[false,false], b:[false,false] };
+  S.seats = { w: myId(), b: null }; S.soloOrigin = true;
+  stack = []; seen = {}; over = null; lastMove = null; sel = -1; offer = null; lookStep = 0; botSay = ''; pz = { done:false, msg:'' };
+}
+function pzTry(from, to){
+  if (pz.done) return false;
+  const m = legal(S, WHITE).find(x => x.from === from && x.to === to);
+  const ns = copy(S); applyMove(ns, m); lookStep = 0;
+  if (PUZ[pzI].ok(m, ns)){ S = ns; lastMove = { from, to }; pz.done = true; pz.msg = '✓ ' + PUZ[pzI].yes; }
+  else pz.msg = 'Not quite. ' + PUZ[pzI].hint + ' Try again!';
+  render(); return true;
+}
+// The bot says what it is looking at, so he hears what looking ahead sounds like.
+function sayFor(before, m, side){
+  const o = opponent(side);
+  if (before.b[m.to] !== '.' || m.ep) return 'I took your ' + (NAME[typeOf(before.b[m.to])] || 'pawn') + '!';
+  for (let i = 0; i < 64; i++){
+    const p = S.b[i];
+    if (p !== '.' && colourOf(p) === o && typeOf(p) !== 'K' && attackedBy(S, i, side) && !attackedBy(before, i, side))
+      return "Now I'm looking at your " + NAME[typeOf(p)] + ' on ' + sqName(i) + '.';
+  }
+  return '';
+}       // result instance id, so the hub can tell two games apart
 
 // Which side YOU are, or null if you are only watching.
 //
@@ -563,7 +638,7 @@ function mySeat(){
   return null;                                  // no black seat yet → watching
 }
 const HUMAN = () => mySeat();
-const BOT = () => (mode === 'two' && !S.soloOrigin) ? null : BLACK;
+const BOT = () => (mode === 'puzzle' || (mode === 'two' && !S.soloOrigin)) ? null : BLACK;
 
 // ---- BubHub Record: one line when a game finishes ----------------------
 // Send player *ids* and which colour won; the hub composes the sentence and
@@ -593,6 +668,7 @@ function reset(){
   // A solo-origin table never offers Black to a guest — the bot has it.
   S.seats = { w: myId(), b: null };
   S.soloOrigin = (mode === 'solo');
+  if (mode === 'solo' && handicapQ) S.b[3] = '.';
   seen[posKey(S)] = 1;
 }
 function toSetup(){ S = null; mode = 'setup'; $('play').classList.add('hidden'); $('setup').classList.remove('hidden'); renderSetup(); }
@@ -708,11 +784,12 @@ function driveBot(){
   if (!side || !S || over || S.turn !== side){ $('thinking').textContent = ''; return; }
   $('thinking').textContent = 'bot thinking…';
   botT = setTimeout(() => {
-    const m = botMove(S, side);
+    const m = botMove(S, side, botLevel);
     if (m){
       const before = copy(S);
       applyMove(S, m);
       stack.push(before);
+      botSay = sayFor(before, m, side);
       lastMove = { from:m.from, to:m.to };
       const k = posKey(S); seen[k] = (seen[k] || 0) + 1;
       if (seen[k] === 3) over = { result:'draw', why:'Threefold repetition — draw' };
@@ -720,7 +797,7 @@ function driveBot(){
     }
     $('thinking').textContent = '';
     render();
-  }, 380);
+  }, ({ gentle:1700, friend:1100, sharp:600 })[botLevel] || 600);
 }
 
 /* =====================================================================
@@ -747,7 +824,32 @@ function render(){
   const myTurnNow = !over && S.turn === side;
   const moves = (sel >= 0 && myTurnNow) ? legal(S, side) : [];
   const destSet = new Map();
-  for (const m of moves) if (m.from === sel) destSet.set(m.to, (S.b[m.to] === '.' && !m.ep) ? 'dot' : 'ring');
+  const L = myTurnNow ? lookStep : 0, opp = opponent(side), mark = new Map();
+  const cheap = (list, v) => list.length && Math.min(...list.map(x => VAL[typeOf(S.b[x.from])])) < v;
+  if (L >= 2){
+    const oppM = legal(S, opp), myM = legal(S, side);
+    for (let i = 0; i < 64; i++){
+      const p = S.b[i]; if (p === '.' || typeOf(p) === 'K') continue;
+      const mine = colourOf(p) === side, v = VAL[typeOf(p)];
+      if (mine){
+        const at = oppM.filter(x => x.to === i);
+        if (at.length) mark.set(i, (!attackedBy(S, i, side) || cheap(at, v)) ? 'danger' : 'warn');
+      } else {
+        const at = myM.filter(x => x.to === i);
+        if (at.length && (!attackedBy(S, i, opp) || cheap(at, v))) mark.set(i, 'free');
+      }
+    }
+  }
+  for (const m of moves) if (m.from === sel){
+    let kind = (S.b[m.to] === '.' && !m.ep) ? 'dot' : 'ring';
+    if (L === 3){
+      const ns = copy(S); applyMove(ns, m);
+      const at = legal(ns, opp).filter(x => x.to === m.to);
+      const v = VAL[typeOf(S.b[m.from])];
+      if (at.length && (!attackedBy(ns, m.to, side) || Math.min(...at.map(x => VAL[typeOf(ns.b[x.from])])) < v)) kind += ' bad';
+    }
+    destSet.set(m.to, kind);
+  }
   const chkSq = (!over && inCheck(S, S.turn)) ? kingSq(S, S.turn) : -1;
 
   for (let vr = 0; vr < 8; vr++){
@@ -759,6 +861,8 @@ function render(){
       el.dataset.sq = sq;
       if (lastMove && (sq === lastMove.from || sq === lastMove.to)) el.classList.add('last');
       if (sel === sq) el.classList.add('sel');
+      if (mark.has(sq)) el.classList.add(mark.get(sq));
+      if (L === 1 && lastMove && (sq === lastMove.from || sq === lastMove.to)) el.classList.add('pulse');
       if (sq === chkSq) el.classList.add('check');
       if (col === 0){ const c = document.createElement('span'); c.className = 'cord b'; c.textContent = 8 - row; el.appendChild(c); }
       if (vr === 7){ const c = document.createElement('span'); c.className = 'cord t'; c.textContent = FILES[col]; el.appendChild(c); }
@@ -806,6 +910,11 @@ function render(){
   } else {
     st.textContent = (S.turn === WHITE ? 'White' : 'Black') + ' to move';
   }
+  if (mode === 'puzzle'){
+    $('pn1').textContent = 'You'; $('pn2').textContent = 'Puzzle';
+    st.className = 'status' + (pz.done ? ' good' : ''); st.textContent = 'Puzzle ' + (pzI + 1) + ' of ' + PUZ.length;
+  }
+  document.querySelectorAll('#play .row').forEach(r => r.classList.toggle('hidden', mode === 'puzzle'));
   // Take Black is offered only to a guest with no seat on a shared table.
   $('btn-claim').classList.toggle('hidden', !(mode === 'two' && !S.soloOrigin && !mySeat() && !over));
   // captured: pieces a side has LOST, grouped per colour
@@ -834,6 +943,16 @@ function render(){
   $('btn-new').disabled = mode === 'two' && !isHost() && inRoom();
   // A guest can't tear the table down; the host (or a pre-room solo player) can.
   $('btn-menu').style.display = isHost() ? '' : 'none';
+  $('coach').classList.toggle('hidden', watching);
+  document.querySelectorAll('#cq li').forEach((li, i) => li.classList.toggle('act', i + 1 === L));
+  const lt = L === 1 ? (lastMove ? 'Their last move is glowing. What did it change?' : 'Nobody has moved yet.')
+           : L === 2 ? 'Red: you could lose it. Amber: they could trade. Green: free for you to take.'
+           : L === 3 ? 'Red dots: they could take you there.' : '';
+  const base = mode === 'puzzle' ? (pz.done ? pz.msg : (pz.msg ? pz.msg + ' ' : '') + PUZ[pzI].t) : (L ? '' : botSay);
+  $('say').textContent = (base + ' ' + lt).trim();
+  $('btn-look').textContent = L === 0 ? '👀 Look' : (L < 3 ? 'Next question ▸' : 'Clear');
+  $('btn-look').disabled = !myTurnNow;
+  $('btn-pznext').classList.toggle('hidden', !(mode === 'puzzle' && pz.done));
   reportResult();
   driveBot();
 }
@@ -851,11 +970,13 @@ function humanMove(from, to){
   const side = HUMAN();
   if (S.turn !== side) return false;
   if (!legal(S, side).some(x => x.from === from && x.to === to)) return false;
+  if (mode === 'puzzle') return pzTry(from, to);
   if (mode === 'two' && inRoom() && !isHost()){
     // guest: ask the host to validate, it applies and broadcasts
     Hub.up('intent', { a:'move', from, to });
     return true;
   }
+  lookStep = 0; botSay = '';
   doMove(from, to, side);
   send();
   return true;
@@ -966,6 +1087,16 @@ $('btn-decline').addEventListener('click', () => {
   else Hub.up('intent', { a:'decline' });
 });
 
+$('btn-look').addEventListener('click', () => { if (!S || over) return; lookStep = (lookStep + 1) % 4; render(); });
+$('btn-pznext').addEventListener('click', () => { loadPuzzle((pzI + 1) % PUZ.length); render(); });
+$('btn-puz').addEventListener('click', () => {
+  mode = 'puzzle'; loadPuzzle(0);
+  $('setup').classList.add('hidden'); $('play').classList.remove('hidden'); render();
+});
+$('hq').addEventListener('change', (e) => { handicapQ = e.target.checked; });
+const showLv = () => document.querySelectorAll('[data-lv]').forEach(b => b.classList.toggle('on', b.dataset.lv === botLevel));
+document.querySelectorAll('[data-lv]').forEach(b => b.addEventListener('click', () => { botLevel = b.dataset.lv; showLv(); }));
+showLv();
 Hub.init();
 renderSetup();
 render();
