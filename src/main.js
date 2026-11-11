@@ -447,6 +447,38 @@ export async function boot() {
     return 'html';
   }
 
+  function slugSeg(name) {
+    return String(name || '').trim().replace(/[\s_]+/g, '-').replace(/[^A-Za-z0-9-]/g, '').replace(/-+/g, '-').replace(/^-|-$/g, '');
+  }
+
+  function thingPath(t) {
+    const segs = [];
+    String(t.folder || '').split('/').filter(Boolean).forEach(function (s) { segs.push(slugSeg(s)); });
+    segs.push(slugSeg(t.title));
+    return '/' + segs.filter(Boolean).join('/');
+  }
+
+  function findThingByPath(pathname) {
+    const segs = String(pathname || '').split('/').filter(Boolean).map(function (s) { try { return decodeURIComponent(s); } catch (e) { return s; } }).map(function (s) { return slugSeg(s).toLowerCase(); });
+    if (!segs.length) return null;
+    return things.find(function (t) {
+      const tsegs = thingPath(t).split('/').filter(Boolean).map(function (s) { return slugSeg(s).toLowerCase(); });
+      return tsegs.length === segs.length && tsegs.every(function (s, i) { return s === segs[i]; });
+    }) || null;
+  }
+
+  function syncThingUrl(t) {
+    const p = thingPath(t);
+    if (window.location.pathname !== p) {
+      try { window.history.pushState({ thing: t.title }, '', p); } catch (e) {}
+    }
+  }
+
+  function handleThingRoute() {
+    const t = findThingByPath(window.location.pathname);
+    if (t) openThing(t);
+  }
+
   async function loadThings() {
     const urlEntries = await Promise.all(Object.entries(THING_GLOB).map(async function (e) {
       const rel = String(e[0]).replace(/^\.\/things-we-made\//, '');
@@ -474,6 +506,7 @@ export async function boot() {
     });
     renderThings();
     renderButtons();
+    handleThingRoute();
   }
 
   function thingTitleCase(name) {
@@ -588,6 +621,7 @@ export async function boot() {
 
   function openThing(t) {
     const slug = 'show-' + String(t.title || '').toLowerCase().replace(/[^a-z0-9]+/g, '-');
+    syncThingUrl(t);
     closeStageOnly();
     if (isThingVideo(t)) { openVideo(t, slug); return; }
     if (isThingAudio(t)) { openAudio(t, slug); return; }
@@ -1673,6 +1707,11 @@ export async function boot() {
           leaveOpenGame();
         }
       }
+    });
+    window.addEventListener('popstate', function () {
+      const t = findThingByPath(window.location.pathname);
+      if (t) { openThing(t); }
+      else { try { closeStageOnly(); } catch (e) {} }
     });
     window.addEventListener('pagehide', function () { saveSession(store.state); });
     document.addEventListener('visibilitychange', function () {
