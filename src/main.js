@@ -15,8 +15,12 @@ import { createRecord } from '../plugins/record.js';
 
 const SKEY = 'bubhub.session.v2';
 const NAME_KEY = 'bubhub.name';
-const THING_GLOB = import.meta.glob('./things-we-made/*.{html,mp4,webm,ogv,svg,png,jpg,jpeg,webp,gif}', { query: '?url', import: 'default' });
-const MD_GLOB = import.meta.glob('./things-we-made/*.md', { query: '?raw', import: 'default' });
+const THING_GLOB_TOP = import.meta.glob('./things-we-made/*.{html,mp4,webm,ogv,svg,png,jpg,jpeg,webp,gif,mp3,wav}', { query: '?url', import: 'default' });
+const THING_GLOB_NESTED = import.meta.glob('./things-we-made/**/*.{html,mp4,webm,ogv,svg,png,jpg,jpeg,webp,gif,mp3,wav}', { query: '?url', import: 'default' });
+const THING_GLOB = Object.assign({}, THING_GLOB_TOP, THING_GLOB_NESTED);
+const MD_GLOB_TOP = import.meta.glob('./things-we-made/*.md', { query: '?raw', import: 'default' });
+const MD_GLOB_NESTED = import.meta.glob('./things-we-made/**/*.md', { query: '?raw', import: 'default' });
+const MD_GLOB = Object.assign({}, MD_GLOB_TOP, MD_GLOB_NESTED);
 const things = [];
 
 function loadSession() {
@@ -429,7 +433,7 @@ export async function boot() {
   }
 
   function thingTitle(path) {
-    const name = String(path || '').split('/').pop().replace(/\.(html|mp4|webm|ogv|svg|png|jpe?g|webp|gif|md)$/i, '');
+    const name = String(path || '').split('/').pop().replace(/\.(html|mp4|webm|ogv|svg|png|jpe?g|webp|gif|mp3|wav|md)$/i, '');
     const words = name.split(/[-_]+/).map(function (w) { return w ? w.charAt(0).toUpperCase() + w.slice(1) : w; });
     return words.join(' ');
   }
@@ -438,23 +442,112 @@ export async function boot() {
     const ext = String(path || '').split('/').pop().split('.').pop().toLowerCase();
     if (ext === 'md') return 'markdown';
     if (/^(mp4|webm|ogv)$/.test(ext)) return 'video';
+    if (/^(mp3|wav)$/.test(ext)) return 'audio';
     if (/^(svg|png|jpe?g|webp|gif)$/.test(ext)) return 'image';
     return 'html';
   }
 
   async function loadThings() {
     const urlEntries = await Promise.all(Object.entries(THING_GLOB).map(async function (e) {
+      const rel = String(e[0]).replace(/^\.\/things-we-made\//, '');
+      const folder = rel.indexOf('/') >= 0 ? rel.slice(0, rel.lastIndexOf('/')) : '';
       const url = await e[1]();
-      return { title: thingTitle(e[0]), url: url, kind: kindOf(e[0]) };
+      return { title: thingTitle(e[0]), url: url, kind: kindOf(e[0]), folder: folder, path: e[0] };
     }));
     const mdEntries = await Promise.all(Object.entries(MD_GLOB).map(async function (e) {
+      const rel = String(e[0]).replace(/^\.\/things-we-made\//, '');
+      const folder = rel.indexOf('/') >= 0 ? rel.slice(0, rel.lastIndexOf('/')) : '';
       const text = await e[1]();
-      return { title: thingTitle(e[0]), text: text, kind: 'markdown' };
+      return { title: thingTitle(e[0]), text: text, kind: 'markdown', folder: folder, path: e[0] };
     }));
     things.length = 0;
     urlEntries.concat(mdEntries).forEach(function (t) { things.push(t); });
+    // Audio playlists: tracks in the same folder play through in name order.
+    const byFolder = {};
+    things.forEach(function (t) {
+      if (t.kind !== 'audio') return;
+      (byFolder[t.folder] = byFolder[t.folder] || []).push(t);
+    });
+    Object.keys(byFolder).forEach(function (f) {
+      byFolder[f].sort(function (a, b) { return a.title < b.title ? -1 : a.title > b.title ? 1 : 0; });
+      byFolder[f].forEach(function (t) { t.playlist = byFolder[f]; });
+    });
     renderThings();
     renderButtons();
+  }
+
+  function thingTitleCase(name) {
+    return String(name || '').split(/[-_]+/).map(function (w) { return w ? w.charAt(0).toUpperCase() + w.slice(1) : w; }).join(' ');
+  }
+
+  function audioInNode(node) {
+    const out = [];
+    (node.items || []).forEach(function (t) { if (t.kind === 'audio') out.push(t); });
+    Object.keys(node.folders || {}).forEach(function (k) { out.push.apply(out, audioInNode(node.folders[k])); });
+    return out;
+  }
+
+  function buildThingTree(items) {
+    const root = { name: '', items: [], folders: {} };
+    items.forEach(function (t) {
+      const parts = String(t.folder || '').split('/').filter(Boolean);
+      let node = root;
+      parts.forEach(function (seg) {
+        if (!node.folders[seg]) node.folders[seg] = { name: seg, items: [], folders: {} };
+        node = node.folders[seg];
+      });
+      node.items.push(t);
+    });
+    return root;
+  }
+
+  function renderThingItem(t) {
+    const li = document.createElement('li');
+    const b = document.createElement('button');
+    b.className = 'btn-bouncy rounded-xl px-3 py-2 text-sm font-bold';
+    b.style.background = '#0f766e';
+    b.textContent = t.title;
+    b.addEventListener('click', function () { openThing(t); });
+    li.appendChild(b);
+    return li;
+  }
+
+  function renderThingNode(container, node, isRoot) {
+    // folders first
+    Object.keys(node.folders).sort().forEach(function (name) {
+      const folder = node.folders[name];
+      const li = document.createElement('li');
+      const details = document.createElement('details');
+      const summary = document.createElement('summary');
+      summary.className = 'cursor-pointer font-bold text-sm text-teal-200';
+      summary.textContent = thingTitleCase(name);
+      const audios = audioInNode(folder);
+      if (audios.length) {
+        const playAll = document.createElement('button');
+        playAll.className = 'btn-bouncy rounded px-2 py-0.5 text-xs font-bold ml-2';
+        playAll.style.background = '#0f766e';
+        playAll.textContent = 'Play all (' + audios.length + ')';
+        playAll.addEventListener('click', function (e) {
+          e.preventDefault();
+          e.stopPropagation();
+          const pl = audios.slice().sort(function (a, b) { return a.title < b.title ? -1 : a.title > b.title ? 1 : 0; });
+          pl.forEach(function (t) { t.playlist = pl; });
+          if (pl.length) openThing(pl[0]);
+        });
+        summary.appendChild(playAll);
+      }
+      details.appendChild(summary);
+      const ul = document.createElement('ul');
+      ul.className = 'flex flex-col gap-1 ml-4 mt-1';
+      renderThingNode(ul, folder, false);
+      details.appendChild(ul);
+      li.appendChild(details);
+      container.appendChild(li);
+    });
+    // items
+    node.items.slice().sort(function (a, b) { return a.title < b.title ? -1 : a.title > b.title ? 1 : 0; }).forEach(function (t) {
+      container.appendChild(renderThingItem(t));
+    });
   }
 
   function renderThings() {
@@ -468,19 +561,11 @@ export async function boot() {
       ul.appendChild(li);
       return;
     }
-    things.forEach(function (t) {
-      const li = document.createElement('li');
-      const b = document.createElement('button');
-      b.className = 'btn-bouncy rounded-xl px-3 py-2 text-sm font-bold';
-      b.style.background = '#0f766e';
-      b.textContent = t.title;
-      b.addEventListener('click', function () { openThing(t); });
-      li.appendChild(b);
-      ul.appendChild(li);
-    });
+    renderThingNode(ul, buildThingTree(things), true);
   }
 
   function isThingVideo(t) { return t && t.kind === 'video'; }
+  function isThingAudio(t) { return t && t.kind === 'audio'; }
   function isThingImage(t) { return t && t.kind === 'image'; }
   function isThingMarkdown(t) { return t && t.kind === 'markdown'; }
 
@@ -505,6 +590,7 @@ export async function boot() {
     const slug = 'show-' + String(t.title || '').toLowerCase().replace(/[^a-z0-9]+/g, '-');
     closeStageOnly();
     if (isThingVideo(t)) { openVideo(t, slug); return; }
+    if (isThingAudio(t)) { openAudio(t, slug); return; }
     if (isThingImage(t)) { openImage(t, slug); return; }
     if (isThingMarkdown(t)) { openMarkdown(t, slug); return; }
     compat.open({ id: slug, title: t.title, file: t.url, fill: false, height: 560 }, t.url);
@@ -529,6 +615,64 @@ export async function boot() {
         shadow.appendChild(v);
         v.play().catch(function () {});
         return { destroy: function () { try { v.pause(); v.src = ''; } catch (e) {} } };
+      }
+    };
+    stage.mount({ id: slug, title: t.title, fill: false }, mod, {});
+  }
+
+  function openAudio(t, slug) {
+    const ft = document.getElementById('focus-title');
+    if (ft) ft.textContent = t.title;
+    const mod = {
+      mount: function (shadow, api) {
+        shadow.host.style.minHeight = '240px';
+        const wrap = document.createElement('div');
+        wrap.style.cssText = 'padding:20px;background:#0b1021;border-radius:12px;display:flex;flex-direction:column;gap:12px';
+        const title = document.createElement('div');
+        title.style.cssText = 'font:600 16px/1.4 system-ui;color:#e2e8f0';
+        title.textContent = t.title;
+        const audio = document.createElement('audio');
+        audio.controls = true;
+        audio.preload = 'metadata';
+        audio.src = t.url;
+        audio.style.width = '100%';
+        const nav = document.createElement('div');
+        nav.style.cssText = 'display:flex;gap:8px;align-items:center';
+        const pl = (t.playlist && t.playlist.length) ? t.playlist : [t];
+        let idx = pl.indexOf(t);
+        if (idx < 0) idx = 0;
+        function load(i) {
+          idx = i;
+          audio.src = pl[idx].url;
+          title.textContent = pl[idx].title;
+          audio.play().catch(function () {});
+        }
+        if (pl.length > 1) {
+          const prev = document.createElement('button');
+          prev.className = 'btn-bouncy rounded px-3 py-1 text-sm font-bold';
+          prev.style.background = '#0f766e';
+          prev.textContent = 'Prev';
+          prev.addEventListener('click', function () { if (idx > 0) load(idx - 1); });
+          const next = document.createElement('button');
+          next.className = 'btn-bouncy rounded px-3 py-1 text-sm font-bold';
+          next.style.background = '#0f766e';
+          next.textContent = 'Next';
+          next.addEventListener('click', function () { if (idx < pl.length - 1) load(idx + 1); });
+          const info = document.createElement('span');
+          info.style.cssText = 'color:#94a3b8;font-size:12px';
+          info.textContent = (idx + 1) + ' / ' + pl.length;
+          audio.addEventListener('ended', function () { if (idx < pl.length - 1) load(idx + 1); });
+          audio.addEventListener('play', function () { info.textContent = (idx + 1) + ' / ' + pl.length; });
+          nav.appendChild(prev);
+          nav.appendChild(next);
+          nav.appendChild(info);
+        }
+        wrap.appendChild(title);
+        wrap.appendChild(audio);
+        if (pl.length > 1) wrap.appendChild(nav);
+        shadow.appendChild(wrap);
+        audio.play().catch(function () {});
+        return { destroy: function () { try { audio.pause(); audio.src = ''; } catch (e) {} } };
       }
     };
     stage.mount({ id: slug, title: t.title, fill: false }, mod, {});
