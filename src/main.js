@@ -825,17 +825,17 @@ export async function boot() {
           "@font-face{font-family:'Courier Prime';src:url('/fonts/CourierPrime/CourierPrime-Bold.ttf') format('truetype');font-weight:700;font-style:normal;}",
           "@font-face{font-family:'Courier Prime';src:url('/fonts/CourierPrime/CourierPrime-Italic.ttf') format('truetype');font-weight:400;font-style:italic;}",
           "@font-face{font-family:'Courier Prime';src:url('/fonts/CourierPrime/CourierPrime-BoldItalic.ttf') format('truetype');font-weight:700;font-style:italic;}",
-          ".md{font-family:'Courier Prime',monospace;font-size:16px;line-height:1.6;color:#e2e8f0;background:#0b1021;padding:24px;border-radius:12px;max-width:76ch;overflow:auto}",
-          ".md h1,.md h2,.md h3,.md h4,.md h5,.md h6{color:#5eead4;margin:1em 0 .4em;font-weight:700}",
+          ".md{font-family:'Courier New',Courier,monospace;font-size:16px;line-height:1.6;color:#000000;background:#FFFFFF;padding:24px;border-radius:12px;max-width:76ch;overflow:auto}",
+          ".md h1,.md h2,.md h3,.md h4,.md h5,.md h6{color:#000000;margin:1em 0 .4em;font-weight:700}",
           ".md h1{font-size:1.6em}.md h2{font-size:1.35em}.md h3{font-size:1.15em}",
           ".md p{margin:.6em 0}",
           ".md ul,.md ol{margin:.6em 0;padding-left:1.6em}",
           ".md li{margin:.25em 0}",
-          ".md blockquote{border-left:3px solid #334155;margin:.8em 0;padding:.2em 1em;color:#94a3b8}",
-          ".md pre{background:#020617;padding:12px;border-radius:8px;overflow:auto}",
-          ".md code{background:#020617;padding:1px 4px;border-radius:4px;font-size:.95em}",
+          ".md blockquote{border-left:3px solid #000000;margin:.8em 0;padding:.2em 1em;color:#000000}",
+          ".md pre{background:#f2f2f2;padding:12px;border-radius:8px;overflow:auto}",
+          ".md code{background:#f2f2f2;padding:1px 4px;border-radius:4px;font-size:.95em;color:#000000}",
           ".md pre code{background:none;padding:0}",
-          ".md a{color:#22d3ee;text-decoration:underline}",
+          ".md a{color:#000000;text-decoration:underline}",
           ".md strong{font-weight:700}.md em{font-style:italic}"
         ].join('');
         shadow.appendChild(style);
