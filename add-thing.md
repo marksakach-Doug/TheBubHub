@@ -29,7 +29,7 @@ Drop `.png`/`.jpg`/`.webp`/`.gif`/`.svg` directly. Keep files reasonable (a few 
 
 ## Markdown (poems, notes)
 
-Drop a `.md` file. Its filename becomes the menu title (`a-short-poem.md` → "A Short Poem"). Use dashes/underscores for multi-word titles. Line breaks are preserved, so it works well for poems.
+Drop a `.md` file. Its filename becomes the menu title (`a-short-poem.md` → "A Short Poem"). Use dashes/underscores for multi-word titles. Standard Markdown (headings, lists, bold/italic, code, links, blockquotes) is rendered, in Courier Prime.
 
 ## Audio (songs, albums)
 

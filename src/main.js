@@ -736,15 +736,112 @@ export async function boot() {
     stage.mount({ id: slug, title: t.title, fill: false }, mod, {});
   }
 
+  function escapeHtmlMd(s) {
+    return String(s).replace(/&/g, '&amp;').replace(/</g, '&lt;').replace(/>/g, '&gt;');
+  }
+
+  function inlineMarkdown(s) {
+    let t = escapeHtmlMd(s);
+    t = t.replace(/`([^`]+)`/g, '<code>$1</code>');
+    t = t.replace(/\*\*([^*]+)\*\*/g, '<strong>$1</strong>');
+    t = t.replace(/__([^_]+)__/g, '<strong>$1</strong>');
+    t = t.replace(/\*([^*]+)\*/g, '<em>$1</em>');
+    t = t.replace(/_([^_]+)_/g, '<em>$1</em>');
+    t = t.replace(/\[([^\]]+)\]\(([^)]+)\)/g, '<a href="$2" target="_blank" rel="noopener">$1</a>');
+    return t;
+  }
+
+  function renderMarkdown(text) {
+    const lines = String(text || '').replace(/\r\n/g, '\n').split('\n');
+    let html = '';
+    let inCode = false;
+    const codeLines = [];
+    let inUl = false;
+    let inOl = false;
+    let inBq = false;
+    function closeLists() { if (inUl) { html += '</ul>'; inUl = false; } if (inOl) { html += '</ol>'; inOl = false; } }
+    function closeBq() { if (inBq) { html += '</blockquote>'; inBq = false; } }
+    for (let i = 0; i < lines.length; i++) {
+      const line = lines[i];
+      if (/^```/.test(line.trim())) {
+        if (inCode) {
+          html += '<pre><code>' + escapeHtmlMd(codeLines.join('\n')) + '</code></pre>';
+          codeLines.length = 0;
+          inCode = false;
+        } else {
+          closeLists(); closeBq();
+          inCode = true;
+        }
+        continue;
+      }
+      if (inCode) { codeLines.push(line); continue; }
+      if (/^\s*$/.test(line)) { closeLists(); closeBq(); continue; }
+      const h = line.match(/^(#{1,6})\s+(.*)$/);
+      if (h) {
+        closeLists(); closeBq();
+        const level = h[1].length;
+        html += '<h' + level + '>' + inlineMarkdown(h[2]) + '</h' + level + '>';
+        continue;
+      }
+      const bq = line.match(/^>\s?(.*)$/);
+      if (bq) {
+        closeLists();
+        if (!inBq) { html += '<blockquote>'; inBq = true; }
+        html += '<p>' + inlineMarkdown(bq[1]) + '</p>';
+        continue;
+      }
+      closeBq();
+      const ul = line.match(/^[-*+]\s+(.*)$/);
+      if (ul) {
+        if (inOl) { html += '</ol>'; inOl = false; }
+        if (!inUl) { html += '<ul>'; inUl = true; }
+        html += '<li>' + inlineMarkdown(ul[1]) + '</li>';
+        continue;
+      }
+      const ol = line.match(/^\d+\.\s+(.*)$/);
+      if (ol) {
+        if (inUl) { html += '</ul>'; inUl = false; }
+        if (!inOl) { html += '<ol>'; inOl = true; }
+        html += '<li>' + inlineMarkdown(ol[1]) + '</li>';
+        continue;
+      }
+      closeLists(); closeBq();
+      html += '<p>' + inlineMarkdown(line) + '</p>';
+    }
+    if (inCode) html += '<pre><code>' + escapeHtmlMd(codeLines.join('\n')) + '</code></pre>';
+    closeLists(); closeBq();
+    return html;
+  }
+
   function openMarkdown(t, slug) {
     const ft = document.getElementById('focus-title');
     if (ft) ft.textContent = t.title;
     const mod = {
       mount: function (shadow, api) {
         shadow.host.style.minHeight = '420px';
+        const style = document.createElement('style');
+        style.textContent = [
+          "@font-face{font-family:'Courier Prime';src:url('/fonts/CourierPrime/CourierPrime-Regular.ttf') format('truetype');font-weight:400;font-style:normal;}",
+          "@font-face{font-family:'Courier Prime';src:url('/fonts/CourierPrime/CourierPrime-Bold.ttf') format('truetype');font-weight:700;font-style:normal;}",
+          "@font-face{font-family:'Courier Prime';src:url('/fonts/CourierPrime/CourierPrime-Italic.ttf') format('truetype');font-weight:400;font-style:italic;}",
+          "@font-face{font-family:'Courier Prime';src:url('/fonts/CourierPrime/CourierPrime-BoldItalic.ttf') format('truetype');font-weight:700;font-style:italic;}",
+          ".md{font-family:'Courier Prime',monospace;font-size:16px;line-height:1.6;color:#e2e8f0;background:#0b1021;padding:24px;border-radius:12px;max-width:76ch;overflow:auto}",
+          ".md h1,.md h2,.md h3,.md h4,.md h5,.md h6{color:#5eead4;margin:1em 0 .4em;font-weight:700}",
+          ".md h1{font-size:1.6em}.md h2{font-size:1.35em}.md h3{font-size:1.15em}",
+          ".md p{margin:.6em 0}",
+          ".md ul,.md ol{margin:.6em 0;padding-left:1.6em}",
+          ".md li{margin:.25em 0}",
+          ".md blockquote{border-left:3px solid #334155;margin:.8em 0;padding:.2em 1em;color:#94a3b8}",
+          ".md pre{background:#020617;padding:12px;border-radius:8px;overflow:auto}",
+          ".md code{background:#020617;padding:1px 4px;border-radius:4px;font-size:.95em}",
+          ".md pre code{background:none;padding:0}",
+          ".md a{color:#22d3ee;text-decoration:underline}",
+          ".md strong{font-weight:700}.md em{font-style:italic}"
+        ].join('');
+        shadow.appendChild(style);
         const el = document.createElement('div');
-        el.style.cssText = 'max-width:76ch;line-height:1.6;font:16px/1.6 system-ui;color:#e2e8f0;background:#0b1021;padding:24px;border-radius:12px;white-space:pre-wrap;overflow:auto';
-        el.textContent = t.text || '';
+        el.className = 'md';
+        el.innerHTML = renderMarkdown(t.text || '');
         shadow.appendChild(el);
         return { destroy: function () {} };
       }
