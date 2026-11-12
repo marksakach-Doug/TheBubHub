@@ -636,17 +636,21 @@ export async function boot() {
     const ft = document.getElementById('focus-title');
     if (ft) ft.textContent = t.title;
     const mod = {
-      mount: function (shadow, api) {
-        shadow.host.style.minHeight = '560px';
-        const v = document.createElement('video');
-        v.controls = true;
-        v.playsInline = true;
-        v.src = t.url;
-        v.style.width = '100%';
-        v.style.height = '100%';
-        v.style.display = 'block';
-        v.style.background = '#000';
-        shadow.appendChild(v);
+       mount: function (shadow, api) {
+         shadow.host.style.minHeight = '560px';
+         shadow.host.style.touchAction = 'auto';
+         shadow.host.style.overflow = 'hidden';
+         const v = document.createElement('video');
+         v.controls = true;
+         v.playsInline = true;
+         v.preload = 'auto';
+         v.src = t.url;
+         v.style.width = '100%';
+         v.style.height = '100%';
+         v.style.display = 'block';
+         v.style.background = '#000';
+         v.style.touchAction = 'auto';
+         shadow.appendChild(v);
         v.play().catch(function () {});
         return { destroy: function () { try { v.pause(); v.src = ''; } catch (e) {} } };
       }
@@ -658,18 +662,21 @@ export async function boot() {
     const ft = document.getElementById('focus-title');
     if (ft) ft.textContent = t.title;
     const mod = {
-      mount: function (shadow, api) {
-        shadow.host.style.minHeight = '240px';
-        const wrap = document.createElement('div');
-        wrap.style.cssText = 'padding:20px;background:#0b1021;border-radius:12px;display:flex;flex-direction:column;gap:12px';
-        const title = document.createElement('div');
-        title.style.cssText = 'font:600 16px/1.4 system-ui;color:#e2e8f0';
-        title.textContent = t.title;
-        const audio = document.createElement('audio');
-        audio.controls = true;
-        audio.preload = 'metadata';
-        audio.src = t.url;
-        audio.style.width = '100%';
+       mount: function (shadow, api) {
+         shadow.host.style.minHeight = '240px';
+         shadow.host.style.touchAction = 'auto';
+         shadow.host.style.overflow = 'hidden';
+         const wrap = document.createElement('div');
+         wrap.style.cssText = 'padding:20px;background:#0b1021;border-radius:12px;display:flex;flex-direction:column;gap:12px';
+         const title = document.createElement('div');
+         title.style.cssText = 'font:600 16px/1.4 system-ui;color:#e2e8f0';
+         title.textContent = t.title;
+         const audio = document.createElement('audio');
+         audio.controls = true;
+         audio.preload = 'auto';
+         audio.src = t.url;
+         audio.style.width = '100%';
+         audio.style.touchAction = 'auto';
         const nav = document.createElement('div');
         nav.style.cssText = 'display:flex;gap:8px;align-items:center';
         const pl = (t.playlist && t.playlist.length) ? t.playlist : [t];

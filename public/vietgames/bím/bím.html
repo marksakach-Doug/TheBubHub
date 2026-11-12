@@ -1,0 +1,638 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<meta name="color-scheme" content="light">
+<title>Bím</title>
+<style>
+:root{
+  --paper:#f4efe5;--card:#fffdf8;--ink:#302c25;--muted:#746b5f;--line:#d9cfbd;
+  --wash:#eee6d8;--accent:#a45f3b;--syn:#3f7778;--ant:#94607e;--fail:#a49a8d;
+  --radius:15px;--shadow:0 2px 4px #332e2610,0 10px 26px #332e260d;
+}
+*{box-sizing:border-box}
+html,body{margin:0;background:var(--paper);color:var(--ink)}
+body{font:15px/1.5 "Segoe UI",system-ui,-apple-system,BlinkMacSystemFont,Arial,sans-serif}
+button,input,select{font:inherit}
+button{color:var(--ink);background:linear-gradient(#fffefa,#f0e9dc);border:1px solid var(--line);border-radius:999px;padding:9px 17px;min-height:42px;cursor:pointer;box-shadow:0 1px 2px #332e260d}
+button:hover:not(:disabled){filter:brightness(.985);border-color:#b9aa94}
+button:disabled{opacity:.45;cursor:not-allowed}
+button:focus-visible,input:focus-visible,summary:focus-visible{outline:3px solid #a45f3b66;outline-offset:2px}
+button.primary{background:linear-gradient(#b66c47,#a45f3b);border-color:#8e4f30;color:white}
+input[type=text],select{width:100%;min-height:44px;border:1px solid var(--line);border-radius:10px;padding:10px 12px;background:#fffefa;color:var(--ink)}
+label{display:flex;flex-direction:column;gap:5px;font-size:13px;font-weight:700;color:var(--muted)}
+#app{max-width:1040px;margin:auto;padding:clamp(14px,3vw,26px)}
+.hidden{display:none!important}
+.hero{position:relative;overflow:hidden;text-align:center;padding:24px 18px;margin-bottom:14px;border:1px solid var(--line);border-radius:19px;background:linear-gradient(135deg,#fcf8f0,#eee3d0);box-shadow:var(--shadow)}
+.hero:before,.hero:after{content:"";position:absolute;left:-5%;width:110%;height:14px;border-top:2px solid #a45f3b25;border-radius:50%;transform:rotate(-3deg)}
+.hero:before{top:12px}.hero:after{bottom:5px;transform:rotate(2deg)}
+h1{font:600 clamp(38px,8vw,58px)/1 Georgia,"Times New Roman",serif;letter-spacing:.02em;margin:0;color:#3d3328}
+.tag{margin:9px 0 0;color:var(--muted);font-size:15px}
+.card{background:var(--card);border:1px solid var(--line);border-radius:var(--radius);padding:clamp(15px,3vw,22px);box-shadow:var(--shadow);margin-bottom:14px}
+h2{font:600 21px Georgia,"Times New Roman",serif;margin:0 0 8px;color:#60452f}
+p{margin:6px 0}.muted{color:var(--muted);font-size:14px}
+.status{min-height:1.4em;margin:0 0 12px;color:#874c2d;font-weight:700}.status:empty{display:none}
+.setup{display:flex;gap:12px;align-items:end;flex-wrap:wrap}.setup label{width:180px}
+.actions{display:flex;gap:9px;align-items:center;flex-wrap:wrap;margin-top:12px}
+.turnhead{display:flex;justify-content:space-between;align-items:center;gap:12px;flex-wrap:wrap;margin-bottom:4px}
+.turnline{font-weight:750;font-size:17px}
+.timer{font-variant-numeric:tabular-nums;font-weight:800;font-size:15px;padding:4px 12px;border-radius:999px;background:var(--wash);border:1px solid var(--line);color:var(--ink)}
+.timer.urgent{background:#f9e6e2;border-color:#c96a5b;color:#9e2f20}
+.timer.paused{background:#f3eee5;color:var(--muted)}
+.prompt{color:var(--muted);margin-bottom:10px}
+.entry{display:flex;gap:8px;align-items:stretch;margin-top:10px}
+.entry input{flex:1;min-width:0;font-size:17px}
+.boardwrap{overflow:auto;border:1px solid var(--line);border-radius:13px;background:linear-gradient(180deg,#fffefa,#f8f2e8);padding:8px}
+#board svg{display:block;max-width:none}
+.judgegrid{display:grid;grid-template-columns:1fr 1fr;gap:10px;margin:10px 0}
+.judgeitem{padding:12px;border:1px solid var(--line);border-radius:11px;background:#faf7f0}
+.judgeitem strong{display:block;margin-bottom:8px}
+.toggle{display:flex;gap:7px}
+.toggle button{flex:1;min-height:38px;padding:6px 10px}
+.toggle button.chosen.yes{background:#e7f0e9;border-color:#6d997c;color:#2e6240}
+.toggle button.chosen.no{background:#f1e8ec;border-color:#b28a9f;color:#79445e}
+.playerlist{display:flex;gap:7px;flex-wrap:wrap;padding:0;margin:0;list-style:none}
+.playerlist li{display:flex;align-items:center;gap:7px;padding:6px 11px;background:var(--wash);border-radius:99px;font-size:13px}
+.playerlist li.current{outline:2px solid var(--accent);font-weight:800}
+.playerlist li.out{opacity:.45;text-decoration:line-through}
+.dot{width:9px;height:9px;border-radius:50%;display:inline-block}
+details summary{cursor:pointer;font-weight:750;color:#805033}
+details p{max-width:78ch;font-size:14px}
+.rulesgrid{display:grid;grid-template-columns:1fr 1fr;gap:4px 20px;margin-top:8px}
+@media(max-width:620px){.judgegrid,.rulesgrid{grid-template-columns:1fr}.entry{flex-direction:column}.entry button{width:100%}.setup label{width:100%}}
+@media(prefers-reduced-motion:reduce){*{scroll-behavior:auto!important;transition:none!important}}
+</style>
+</head>
+<body>
+<div id="app">
+  <header class="hero"><h1>Bím</h1><p class="tag">Tét từ.</p></header>
+  <p id="status" class="status" role="status" aria-live="polite"></p>
+
+  <section id="lobby" class="card">
+    <h2>Giữ chặt các sợi</h2>
+    <p class="muted">Ba sợi đan xen nhau ở giữa. Hai từ khóa khởi đầu cho bím. Đánh bại đồng hồ 60 giây. Không được thì bị loại.</p>
+    <div class="setup"><label>Người Chơi
+      <select id="playerCount"><option value="2" selected>2 người chơi</option><option value="3">3 người chơi</option><option value="4">4 người chơi</option><option value="5">5 người chơi</option><option value="6">6 người chơi</option></select>
+    </label><button id="start" class="primary">Bắt đầu</button><span id="waiting" class="muted hidden"></span></div>
+  </section>
+
+  <main id="game" class="hidden">
+    <section class="card">
+      <div class="turnhead">
+        <div id="turn" class="turnline"></div>
+        <div id="timer" class="timer hidden" aria-live="off">1:00</div>
+      </div>
+      <div id="prompt" class="prompt"></div>
+      <div id="seedEntry" class="entry hidden"><input id="seedWord" type="text" maxlength="32" autocomplete="off" placeholder="Your one seed word"><button id="addSeed" class="primary">Add seed word</button></div>
+      <div id="playEntry" class="hidden">
+        <div class="entry"><input id="newWord" type="text" maxlength="32" autocomplete="off" placeholder="One word only" aria-label="Your one-word bridge"><button id="addWord" class="primary">Add one word</button></div>
+      </div>
+      <div id="judging" class="hidden">
+        <h2 id="judgeHeading">Other players: vote</h2>
+        <p id="judgePrompt" class="muted"></p>
+        <div id="judgeControls" class="judgegrid">
+          <div class="judgeitem"><strong id="judgeQSyn">Is it associated?</strong><div class="toggle"><button data-kind="syn" data-value="yes">Yes</button><button data-kind="syn" data-value="no">No</button></div></div>
+          <div class="judgeitem"><strong id="judgeQAnt">Is it clearly NOT associated?</strong><div class="toggle"><button data-kind="ant" data-value="yes">Yes</button><button data-kind="ant" data-value="no">No</button></div></div>
+        </div>
+      </div>
+    </section>
+
+    <section class="card">
+      <h2>The braid</h2>
+      <div class="boardwrap"><div id="board"></div></div>
+    </section>
+
+    <section class="card">
+      <h2>Players</h2><ul id="players" class="playerlist"></ul>
+      <div class="actions"><button id="saveBraid" class="hidden">Save final braid</button><button id="new" class="hidden">New braid</button><button id="lobbyBtn" class="hidden">Back to lobby</button></div>
+    </section>
+  </main>
+
+  <details class="card"><summary>How to play</summary>
+    <div class="rulesgrid">
+      <p><b>1. Seed two strands.</b> The first two turns place one starting word on the Middle and Right strands.</p>
+      <p><b>2. Cross and pivot.</b> The active outer strand crosses over the middle: enter one word <b>associated</b> with the middle word and <b>clearly NOT associated</b> with the loose outer word.</p>
+      <p><b>3. Other players vote.</b> Your clock pauses while the other players tap Yes or No on both links. If rejected, your clock resumes and you must try again.</p>
+      <p><b>4. Beat the 60s clock.</b> If your timer hits zero, you are knocked out and the next player takes the turn. Last player standing wins.</p>
+    </div>
+  </details>
+</div>
+
+<script>
+(function(){
+'use strict';
+const $=id=>document.getElementById(id);
+const STRAND_COLORS=['#a45f3b','#3f7778','#8a5a72'];
+const SLOT_NAMES=['Left','Middle','Right'];
+const PLAYER_COLORS=['#a45f3b','#3f7778','#8a5a72','#71834e','#746b9b','#b08336'];
+const TURN_MS=60000;
+let S=null, mode='wait', Hub={me:null,roster:[],up(k,p){try{window.parent.postMessage({t:'gu',game:'braid',k,p},'*')}catch(e){}}};
+let verdict={syn:null,ant:null}, pickTurn=null, focusKey=null, heightTimer=null;
+
+function esc(s){return String(s).replace(/[&<>"']/g,c=>({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;'}[c]));}
+function playerName(id){return S&&S.names[id]||'Player'}
+function myId(){return mode==='local'?'local':Hub.me&&Hub.me.id}
+function isHost(){return mode==='local'||!!(Hub.me&&Hub.me.isHost)}
+function isMyTurn(){return !!S&&(mode==='local'||S.turnId===myId())}
+function canVote(){return !!S&&S.phase==='judge'&&(mode==='local'||(myId()&&myId()!==S.turnId))}
+function alivePlayers(){return S?S.order.filter(id=>!(S.eliminated||[]).includes(id)):[]}
+function nextAfter(id){
+  if(!S)return null;
+  let n=S.order.length, startIdx=S.order.indexOf(id);
+  for(let step=1;step<=n;step++){
+    let cand=S.order[(startIdx+step+n)%n];
+    if(!(S.eliminated||[]).includes(cand))return cand;
+  }
+  return id;
+}
+function playerColor(id){let i=S?S.order.indexOf(id):0;return PLAYER_COLORS[(i<0?0:i)%PLAYER_COLORS.length]}
+function say(t){$('status').textContent=t;clearTimeout(say.timer);say.timer=setTimeout(()=>{$('status').textContent=''},3200)}
+function syncPickTurn(){
+  let key=S?(S.phase+':'+S.turnId+':'+(S.pending?S.pending.text:'')):'';
+  if(key!==pickTurn){verdict={syn:null,ant:null};pickTurn=key;}
+}
+function reportHeight(){clearTimeout(heightTimer);heightTimer=setTimeout(()=>{let app=$('app');if(app)Hub.up('height',Math.ceil(app.getBoundingClientRect().height))},60)}
+function postState(){render();if(mode==='hub'&&isHost())Hub.up('state',S)}
+function validWord(t){return !!t&&!/\s/.test(t)&&t.length<=32}
+function byId(id){return S&&S.words.find(w=>w.id===id)||null}
+function latestOnStrand(strandId){
+  if(!S)return null;
+  for(let i=S.words.length-1;i>=0;i--){
+    if(S.words[i].strand===strandId)return S.words[i];
+  }
+  return null;
+}
+
+/*
+ * Three-strand state:
+ * slots: [leftStrandId, midStrandId, rightStrandId] -> initially [0, 1, 2]
+ * Seed 1 goes on Middle strand (1), Seed 2 goes on Right strand (2).
+ * Then Left strand (0) crosses over Middle (1) on the first play turn.
+ */
+function start(order,names){
+  S={
+    order:order.slice(),
+    names:Object.assign({},names),
+    eliminated:[],
+    winnerId:null,
+    phase:'seed',
+    turnId:order[0],
+    seedCount:0,
+    slots:[0,1,2],
+    nextSide:'L',
+    words:[],
+    nextId:1,
+    stepCount:0,
+    pending:null,
+    timeLeftMs:TURN_MS,
+    turnDeadline:Date.now()+TURN_MS
+  };
+  verdict={syn:null,ant:null};pickTurn=null;focusKey=null;postState();
+}
+
+function localStart(){
+  let n=+$('playerCount').value,order=[],names={};
+  for(let i=0;i<n;i++){let id='local-'+i;order.push(id);names[id]='Player '+(i+1)}
+  start(order,names);
+}
+
+function currentTargets(){
+  if(!S)return {outerSlot:0,looseSlot:2,midSlot:1,movingStrand:0,A:null,B:null};
+  let outerSlot=S.nextSide==='L'?0:2;
+  let looseSlot=S.nextSide==='L'?2:0;
+  let midSlot=1;
+  let movingStrand=S.slots[outerSlot];
+  let A=latestOnStrand(S.slots[midSlot]);
+  let B=latestOnStrand(S.slots[looseSlot]);
+  return {outerSlot,looseSlot,midSlot,movingStrand,A,B};
+}
+
+function resetClock(){
+  S.timeLeftMs=TURN_MS;
+  S.turnDeadline=Date.now()+TURN_MS;
+}
+
+function apply(a,from){
+  if(!S||!a)return;
+  if(a.a==='seed'){
+    if(S.phase!=='seed'||from!==S.turnId)return 'It is not your seed turn.';
+    let text=String(a.text||'').trim();
+    if(!validWord(text))return 'Please enter exactly one word.';
+    if(S.words.some(w=>w.text.toLowerCase()===text.toLowerCase()))return 'That word is already on the braid.';
+    let strand=S.seedCount+1; // Seed 1 -> Middle (1), Seed 2 -> Right (2)
+    S.words.push({
+      id:S.nextId++,
+      text,
+      by:from,
+      seed:true,
+      strand,
+      step:0,
+      slots:[0,1,2]
+    });
+    S.seedCount++;
+    if(S.seedCount>=2){
+      S.phase='play';
+      S.nextSide='L';
+    }
+    S.turnId=nextAfter(from);
+    resetClock();
+  }else if(a.a==='add'){
+    if(S.phase!=='play'||from!==S.turnId)return 'It is not your turn.';
+    let text=String(a.text||'').trim();
+    if(!validWord(text))return 'Please enter exactly one word.';
+    if(S.words.some(w=>w.text.toLowerCase()===text.toLowerCase()))return 'That word is already on the braid.';
+    let t=currentTargets();
+    if(!t.A||!t.B)return 'Seed words are still needed.';
+    S.timeLeftMs=Math.max(500,S.turnDeadline-Date.now());
+    S.pending={
+      text,
+      by:from,
+      strand:t.movingStrand,
+      side:S.nextSide,
+      aId:t.A.id,
+      bId:t.B.id,
+      slotsBefore:S.slots.slice()
+    };
+    S.phase='judge';
+  }else if(a.a==='judge'){
+    if(S.phase!=='judge')return null;
+    if(mode==='hub'&&from===S.turnId)return 'The other players vote on your word.';
+    if(!['yes','no'].includes(a.syn)||!['yes','no'].includes(a.ant))return 'Vote Yes or No on both links.';
+    let p=S.pending;if(!p)return 'Missing pending word.';
+    let synOk=a.syn==='yes', antOk=a.ant==='yes';
+
+    if(synOk&&antOk){
+      let outerSlot=p.side==='L'?0:2;
+      let newSlots=S.slots.slice();
+      let tmp=newSlots[1];
+      newSlots[1]=newSlots[outerSlot];
+      newSlots[outerSlot]=tmp;
+      S.slots=newSlots;
+      S.stepCount++;
+      S.words.push({
+        id:S.nextId++,
+        text:p.text,
+        by:p.by,
+        seed:false,
+        strand:p.strand,
+        step:S.stepCount,
+        side:p.side,
+        crossedFrom:outerSlot,
+        slotsBefore:p.slotsBefore.slice(),
+        slots:newSlots.slice(),
+        aId:p.aId,
+        bId:p.bId
+      });
+      S.nextSide=S.nextSide==='L'?'R':'L';
+      let doneBy=S.turnId;
+      S.pending=null;
+      S.phase='play';
+      S.turnId=nextAfter(doneBy);
+      resetClock();
+    }else{
+      S.pending=null;
+      S.phase='play';
+      S.turnDeadline=Date.now()+Math.max(500,S.timeLeftMs||TURN_MS);
+      say('Rejected — clock resumed! Try another word.');
+    }
+  }else if(a.a==='timeout'){
+    if((S.phase!=='seed'&&S.phase!=='play')||!isHost())return null;
+    let outId=S.turnId;
+    if(!S.eliminated.includes(outId))S.eliminated.push(outId);
+    let alive=alivePlayers();
+    if(alive.length<=1){
+      S.phase='gameover';
+      S.winnerId=alive[0]||outId;
+      say(`${playerName(outId)} ran out of time! ${playerName(S.winnerId)} wins!`);
+    }else{
+      S.turnId=nextAfter(outId);
+      resetClock();
+      say(`${playerName(outId)} ran out of time and is knocked out!`);
+    }
+  }else if(a.a==='new'){
+    if(!isHost())return 'Only the host can start a new braid.';
+    if(mode==='local')localStart();
+    else{let order=Hub.roster.map(p=>p.id),names={};Hub.roster.forEach(p=>names[p.id]=p.name);start(order,names)}
+    return null;
+  }else if(a.a==='toLobby'){
+    if(!isHost())return 'Only the host can return to the lobby.';
+    S=null;postState();return null;
+  }else return 'Unknown move.';
+  postState();return null;
+}
+
+function act(a){
+  let from;
+  if(mode==='local')from=S?(a.a==='judge'?'voters':S.turnId):'local';
+  else from=myId();
+  if(mode==='local'||isHost()){let e=apply(a,from);if(e)say(e)}
+  else Hub.up('intent',a);
+}
+
+function drawCurve(x0,y0,x1,y1,color,isOver,isDashed){
+  let dx=x1-x0, d=`M ${x0} ${y0} C ${x0+dx*.44} ${y0}, ${x1-dx*.44} ${y1}, ${x1} ${y1}`;
+  let dash=isDashed?' stroke-dasharray="5 5"':'';
+  let s='';
+  if(isOver)s+=`<path d="${d}" fill="none" stroke="#faf5ec" stroke-width="13" stroke-linecap="round"/>`;
+  s+=`<path d="${d}" fill="none" stroke="${color}" stroke-width="7" stroke-linecap="round" opacity="${isDashed ? .12 : .18}"${dash}/>`;
+  s+=`<path d="${d}" fill="none" stroke="${color}" stroke-width="${isOver?3.4:2.8}" stroke-linecap="round" opacity="${isDashed ? .6 : .92}"${dash}/>`;
+  return s;
+}
+
+function drawBead(x,y,text,stroke,pending){
+  let tw=Math.max(62,Math.min(128,text.length*8+26));
+  let dash=pending?' stroke-dasharray="4 4"':'';
+  let out=`<g filter="url(#shadow)">`;
+  out+=`<rect x="${x-tw/2}" y="${y-17}" width="${tw}" height="34" rx="13" fill="${pending?'#fff8e9':'#fffdf8'}" stroke="${stroke}" stroke-width="2.4"${dash}/>`;
+  out+=`<text x="${x}" y="${y+5}" text-anchor="middle" font-family="Georgia,serif" font-size="${text.length>13?11:text.length>9?13:16}" font-weight="700" fill="#302c25">${esc(text)}</text>`;
+  out+='</g>';
+  return out;
+}
+
+function svgBoard(){
+  if(!S)return '';
+  const Y=[64,144,224], X0=100, DX=162;
+  const steps=S.stepCount;
+  const showNext=S.phase==='play'||S.phase==='judge';
+  const totalCols=Math.max(1,1+steps+(showNext?1:0));
+  const W=Math.max(610,X0+totalCols*DX+40), H=284;
+
+  let out=`<svg xmlns="http://www.w3.org/2000/svg" width="${W}" height="${H}" viewBox="0 0 ${W} ${H}" role="img" aria-label="Three-strand braid">`;
+  out+='<defs><filter id="shadow" x="-30%" y="-30%" width="160%" height="160%"><feDropShadow dx="0" dy="2" stdDeviation="2" flood-color="#302c25" flood-opacity=".12"/></filter></defs>';
+
+  let seeds=S.words.filter(w=>w.seed);
+  if(S.phase==='seed'){
+    [0,1,2].forEach(lane=>{
+      out+=`<line x1="40" y1="${Y[lane]}" x2="${W-40}" y2="${Y[lane]}" stroke="${STRAND_COLORS[lane]}" stroke-width="2.5" opacity=".25" stroke-dasharray="4 8"/>`;
+    });
+    out+=`<circle cx="${X0}" cy="${Y[0]}" r="6" fill="${STRAND_COLORS[0]}"/>`;
+    seeds.forEach(w=>{
+      out+=drawBead(X0,Y[w.strand],w.text,STRAND_COLORS[w.strand],false);
+    });
+    out+='</svg>';
+    return out;
+  }
+
+  let beads=[];
+  out+=`<circle cx="${X0}" cy="${Y[0]}" r="6" fill="${STRAND_COLORS[0]}"/>`;
+  seeds.forEach(w=>{
+    beads.push({x:X0,y:Y[w.strand],text:w.text,strand:w.strand});
+  });
+
+  let crossings=S.words.filter(w=>!w.seed);
+  crossings.forEach((c,idx)=>{
+    let xPrev=X0+idx*DX, x=X0+(idx+1)*DX;
+    let lb=c.slotsBefore;
+    let overSlot=c.crossedFrom;
+    let looseSlot=overSlot===0?2:0;
+    out+=drawCurve(xPrev,Y[looseSlot],x,Y[looseSlot],STRAND_COLORS[lb[looseSlot]],false,false);
+    out+=drawCurve(xPrev,Y[1],x,Y[overSlot],STRAND_COLORS[lb[1]],false,false);
+    out+=drawCurve(xPrev,Y[overSlot],x,Y[1],STRAND_COLORS[lb[overSlot]],true,false);
+    beads.push({x,y:Y[1],text:c.text,strand:c.strand});
+  });
+
+  if(showNext){
+    let t=currentTargets();
+    let xPrev=X0+steps*DX, xNext=X0+(steps+1)*DX;
+    let lb=S.slots;
+    out+=drawCurve(xPrev,Y[t.looseSlot],xNext,Y[t.looseSlot],STRAND_COLORS[lb[t.looseSlot]],false,true);
+    out+=drawCurve(xPrev,Y[1],xNext,Y[t.outerSlot],STRAND_COLORS[lb[1]],false,true);
+    out+=drawCurve(xPrev,Y[t.outerSlot],xNext,Y[1],STRAND_COLORS[lb[t.outerSlot]],true,true);
+    if(S.pending){
+      beads.push({x:xNext,y:Y[1],text:S.pending.text,strand:S.pending.strand,pending:true});
+    }
+  }
+
+  beads.forEach(b=>{
+    out+=drawBead(b.x,b.y,b.text,STRAND_COLORS[b.strand],b.pending);
+  });
+
+  out+='</svg>';
+  return out;
+}
+
+function drawBoard(){
+  $('board').innerHTML=svgBoard();
+  let wrap=$('board').parentElement;
+  if(wrap)wrap.scrollLeft=wrap.scrollWidth;
+}
+
+function renderPlayers(){
+  let ul=$('players');ul.innerHTML='';
+  S.order.forEach(id=>{
+    let isOut=(S.eliminated||[]).includes(id);
+    let isCurrent=(S.phase==='seed'||S.phase==='play'||S.phase==='judge')&&id===S.turnId&&!isOut;
+    let li=document.createElement('li');
+    if(isCurrent)li.className='current';
+    else if(isOut)li.className='out';
+    let dot=document.createElement('i');dot.className='dot';dot.style.background=playerColor(id);
+    let suffix=isOut?' · out':(S.phase==='gameover'&&id===S.winnerId?' · winner':(isCurrent?' · active':''));
+    li.append(dot,document.createTextNode(playerName(id)+suffix));
+    ul.append(li);
+  });
+}
+
+function fmtClock(ms){
+  let s=Math.max(0,Math.ceil(ms/1000));
+  let m=Math.floor(s/60), r=s%60;
+  return m+':'+(r<10?'0':'')+r;
+}
+
+function updateTimerDisplay(){
+  let el=$('timer');
+  if(!S||S.phase==='gameover'){el.classList.add('hidden');return}
+  el.classList.remove('hidden');
+  if(S.phase==='judge'){
+    el.textContent='Paused · '+fmtClock(S.timeLeftMs||0);
+    el.className='timer paused';
+    return;
+  }
+  let rem=Math.max(0,(S.turnDeadline||0)-Date.now());
+  el.textContent=fmtClock(rem);
+  el.className='timer'+(rem<=10000?' urgent':'');
+  if(rem<=0&&isHost()){
+    apply({a:'timeout'},S.turnId);
+  }
+}
+
+function render(){
+  $('lobby').classList.toggle('hidden',!!S);
+  $('game').classList.toggle('hidden',!S);
+  $('start').classList.toggle('hidden',mode==='wait'||(mode==='hub'&&!isHost()));
+  $('waiting').classList.toggle('hidden',!(mode==='hub'&&!S&&!isHost()));
+  if(!S){$('status').textContent=mode==='wait'?'Connecting to the shared table…':'';reportHeight();return}
+  syncPickTurn();
+  updateTimerDisplay();
+
+  let myTurn=isMyTurn(), voter=canVote();
+  let t=currentTargets();
+
+  if(S.phase==='gameover'){
+    $('turn').textContent=`${playerName(S.winnerId)} is the last one standing!`;
+    $('prompt').textContent='Game over. Start a new braid to play again.';
+  }else if(S.phase==='seed'){
+    let strandName=SLOT_NAMES[S.seedCount+1];
+    $('turn').textContent=myTurn?`${playerName(S.turnId)}: lay a seed word.`:`Waiting for ${playerName(S.turnId)} to lay a seed word.`;
+    $('prompt').textContent=`Add one word to start the ${strandName} strand (seed ${S.seedCount+1} of 2).`;
+  }else if(S.phase==='play'){
+    $('turn').textContent=myTurn?`${playerName(S.turnId)}’s turn.`:`Waiting for ${playerName(S.turnId)}.`;
+    $('prompt').textContent=`Nhập một từ có liên quan đến “${t.A?t.A.text:''}” và rõ ràng KHÔNG liên quan đến “${t.B?t.B.text:''}”.`;
+  }else if(S.phase==='judge'){
+    $('turn').textContent=voter?`Other players: vote on ${playerName(S.turnId)}’s word.`:`Waiting for the other players to vote on “${S.pending?S.pending.text:''}”…`;
+    $('prompt').textContent=`Timer paused for ${playerName(S.turnId)}.`;
+  }
+
+  $('seedEntry').classList.toggle('hidden',!(S.phase==='seed'&&myTurn));
+  $('playEntry').classList.toggle('hidden',!(S.phase==='play'&&myTurn));
+  $('judging').classList.toggle('hidden',S.phase!=='judge');
+
+  if(S.phase==='judge'&&S.pending){
+    let aWord=byId(S.pending.aId), bWord=byId(S.pending.bId);
+    let aText=aWord?aWord.text:'', bText=bWord?bWord.text:'';
+    $('judgeHeading').textContent=voter?`Other players: vote on “${S.pending.text}”`:`Players are voting on “${S.pending.text}”`;
+    $('judgePrompt').textContent=voter?'Tap Yes or No for both links to immediately resolve:':'Hold tight while the rest of the table votes.';
+    $('judgeControls').classList.toggle('hidden',!voter);
+    $('judgeQSyn').textContent=`Is “${S.pending.text}” associated with “${aText}”?`;
+    $('judgeQAnt').textContent=`Is “${S.pending.text}” clearly NOT associated with “${bText}”?`;
+    document.querySelectorAll('[data-kind]').forEach(btn=>{
+      let v=verdict[btn.dataset.kind];
+      btn.classList.toggle('chosen',v===btn.dataset.value);
+      btn.classList.toggle('yes',v==='yes'&&btn.dataset.value==='yes');
+      btn.classList.toggle('no',v==='no'&&btn.dataset.value==='no');
+    });
+  }
+
+  $('saveBraid').classList.toggle('hidden',!(S && S.phase==='gameover'));
+  $('new').classList.toggle('hidden',!isHost());
+  $('lobbyBtn').classList.toggle('hidden',!isHost());
+  drawBoard();renderPlayers();reportHeight();
+
+  let newFocusKey=S.phase+':'+S.turnId+':'+(S.words.length);
+  if(myTurn&&newFocusKey!==focusKey){
+    focusKey=newFocusKey;
+    setTimeout(()=>{
+      if(S&&S.phase==='seed'&&isMyTurn())$('seedWord').focus();
+      else if(S&&S.phase==='play'&&isMyTurn())$('newWord').focus();
+    },30);
+  }else if(S.phase==='judge'){
+    focusKey=null;
+  }
+}
+
+$('start').addEventListener('click',()=>{
+  if(mode==='local')localStart();
+  else if(isHost()){let order=Hub.roster.map(p=>p.id),names={};Hub.roster.forEach(p=>names[p.id]=p.name);if(order.length<2){say('At least two players are needed.');return}start(order,names)}
+});
+$('addSeed').addEventListener('click',()=>{let text=$('seedWord').value.trim();if(!validWord(text)){say('Enter exactly one word.');return}$('seedWord').value='';act({a:'seed',text})});
+$('seedWord').addEventListener('keydown',e=>{if(e.key==='Enter')$('addSeed').click()});
+$('addWord').addEventListener('click',()=>{
+  let text=$('newWord').value.trim();if(!validWord(text)){say('Enter exactly one word.');return}
+  $('newWord').value='';act({a:'add',text});
+});
+$('newWord').addEventListener('keydown',e=>{if(e.key==='Enter')$('addWord').click()});
+document.querySelectorAll('[data-kind]').forEach(btn=>btn.addEventListener('click',()=>{
+  if(!canVote())return;
+  verdict[btn.dataset.kind]=btn.dataset.value;
+  render();
+  if(verdict.syn&&verdict.ant){
+    let syn=verdict.syn, ant=verdict.ant;
+    verdict={syn:null,ant:null};
+    act({a:'judge',syn,ant});
+  }
+}));
+function saveBraid(){
+  if(!S||!S.words||!S.words.length){say('No braid to save yet.');return}
+  var date = new Date();
+  var stamp = date.getFullYear() + '-' + String(date.getMonth()+1).padStart(2,'0') + '-' + String(date.getDate()).padStart(2,'0');
+  var svg = svgBoard();
+  var winner = S.winnerId ? playerName(S.winnerId) : '';
+  var crossings = S.words.filter(function(w){return !w.seed}).length;
+  var parts = [];
+  parts.push('<!DOCTYPE html><html lang="en"><head><meta charset="utf-8">');
+  parts.push('<meta name="viewport" content="width=device-width, initial-scale=1">');
+  parts.push('<meta name="color-scheme" content="light">');
+  parts.push('<title>Braid — final braid</title>');
+  parts.push('<style>');
+  parts.push('body{margin:0;padding:24px;background:#f4efe5;color:#302c25;font:15px/1.5 "Segoe UI",system-ui,-apple-system,Arial,sans-serif}');
+  parts.push('.wrap{max-width:980px;margin:0 auto}');
+  parts.push('.card{background:#fffdf8;border:1px solid #d9cfbd;border-radius:15px;padding:18px 20px;box-shadow:0 2px 4px #332e2610,0 10px 26px #332e260d;margin:0 0 14px}');
+  parts.push('h1{font:600 42px/1 Georgia,"Times New Roman",serif;margin:0 0 4px;color:#3d3328}');
+  parts.push('h2{font:600 21px Georgia,"Times New Roman",serif;margin:0 0 8px;color:#60452f}');
+  parts.push('.muted{color:#746b5f;font-size:14px}');
+  parts.push('.meta{display:flex;gap:8px;flex-wrap:wrap;margin:10px 0 0}');
+  parts.push('.pill{display:inline-block;padding:4px 10px;border-radius:999px;background:#eee6d8;border:1px solid #d9cfbd;font-size:13px}');
+  parts.push('.winner{background:#f3ead7;border-color:#c9b07c;color:#6d4d12;font-weight:700}');
+  parts.push('.board{overflow:auto;border:1px solid #d9cfbd;border-radius:13px;background:linear-gradient(180deg,#fffefa,#f8f2e8);padding:8px}');
+  parts.push('.board svg{display:block;max-width:none}');
+  parts.push('table{width:100%;border-collapse:collapse;font-size:14px}');
+  parts.push('th,td{text-align:left;padding:8px 10px;border-bottom:1px solid #e6ddcd;vertical-align:top}');
+  parts.push('th{color:#746b5f;font-size:12px;text-transform:uppercase;letter-spacing:.04em}');
+  parts.push('tr:last-child td{border-bottom:0}');
+  parts.push('.seed{color:#3f7778;font-weight:700}');
+  parts.push('.out{text-decoration:line-through;color:#746b5f}');
+  parts.push('@media print{body{padding:0;background:#fff}.card{box-shadow:none}}');
+  parts.push('</style></head><body><div class="wrap">');
+  parts.push('<section class="card"><h1>Braid</h1><p class="muted">Final braid · saved ' + esc(date.toLocaleString()) + '</p><div class="meta">');
+  if(winner) parts.push('<span class="pill winner">Winner: ' + esc(winner) + '</span>');
+  parts.push('<span class="pill">' + crossings + ' crossing' + (crossings===1?'':'s') + '</span>');
+  parts.push('<span class="pill">' + S.words.length + ' word' + (S.words.length===1?'':'s') + '</span>');
+  parts.push('</div></section>');
+  parts.push('<section class="card"><h2>The braid</h2><div class="board">' + svg + '</div></section>');
+  parts.push('<section class="card"><h2>Players</h2><div class="meta">');
+  (S.order||[]).forEach(function(id){
+    var isOut=(S.eliminated||[]).indexOf(id)>=0;
+    var isWin=id===S.winnerId;
+    var cls='pill'+(isWin?' winner':'')+(isOut&&!isWin?' out':'');
+    var suffix=isWin?' · winner':(isOut?' · out':'');
+    parts.push('<span class="' + cls + '">' + esc(playerName(id) + suffix) + '</span>');
+  });
+  parts.push('</div></section>');
+  parts.push('<section class="card"><h2>Words</h2><table><thead><tr><th>#</th><th>Word</th><th>Kind</th><th>Player</th><th>Bridge</th></tr></thead><tbody>');
+  S.words.forEach(function(w,i){
+    var who=esc(playerName(w.by));
+    var kind=w.seed?'<span class="seed">Seed ('+esc(SLOT_NAMES[w.strand]||'')+' strand)</span>':'Crossing '+esc(String(w.step||'' ));
+    var bridge='';
+    if(!w.seed){
+      var aWord=byId(w.aId), bWord=byId(w.bId);
+      bridge='associated with “'+esc(aWord?aWord.text:'?')+'”, not associated with “'+esc(bWord?bWord.text:'?')+'”';
+    }
+    parts.push('<tr><td>'+(i+1)+'</td><td><strong>'+esc(w.text)+'</strong></td><td>'+kind+'</td><td>'+who+'</td><td class="muted">'+bridge+'</td></tr>');
+  });
+  parts.push('</tbody></table></section>');
+  parts.push('</div></body></html>');
+  var blob = new Blob(parts, {type:'text/html'});
+  var url = URL.createObjectURL(blob);
+  var a = document.createElement('a');
+  a.href = url;
+  a.download = 'braid-final-' + stamp + '.html';
+  document.body.appendChild(a);
+  a.click();
+  setTimeout(function(){ URL.revokeObjectURL(url); if(a.parentNode) a.parentNode.removeChild(a); }, 2000);
+}
+
+$('saveBraid').addEventListener('click', saveBraid);
+$('new').addEventListener('click',()=>{if(mode==='local')localStart();else if(isHost())act({a:'new'})});
+$('lobbyBtn').addEventListener('click',()=>{if(isHost())act({a:'toLobby'})});
+setInterval(updateTimerDisplay,200);
+
+window.addEventListener('message',e=>{
+  let m=e.data;if(!m||m.t!=='gd'||m.game!=='braid')return;
+  if(m.k==='roster'){
+    Hub.me=m.p.you;Hub.roster=m.p.roster||[];mode='hub';
+    if(isHost()&&S)Hub.up('state',S);else if(!S)render();
+  }else if(m.k==='state'){
+    if(mode==='hub'&&isHost()&&S)return;
+    S=m.p;mode='hub';render();
+  }else if(m.k==='intent'&&isHost()){
+    let err=apply(m.p,m.from&&m.from.id);if(err)Hub.up('denied',{to:m.from&&m.from.id,text:err});
+  }else if(m.k==='denied'&&m.p&&m.p.text){say(m.p.text)}
+});
+mode='wait';render();Hub.up('hello');
+window.addEventListener('resize',reportHeight);
+document.addEventListener('visibilitychange',()=>{if(!document.hidden&&mode==='hub')Hub.up('hello')});
+setTimeout(()=>{if(!Hub.me){mode='local';render()}},1300);
+})();
+</script>
+</body>
+</html>
