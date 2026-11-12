@@ -86,9 +86,9 @@ pieces:
 Wire-up is: a card on the landing page (`public/vietgames/index.html`), audio
 served from `public/vietgames/assets/<id>/` (the module points at
 `../assets/<id>/`), and a rules suite in the offline table of `test.sh` plus
-the built-site checks in `tests/vietgames_play.py`. Chém Từ (`chem-tu/`) and
-Từ Trái Nghĩa (`tutrainghia/`) are the two resident games and the patterns to
-copy.
+the built-site checks in `tests/vietgames_play.py`. Chém Từ (`chem-tu/`), Từ
+Trái Nghĩa (`tutrainghia/`), Câu Phá (`caupha/`) and Bím (`bím/bim.html`) are
+the resident games and the patterns to copy.
 
 ---
 

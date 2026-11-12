@@ -1,5 +1,5 @@
 <!doctype html>
-<html lang="en">
+<html lang="vi">
 <head>
 <meta charset="utf-8">
 <meta name="viewport" content="width=device-width, initial-scale=1">
@@ -65,16 +65,17 @@ details p{max-width:78ch;font-size:14px}
 </style>
 </head>
 <body>
+<div style="max-width:1040px;margin:0 auto;padding:8px 18px 0"><a href="../" style="color:var(--muted);text-decoration:none;font-weight:700;font-size:14px">← VietGames</a></div>
 <div id="app">
-  <header class="hero"><h1>Bím</h1><p class="tag">Tét từ.</p></header>
+  <header class="hero"><h1>Bím</h1><p class="tag">Tết từ.</p></header>
   <p id="status" class="status" role="status" aria-live="polite"></p>
 
   <section id="lobby" class="card">
     <h2>Giữ chặt các sợi</h2>
-    <p class="muted">Ba sợi đan xen nhau ở giữa. Hai từ khóa khởi đầu cho bím. Đánh bại đồng hồ 60 giây. Không được thì bị loại.</p>
-    <div class="setup"><label>Người Chơi
-      <select id="playerCount"><option value="2" selected>2 người chơi</option><option value="3">3 người chơi</option><option value="4">4 người chơi</option><option value="5">5 người chơi</option><option value="6">6 người chơi</option></select>
-    </label><button id="start" class="primary">Bắt đầu</button><span id="waiting" class="muted hidden"></span></div>
+    <p class="muted">Ba sợi đan xen nhau ở giữa. Hai từ gốc mở đầu cho bím. Đánh bại đồng hồ 60 giây, không kịp thì bị loại. Chơi một mình, hoặc chuyền điện thoại cho bạn bè.</p>
+    <div class="setup"><label>Số người chơi
+      <select id="playerCount"><option value="1">1 người (chơi một mình)</option><option value="2" selected>2 người chơi</option><option value="3">3 người chơi</option><option value="4">4 người chơi</option><option value="5">5 người chơi</option><option value="6">6 người chơi</option></select>
+    </label><button id="start" class="primary">Bắt đầu</button></div>
   </section>
 
   <main id="game" class="hidden">
@@ -84,37 +85,38 @@ details p{max-width:78ch;font-size:14px}
         <div id="timer" class="timer hidden" aria-live="off">1:00</div>
       </div>
       <div id="prompt" class="prompt"></div>
-      <div id="seedEntry" class="entry hidden"><input id="seedWord" type="text" maxlength="32" autocomplete="off" placeholder="Your one seed word"><button id="addSeed" class="primary">Add seed word</button></div>
+      <div id="seedEntry" class="entry hidden"><input id="seedWord" type="text" maxlength="40" lang="vi" autocomplete="off" autocapitalize="none" spellcheck="false" placeholder="Từ gốc của bạn (1–3 âm tiết)" aria-label="Từ gốc"><button id="addSeed" class="primary">Thêm từ gốc</button></div>
       <div id="playEntry" class="hidden">
-        <div class="entry"><input id="newWord" type="text" maxlength="32" autocomplete="off" placeholder="One word only" aria-label="Your one-word bridge"><button id="addWord" class="primary">Add one word</button></div>
+        <div class="entry"><input id="newWord" type="text" maxlength="40" lang="vi" autocomplete="off" autocapitalize="none" spellcheck="false" placeholder="Một từ (1–3 âm tiết)" aria-label="Từ nối của bạn"><button id="addWord" class="primary">Thêm từ</button></div>
       </div>
       <div id="judging" class="hidden">
-        <h2 id="judgeHeading">Other players: vote</h2>
+        <h2 id="judgeHeading"></h2>
         <p id="judgePrompt" class="muted"></p>
         <div id="judgeControls" class="judgegrid">
-          <div class="judgeitem"><strong id="judgeQSyn">Is it associated?</strong><div class="toggle"><button data-kind="syn" data-value="yes">Yes</button><button data-kind="syn" data-value="no">No</button></div></div>
-          <div class="judgeitem"><strong id="judgeQAnt">Is it clearly NOT associated?</strong><div class="toggle"><button data-kind="ant" data-value="yes">Yes</button><button data-kind="ant" data-value="no">No</button></div></div>
+          <div class="judgeitem"><strong id="judgeQSyn"></strong><div class="toggle"><button data-kind="syn" data-value="yes">Có</button><button data-kind="syn" data-value="no">Không</button></div></div>
+          <div class="judgeitem"><strong id="judgeQAnt"></strong><div class="toggle"><button data-kind="ant" data-value="yes">Có</button><button data-kind="ant" data-value="no">Không</button></div></div>
         </div>
       </div>
     </section>
 
     <section class="card">
-      <h2>The braid</h2>
+      <h2>Chiếc bím</h2>
       <div class="boardwrap"><div id="board"></div></div>
     </section>
 
     <section class="card">
-      <h2>Players</h2><ul id="players" class="playerlist"></ul>
-      <div class="actions"><button id="saveBraid" class="hidden">Save final braid</button><button id="new" class="hidden">New braid</button><button id="lobbyBtn" class="hidden">Back to lobby</button></div>
+      <h2>Người chơi</h2><ul id="players" class="playerlist"></ul>
+      <div class="actions"><button id="saveBraid" class="hidden">Lưu bím cuối cùng</button><button id="new">Bím mới</button><button id="lobbyBtn">Về màn hình chính</button></div>
     </section>
   </main>
 
-  <details class="card"><summary>How to play</summary>
+  <details class="card"><summary>Cách chơi</summary>
     <div class="rulesgrid">
-      <p><b>1. Seed two strands.</b> The first two turns place one starting word on the Middle and Right strands.</p>
-      <p><b>2. Cross and pivot.</b> The active outer strand crosses over the middle: enter one word <b>associated</b> with the middle word and <b>clearly NOT associated</b> with the loose outer word.</p>
-      <p><b>3. Other players vote.</b> Your clock pauses while the other players tap Yes or No on both links. If rejected, your clock resumes and you must try again.</p>
-      <p><b>4. Beat the 60s clock.</b> If your timer hits zero, you are knocked out and the next player takes the turn. Last player standing wins.</p>
+      <p><b>1. Đặt hai sợi gốc.</b> Hai lượt đầu, mỗi lượt đặt một từ gốc lên sợi Giữa và sợi Phải.</p>
+      <p><b>2. Bắt chéo và xoay.</b> Sợi ngoài đến lượt sẽ bắt chéo qua sợi giữa: nhập một từ <b>có liên quan</b> đến từ ở giữa và <b>rõ ràng KHÔNG liên quan</b> đến từ ở sợi ngoài còn lại. Mỗi từ gồm 1–3 âm tiết (ví dụ: “nước”, “con mèo”, “máy bay giấy”).</p>
+      <p><b>3. Mọi người bỏ phiếu.</b> Đồng hồ của bạn tạm dừng trong lúc những người chơi khác bấm Có hoặc Không cho cả hai mối liên hệ (hãy đưa điện thoại cho họ). Nếu bị từ chối, đồng hồ chạy tiếp và bạn phải thử từ khác.</p>
+      <p><b>4. Đánh bại đồng hồ 60 giây.</b> Hết giờ là bị loại và lượt chuyển cho người kế tiếp. Người cuối cùng còn lại sẽ thắng.</p>
+      <p><b>5. Chơi một mình.</b> Bạn tự bỏ phiếu cho từ của mình (hãy thành thật!) và cố bện được càng nhiều lần càng tốt trước khi hết giờ.</p>
     </div>
   </details>
 </div>
@@ -124,18 +126,15 @@ details p{max-width:78ch;font-size:14px}
 'use strict';
 const $=id=>document.getElementById(id);
 const STRAND_COLORS=['#a45f3b','#3f7778','#8a5a72'];
-const SLOT_NAMES=['Left','Middle','Right'];
+const SLOT_NAMES=['Trái','Giữa','Phải'];
 const PLAYER_COLORS=['#a45f3b','#3f7778','#8a5a72','#71834e','#746b9b','#b08336'];
 const TURN_MS=60000;
-let S=null, mode='wait', Hub={me:null,roster:[],up(k,p){try{window.parent.postMessage({t:'gu',game:'braid',k,p},'*')}catch(e){}}};
-let verdict={syn:null,ant:null}, pickTurn=null, focusKey=null, heightTimer=null;
+const MAX_SYLLABLES=3;
+let S=null, verdict={syn:null,ant:null}, pickTurn=null, focusKey=null;
 
 function esc(s){return String(s).replace(/[&<>"']/g,c=>({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;'}[c]));}
-function playerName(id){return S&&S.names[id]||'Player'}
-function myId(){return mode==='local'?'local':Hub.me&&Hub.me.id}
-function isHost(){return mode==='local'||!!(Hub.me&&Hub.me.isHost)}
-function isMyTurn(){return !!S&&(mode==='local'||S.turnId===myId())}
-function canVote(){return !!S&&S.phase==='judge'&&(mode==='local'||(myId()&&myId()!==S.turnId))}
+function playerName(id){return S&&S.names[id]||'Người chơi'}
+function isSolo(){return !!S&&S.order.length===1}
 function alivePlayers(){return S?S.order.filter(id=>!(S.eliminated||[]).includes(id)):[]}
 function nextAfter(id){
   if(!S)return null;
@@ -147,14 +146,23 @@ function nextAfter(id){
   return id;
 }
 function playerColor(id){let i=S?S.order.indexOf(id):0;return PLAYER_COLORS[(i<0?0:i)%PLAYER_COLORS.length]}
-function say(t){$('status').textContent=t;clearTimeout(say.timer);say.timer=setTimeout(()=>{$('status').textContent=''},3200)}
+function say(t){$('status').textContent=t;clearTimeout(say.timer);say.timer=setTimeout(()=>{$('status').textContent=''},3600)}
 function syncPickTurn(){
   let key=S?(S.phase+':'+S.turnId+':'+(S.pending?S.pending.text:'')):'';
   if(key!==pickTurn){verdict={syn:null,ant:null};pickTurn=key;}
 }
-function reportHeight(){clearTimeout(heightTimer);heightTimer=setTimeout(()=>{let app=$('app');if(app)Hub.up('height',Math.ceil(app.getBoundingClientRect().height))},60)}
-function postState(){render();if(mode==='hub'&&isHost())Hub.up('state',S)}
-function validWord(t){return !!t&&!/\s/.test(t)&&t.length<=32}
+
+/* A word is 1–3 Vietnamese syllables separated by spaces, letters only. */
+function normWord(t){return String(t||'').normalize('NFC').trim().replace(/\s+/g,' ')}
+function validWord(t){
+  t=normWord(t);
+  if(!t||t.length>40)return false;
+  let parts=t.split(' ');
+  return parts.length<=MAX_SYLLABLES&&parts.every(p=>new RegExp('^[\\p{L}\\p{M}]+$', 'u').test(p));
+}
+const BAD_WORD='Hãy nhập một từ tiếng Việt gồm 1–3 âm tiết (chỉ dùng chữ cái).';
+function sameWord(a,b){return a.toLocaleLowerCase('vi')===b.toLocaleLowerCase('vi')}
+
 function byId(id){return S&&S.words.find(w=>w.id===id)||null}
 function latestOnStrand(strandId){
   if(!S)return null;
@@ -188,12 +196,13 @@ function start(order,names){
     timeLeftMs:TURN_MS,
     turnDeadline:Date.now()+TURN_MS
   };
-  verdict={syn:null,ant:null};pickTurn=null;focusKey=null;postState();
+  verdict={syn:null,ant:null};pickTurn=null;focusKey=null;render();
 }
 
-function localStart(){
-  let n=+$('playerCount').value,order=[],names={};
-  for(let i=0;i<n;i++){let id='local-'+i;order.push(id);names[id]='Player '+(i+1)}
+function localStart(n){
+  n=n||+$('playerCount').value||2;
+  let order=[],names={};
+  for(let i=0;i<n;i++){let id='p'+i;order.push(id);names[id]=n===1?'Bạn':'Người chơi '+(i+1)}
   start(order,names);
 }
 
@@ -213,53 +222,34 @@ function resetClock(){
   S.turnDeadline=Date.now()+TURN_MS;
 }
 
-function apply(a,from){
+function apply(a){
   if(!S||!a)return;
+  let from=S.turnId;
   if(a.a==='seed'){
-    if(S.phase!=='seed'||from!==S.turnId)return 'It is not your seed turn.';
-    let text=String(a.text||'').trim();
-    if(!validWord(text))return 'Please enter exactly one word.';
-    if(S.words.some(w=>w.text.toLowerCase()===text.toLowerCase()))return 'That word is already on the braid.';
+    if(S.phase!=='seed')return 'Chưa đến lượt đặt từ gốc.';
+    let text=normWord(a.text);
+    if(!validWord(text))return BAD_WORD;
+    if(S.words.some(w=>sameWord(w.text,text)))return 'Từ này đã có trên bím rồi.';
     let strand=S.seedCount+1; // Seed 1 -> Middle (1), Seed 2 -> Right (2)
-    S.words.push({
-      id:S.nextId++,
-      text,
-      by:from,
-      seed:true,
-      strand,
-      step:0,
-      slots:[0,1,2]
-    });
+    S.words.push({id:S.nextId++,text,by:from,seed:true,strand,step:0,slots:[0,1,2]});
     S.seedCount++;
-    if(S.seedCount>=2){
-      S.phase='play';
-      S.nextSide='L';
-    }
+    if(S.seedCount>=2){S.phase='play';S.nextSide='L'}
     S.turnId=nextAfter(from);
     resetClock();
   }else if(a.a==='add'){
-    if(S.phase!=='play'||from!==S.turnId)return 'It is not your turn.';
-    let text=String(a.text||'').trim();
-    if(!validWord(text))return 'Please enter exactly one word.';
-    if(S.words.some(w=>w.text.toLowerCase()===text.toLowerCase()))return 'That word is already on the braid.';
+    if(S.phase!=='play')return 'Chưa đến lượt bạn.';
+    let text=normWord(a.text);
+    if(!validWord(text))return BAD_WORD;
+    if(S.words.some(w=>sameWord(w.text,text)))return 'Từ này đã có trên bím rồi.';
     let t=currentTargets();
-    if(!t.A||!t.B)return 'Seed words are still needed.';
+    if(!t.A||!t.B)return 'Vẫn còn thiếu từ gốc.';
     S.timeLeftMs=Math.max(500,S.turnDeadline-Date.now());
-    S.pending={
-      text,
-      by:from,
-      strand:t.movingStrand,
-      side:S.nextSide,
-      aId:t.A.id,
-      bId:t.B.id,
-      slotsBefore:S.slots.slice()
-    };
+    S.pending={text,by:from,strand:t.movingStrand,side:S.nextSide,aId:t.A.id,bId:t.B.id,slotsBefore:S.slots.slice()};
     S.phase='judge';
   }else if(a.a==='judge'){
     if(S.phase!=='judge')return null;
-    if(mode==='hub'&&from===S.turnId)return 'The other players vote on your word.';
-    if(!['yes','no'].includes(a.syn)||!['yes','no'].includes(a.ant))return 'Vote Yes or No on both links.';
-    let p=S.pending;if(!p)return 'Missing pending word.';
+    if(!['yes','no'].includes(a.syn)||!['yes','no'].includes(a.ant))return 'Hãy chọn Có hoặc Không cho cả hai mối liên hệ.';
+    let p=S.pending;if(!p)return 'Không có từ nào đang chờ.';
     let synOk=a.syn==='yes', antOk=a.ant==='yes';
 
     if(synOk&&antOk){
@@ -271,18 +261,9 @@ function apply(a,from){
       S.slots=newSlots;
       S.stepCount++;
       S.words.push({
-        id:S.nextId++,
-        text:p.text,
-        by:p.by,
-        seed:false,
-        strand:p.strand,
-        step:S.stepCount,
-        side:p.side,
-        crossedFrom:outerSlot,
-        slotsBefore:p.slotsBefore.slice(),
-        slots:newSlots.slice(),
-        aId:p.aId,
-        bId:p.bId
+        id:S.nextId++,text:p.text,by:p.by,seed:false,strand:p.strand,step:S.stepCount,
+        side:p.side,crossedFrom:outerSlot,slotsBefore:p.slotsBefore.slice(),slots:newSlots.slice(),
+        aId:p.aId,bId:p.bId
       });
       S.nextSide=S.nextSide==='L'?'R':'L';
       let doneBy=S.turnId;
@@ -294,41 +275,32 @@ function apply(a,from){
       S.pending=null;
       S.phase='play';
       S.turnDeadline=Date.now()+Math.max(500,S.timeLeftMs||TURN_MS);
-      say('Rejected — clock resumed! Try another word.');
+      say('Bị từ chối — đồng hồ chạy tiếp! Hãy thử từ khác.');
     }
   }else if(a.a==='timeout'){
-    if((S.phase!=='seed'&&S.phase!=='play')||!isHost())return null;
+    if(S.phase!=='seed'&&S.phase!=='play')return null;
     let outId=S.turnId;
     if(!S.eliminated.includes(outId))S.eliminated.push(outId);
-    let alive=alivePlayers();
-    if(alive.length<=1){
-      S.phase='gameover';
-      S.winnerId=alive[0]||outId;
-      say(`${playerName(outId)} ran out of time! ${playerName(S.winnerId)} wins!`);
+    if(isSolo()){
+      S.phase='gameover';S.winnerId=null;
+      say(`Hết giờ! Bạn đã bện được ${S.stepCount} lần.`);
     }else{
-      S.turnId=nextAfter(outId);
-      resetClock();
-      say(`${playerName(outId)} ran out of time and is knocked out!`);
+      let alive=alivePlayers();
+      if(alive.length<=1){
+        S.phase='gameover';
+        S.winnerId=alive[0]||outId;
+        say(`${playerName(outId)} hết giờ! ${playerName(S.winnerId)} thắng!`);
+      }else{
+        S.turnId=nextAfter(outId);
+        resetClock();
+        say(`${playerName(outId)} hết giờ và bị loại!`);
+      }
     }
-  }else if(a.a==='new'){
-    if(!isHost())return 'Only the host can start a new braid.';
-    if(mode==='local')localStart();
-    else{let order=Hub.roster.map(p=>p.id),names={};Hub.roster.forEach(p=>names[p.id]=p.name);start(order,names)}
-    return null;
-  }else if(a.a==='toLobby'){
-    if(!isHost())return 'Only the host can return to the lobby.';
-    S=null;postState();return null;
-  }else return 'Unknown move.';
-  postState();return null;
+  }else return 'Nước đi không hợp lệ.';
+  render();return null;
 }
 
-function act(a){
-  let from;
-  if(mode==='local')from=S?(a.a==='judge'?'voters':S.turnId):'local';
-  else from=myId();
-  if(mode==='local'||isHost()){let e=apply(a,from);if(e)say(e)}
-  else Hub.up('intent',a);
-}
+function act(a){let e=apply(a);if(e)say(e)}
 
 function drawCurve(x0,y0,x1,y1,color,isOver,isDashed){
   let dx=x1-x0, d=`M ${x0} ${y0} C ${x0+dx*.44} ${y0}, ${x1-dx*.44} ${y1}, ${x1} ${y1}`;
@@ -341,24 +313,25 @@ function drawCurve(x0,y0,x1,y1,color,isOver,isDashed){
 }
 
 function drawBead(x,y,text,stroke,pending){
-  let tw=Math.max(62,Math.min(128,text.length*8+26));
+  let fs=text.length>17?10:text.length>13?11:text.length>9?13:16;
+  let tw=Math.max(62,Math.min(156,Math.round(text.length*fs*.6)+28));
   let dash=pending?' stroke-dasharray="4 4"':'';
   let out=`<g filter="url(#shadow)">`;
   out+=`<rect x="${x-tw/2}" y="${y-17}" width="${tw}" height="34" rx="13" fill="${pending?'#fff8e9':'#fffdf8'}" stroke="${stroke}" stroke-width="2.4"${dash}/>`;
-  out+=`<text x="${x}" y="${y+5}" text-anchor="middle" font-family="Georgia,serif" font-size="${text.length>13?11:text.length>9?13:16}" font-weight="700" fill="#302c25">${esc(text)}</text>`;
+  out+=`<text x="${x}" y="${y+5}" text-anchor="middle" font-family="Georgia,'Times New Roman',serif" font-size="${fs}" font-weight="700" fill="#302c25">${esc(text)}</text>`;
   out+='</g>';
   return out;
 }
 
 function svgBoard(){
   if(!S)return '';
-  const Y=[64,144,224], X0=100, DX=162;
+  const Y=[64,144,224], X0=100, DX=176;
   const steps=S.stepCount;
   const showNext=S.phase==='play'||S.phase==='judge';
   const totalCols=Math.max(1,1+steps+(showNext?1:0));
   const W=Math.max(610,X0+totalCols*DX+40), H=284;
 
-  let out=`<svg xmlns="http://www.w3.org/2000/svg" width="${W}" height="${H}" viewBox="0 0 ${W} ${H}" role="img" aria-label="Three-strand braid">`;
+  let out=`<svg xmlns="http://www.w3.org/2000/svg" width="${W}" height="${H}" viewBox="0 0 ${W} ${H}" role="img" aria-label="Bím ba sợi">`;
   out+='<defs><filter id="shadow" x="-30%" y="-30%" width="160%" height="160%"><feDropShadow dx="0" dy="2" stdDeviation="2" flood-color="#302c25" flood-opacity=".12"/></filter></defs>';
 
   let seeds=S.words.filter(w=>w.seed);
@@ -367,18 +340,14 @@ function svgBoard(){
       out+=`<line x1="40" y1="${Y[lane]}" x2="${W-40}" y2="${Y[lane]}" stroke="${STRAND_COLORS[lane]}" stroke-width="2.5" opacity=".25" stroke-dasharray="4 8"/>`;
     });
     out+=`<circle cx="${X0}" cy="${Y[0]}" r="6" fill="${STRAND_COLORS[0]}"/>`;
-    seeds.forEach(w=>{
-      out+=drawBead(X0,Y[w.strand],w.text,STRAND_COLORS[w.strand],false);
-    });
+    seeds.forEach(w=>{out+=drawBead(X0,Y[w.strand],w.text,STRAND_COLORS[w.strand],false)});
     out+='</svg>';
     return out;
   }
 
   let beads=[];
   out+=`<circle cx="${X0}" cy="${Y[0]}" r="6" fill="${STRAND_COLORS[0]}"/>`;
-  seeds.forEach(w=>{
-    beads.push({x:X0,y:Y[w.strand],text:w.text,strand:w.strand});
-  });
+  seeds.forEach(w=>{beads.push({x:X0,y:Y[w.strand],text:w.text,strand:w.strand})});
 
   let crossings=S.words.filter(w=>!w.seed);
   crossings.forEach((c,idx)=>{
@@ -399,15 +368,10 @@ function svgBoard(){
     out+=drawCurve(xPrev,Y[t.looseSlot],xNext,Y[t.looseSlot],STRAND_COLORS[lb[t.looseSlot]],false,true);
     out+=drawCurve(xPrev,Y[1],xNext,Y[t.outerSlot],STRAND_COLORS[lb[1]],false,true);
     out+=drawCurve(xPrev,Y[t.outerSlot],xNext,Y[1],STRAND_COLORS[lb[t.outerSlot]],true,true);
-    if(S.pending){
-      beads.push({x:xNext,y:Y[1],text:S.pending.text,strand:S.pending.strand,pending:true});
-    }
+    if(S.pending)beads.push({x:xNext,y:Y[1],text:S.pending.text,strand:S.pending.strand,pending:true});
   }
 
-  beads.forEach(b=>{
-    out+=drawBead(b.x,b.y,b.text,STRAND_COLORS[b.strand],b.pending);
-  });
-
+  beads.forEach(b=>{out+=drawBead(b.x,b.y,b.text,STRAND_COLORS[b.strand],b.pending)});
   out+='</svg>';
   return out;
 }
@@ -427,7 +391,7 @@ function renderPlayers(){
     if(isCurrent)li.className='current';
     else if(isOut)li.className='out';
     let dot=document.createElement('i');dot.className='dot';dot.style.background=playerColor(id);
-    let suffix=isOut?' · out':(S.phase==='gameover'&&id===S.winnerId?' · winner':(isCurrent?' · active':''));
+    let suffix=isOut?' · bị loại':(S.phase==='gameover'&&id===S.winnerId?' · thắng':(isCurrent?' · đang chơi':''));
     li.append(dot,document.createTextNode(playerName(id)+suffix));
     ul.append(li);
   });
@@ -444,57 +408,54 @@ function updateTimerDisplay(){
   if(!S||S.phase==='gameover'){el.classList.add('hidden');return}
   el.classList.remove('hidden');
   if(S.phase==='judge'){
-    el.textContent='Paused · '+fmtClock(S.timeLeftMs||0);
+    el.textContent='Tạm dừng · '+fmtClock(S.timeLeftMs||0);
     el.className='timer paused';
     return;
   }
   let rem=Math.max(0,(S.turnDeadline||0)-Date.now());
   el.textContent=fmtClock(rem);
   el.className='timer'+(rem<=10000?' urgent':'');
-  if(rem<=0&&isHost()){
-    apply({a:'timeout'},S.turnId);
-  }
+  if(rem<=0)apply({a:'timeout'});
 }
 
 function render(){
   $('lobby').classList.toggle('hidden',!!S);
   $('game').classList.toggle('hidden',!S);
-  $('start').classList.toggle('hidden',mode==='wait'||(mode==='hub'&&!isHost()));
-  $('waiting').classList.toggle('hidden',!(mode==='hub'&&!S&&!isHost()));
-  if(!S){$('status').textContent=mode==='wait'?'Connecting to the shared table…':'';reportHeight();return}
+  if(!S)return;
   syncPickTurn();
   updateTimerDisplay();
+  if(!S)return;
 
-  let myTurn=isMyTurn(), voter=canVote();
+  let solo=isSolo();
+  let nm=solo?'bạn':playerName(S.turnId);
   let t=currentTargets();
 
   if(S.phase==='gameover'){
-    $('turn').textContent=`${playerName(S.winnerId)} is the last one standing!`;
-    $('prompt').textContent='Game over. Start a new braid to play again.';
+    $('turn').textContent=solo?`Hết giờ! Bạn đã bện được ${S.stepCount} lần.`:`${playerName(S.winnerId)} là người cuối cùng trụ lại!`;
+    $('prompt').textContent='Kết thúc. Bấm “Bím mới” để chơi lại.';
   }else if(S.phase==='seed'){
     let strandName=SLOT_NAMES[S.seedCount+1];
-    $('turn').textContent=myTurn?`${playerName(S.turnId)}: lay a seed word.`:`Waiting for ${playerName(S.turnId)} to lay a seed word.`;
-    $('prompt').textContent=`Add one word to start the ${strandName} strand (seed ${S.seedCount+1} of 2).`;
+    $('turn').textContent=`${playerName(S.turnId)}: hãy đặt một từ gốc.`;
+    $('prompt').textContent=`Thêm một từ để bắt đầu sợi ${strandName} (từ gốc ${S.seedCount+1}/2).`;
   }else if(S.phase==='play'){
-    $('turn').textContent=myTurn?`${playerName(S.turnId)}’s turn.`:`Waiting for ${playerName(S.turnId)}.`;
+    $('turn').textContent=`Lượt của ${nm}.`;
     $('prompt').textContent=`Nhập một từ có liên quan đến “${t.A?t.A.text:''}” và rõ ràng KHÔNG liên quan đến “${t.B?t.B.text:''}”.`;
   }else if(S.phase==='judge'){
-    $('turn').textContent=voter?`Other players: vote on ${playerName(S.turnId)}’s word.`:`Waiting for the other players to vote on “${S.pending?S.pending.text:''}”…`;
-    $('prompt').textContent=`Timer paused for ${playerName(S.turnId)}.`;
+    $('turn').textContent=solo?'Tự đánh giá từ của bạn.':`Những người chơi khác: bỏ phiếu cho từ của ${playerName(S.turnId)}.`;
+    $('prompt').textContent=`Đồng hồ của ${nm} đang tạm dừng.`;
   }
 
-  $('seedEntry').classList.toggle('hidden',!(S.phase==='seed'&&myTurn));
-  $('playEntry').classList.toggle('hidden',!(S.phase==='play'&&myTurn));
+  $('seedEntry').classList.toggle('hidden',S.phase!=='seed');
+  $('playEntry').classList.toggle('hidden',S.phase!=='play');
   $('judging').classList.toggle('hidden',S.phase!=='judge');
 
   if(S.phase==='judge'&&S.pending){
     let aWord=byId(S.pending.aId), bWord=byId(S.pending.bId);
     let aText=aWord?aWord.text:'', bText=bWord?bWord.text:'';
-    $('judgeHeading').textContent=voter?`Other players: vote on “${S.pending.text}”`:`Players are voting on “${S.pending.text}”`;
-    $('judgePrompt').textContent=voter?'Tap Yes or No for both links to immediately resolve:':'Hold tight while the rest of the table votes.';
-    $('judgeControls').classList.toggle('hidden',!voter);
-    $('judgeQSyn').textContent=`Is “${S.pending.text}” associated with “${aText}”?`;
-    $('judgeQAnt').textContent=`Is “${S.pending.text}” clearly NOT associated with “${bText}”?`;
+    $('judgeHeading').textContent=solo?`Tự đánh giá “${S.pending.text}”`:`Bỏ phiếu cho “${S.pending.text}”`;
+    $('judgePrompt').textContent=solo?'Hãy thành thật: bấm Có hoặc Không cho cả hai mối liên hệ.':'Đưa điện thoại cho những người chơi khác, rồi bấm Có hoặc Không cho cả hai mối liên hệ.';
+    $('judgeQSyn').textContent=`“${S.pending.text}” có liên quan đến “${aText}” không?`;
+    $('judgeQAnt').textContent=`“${S.pending.text}” có rõ ràng KHÔNG liên quan đến “${bText}” không?`;
     document.querySelectorAll('[data-kind]').forEach(btn=>{
       let v=verdict[btn.dataset.kind];
       btn.classList.toggle('chosen',v===btn.dataset.value);
@@ -503,36 +464,36 @@ function render(){
     });
   }
 
-  $('saveBraid').classList.toggle('hidden',!(S && S.phase==='gameover'));
-  $('new').classList.toggle('hidden',!isHost());
-  $('lobbyBtn').classList.toggle('hidden',!isHost());
-  drawBoard();renderPlayers();reportHeight();
+  $('saveBraid').classList.toggle('hidden',S.phase!=='gameover');
+  drawBoard();renderPlayers();
 
   let newFocusKey=S.phase+':'+S.turnId+':'+(S.words.length);
-  if(myTurn&&newFocusKey!==focusKey){
+  if((S.phase==='seed'||S.phase==='play')&&newFocusKey!==focusKey){
     focusKey=newFocusKey;
     setTimeout(()=>{
-      if(S&&S.phase==='seed'&&isMyTurn())$('seedWord').focus();
-      else if(S&&S.phase==='play'&&isMyTurn())$('newWord').focus();
+      if(S&&S.phase==='seed')$('seedWord').focus();
+      else if(S&&S.phase==='play')$('newWord').focus();
     },30);
   }else if(S.phase==='judge'){
     focusKey=null;
   }
 }
 
-$('start').addEventListener('click',()=>{
-  if(mode==='local')localStart();
-  else if(isHost()){let order=Hub.roster.map(p=>p.id),names={};Hub.roster.forEach(p=>names[p.id]=p.name);if(order.length<2){say('At least two players are needed.');return}start(order,names)}
+$('start').addEventListener('click',()=>localStart());
+$('addSeed').addEventListener('click',()=>{
+  let text=normWord($('seedWord').value);
+  if(!validWord(text)){say(BAD_WORD);return}
+  $('seedWord').value='';act({a:'seed',text});
 });
-$('addSeed').addEventListener('click',()=>{let text=$('seedWord').value.trim();if(!validWord(text)){say('Enter exactly one word.');return}$('seedWord').value='';act({a:'seed',text})});
-$('seedWord').addEventListener('keydown',e=>{if(e.key==='Enter')$('addSeed').click()});
+$('seedWord').addEventListener('keydown',e=>{if(e.key==='Enter'&&!e.isComposing)$('addSeed').click()});
 $('addWord').addEventListener('click',()=>{
-  let text=$('newWord').value.trim();if(!validWord(text)){say('Enter exactly one word.');return}
+  let text=normWord($('newWord').value);
+  if(!validWord(text)){say(BAD_WORD);return}
   $('newWord').value='';act({a:'add',text});
 });
-$('newWord').addEventListener('keydown',e=>{if(e.key==='Enter')$('addWord').click()});
+$('newWord').addEventListener('keydown',e=>{if(e.key==='Enter'&&!e.isComposing)$('addWord').click()});
 document.querySelectorAll('[data-kind]').forEach(btn=>btn.addEventListener('click',()=>{
-  if(!canVote())return;
+  if(!S||S.phase!=='judge')return;
   verdict[btn.dataset.kind]=btn.dataset.value;
   render();
   if(verdict.syn&&verdict.ant){
@@ -541,18 +502,20 @@ document.querySelectorAll('[data-kind]').forEach(btn=>btn.addEventListener('clic
     act({a:'judge',syn,ant});
   }
 }));
+
 function saveBraid(){
-  if(!S||!S.words||!S.words.length){say('No braid to save yet.');return}
+  if(!S||!S.words||!S.words.length){say('Chưa có bím nào để lưu.');return}
   var date = new Date();
   var stamp = date.getFullYear() + '-' + String(date.getMonth()+1).padStart(2,'0') + '-' + String(date.getDate()).padStart(2,'0');
   var svg = svgBoard();
+  var solo = isSolo();
   var winner = S.winnerId ? playerName(S.winnerId) : '';
   var crossings = S.words.filter(function(w){return !w.seed}).length;
   var parts = [];
-  parts.push('<!DOCTYPE html><html lang="en"><head><meta charset="utf-8">');
+  parts.push('<!DOCTYPE html><html lang="vi"><head><meta charset="utf-8">');
   parts.push('<meta name="viewport" content="width=device-width, initial-scale=1">');
   parts.push('<meta name="color-scheme" content="light">');
-  parts.push('<title>Braid — final braid</title>');
+  parts.push('<title>Bím — bím cuối cùng</title>');
   parts.push('<style>');
   parts.push('body{margin:0;padding:24px;background:#f4efe5;color:#302c25;font:15px/1.5 "Segoe UI",system-ui,-apple-system,Arial,sans-serif}');
   parts.push('.wrap{max-width:980px;margin:0 auto}');
@@ -573,31 +536,33 @@ function saveBraid(){
   parts.push('.out{text-decoration:line-through;color:#746b5f}');
   parts.push('@media print{body{padding:0;background:#fff}.card{box-shadow:none}}');
   parts.push('</style></head><body><div class="wrap">');
-  parts.push('<section class="card"><h1>Braid</h1><p class="muted">Final braid · saved ' + esc(date.toLocaleString()) + '</p><div class="meta">');
-  if(winner) parts.push('<span class="pill winner">Winner: ' + esc(winner) + '</span>');
-  parts.push('<span class="pill">' + crossings + ' crossing' + (crossings===1?'':'s') + '</span>');
-  parts.push('<span class="pill">' + S.words.length + ' word' + (S.words.length===1?'':'s') + '</span>');
+  parts.push('<section class="card"><h1>Bím</h1><p class="muted">Bím cuối cùng · lưu lúc ' + esc(date.toLocaleString('vi-VN')) + '</p><div class="meta">');
+  if(winner) parts.push('<span class="pill winner">Người thắng: ' + esc(winner) + '</span>');
+  parts.push('<span class="pill">' + crossings + ' lần bện</span>');
+  parts.push('<span class="pill">' + S.words.length + ' từ</span>');
   parts.push('</div></section>');
-  parts.push('<section class="card"><h2>The braid</h2><div class="board">' + svg + '</div></section>');
-  parts.push('<section class="card"><h2>Players</h2><div class="meta">');
-  (S.order||[]).forEach(function(id){
-    var isOut=(S.eliminated||[]).indexOf(id)>=0;
-    var isWin=id===S.winnerId;
-    var cls='pill'+(isWin?' winner':'')+(isOut&&!isWin?' out':'');
-    var suffix=isWin?' · winner':(isOut?' · out':'');
-    parts.push('<span class="' + cls + '">' + esc(playerName(id) + suffix) + '</span>');
-  });
-  parts.push('</div></section>');
-  parts.push('<section class="card"><h2>Words</h2><table><thead><tr><th>#</th><th>Word</th><th>Kind</th><th>Player</th><th>Bridge</th></tr></thead><tbody>');
+  parts.push('<section class="card"><h2>Chiếc bím</h2><div class="board">' + svg + '</div></section>');
+  if(!solo){
+    parts.push('<section class="card"><h2>Người chơi</h2><div class="meta">');
+    (S.order||[]).forEach(function(id){
+      var isOut=(S.eliminated||[]).indexOf(id)>=0;
+      var isWin=id===S.winnerId;
+      var cls='pill'+(isWin?' winner':'')+(isOut&&!isWin?' out':'');
+      var suffix=isWin?' · thắng':(isOut?' · bị loại':'');
+      parts.push('<span class="' + cls + '">' + esc(playerName(id) + suffix) + '</span>');
+    });
+    parts.push('</div></section>');
+  }
+  parts.push('<section class="card"><h2>Các từ</h2><table><thead><tr><th>#</th><th>Từ</th><th>Loại</th>' + (solo?'':'<th>Người chơi</th>') + '<th>Cầu nối</th></tr></thead><tbody>');
   S.words.forEach(function(w,i){
     var who=esc(playerName(w.by));
-    var kind=w.seed?'<span class="seed">Seed ('+esc(SLOT_NAMES[w.strand]||'')+' strand)</span>':'Crossing '+esc(String(w.step||'' ));
+    var kind=w.seed?'<span class="seed">Từ gốc (sợi '+esc(SLOT_NAMES[w.strand]||'')+')</span>':'Lần bện '+esc(String(w.step||''));
     var bridge='';
     if(!w.seed){
       var aWord=byId(w.aId), bWord=byId(w.bId);
-      bridge='associated with “'+esc(aWord?aWord.text:'?')+'”, not associated with “'+esc(bWord?bWord.text:'?')+'”';
+      bridge='liên quan đến “'+esc(aWord?aWord.text:'?')+'”, không liên quan đến “'+esc(bWord?bWord.text:'?')+'”';
     }
-    parts.push('<tr><td>'+(i+1)+'</td><td><strong>'+esc(w.text)+'</strong></td><td>'+kind+'</td><td>'+who+'</td><td class="muted">'+bridge+'</td></tr>');
+    parts.push('<tr><td>'+(i+1)+'</td><td><strong>'+esc(w.text)+'</strong></td><td>'+kind+'</td>'+(solo?'':'<td>'+who+'</td>')+'<td class="muted">'+bridge+'</td></tr>');
   });
   parts.push('</tbody></table></section>');
   parts.push('</div></body></html>');
@@ -605,33 +570,20 @@ function saveBraid(){
   var url = URL.createObjectURL(blob);
   var a = document.createElement('a');
   a.href = url;
-  a.download = 'braid-final-' + stamp + '.html';
+  a.download = 'bim-cuoi-cung-' + stamp + '.html';
   document.body.appendChild(a);
   a.click();
   setTimeout(function(){ URL.revokeObjectURL(url); if(a.parentNode) a.parentNode.removeChild(a); }, 2000);
 }
 
 $('saveBraid').addEventListener('click', saveBraid);
-$('new').addEventListener('click',()=>{if(mode==='local')localStart();else if(isHost())act({a:'new'})});
-$('lobbyBtn').addEventListener('click',()=>{if(isHost())act({a:'toLobby'})});
-setInterval(updateTimerDisplay,200);
-
-window.addEventListener('message',e=>{
-  let m=e.data;if(!m||m.t!=='gd'||m.game!=='braid')return;
-  if(m.k==='roster'){
-    Hub.me=m.p.you;Hub.roster=m.p.roster||[];mode='hub';
-    if(isHost()&&S)Hub.up('state',S);else if(!S)render();
-  }else if(m.k==='state'){
-    if(mode==='hub'&&isHost()&&S)return;
-    S=m.p;mode='hub';render();
-  }else if(m.k==='intent'&&isHost()){
-    let err=apply(m.p,m.from&&m.from.id);if(err)Hub.up('denied',{to:m.from&&m.from.id,text:err});
-  }else if(m.k==='denied'&&m.p&&m.p.text){say(m.p.text)}
+$('new').addEventListener('click',()=>{if(S)localStart(S.order.length)});
+$('lobbyBtn').addEventListener('click',()=>{
+  if(S&&S.phase!=='gameover'&&!confirm('Thoát ván đang chơi và về màn hình chính?'))return;
+  S=null;render();
 });
-mode='wait';render();Hub.up('hello');
-window.addEventListener('resize',reportHeight);
-document.addEventListener('visibilitychange',()=>{if(!document.hidden&&mode==='hub')Hub.up('hello')});
-setTimeout(()=>{if(!Hub.me){mode='local';render()}},1300);
+setInterval(updateTimerDisplay,200);
+render();
 })();
 </script>
 </body>
