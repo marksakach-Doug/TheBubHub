@@ -49,7 +49,8 @@ export const meta = {
 // ---------- pure helpers ----------
 
 function archiveUrl() {
-  return (typeof globalThis !== 'undefined' && globalThis.BUB_STORY_ARCHIVE) || 'https://script.google.com/macros/s/AKfycbwE6I_zS_MgHWa60avHbzxbcFZQFLDHmG1mVajHEiC_qbgwckzcHnB2Rk72yrihERav/exec';
+  const env = (typeof globalThis !== 'undefined') ? globalThis.BUB_STORY_ARCHIVE : undefined;
+  return (env != null ? env : 'https://script.google.com/macros/s/AKfycbwE6I_zS_MgHWa60avHbzxbcFZQFLDHmG1mVajHEiC_qbgwckzcHnB2Rk72yrihERav/exec');
 }
 
 const clean = (s) => String(s == null ? '' : s).replace(/\s+/g, ' ').trim();
@@ -61,7 +62,7 @@ function oneSentence(raw) {
   const text = clean(raw);
   if (!text) return { error: 'Write a sentence first.' };
   if (text.length > MAX_SENTENCE) return { error: `Keep it under ${MAX_SENTENCE} characters.` };
-  if (!/\p{L}/u.test(text)) return { error: 'That does not look like a sentence.' };
+  if (!/[^\W\d_]/u.test(text)) return { error: 'That does not look like a sentence.' };
   if (/[.!?…]["'”’)\]]*\s+\S/.test(text)) return { error: 'One sentence per turn.' };
   return { text };
 }
@@ -507,6 +508,7 @@ export function mount(root, api) {
   let lastMine = '';
     let lastGid = '';
     const draft = { theme: '', write: '' };
+  let autoSubmitted = false;
   const filed = new Set();
   const posted = new Set();
 
@@ -633,6 +635,7 @@ export function mount(root, api) {
     timerKey = key;
     timing = v.phase === 'setup' || v.phase === 'writing';
     remain = v.phase === 'setup' ? SETUP_SECONDS : WRITE_SECONDS;
+    autoSubmitted = false;
   }
 
   function drawClock() {
@@ -891,6 +894,12 @@ export function mount(root, api) {
   api.setInterval(() => {
     if (timing && remain > 0) {
       remain -= 1;
+      if (remain === 0 && !autoSubmitted && view && view.isWriter) {
+        autoSubmitted = true;
+        const ta = (root.querySelector && root.querySelector('.panel textarea')) || null;
+        const val = ta ? ta.value : (draft.write || '');
+        if (val && String(val).trim()) api.send({ a: 'write', text: val });
+      }
       drawClock();
     }
   }, 1000);
