@@ -58,13 +58,28 @@ const clean = (s) => String(s == null ? '' : s).replace(/\s+/g, ' ').trim();
 const isStoryId = (id) => typeof id === 'string' && id.length > 0 && id.length <= 80;
 
 // One sentence per turn: an internal sentence break followed by more text is refused.
+// Common abbreviations and mid-sentence ellipses are tolerated before the check.
 function oneSentence(raw) {
   const text = clean(raw);
   if (!text) return { error: 'Write a sentence first.' };
   if (text.length > MAX_SENTENCE) return { error: `Keep it under ${MAX_SENTENCE} characters.` };
   if (!/[^\W\d_]/u.test(text)) return { error: 'That does not look like a sentence.' };
-  if (/[.!?…]["'”’)\]]*\s+\S/.test(text)) return { error: 'One sentence per turn.' };
+  const stripped = text
+    .replace(/\b(Mr|Mrs|Ms|Dr|Prof|St|Jr|Sr|vs|etc)\./gi, '$1')
+    .replace(/\.{2,}|…/g, '');
+  if (/[.!?]["'”’)\]]*\s+[A-Z]/.test(stripped)) return { error: 'One sentence per turn.' };
   return { text };
+}
+
+// Auto-submit cannot fail: fall back to a default sentence, then turn any
+// internal sentence break into a semicolon so the coerced text passes oneSentence.
+function coerceSentence(raw, fallback) {
+  let text = clean(raw).slice(0, MAX_SENTENCE);
+  if (!text || !/[^\W\d_]/u.test(text)) text = fallback || 'The silence stretched on.';
+  const r = oneSentence(text);
+  if (!r.error) return r.text;
+  const fixed = text.replace(/([.!?]["'”’)\]]*)(\s+)/g, ';$2').replace(/;+$/, '.');
+  return oneSentence(fixed).text || (fallback || 'The silence stretched on.');
 }
 
 // Seats alternate between the two teams, so the table splits as evenly as it can.
@@ -318,6 +333,8 @@ export function project(state, playerId) {
   const writers = writing && state.teams
     ? [writerOf(state, 0, state.round), writerOf(state, 1, state.round)]
     : null;
+  const myStory = writing && team >= 0 ? storyFor(team, state.round) : null;
+  const wrote = myStory !== null && state.stories[myStory].length >= state.round;
   const view = {
     phase: state.phase,
     gid: state.gid,
@@ -330,8 +347,9 @@ export function project(state, playerId) {
     team,
     teams: state.teams ? state.teams.map((t) => t.slice()) : null,
     writers,
-    isWriter: !!writers && team >= 0 && writers[team] === me,
-    myStory: writing && team >= 0 ? storyFor(team, state.round) : null,
+    wrote,
+    isWriter: !!writers && team >= 0 && writers[team] === me && !wrote,
+    myStory,
     themeSet: state.themes.map((t) => !!t),
     ownTheme: team >= 0 ? state.themes[team] : null,
       defaultTheme: state.phase === 'setup' && team >= 0 && !state.themes[team]
@@ -703,7 +721,7 @@ export function mount(root, api) {
     }
     const judgeState = v.judge ? `${v.judge.myVotes.join(',')}/${v.judge.voted.length}` : '';
     const key = [
-      v.phase, v.round, v.team, v.isWriter, v.seated, v.themeSet.join(','), !!v.ownTheme,
+      v.phase, v.round, v.team, v.isWriter, v.wrote, v.seated, v.themeSet.join(','), !!v.ownTheme,
       mine, judgeState, v.players.length, !!api.isHost, (v.writers || []).join(','),
     ].join('|');
     if (key === panelKey) return;
@@ -732,9 +750,19 @@ export function mount(root, api) {
         ta.maxLength = MAX_SENTENCE;
         if (!draft.write && initial) draft.write = initial;
         ta.value = draft.write;
-        ta.addEventListener('input', () => { draft.write = ta.value; });
+        ta.addEventListener('input', () => {
+          draft.write = ta.value;
+          if (ui.notice.textContent) ui.notice.textContent = v.notice || '';
+        });
         add(ta);
-        button(label, () => api.send({ a: 'write', text: ta.value }), 'primary');
+        button(label, () => {
+          const check = oneSentence(ta.value);
+          if (check.error) {
+            ui.notice.textContent = check.error;
+            return;
+          }
+          api.send({ a: 'write', text: check.text });
+        }, 'primary');
       };
     const teamLine = (t) => `Team ${t + 1}: ${v.teams[t].map(nameOf).join(', ')}`;
 
@@ -803,7 +831,9 @@ export function mount(root, api) {
         seal.className = 'primary';
         seal.addEventListener('click', () => api.send({ a: 'theme', text: input.value }));
         r.append(seal);
-        if (v.isWriter) {
+        if (v.wrote) {
+          text('Your team’s opening sentence is in. Waiting for the other team…', 'muted');
+        } else if (v.isWriter) {
           text('You write your team’s opening sentence.', 'muted');
           writeBox('The first sentence of the story', 'Write the opening sentence', v.starter);
         } else {
@@ -816,7 +846,9 @@ export function mount(root, api) {
       text(`Sentence ${v.round} of ${v.rounds}.`);
       if (v.team >= 0) text(`Your team’s secret theme: “${v.ownTheme}”`, 'secret');
       text(`Writing this round: Team 1, ${nameOf(v.writers[0])}; Team 2, ${nameOf(v.writers[1])}.`, 'muted');
-      if (v.isWriter) {
+      if (v.wrote) {
+        text('Your team’s sentence is in. Waiting for the other team…', 'muted');
+      } else if (v.isWriter) {
         writeBox('One sentence that continues the story and bends it your way', 'Submit sentence');
       } else if (v.team >= 0) {
         text(`Waiting for ${nameOf(v.writers[v.team])} to write for your team. Suggest ideas below.`, 'muted');
@@ -894,11 +926,17 @@ export function mount(root, api) {
   api.setInterval(() => {
     if (timing && remain > 0) {
       remain -= 1;
-      if (remain === 0 && !autoSubmitted && view && view.isWriter) {
+      if (remain === 0 && !autoSubmitted && view) {
         autoSubmitted = true;
-        const ta = (root.querySelector && root.querySelector('.panel textarea')) || null;
-        const val = ta ? ta.value : (draft.write || '');
-        if (val && String(val).trim()) api.send({ a: 'write', text: val });
+        if (view.phase === 'setup' && view.team >= 0 && !view.ownTheme) {
+          api.send({ a: 'theme', text: draft.theme || view.defaultTheme || 'Trust' });
+        }
+        if (view.isWriter && !view.wrote) {
+          const ta = (root.querySelector && root.querySelector('.panel textarea')) || null;
+          const val = ta ? ta.value : (draft.write || '');
+          const fallback = view.starter || 'The story took an unexpected turn.';
+          api.send({ a: 'write', text: coerceSentence(val, fallback) });
+        }
       }
       drawClock();
     }
