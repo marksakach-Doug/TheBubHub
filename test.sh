@@ -191,6 +191,7 @@ OFFLINE_SUITES=(
   # hub module contract but are driven by local harnesses — one rules suite each.
   "vietgames|vietgames_test.mjs"
   "vietgames — từ trái nghĩa|vietgames_tutrainghia_test.mjs"
+  "vietgames — không mặc gì|vietgames_khongmacgi_test.mjs"
 )
 
 SERVE_PORT="${SERVE_PORT:-5180}"
