@@ -1347,7 +1347,7 @@ export function mount(root, api) {
       drawer.hidden = false;
       const note = document.createElement('div');
       note.className = 'cu-note';
-      note.textContent = 'CULE · Five rounds. One player is secretly the murderer. Everyone wanders for 8 seconds in the dark. When the lights return, the murderer and one random player are trapped together. They invent an alibi; everyone else tries to identify the murderer. Correct votes earn 1 point; an escaping murderer earns 2 and their partner earns 1. Highest score wins.';
+      note.textContent = 'One player is secretly the murderer.';
       drawer.appendChild(note);
 
       const row = document.createElement('div');

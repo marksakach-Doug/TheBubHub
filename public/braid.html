@@ -9,27 +9,27 @@
 :root{
   --paper:#f4efe5;--card:#fffdf8;--ink:#302c25;--muted:#746b5f;--line:#d9cfbd;
   --wash:#eee6d8;--accent:#a45f3b;--syn:#3f7778;--ant:#94607e;--fail:#a49a8d;
-  --radius:15px;--shadow:0 2px 4px #332e2610,0 10px 26px #332e260d;
+  --radius:0;--shadow:0 2px 4px #332e2610,0 10px 26px #332e260d;
 }
 *{box-sizing:border-box}
 html,body{margin:0;background:var(--paper);color:var(--ink)}
 body{font:15px/1.5 "Segoe UI",system-ui,-apple-system,BlinkMacSystemFont,Arial,sans-serif}
 button,input,select{font:inherit}
-button{color:var(--ink);background:linear-gradient(#fffefa,#f0e9dc);border:1px solid var(--line);border-radius:999px;padding:9px 17px;min-height:42px;cursor:pointer;box-shadow:0 1px 2px #332e260d}
+button{color:var(--ink);background:linear-gradient(#fffefa,#f0e9dc);border:1px solid var(--line);padding:9px 17px;min-height:42px;cursor:pointer;box-shadow:0 1px 2px #332e260d}
 button:hover:not(:disabled){filter:brightness(.985);border-color:#b9aa94}
 button:disabled{opacity:.45;cursor:not-allowed}
 button:focus-visible,input:focus-visible,summary:focus-visible{outline:3px solid #a45f3b66;outline-offset:2px}
 button.primary{background:linear-gradient(#b66c47,#a45f3b);border-color:#8e4f30;color:white}
-input[type=text],select{width:100%;min-height:44px;border:1px solid var(--line);border-radius:10px;padding:10px 12px;background:#fffefa;color:var(--ink)}
+input[type=text],select{width:100%;min-height:44px;border:1px solid var(--line);padding:10px 12px;background:#fffefa;color:var(--ink)}
 label{display:flex;flex-direction:column;gap:5px;font-size:13px;font-weight:700;color:var(--muted)}
 #app{max-width:1040px;margin:auto;padding:clamp(14px,3vw,26px)}
 .hidden{display:none!important}
-.hero{position:relative;overflow:hidden;text-align:center;padding:24px 18px;margin-bottom:14px;border:1px solid var(--line);border-radius:19px;background:linear-gradient(135deg,#fcf8f0,#eee3d0);box-shadow:var(--shadow)}
-.hero:before,.hero:after{content:"";position:absolute;left:-5%;width:110%;height:14px;border-top:2px solid #a45f3b25;border-radius:50%;transform:rotate(-3deg)}
+.hero{position:relative;overflow:hidden;text-align:center;padding:24px 18px;margin-bottom:14px;border:1px solid var(--line);background:linear-gradient(135deg,#fcf8f0,#eee3d0);box-shadow:var(--shadow)}
+.hero:before,.hero:after{content:"";position:absolute;left:-5%;width:110%;height:14px;border-top:2px solid #a45f3b25;transform:rotate(-3deg)}
 .hero:before{top:12px}.hero:after{bottom:5px;transform:rotate(2deg)}
 h1{font:600 clamp(38px,8vw,58px)/1 Georgia,"Times New Roman",serif;letter-spacing:.02em;margin:0;color:#3d3328}
 .tag{margin:9px 0 0;color:var(--muted);font-size:15px}
-.card{background:var(--card);border:1px solid var(--line);border-radius:var(--radius);padding:clamp(15px,3vw,22px);box-shadow:var(--shadow);margin-bottom:14px}
+.card{background:var(--card);border:1px solid var(--line);padding:clamp(15px,3vw,22px);box-shadow:var(--shadow);margin-bottom:14px}
 h2{font:600 21px Georgia,"Times New Roman",serif;margin:0 0 8px;color:#60452f}
 p{margin:6px 0}.muted{color:var(--muted);font-size:14px}
 .status{min-height:1.4em;margin:0 0 12px;color:#874c2d;font-weight:700}.status:empty{display:none}
@@ -37,26 +37,26 @@ p{margin:6px 0}.muted{color:var(--muted);font-size:14px}
 .actions{display:flex;gap:9px;align-items:center;flex-wrap:wrap;margin-top:12px}
 .turnhead{display:flex;justify-content:space-between;align-items:center;gap:12px;flex-wrap:wrap;margin-bottom:4px}
 .turnline{font-weight:750;font-size:17px}
-.timer{font-variant-numeric:tabular-nums;font-weight:800;font-size:15px;padding:4px 12px;border-radius:999px;background:var(--wash);border:1px solid var(--line);color:var(--ink)}
+.timer{font-variant-numeric:tabular-nums;font-weight:800;font-size:15px;padding:4px 12px;background:var(--wash);border:1px solid var(--line);color:var(--ink)}
 .timer.urgent{background:#f9e6e2;border-color:#c96a5b;color:#9e2f20}
 .timer.paused{background:#f3eee5;color:var(--muted)}
 .prompt{color:var(--muted);margin-bottom:10px}
 .entry{display:flex;gap:8px;align-items:stretch;margin-top:10px}
 .entry input{flex:1;min-width:0;font-size:17px}
-.boardwrap{overflow:auto;border:1px solid var(--line);border-radius:13px;background:linear-gradient(180deg,#fffefa,#f8f2e8);padding:8px}
+.boardwrap{overflow:auto;border:1px solid var(--line);background:linear-gradient(180deg,#fffefa,#f8f2e8);padding:8px}
 #board svg{display:block;max-width:none}
 .judgegrid{display:grid;grid-template-columns:1fr 1fr;gap:10px;margin:10px 0}
-.judgeitem{padding:12px;border:1px solid var(--line);border-radius:11px;background:#faf7f0}
+.judgeitem{padding:12px;border:1px solid var(--line);background:#faf7f0}
 .judgeitem strong{display:block;margin-bottom:8px}
 .toggle{display:flex;gap:7px}
 .toggle button{flex:1;min-height:38px;padding:6px 10px}
-.toggle button.chosen.yes{background:#e7f0e9;border-color:#6d997c;color:#2e6240}
-.toggle button.chosen.no{background:#f1e8ec;border-color:#b28a9f;color:#79445e}
+.toggle button.chosen.good{background:#e7f0e9;border-color:#6d997c;color:#2e6240}
+.toggle button.chosen.bad{background:#f1e8ec;border-color:#b28a9f;color:#79445e}
 .playerlist{display:flex;gap:7px;flex-wrap:wrap;padding:0;margin:0;list-style:none}
-.playerlist li{display:flex;align-items:center;gap:7px;padding:6px 11px;background:var(--wash);border-radius:99px;font-size:13px}
+.playerlist li{display:flex;align-items:center;gap:7px;padding:6px 11px;background:var(--wash);font-size:13px}
 .playerlist li.current{outline:2px solid var(--accent);font-weight:800}
 .playerlist li.out{opacity:.45;text-decoration:line-through}
-.dot{width:9px;height:9px;border-radius:50%;display:inline-block}
+.dot{width:9px;height:9px;display:inline-block}
 details summary{cursor:pointer;font-weight:750;color:#805033}
 details p{max-width:78ch;font-size:14px}
 .rulesgrid{display:grid;grid-template-columns:1fr 1fr;gap:4px 20px;margin-top:8px}
@@ -71,10 +71,8 @@ details p{max-width:78ch;font-size:14px}
 
   <section id="lobby" class="card">
     <h2>Gather the strands</h2>
-    <p class="muted">Three strands weave alternately over the middle. Two seed words start the braid; beat the 60-second clock to stay alive.</p>
-    <div class="setup"><label>Players
-      <select id="playerCount"><option value="2" selected>2 players</option><option value="3">3 players</option><option value="4">4 players</option><option value="5">5 players</option><option value="6">6 players</option></select>
-    </label><button id="start" class="primary">Start braid</button><span id="waiting" class="muted hidden">Waiting for the host to start.</span></div>
+    <p class="muted">Three strands weave alternately over the middle. Two seed words start the braid; beat the 60-second clock to stay alive. On your own, you play solo and judge your own words. With others in the room, the host starts the braid for everyone.</p>
+    <div class="setup"><button id="start" class="primary">Start braid</button><span id="waiting" class="muted hidden">Waiting for the host to start.</span></div>
   </section>
 
   <main id="game" class="hidden">
@@ -93,7 +91,7 @@ details p{max-width:78ch;font-size:14px}
         <p id="judgePrompt" class="muted"></p>
         <div id="judgeControls" class="judgegrid">
           <div class="judgeitem"><strong id="judgeQSyn">Is it associated?</strong><div class="toggle"><button data-kind="syn" data-value="yes">Yes</button><button data-kind="syn" data-value="no">No</button></div></div>
-          <div class="judgeitem"><strong id="judgeQAnt">Is it clearly NOT associated?</strong><div class="toggle"><button data-kind="ant" data-value="yes">Yes</button><button data-kind="ant" data-value="no">No</button></div></div>
+          <div class="judgeitem"><strong id="judgeQAnt">Is it associated?</strong><div class="toggle"><button data-kind="ant" data-value="yes">Yes</button><button data-kind="ant" data-value="no">No</button></div></div>
         </div>
       </div>
     </section>
@@ -113,8 +111,9 @@ details p{max-width:78ch;font-size:14px}
     <div class="rulesgrid">
       <p><b>1. Seed two strands.</b> The first two turns place one starting word on the Middle and Right strands.</p>
       <p><b>2. Cross and pivot.</b> The active outer strand crosses over the middle: enter one word <b>associated</b> with the middle word and <b>clearly NOT associated</b> with the loose outer word.</p>
-      <p><b>3. Other players vote.</b> Your clock pauses while the other players tap Yes or No on both links. If rejected, your clock resumes and you must try again.</p>
+      <p><b>3. Other players vote.</b> Your clock pauses while the other players answer two questions: is your word associated with the middle word (it needs a <b>Yes</b>), and is it associated with the loose word (it needs a <b>No</b>). If rejected, your clock resumes and you must try again.</p>
       <p><b>4. Beat the 60s clock.</b> If your timer hits zero, you are knocked out and the next player takes the turn. Last player standing wins.</p>
+      <p><b>5. Solo mode.</b> Play alone (the default until others are in the room) and judge your own words honestly. You lay both seeds, then weave as many crossings as you can before the clock runs out.</p>
     </div>
   </details>
 </div>
@@ -135,7 +134,7 @@ function playerName(id){return S&&S.names[id]||'Player'}
 function myId(){return mode==='local'?'local':Hub.me&&Hub.me.id}
 function isHost(){return mode==='local'||!!(Hub.me&&Hub.me.isHost)}
 function isMyTurn(){return !!S&&(mode==='local'||S.turnId===myId())}
-function canVote(){return !!S&&S.phase==='judge'&&(mode==='local'||(myId()&&myId()!==S.turnId))}
+function canVote(){return !!S&&S.phase==='judge'&&(mode==='local'||S.solo||(myId()&&myId()!==S.turnId))}
 function alivePlayers(){return S?S.order.filter(id=>!(S.eliminated||[]).includes(id)):[]}
 function nextAfter(id){
   if(!S)return null;
@@ -173,6 +172,7 @@ function latestOnStrand(strandId){
 function start(order,names){
   S={
     order:order.slice(),
+    solo:order.length===1,
     names:Object.assign({},names),
     eliminated:[],
     winnerId:null,
@@ -192,9 +192,8 @@ function start(order,names){
 }
 
 function localStart(){
-  let n=+$('playerCount').value,order=[],names={};
-  for(let i=0;i<n;i++){let id='local-'+i;order.push(id);names[id]='Player '+(i+1)}
-  start(order,names);
+  // Outside the shared room there is nobody else to play: always solo.
+  start(['local-0'],{'local-0':'Player 1'});
 }
 
 function currentTargets(){
@@ -257,10 +256,10 @@ function apply(a,from){
     S.phase='judge';
   }else if(a.a==='judge'){
     if(S.phase!=='judge')return null;
-    if(mode==='hub'&&from===S.turnId)return 'The other players vote on your word.';
+    if(mode==='hub'&&!S.solo&&from===S.turnId)return 'The other players vote on your word.';
     if(!['yes','no'].includes(a.syn)||!['yes','no'].includes(a.ant))return 'Vote Yes or No on both links.';
     let p=S.pending;if(!p)return 'Missing pending word.';
-    let synOk=a.syn==='yes', antOk=a.ant==='yes';
+    let synOk=a.syn==='yes', antOk=a.ant==='no'; // must be associated with the middle word, NOT associated with the loose word
 
     if(synOk&&antOk){
       let outerSlot=p.side==='L'?0:2;
@@ -299,6 +298,11 @@ function apply(a,from){
   }else if(a.a==='timeout'){
     if((S.phase!=='seed'&&S.phase!=='play')||!isHost())return null;
     let outId=S.turnId;
+    if(S.solo){
+      S.phase='gameover';S.winnerId=null;S.pending=null;
+      say(`Time’s up! You wove ${S.stepCount} crossing${S.stepCount===1?'':'s'}.`);
+      postState();return null;
+    }
     if(!S.eliminated.includes(outId))S.eliminated.push(outId);
     let alive=alivePlayers();
     if(alive.length<=1){
@@ -344,7 +348,7 @@ function drawBead(x,y,text,stroke,pending){
   let tw=Math.max(62,Math.min(128,text.length*8+26));
   let dash=pending?' stroke-dasharray="4 4"':'';
   let out=`<g filter="url(#shadow)">`;
-  out+=`<rect x="${x-tw/2}" y="${y-17}" width="${tw}" height="34" rx="13" fill="${pending?'#fff8e9':'#fffdf8'}" stroke="${stroke}" stroke-width="2.4"${dash}/>`;
+  out+=`<rect x="${x-tw/2}" y="${y-17}" width="${tw}" height="34" fill="${pending?'#fff8e9':'#fffdf8'}" stroke="${stroke}" stroke-width="2.4"${dash}/>`;
   out+=`<text x="${x}" y="${y+5}" text-anchor="middle" font-family="Georgia,serif" font-size="${text.length>13?11:text.length>9?13:16}" font-weight="700" fill="#302c25">${esc(text)}</text>`;
   out+='</g>';
   return out;
@@ -366,7 +370,7 @@ function svgBoard(){
     [0,1,2].forEach(lane=>{
       out+=`<line x1="40" y1="${Y[lane]}" x2="${W-40}" y2="${Y[lane]}" stroke="${STRAND_COLORS[lane]}" stroke-width="2.5" opacity=".25" stroke-dasharray="4 8"/>`;
     });
-    out+=`<circle cx="${X0}" cy="${Y[0]}" r="6" fill="${STRAND_COLORS[0]}"/>`;
+    out+=`<rect x="${X0-6}" y="${Y[0]-6}" width="12" height="12" fill="${STRAND_COLORS[0]}"/>`;
     seeds.forEach(w=>{
       out+=drawBead(X0,Y[w.strand],w.text,STRAND_COLORS[w.strand],false);
     });
@@ -375,7 +379,7 @@ function svgBoard(){
   }
 
   let beads=[];
-  out+=`<circle cx="${X0}" cy="${Y[0]}" r="6" fill="${STRAND_COLORS[0]}"/>`;
+  out+=`<rect x="${X0-6}" y="${Y[0]-6}" width="12" height="12" fill="${STRAND_COLORS[0]}"/>`;
   seeds.forEach(w=>{
     beads.push({x:X0,y:Y[w.strand],text:w.text,strand:w.strand});
   });
@@ -469,17 +473,22 @@ function render(){
   let t=currentTargets();
 
   if(S.phase==='gameover'){
-    $('turn').textContent=`${playerName(S.winnerId)} is the last one standing!`;
-    $('prompt').textContent='Game over. Start a new braid to play again.';
+    if(S.solo){
+      $('turn').textContent=`Time’s up! You wove ${S.stepCount} crossing${S.stepCount===1?'':'s'}.`;
+      $('prompt').textContent='Start a new braid to beat it.';
+    }else{
+      $('turn').textContent=`${playerName(S.winnerId)} is the last one standing!`;
+      $('prompt').textContent='Game over. Start a new braid to play again.';
+    }
   }else if(S.phase==='seed'){
     let strandName=SLOT_NAMES[S.seedCount+1];
-    $('turn').textContent=myTurn?`${playerName(S.turnId)}: lay a seed word.`:`Waiting for ${playerName(S.turnId)} to lay a seed word.`;
+    $('turn').textContent=S.solo?'Lay a seed word.':myTurn?`${playerName(S.turnId)}: lay a seed word.`:`Waiting for ${playerName(S.turnId)} to lay a seed word.`;
     $('prompt').textContent=`Add one word to start the ${strandName} strand (seed ${S.seedCount+1} of 2).`;
   }else if(S.phase==='play'){
-    $('turn').textContent=myTurn?`${playerName(S.turnId)}’s turn.`:`Waiting for ${playerName(S.turnId)}.`;
+    $('turn').textContent=S.solo?'Your turn.':myTurn?`${playerName(S.turnId)}’s turn.`:`Waiting for ${playerName(S.turnId)}.`;
     $('prompt').textContent=`Enter a word that is associated with “${t.A?t.A.text:''}” and clearly NOT associated with “${t.B?t.B.text:''}”.`;
   }else if(S.phase==='judge'){
-    $('turn').textContent=voter?`Other players: vote on ${playerName(S.turnId)}’s word.`:`Waiting for the other players to vote on “${S.pending?S.pending.text:''}”…`;
+    $('turn').textContent=S.solo?'Judge your own word.':voter?`Other players: vote on ${playerName(S.turnId)}’s word.`:`Waiting for the other players to vote on “${S.pending?S.pending.text:''}”…`;
     $('prompt').textContent=`Timer paused for ${playerName(S.turnId)}.`;
   }
 
@@ -490,16 +499,17 @@ function render(){
   if(S.phase==='judge'&&S.pending){
     let aWord=byId(S.pending.aId), bWord=byId(S.pending.bId);
     let aText=aWord?aWord.text:'', bText=bWord?bWord.text:'';
-    $('judgeHeading').textContent=voter?`Other players: vote on “${S.pending.text}”`:`Players are voting on “${S.pending.text}”`;
-    $('judgePrompt').textContent=voter?'Tap Yes or No for both links to immediately resolve:':'Hold tight while the rest of the table votes.';
+    $('judgeHeading').textContent=S.solo?`Judge “${S.pending.text}”`:voter?`Other players: vote on “${S.pending.text}”`:`Players are voting on “${S.pending.text}”`;
+    $('judgePrompt').textContent=voter?(S.solo?'Be honest. Answer both questions to resolve. Your word passes with Yes, then No.':'Answer both questions to resolve. The word passes with Yes, then No.'):'Hold tight while the rest of the table votes.';
     $('judgeControls').classList.toggle('hidden',!voter);
     $('judgeQSyn').textContent=`Is “${S.pending.text}” associated with “${aText}”?`;
-    $('judgeQAnt').textContent=`Is “${S.pending.text}” clearly NOT associated with “${bText}”?`;
+    $('judgeQAnt').textContent=`Is “${S.pending.text}” associated with “${bText}”?`;
     document.querySelectorAll('[data-kind]').forEach(btn=>{
       let v=verdict[btn.dataset.kind];
       btn.classList.toggle('chosen',v===btn.dataset.value);
-      btn.classList.toggle('yes',v==='yes'&&btn.dataset.value==='yes');
-      btn.classList.toggle('no',v==='no'&&btn.dataset.value==='no');
+      let goodAnswer=btn.dataset.kind==='syn'?'yes':'no', picked=v===btn.dataset.value;
+      btn.classList.toggle('good',picked&&btn.dataset.value===goodAnswer);
+      btn.classList.toggle('bad',picked&&btn.dataset.value!==goodAnswer);
     });
   }
 
@@ -522,7 +532,7 @@ function render(){
 
 $('start').addEventListener('click',()=>{
   if(mode==='local')localStart();
-  else if(isHost()){let order=Hub.roster.map(p=>p.id),names={};Hub.roster.forEach(p=>names[p.id]=p.name);if(order.length<2){say('At least two players are needed.');return}start(order,names)}
+  else if(isHost()){let order=Hub.roster.map(p=>p.id),names={};Hub.roster.forEach(p=>names[p.id]=p.name);if(order.length<1){say('At least one player is needed.');return}start(order,names)}
 });
 $('addSeed').addEventListener('click',()=>{let text=$('seedWord').value.trim();if(!validWord(text)){say('Enter exactly one word.');return}$('seedWord').value='';act({a:'seed',text})});
 $('seedWord').addEventListener('keydown',e=>{if(e.key==='Enter')$('addSeed').click()});
@@ -556,14 +566,14 @@ function saveBraid(){
   parts.push('<style>');
   parts.push('body{margin:0;padding:24px;background:#f4efe5;color:#302c25;font:15px/1.5 "Segoe UI",system-ui,-apple-system,Arial,sans-serif}');
   parts.push('.wrap{max-width:980px;margin:0 auto}');
-  parts.push('.card{background:#fffdf8;border:1px solid #d9cfbd;border-radius:15px;padding:18px 20px;box-shadow:0 2px 4px #332e2610,0 10px 26px #332e260d;margin:0 0 14px}');
+  parts.push('.card{background:#fffdf8;border:1px solid #d9cfbd;padding:18px 20px;box-shadow:0 2px 4px #332e2610,0 10px 26px #332e260d;margin:0 0 14px}');
   parts.push('h1{font:600 42px/1 Georgia,"Times New Roman",serif;margin:0 0 4px;color:#3d3328}');
   parts.push('h2{font:600 21px Georgia,"Times New Roman",serif;margin:0 0 8px;color:#60452f}');
   parts.push('.muted{color:#746b5f;font-size:14px}');
   parts.push('.meta{display:flex;gap:8px;flex-wrap:wrap;margin:10px 0 0}');
-  parts.push('.pill{display:inline-block;padding:4px 10px;border-radius:999px;background:#eee6d8;border:1px solid #d9cfbd;font-size:13px}');
+  parts.push('.pill{display:inline-block;padding:4px 10px;background:#eee6d8;border:1px solid #d9cfbd;font-size:13px}');
   parts.push('.winner{background:#f3ead7;border-color:#c9b07c;color:#6d4d12;font-weight:700}');
-  parts.push('.board{overflow:auto;border:1px solid #d9cfbd;border-radius:13px;background:linear-gradient(180deg,#fffefa,#f8f2e8);padding:8px}');
+  parts.push('.board{overflow:auto;border:1px solid #d9cfbd;background:linear-gradient(180deg,#fffefa,#f8f2e8);padding:8px}');
   parts.push('.board svg{display:block;max-width:none}');
   parts.push('table{width:100%;border-collapse:collapse;font-size:14px}');
   parts.push('th,td{text-align:left;padding:8px 10px;border-bottom:1px solid #e6ddcd;vertical-align:top}');
