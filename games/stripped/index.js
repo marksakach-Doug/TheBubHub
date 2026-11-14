@@ -14,17 +14,17 @@ const PAIRS = data.pairs;
 const LINES = data.lines;
 // Praat-like pitch settings (think Sound > To Pitch (ac)...). Edit and reload.
 const PITCH = {
-  timeStep: 0.02,          // seconds between pitch frames (Praat "time step"); smaller = finer but heavier
+  timeStep: 0.04,          // seconds between pitch frames (Praat "time step"); smaller = finer but heavier
   floor: 70,               // Hz, pitch floor; if you lower it, raise `window` too
-  ceiling: 480,            // Hz, pitch ceiling
+  ceiling: 380,            // Hz, pitch ceiling
   silenceThreshold: 0.012, // frames quieter than this (RMS) count as unvoiced
   voicingThreshold: 0.72,  // min autocorrelation strength to count as voiced (Praat default is 0.45)
   octaveCost: 0.01,        // favors higher candidates (Praat default 0.01)
-  octaveJumpCost: 0.65,    // penalizes jumping an octave from the previous frame (Praat default 0.35)
-  window: 2048,            // samples analysed per frame, a power of 2 (2048 is steadier for low voices)
+  octaveJumpCost: 0.35,    // penalizes jumping an octave from the previous frame (Praat default 0.35)
+  window: 1024,            // samples analysed per frame, a power of 2 (2048 is steadier for low voices)
   maxSeconds: 4.8,         // longest recording
   normalizeTo: 150,        // Hz; each clip's median pitch is moved here so only the melody is heard
-  glide: 0.005             // seconds; playback pitch smoothing (bigger = smoother hum)
+  glide: 0.015             // seconds; playback pitch smoothing (bigger = smoother hum)
 };
 const MAX_FRAMES = Math.round(PITCH.maxSeconds / PITCH.timeStep);
 
@@ -299,7 +299,8 @@ export function mount(root, api) {
     .board div{display:flex;justify-content:space-between;gap:14px}
     .board .me{color:#f59e0b}
     .say{text-align:left;font-size:2rem;line-height:1.25;font-weight:800;margin:18px 0 12px}
-    .say .l2{margin-left:1.2em}
+    .say{container-type:inline-size}
+    .say .l2{margin-left:1.2em;white-space:nowrap}
     .say .l3{margin-left:2.4em}
     .say b{color:#f59e0b}
     @media (max-width:700px){.stage{flex-direction:column}.board{position:static;align-self:flex-end;margin-bottom:8px}}
@@ -453,7 +454,7 @@ export function mount(root, api) {
       } else {
         ctl = `<button class="btn pri" id="rec">● Speak</button>${rec.err ? '<div class="sub">Mic blocked</div>' : ''}`;
       }
-      const say = `<div class="say"><div>Say</div><div class="l2">"${view.line}"</div><div class="l3">in ${article(view.myAim)} <b>${view.myAim}</b> way</div></div>`;
+      const say = `<div class="say"><div>Say</div><div class="l2" style="font-size:min(2rem,${(100 / (1.2 + 0.62 * (view.line.length + 2))).toFixed(2)}cqw)">"${view.line}"</div><div class="l3">in ${article(view.myAim)} <b>${view.myAim}</b> way</div></div>`;
       app.innerHTML = `${head}${say}${ctl}`;
       const r = app.querySelector('#rec');
       if (r && !api.isSpectator) r.onclick = () => (rec.mode === 'rec' ? finishRec() : beginRec());
