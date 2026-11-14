@@ -1,0 +1,17 @@
+{
+  "pairs": [
+    ["Ba đi chợ.", "Bà đi chợ."],
+    ["Chị mua cá.", "Chị mua cà."],
+    ["Bố đi làm.", "Bò đi làm."],
+    ["Cô ấy mặc áo đỏ.", "Cô ấy mặc áo đó."],
+    ["Cái này giá bao nhiêu?", "Cái này già bao nhiêu?"],
+    ["Ông ấy mua lúa.", "Ông ấy mua lụa."],
+    ["Tôi mua vé.", "Tôi mua về."],
+    ["Chúng ta đi biển.", "Chúng ta đi biến."],
+    ["Ở đây có hổ.", "Ở đây có hồ."],
+    ["Anh có tiền không?", "Anh có tiên không?"],
+    ["Ma ở đây.", "Má ở đây."],
+    ["Con lợn đang ăn.", "Con lớn đang ăn."],
+    ["Anh ấy cười hôm qua.", "Anh ấy cưới hôm qua."]
+  ]
+}
