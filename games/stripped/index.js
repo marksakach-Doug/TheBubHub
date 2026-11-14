@@ -12,7 +12,21 @@ export const meta = {
 
 const PAIRS = data.pairs;
 const LINES = data.lines;
-const MAX_FRAMES = 120; // 120 frames x 40 ms = 4.8 s
+// Praat-like pitch settings (think Sound > To Pitch (ac)...). Edit and reload.
+const PITCH = {
+  timeStep: 0.02,          // seconds between pitch frames (Praat "time step"); smaller = finer but heavier
+  floor: 70,               // Hz, pitch floor; if you lower it, raise `window` too
+  ceiling: 480,            // Hz, pitch ceiling
+  silenceThreshold: 0.012, // frames quieter than this (RMS) count as unvoiced
+  voicingThreshold: 0.72,  // min autocorrelation strength to count as voiced (Praat default is 0.45)
+  octaveCost: 0.01,        // favors higher candidates (Praat default 0.01)
+  octaveJumpCost: 0.65,    // penalizes jumping an octave from the previous frame (Praat default 0.35)
+  window: 2048,            // samples analysed per frame, a power of 2 (2048 is steadier for low voices)
+  maxSeconds: 4.8,         // longest recording
+  normalizeTo: 150,        // Hz; each clip's median pitch is moved here so only the melody is heard
+  glide: 0.005             // seconds; playback pitch smoothing (bigger = smoother hum)
+};
+const MAX_FRAMES = Math.round(PITCH.maxSeconds / PITCH.timeStep);
 
 function dealRound(state, round, rng) {
   const order = state.order;
@@ -131,9 +145,12 @@ export function reduce(state, action, ctx) {
     }
     const picks = { ...state.picks, [idx]: action.side };
     if (Object.keys(picks).length < state.deck.length) return { ...state, picks };
-    let pts = 0;
-    state.deck.forEach((c, i) => { if (picks[i] === c.aim) pts++; });
-    const scores = { ...state.scores, [state.ear]: (state.scores[state.ear] || 0) + pts };
+    const scores = { ...state.scores };
+    state.deck.forEach((c, i) => {
+      if (picks[i] !== c.aim) return;
+      scores[state.ear] = (scores[state.ear] || 0) + 1;
+      if (c.owner !== state.ear) scores[c.owner] = (scores[c.owner] || 0) + 1;
+    });
     const vault = [...state.vault, ...state.deck.map((c) => c.frames)];
     return { ...state, phase: 'reveal', picks, scores, vault };
   }
@@ -194,13 +211,13 @@ export function mount(root, api) {
     return actx;
   };
 
-  function detectF0(buf, sr) {
+  function detectF0(buf, sr, prev) {
     let rms = 0;
     for (let i = 0; i < buf.length; i++) rms += buf[i] * buf[i];
     rms = Math.sqrt(rms / buf.length);
-    if (rms < 0.012) return [0, 0];
-    const minL = Math.floor(sr / 380), maxL = Math.floor(sr / 70);
-    let bestL = 0, bestC = 0;
+    if (rms < PITCH.silenceThreshold) return [0, 0];
+    const minL = Math.floor(sr / PITCH.ceiling), maxL = Math.floor(sr / PITCH.floor);
+    let bestL = 0, bestScore = -Infinity;
     for (let l = minL; l <= maxL; l++) {
       let c = 0, n1 = 0, n2 = 0;
       for (let i = 0; i < buf.length - l; i += 2) {
@@ -209,7 +226,11 @@ export function mount(root, api) {
         n2 += buf[i + l] * buf[i + l];
       }
       const r = c / Math.sqrt((n1 * n2) || 1);
-      if (r > 0.72 && r > bestC) { bestC = r; bestL = l; }
+      if (r <= PITCH.voicingThreshold) continue;
+      const hz = sr / l;
+      let score = r + PITCH.octaveCost * Math.log2(hz / PITCH.floor);
+      if (prev) score -= PITCH.octaveJumpCost * Math.abs(Math.log2(hz / prev));
+      if (score > bestScore) { bestScore = score; bestL = l; }
     }
     return [bestL ? Math.round(sr / bestL) : 0, Math.min(100, Math.round(rms * 300))];
   }
@@ -218,7 +239,7 @@ export function mount(root, api) {
   // like Praat's artificial vowel. Edit FORMANTS to change the vowel: [Hz, loudness].
   const FORMANTS = [[500, 1], [1500, 0.7], [2500, 0.4]];
 
-  function playFrames(frames, baseHz = 150, delay = 0, vol = 1) {
+  function playFrames(frames, baseHz = PITCH.normalizeTo, delay = 0, vol = 1) {
     if (!frames || !frames.length) return;
     const ctx = getCtx();
     ctx.resume();
@@ -237,12 +258,12 @@ export function mount(root, api) {
       a.connect(g);
     });
     g.connect(master);
-    const t0 = ctx.currentTime + delay, dt = 0.04;
+    const t0 = ctx.currentTime + delay, dt = PITCH.timeStep;
     frames.forEach(([f0, amp], i) => {
       const t = t0 + i * dt;
       if (f0 > 0) {
-        osc.frequency.setTargetAtTime(f0 * (baseHz / 150), t, 0.015);
-        g.gain.setTargetAtTime(vol * (0.8 + 0.8 * Math.min(1, amp / 30)), t, 0.015);
+        osc.frequency.setTargetAtTime(f0 * (baseHz / PITCH.normalizeTo), t, PITCH.glide);
+        g.gain.setTargetAtTime(vol * (0.8 + 0.8 * Math.min(1, amp / 30)), t, PITCH.glide);
       } else {
         g.gain.setTargetAtTime(0, t, 0.01);
       }
@@ -273,7 +294,15 @@ export function mount(root, api) {
   }
 
   root.innerHTML = `<style>
-    .stage{min-height:80vh;display:flex;align-items:center;justify-content:center;padding:8px}
+    .stage{position:relative;min-height:80vh;display:flex;align-items:center;justify-content:center;padding:8px}
+    .board{position:absolute;top:8px;right:8px;z-index:5;min-width:120px;padding:8px 12px;border-radius:10px;background:#111827;color:#f3f4f6;font:600 .85rem system-ui,sans-serif;text-align:left}
+    .board div{display:flex;justify-content:space-between;gap:14px}
+    .board .me{color:#f59e0b}
+    .say{text-align:left;font-size:2rem;line-height:1.25;font-weight:800;margin:18px 0 12px}
+    .say .l2{margin-left:1.2em}
+    .say .l3{margin-left:2.4em}
+    .say b{color:#f59e0b}
+    @media (max-width:700px){.stage{flex-direction:column}.board{position:static;align-self:flex-end;margin-bottom:8px}}
     .wrap{font-family:system-ui,sans-serif;color:#f3f4f6;background:#111827;padding:16px;border-radius:12px;width:100%;max-width:480px;text-align:center}
     .btn{min-height:42px;padding:8px 16px;margin:4px;border:0;border-radius:8px;font-weight:700;cursor:pointer;background:#374151;color:#fff}
     .btn.pri{background:#f59e0b;color:#111827}
@@ -287,10 +316,11 @@ export function mount(root, api) {
     .note{width:100%;text-align:left;font-size:.9rem}
     .sub{color:#9ca3af;font-size:.85rem}
     canvas{background:#030712;border-radius:6px;flex:1;min-width:80px}
-  </style><div class="stage"><div class="wrap" id="app"></div></div>`;
+  </style><div class="stage"><div class="board" id="board"></div><div class="wrap" id="app"></div></div>`;
   const app = root.getElementById('app');
+  const board = root.getElementById('board');
 
-  const way = (m) => `${/^[aeiou]/i.test(m) ? 'an' : 'a'} ${m} way`;
+  const article = (m) => (/^[aeiou]/i.test(m) ? 'an' : 'a');
   const redraw = () => { if (lastView) update(lastView); };
 
   function cancelRec() {
@@ -305,8 +335,8 @@ export function mount(root, api) {
     cancelRec();
     if (!raw.length) { redraw(); return; }
     const voiced = raw.filter((f) => f[0] > 0).map((f) => f[0]).sort((a, b) => a - b);
-    const med = voiced.length ? voiced[Math.floor(voiced.length / 2)] : 150;
-    const norm = raw.map(([f0, a]) => [f0 ? Math.round((f0 * 150) / med) : 0, a]);
+    const med = voiced.length ? voiced[Math.floor(voiced.length / 2)] : PITCH.normalizeTo;
+    const norm = raw.map(([f0, a]) => [f0 ? Math.round((f0 * PITCH.normalizeTo) / med) : 0, a]);
     api.send({ a: 'clip', frames: norm });
     rec.mode = 'sent';
     redraw();
@@ -325,7 +355,7 @@ export function mount(root, api) {
       return;
     }
     const an = ctx.createAnalyser();
-    an.fftSize = 1024;
+    an.fftSize = PITCH.window;
     ctx.createMediaStreamSource(recStream).connect(an);
     const buf = new Float32Array(an.fftSize);
     rec.mode = 'count';
@@ -339,9 +369,10 @@ export function mount(root, api) {
       rec.mode = 'rec';
       recTimer = api.setInterval(() => {
         an.getFloatTimeDomainData(buf);
-        rec.raw.push(detectF0(buf, ctx.sampleRate));
+        const last = rec.raw.length ? rec.raw[rec.raw.length - 1][0] : 0;
+        rec.raw.push(detectF0(buf, ctx.sampleRate, last));
         if (rec.raw.length >= MAX_FRAMES) finishRec();
-      }, 40);
+      }, PITCH.timeStep * 1000);
       redraw();
     }, 1000);
   }
@@ -362,12 +393,16 @@ export function mount(root, api) {
       return;
     }
     const spec = api.isSpectator ? `<div class="sub">👁 watching</div>` : '';
-    const scores = view.order.map((id) => `${nameOf(id)}: ${view.scores[id] || 0}`).join(' · ');
+    const earNow = ['speak', 'guess', 'reveal'].indexOf(view.phase) >= 0 ? view.ear : null;
+    board.style.display = view.order.length ? '' : 'none';
+    board.innerHTML = view.order
+      .map((id) => `<div class="${id === view.you ? 'me' : ''}"><span>${id === earNow ? '👂 ' : ''}${nameOf(id)}</span><b>${view.scores[id] || 0}</b></div>`)
+      .join('');
 
     if (view.phase === 'lobby') {
       const canStart = (api.isHost || view.order.length <= 1) && !api.isSpectator;
       app.innerHTML = `${spec}<div class="big">Stripped Speech</div>
-        <div class="sub">${view.order.length} at table · ${scores || 'waiting'}</div>
+        <div class="sub">${view.order.length} at table</div>
         <div style="margin-top:12px">
           <button class="btn pri" id="start" ${canStart ? '' : 'disabled'}>Start</button>
         </div>`;
@@ -384,7 +419,6 @@ export function mount(root, api) {
       }
       const canHost = (api.isHost || view.order.length <= 1) && !api.isSpectator;
       app.innerHTML = `${spec}<div class="big">${view.winners.map(nameOf).join(' & ')} won</div>
-        <div class="sub">${scores}</div>
         <div style="margin-top:12px">
           <button class="btn" id="choir">🔊 Choir</button>
           <button class="btn pri" id="again" ${canHost ? '' : 'disabled'}>Play again</button>
@@ -398,7 +432,7 @@ export function mount(root, api) {
       return;
     }
 
-    const head = `${spec}<div class="sub">Round ${view.round + 1}/${view.totalRounds} · The Ear: <b>${nameOf(view.ear)}</b> · ${scores}</div>`;
+    const head = `${spec}<div class="sub">Round ${view.round + 1}/${view.totalRounds} · The Ear: <b>${nameOf(view.ear)}</b></div>`;
     const sentence = `<div class="big">"${view.line}"</div>`;
 
     if (view.phase === 'speak') {
@@ -419,7 +453,8 @@ export function mount(root, api) {
       } else {
         ctl = `<button class="btn pri" id="rec">● Speak</button>${rec.err ? '<div class="sub">Mic blocked</div>' : ''}`;
       }
-      app.innerHTML = `${head}<div class="sub">Say this sentence in <b>${way(view.myAim)}</b>:</div>${sentence}${ctl}`;
+      const say = `<div class="say"><div>Say</div><div class="l2">"${view.line}"</div><div class="l3">in ${article(view.myAim)} <b>${view.myAim}</b> way</div></div>`;
+      app.innerHTML = `${head}${say}${ctl}`;
       const r = app.querySelector('#rec');
       if (r && !api.isSpectator) r.onclick = () => (rec.mode === 'rec' ? finishRec() : beginRec());
       return;
@@ -445,7 +480,7 @@ export function mount(root, api) {
         <canvas width="140" height="36"></canvas>
         ${reveal
           ? `<div class="mark">${ok ? '✓' : '✗'}</div>
-             <div class="note"><b>${nameOf(c.owner)}</b> meant <b>${c.aim}</b> · Ear heard <b>${pick}</b></div>`
+             <div class="note"><b>${nameOf(c.owner)}</b> meant <b>${c.aim}</b> · Ear heard <b>${pick}</b>${ok ? (c.owner !== view.ear ? ' · +1 each' : ' · +1') : ''}</div>`
           : view.pair.map((s) => `<button class="btn ${pick === s ? 'act' : ''}" data-s="${s}" ${isEar ? '' : 'disabled'}>${s}</button>`).join('')}`;
       list.appendChild(row);
       drawCurve(row.querySelector('canvas'), c.frames);
