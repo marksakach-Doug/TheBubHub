@@ -277,7 +277,7 @@
         <!-- PLAY: who picks the 5 things -->
         <div class="space-y-2">
           <div class="text-[11px] font-extrabold uppercase tracking-widest text-[#E5B363]">Play</div>
-          <div class="grid grid-cols-2 gap-2.5">
+          <div class="grid grid-cols-3 gap-2.5">
             <button type="button" id="modeAutoBtn" onclick="setGameMode('auto')" class="tile py-2">
               <span class="text-2xl leading-none">🎲</span>
               <span class="text-sm">SURPRISE</span>
@@ -288,13 +288,18 @@
               <span class="text-sm">JUNEBUG</span>
               <span class="text-[11px] font-bold opacity-70">friend picks</span>
             </button>
+            <button type="button" id="modeSoloBtn" onclick="setGameMode('solo')" class="tile py-2">
+              <span class="text-2xl leading-none">🔍</span>
+              <span class="text-sm">SOLO</span>
+              <span class="text-[11px] font-bold opacity-70">just you</span>
+            </button>
           </div>
         </div>
 
         <!-- HOW MANY -->
         <div class="space-y-2">
           <div class="text-[11px] font-extrabold uppercase tracking-widest text-[#E5B363]">How many</div>
-          <div class="grid grid-cols-3 gap-2.5">
+          <div class="grid grid-cols-4 gap-2.5">
             <button type="button" id="densEasyBtn" onclick="setDensity('easy')" class="tile py-2">
               <span class="text-xs leading-none">⭐</span><span class="text-sm">EASY</span>
             </button>
@@ -303,6 +308,9 @@
             </button>
             <button type="button" id="densHardBtn" onclick="setDensity('hard')" class="tile py-2">
               <span class="text-xs leading-none">⭐⭐⭐</span><span class="text-sm">HARD</span>
+            </button>
+            <button type="button" id="densSuperBtn" onclick="setDensity('superhard')" class="tile py-2">
+              <span class="text-xs leading-none">💀</span><span class="text-sm">SUPER</span>
             </button>
           </div>
         </div>
@@ -402,6 +410,8 @@
         <div id="doneOverlay" class="hidden absolute inset-0 bg-[#24344D]/90 flex flex-col items-center justify-center gap-3 z-10">
           <div id="donePie" class="done-pop w-44 h-44"></div>
           <div id="doneTime" class="done-pop text-6xl font-black text-[#EFECE6]" style="font-family:'Fredoka',sans-serif;">0.0s</div>
+          <div id="doneMsg" class="hidden done-pop text-3xl font-black text-[#E5B363]" style="font-family:'Fredoka',sans-serif;">You found everything!</div>
+          <button id="newPageBtn" class="hidden px-6 py-3 rounded-2xl bg-[#E5B363] text-[#2B1D16] font-black text-xl uppercase shadow-lg border-b-4 border-[#D69847] active:translate-y-0.5 transition" onclick="newSoloPage()">NEW PAGE ▶</button>
         </div>
       </div>
     </div>
@@ -603,11 +613,12 @@
     const HINT_MS = 8000;          // no find for this long -> the target glows
 
     // Easy = few, BIG, mostly upright. Medium/Hard = the original crowded boards.
-    const DENSITY = {
-      easy:   { count: 18,  min: 56, max: 84, rotRange: 28 },
-      medium: { count: 48,  min: 32, max: 60, rotRange: 180 },
-      hard:   { count: 120, min: 32, max: 60, rotRange: 180 }
-    };
+     const DENSITY = {
+       easy:   { count: 18,  min: 56, max: 84, rotRange: 28 },
+       medium: { count: 48,  min: 32, max: 60, rotRange: 180 },
+       hard:   { count: 120, min: 32, max: 60, rotRange: 180 },
+       superhard: { count: 200, min: 8, max: 18, rotRange: 180, overlap: true }
+     };
 
     const state = {
       p1TotalScore: 0,   // rounds won
@@ -656,12 +667,14 @@
     function syncLobbyUI() {
       document.querySelectorAll(".cat-pill").forEach(btn => paint(btn, state.categories[btn.dataset.cat]));
 
-      paint(document.getElementById("modeAutoBtn"), state.mode === "auto");
-      paint(document.getElementById("modeHumanBtn"), state.mode === "junebug");
+       paint(document.getElementById("modeAutoBtn"), state.mode === "auto");
+       paint(document.getElementById("modeHumanBtn"), state.mode === "junebug");
+       paint(document.getElementById("modeSoloBtn"), state.mode === "solo");
 
-      paint(document.getElementById("densEasyBtn"), state.densityKey === "easy");
-      paint(document.getElementById("densMedBtn"), state.densityKey === "medium");
-      paint(document.getElementById("densHardBtn"), state.densityKey === "hard");
+       paint(document.getElementById("densEasyBtn"), state.densityKey === "easy");
+       paint(document.getElementById("densMedBtn"), state.densityKey === "medium");
+       paint(document.getElementById("densHardBtn"), state.densityKey === "hard");
+       paint(document.getElementById("densSuperBtn"), state.densityKey === "superhard");
 
       paint(document.getElementById("moveOffBtn"), !state.moving);
       paint(document.getElementById("moveOnBtn"), state.moving);
@@ -937,11 +950,12 @@
     }
 
     // Scatter items on the 800x1050 sheet without overlaps. Returns the ones that fit.
-    function placeItems(rawItems) {
-      const W = 800;
-      const H = 1050;
-      const layer = document.getElementById("jumbleLayer");
-      const ordered = [...rawItems].sort((a, b) => b.size - a.size);
+     function placeItems(rawItems) {
+       const W = 800;
+       const H = 1050;
+       const layer = document.getElementById("jumbleLayer");
+       const cfg = DENSITY[state.densityKey] || DENSITY.easy;
+       const ordered = [...rawItems].sort((a, b) => b.size - a.size);
 
       const placedBoxes = [];
       const placedItems = [];
@@ -967,16 +981,18 @@
               const cx = minX + Math.random() * (maxX - minX);
               const cy = minY + Math.random() * (maxY - minY);
 
-              let hit = false;
-              for (let i = 0; i < placedBoxes.length; i++) {
-                const b = placedBoxes[i];
-                if (Math.abs(cx - b.cx) < (rx + b.halfW) && Math.abs(cy - b.cy) < (ry + b.halfH)) {
-                  hit = true;
-                  break;
-                }
-              }
+             let hit = false;
+               if (!cfg.overlap) {
+                 for (let i = 0; i < placedBoxes.length; i++) {
+                   const b = placedBoxes[i];
+                   if (Math.abs(cx - b.cx) < (rx + b.halfW) && Math.abs(cy - b.cy) < (ry + b.halfH)) {
+                     hit = true;
+                     break;
+                   }
+                 }
+               }
 
-              if (!hit) {
+               if (!hit) {
                 item.size = Math.round(curSize);
                 item.cx = Math.round(cx);
                 item.cy = Math.round(cy);
@@ -1068,13 +1084,17 @@
       startRound();
     }
 
-    function startRound() {
-      clearActiveTimer();
-      state.times = { 1: null, 2: null };
-      state.leg = 0;
-      state.hunter = state.firstHunter;
-      setupLeg();
-    }
+     function startRound() {
+       clearActiveTimer();
+       if (state.mode === "solo") {
+         beginSoloHunt();
+         return;
+       }
+       state.times = { 1: null, 2: null };
+       state.leg = 0;
+       state.hunter = state.firstHunter;
+       setupLeg();
+     }
 
     function setupLeg(curtainSub) {
       clearActiveTimer();
@@ -1185,27 +1205,69 @@
     }
 
     /* ---------- the hunt ---------- */
-    function beginHunt() {
-      clearActiveTimer();
-      state.phase = "hunting";
-      state.found = 0;
-      state.wrongTapStreak = 0;
+     function beginHunt() {
+       clearActiveTimer();
+       state.phase = "hunting";
+       state.found = 0;
+       state.wrongTapStreak = 0;
 
-      document.getElementById("hudPlayerTag").textContent = `P${state.hunter}`;
-      document.getElementById("hudPickBox").classList.add("hidden");
-      document.getElementById("hudHuntBox").classList.remove("hidden");
-      document.getElementById("clockBox").classList.remove("hidden");
-      setHudPie(0, false);
+       document.getElementById("hudPlayerTag").textContent = `P${state.hunter}`;
+       document.getElementById("hudPickBox").classList.add("hidden");
+       document.getElementById("hudHuntBox").classList.remove("hidden");
+       document.getElementById("clockBox").classList.remove("hidden");
+       setHudPie(0, false);
 
-      setTarget(0);
+       setTarget(0);
 
-      state.huntStartTs = performance.now();
-      updateClockText(0);
-      state.timerInterval = setInterval(() => {
-        updateClockText(performance.now() - state.huntStartTs);
-      }, 80);
-      startMoving();
-    }
+       state.huntStartTs = performance.now();
+       updateClockText(0);
+       state.timerInterval = setInterval(() => {
+         updateClockText(performance.now() - state.huntStartTs);
+       }, 80);
+       startMoving();
+     }
+
+     function beginSoloHunt() {
+       clearActiveTimer();
+       document.getElementById("doneOverlay").classList.add("hidden");
+       document.getElementById("doneMsg").classList.add("hidden");
+       document.getElementById("newPageBtn").classList.add("hidden");
+       document.getElementById("doneTime").classList.remove("hidden");
+       generateAndRenderSvgJumble();
+       state.targetUids = shuffleArray(state.boardItems).map(it => it.uid);
+       state.phase = "hunting";
+       state.found = 0;
+       state.wrongTapStreak = 0;
+
+       document.getElementById("hudPlayerTag").textContent = "SOLO";
+       document.getElementById("hudPickBox").classList.add("hidden");
+       document.getElementById("hudHuntBox").classList.remove("hidden");
+       document.getElementById("clockBox").classList.add("hidden");
+       updateSoloProgress();
+
+       setTarget(0);
+       startMoving();
+     }
+
+     function updateSoloProgress() {
+       document.getElementById("hudPie").innerHTML = `<span class="text-base font-black text-[#2A1B15] bg-[#E5B363] px-2 py-1 rounded-lg">${state.found}/${state.targetUids.length}</span>`;
+     }
+
+     function finishSolo() {
+       clearActiveTimer();
+       state.phase = "soloDone";
+       playTone("win");
+       document.getElementById("donePie").innerHTML = "";
+       document.getElementById("doneTime").classList.add("hidden");
+       document.getElementById("doneMsg").classList.remove("hidden");
+       document.getElementById("newPageBtn").classList.remove("hidden");
+       document.getElementById("doneOverlay").classList.remove("hidden");
+     }
+
+     function newSoloPage() {
+       document.getElementById("doneOverlay").classList.add("hidden");
+       beginSoloHunt();
+     }
 
     function updateClockText(ms) {
       document.getElementById("clockText").textContent = fmtTime(ms);
@@ -1236,9 +1298,10 @@
     }
 
     /* ---------- the hint: a glowing ring instead of a penalty ---------- */
-    function showHint() {
-      const t = state.currentTarget;
-      if (state.phase !== "hunting" || !t || !t.el || t.hintEl) return;
+     function showHint() {
+       return;   // hints disabled
+       const t = state.currentTarget;
+       if (state.phase !== "hunting" || !t || !t.el || t.hintEl) return;
       const g = document.createElementNS("http://www.w3.org/2000/svg", "g");
       g.setAttribute("class", "hint-ring");
       g.innerHTML = `
@@ -1288,12 +1351,16 @@
           item.el.style.pointerEvents = "none";
         }
         spawnSvgRing(item.cx, item.cy, "#38B449", 450);
-        state.found++;
-        state.wrongTapStreak = 0;
-        setHudPie(state.found, true);
+         state.found++;
+         state.wrongTapStreak = 0;
+         if (state.mode === "solo") updateSoloProgress();
+         else setHudPie(state.found, true);
 
-        if (state.found >= TARGETS_PER_ROUND) finishLeg();
-        else setTarget(state.found);
+         if (state.mode === "solo") {
+           if (state.found >= state.targetUids.length) finishSolo();
+           else setTarget(state.found);
+         } else if (state.found >= TARGETS_PER_ROUND) finishLeg();
+         else setTarget(state.found);
       } else {
         playTone("wrong");
         spawnSvgRing(item.cx, item.cy, "#C9252D", 300);
