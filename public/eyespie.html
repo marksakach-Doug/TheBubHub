@@ -99,6 +99,38 @@
       opacity: 0.55;
     }
 
+
+    /* ---- big, kid-friendly tiles for the lobby ---- */
+    .tile {
+      position: relative;
+      display: flex; flex-direction: column; align-items: center; justify-content: center;
+      gap: 2px; line-height: 1.1; font-weight: 900; cursor: pointer;
+      border: 3px solid; border-radius: 1rem;
+      transition: transform .1s ease;
+    }
+    .tile:active { transform: scale(.95); }
+    .tile-on  { background: var(--pie-gold); color: var(--ink-brown); border-color: var(--pie-crust); box-shadow: 0 3px 0 var(--pie-crust); }
+    .tile-off { background: var(--bg-navy); color: rgba(239,236,230,.6); border-color: #435E85; }
+    .tile .tick {
+      display: none; position: absolute; top: -7px; right: -7px;
+      width: 22px; height: 22px; border-radius: 50%;
+      align-items: center; justify-content: center;
+      background: var(--stem-green); color: #fff; font-size: 13px; font-family: 'DM Sans', sans-serif;
+      border: 2px solid var(--bg-slate);
+    }
+    .tile-on .tick { display: flex; }
+    .shake { animation: shake .3s; }
+    @keyframes shake { 0%,100% { transform: translateX(0); } 25% { transform: translateX(-6px); } 75% { transform: translateX(6px); } }
+
+    /* ---- pie reward + hint ---- */
+    .pie-pop { transform-box: view-box; transform-origin: 50% 50%; animation: piePop .4s ease-out; }
+    @keyframes piePop { 0% { transform: scale(.4); opacity: 0; } 60% { transform: scale(1.15); opacity: 1; } 100% { transform: scale(1); } }
+    .done-pop { animation: donePop .55s cubic-bezier(.2, 1.6, .4, 1); }
+    @keyframes donePop { 0% { transform: scale(.3); opacity: 0; } 100% { transform: scale(1); opacity: 1; } }
+    .hint-ring { animation: hintPulse .9s ease-in-out infinite; pointer-events: none; }
+    @keyframes hintPulse { 0%, 100% { opacity: .3; } 50% { opacity: 1; } }
+    .sum-win { background: rgba(229,179,99,.18); border-color: var(--pie-gold) !important; }
+
     @keyframes ringPulse {
       0% { r: 16; opacity: 1; stroke-width: 8; }
       100% { r: 58; opacity: 0; stroke-width: 2; }
@@ -116,7 +148,7 @@
       
       <!-- HERO: Custom SVG Replica of Attached Icon + Title ONLY -->
       <div class="flex flex-col items-center gap-1.5 sm:gap-2.5 shrink-0">
-        <div class="w-20 h-20 sm:w-28 sm:h-28 rounded-[26%] bg-[#24344D] border-4 border-[#314766] shadow-2xl overflow-hidden flex items-center justify-center relative">
+        <div class="w-16 h-16 sm:w-24 sm:h-24 rounded-[26%] bg-[#24344D] border-4 border-[#314766] shadow-2xl overflow-hidden flex items-center justify-center relative">
           <svg viewBox="0 0 200 200" class="w-full h-full">
             <!-- Outer Navy Square & Slate Circle -->
             <rect width="200" height="200" rx="44" fill="#24344D"/>
@@ -203,9 +235,9 @@
       </div>
 
       <!-- COMPACT LOBBY CARD -->
-      <div class="w-full bg-[#314766] border-2 border-[#435E85] rounded-3xl p-3.5 sm:p-5 shadow-2xl space-y-2.5 sm:space-y-3.5 shrink-0">
-        
-        <!-- Score Pill (Always clean & compact) -->
+      <div class="w-full bg-[#314766] border-2 border-[#435E85] rounded-3xl p-3.5 sm:p-5 shadow-2xl space-y-3 shrink-0">
+
+        <!-- Score pill: rounds won -->
         <div class="flex items-center justify-between bg-[#24344D] px-3.5 py-1.5 sm:py-2 rounded-2xl border border-[#435E85]">
           <div class="flex items-center gap-3 text-sm font-extrabold tracking-wide">
             <span class="text-[#E5B363]">P1: <span id="lobbyP1Score">0</span></span>
@@ -217,73 +249,80 @@
           </button>
         </div>
 
-        <!-- 1. Categories (5 Toggle Pills) -->
-        <div class="space-y-1">
-          <div class="text-[11px] font-extrabold uppercase tracking-widest text-[#E5B363]">Categories</div>
-          <div class="grid grid-cols-2 sm:grid-cols-3 gap-1.5 sm:gap-2">
-            <button type="button" data-cat="numbers" onclick="toggleCat('numbers')" class="cat-pill py-2 px-3 rounded-xl font-extrabold text-xs sm:text-sm border-2 transition flex items-center justify-center gap-1.5">
-              <span>Numbers</span>
+        <!-- FIND: what shows up on the board (the tile shows an example) -->
+        <div class="space-y-2">
+          <div class="text-[11px] font-extrabold uppercase tracking-widest text-[#E5B363]">Find</div>
+          <div class="grid grid-cols-3 gap-2.5">
+          <button type="button" data-cat="numbers" onclick="toggleCat('numbers')" class="cat-pill tile h-14 text-2xl" style="font-family:'Fredoka',sans-serif;">
+            <span>42</span><span class="tick">✓</span>
+          </button>
+          <button type="button" data-cat="bigrams" onclick="toggleCat('bigrams')" class="cat-pill tile h-14 text-2xl" style="font-family:'Fredoka',sans-serif;">
+            <span>ab</span><span class="tick">✓</span>
+          </button>
+          <button type="button" data-cat="words" onclick="toggleCat('words')" class="cat-pill tile h-14 text-2xl" style="font-family:'Fredoka',sans-serif;">
+            <span>cat</span><span class="tick">✓</span>
+          </button>
+          <button type="button" data-cat="words4" onclick="toggleCat('words4')" class="cat-pill tile h-14 text-2xl" style="font-family:'Fredoka',sans-serif;">
+            <span>frog</span><span class="tick">✓</span>
+          </button>
+          <button type="button" data-cat="words5" onclick="toggleCat('words5')" class="cat-pill tile h-14 text-2xl" style="font-family:'Fredoka',sans-serif;">
+            <span>apple</span><span class="tick">✓</span>
+          </button>
+          <button type="button" data-cat="polygons" onclick="toggleCat('polygons')" class="cat-pill tile h-14 text-2xl" style="font-family:'Fredoka',sans-serif;">
+            <span><svg viewBox="0 0 100 100" class="w-9 h-9"><path d="M50 7 L62 35 L93 36 L68 55 L77 86 L50 68 L23 86 L32 55 L7 36 L38 35 Z" fill="none" stroke="currentColor" stroke-width="9" stroke-linejoin="round"/></svg></span><span class="tick">✓</span>
+          </button>
+          </div>
+        </div>
+
+        <!-- PLAY: who picks the 5 things -->
+        <div class="space-y-2">
+          <div class="text-[11px] font-extrabold uppercase tracking-widest text-[#E5B363]">Play</div>
+          <div class="grid grid-cols-2 gap-2.5">
+            <button type="button" id="modeAutoBtn" onclick="setGameMode('auto')" class="tile py-2">
+              <span class="text-2xl leading-none">🎲</span>
+              <span class="text-sm">SURPRISE</span>
+              <span class="text-[11px] font-bold opacity-70">we pick</span>
             </button>
-            <button type="button" data-cat="bigrams" onclick="toggleCat('bigrams')" class="cat-pill py-2 px-3 rounded-xl font-extrabold text-xs sm:text-sm border-2 transition flex items-center justify-center gap-1.5">
-              <span>2 Letters</span>
-            </button>
-            <button type="button" data-cat="words" onclick="toggleCat('words')" class="cat-pill py-2 px-3 rounded-xl font-extrabold text-xs sm:text-sm border-2 transition flex items-center justify-center gap-1.5">
-              <span>3 Letters</span>
-            </button>
-            <button type="button" data-cat="polygons" onclick="toggleCat('polygons')" class="cat-pill py-2 px-3 rounded-xl font-extrabold text-xs sm:text-sm border-2 transition flex items-center justify-center gap-1.5">
-              <span>Shapes</span>
-            </button>
-            <button type="button" data-cat="icons" onclick="toggleCat('icons')" class="cat-pill col-span-2 sm:col-span-2 py-2 px-3 rounded-xl font-extrabold text-xs sm:text-sm border-2 transition flex items-center justify-center gap-1.5">
-              <span>Objects</span>
+            <button type="button" id="modeHumanBtn" onclick="setGameMode('junebug')" class="tile py-2">
+              <span class="text-2xl leading-none">🐞</span>
+              <span class="text-sm">JUNEBUG</span>
+              <span class="text-[11px] font-bold opacity-70">friend picks</span>
             </button>
           </div>
         </div>
 
-        <!-- 2. Mode (Combined Auto vs Junebug) -->
-        <div class="space-y-1">
-          <div class="text-[11px] font-extrabold uppercase tracking-widest text-[#E5B363]">Mode</div>
-          <div class="grid grid-cols-2 gap-1.5 sm:gap-2 bg-[#24344D] p-1 sm:p-1.5 rounded-2xl border border-[#435E85]">
-            <button type="button" id="modeAutoBtn" onclick="setGameMode('auto')" class="py-1.5 sm:py-2 rounded-xl font-extrabold text-xs sm:text-sm transition">
-              Auto Mode
+        <!-- HOW MANY -->
+        <div class="space-y-2">
+          <div class="text-[11px] font-extrabold uppercase tracking-widest text-[#E5B363]">How many</div>
+          <div class="grid grid-cols-3 gap-2.5">
+            <button type="button" id="densEasyBtn" onclick="setDensity('easy')" class="tile py-2">
+              <span class="text-xs leading-none">⭐</span><span class="text-sm">EASY</span>
             </button>
-            <button type="button" id="modeHumanBtn" onclick="setGameMode('junebug')" class="py-1.5 sm:py-2 rounded-xl font-extrabold text-xs sm:text-sm transition">
-              Junebug Mode
+            <button type="button" id="densMedBtn" onclick="setDensity('medium')" class="tile py-2">
+              <span class="text-xs leading-none">⭐⭐</span><span class="text-sm">MEDIUM</span>
             </button>
-          </div>
-        </div>
-
-        <!-- 3. Moving Objects (Hard) -->
-        <div class="space-y-1">
-          <div class="text-[11px] font-extrabold uppercase tracking-widest text-[#E5B363]">Challenge</div>
-          <div class="grid grid-cols-2 gap-1.5 sm:gap-2 bg-[#24344D] p-1 sm:p-1.5 rounded-2xl border border-[#435E85]">
-            <button type="button" id="moveOffBtn" onclick="setMoving(false)" class="py-1.5 sm:py-2 rounded-xl font-extrabold text-xs sm:text-sm transition">
-              Static
-            </button>
-            <button type="button" id="moveOnBtn" onclick="setMoving(true)" class="py-1.5 sm:py-2 rounded-xl font-extrabold text-xs sm:text-sm transition">
-              Moving
+            <button type="button" id="densHardBtn" onclick="setDensity('hard')" class="tile py-2">
+              <span class="text-xs leading-none">⭐⭐⭐</span><span class="text-sm">HARD</span>
             </button>
           </div>
         </div>
 
-        <!-- 4. Density (Easy / Medium / Hard) -->
-        <div class="space-y-1">
-          <div class="text-[11px] font-extrabold uppercase tracking-widest text-[#E5B363]">Density</div>
-          <div class="grid grid-cols-3 gap-1.5 sm:gap-2 bg-[#24344D] p-1 sm:p-1.5 rounded-2xl border border-[#435E85]">
-            <button type="button" id="densEasyBtn" onclick="setDensity('easy')" class="py-1.5 sm:py-2 rounded-xl font-extrabold text-xs sm:text-sm transition">
-              Easy
+        <!-- MOVE -->
+        <div class="space-y-2">
+          <div class="text-[11px] font-extrabold uppercase tracking-widest text-[#E5B363]">Move</div>
+          <div class="grid grid-cols-2 gap-2.5">
+            <button type="button" id="moveOffBtn" onclick="setMoving(false)" class="tile py-2">
+              <span class="text-xl leading-none">😴</span><span class="text-sm">STILL</span>
             </button>
-            <button type="button" id="densMedBtn" onclick="setDensity('medium')" class="py-1.5 sm:py-2 rounded-xl font-extrabold text-xs sm:text-sm transition">
-              Medium
-            </button>
-            <button type="button" id="densHardBtn" onclick="setDensity('hard')" class="py-1.5 sm:py-2 rounded-xl font-extrabold text-xs sm:text-sm transition">
-              Hard
+            <button type="button" id="moveOnBtn" onclick="setMoving(true)" class="tile py-2">
+              <span class="text-xl leading-none">🌀</span><span class="text-sm">WIGGLE</span>
             </button>
           </div>
         </div>
 
-        <!-- START BUTTON (pinned to bottom of viewport so it is always reachable, no scrolling needed) -->
-        <button id="startBtn" onclick="startMatchFromLobby()" class="w-full py-3 sm:py-4 rounded-2xl bg-[#C9252D] hover:bg-[#d92c35] text-[#EFECE6] font-black text-lg sm:text-xl tracking-wider uppercase shadow-lg border-b-4 border-[#8E161C] active:translate-y-0.5 transition">
-          START
+        <!-- START BUTTON (pinned to bottom of viewport so it is always reachable) -->
+        <button id="startBtn" onclick="startMatchFromLobby()" class="w-full py-3.5 sm:py-4 rounded-2xl bg-[#C9252D] hover:bg-[#d92c35] text-[#EFECE6] font-black text-2xl tracking-wider uppercase shadow-lg border-b-4 border-[#8E161C] active:translate-y-0.5 transition">
+          PLAY ▶
         </button>
 
       </div>
@@ -293,11 +332,12 @@
   <!-- ==================== SCREEN 2: MINIMAL PASS OVERLAY ==================== -->
   <section id="curtainScreen" class="hidden fixed inset-0 z-50 bg-[#24344D] flex flex-col items-center justify-center p-6 text-center">
     <div class="max-w-xs w-full bg-[#314766] border-2 border-[#435E85] rounded-3xl p-6 shadow-2xl space-y-5">
-      <div id="curtainTitle" class="text-2xl font-black text-[#EFECE6] uppercase tracking-wide">
+      <div id="curtainTitle" class="text-3xl font-black text-[#EFECE6] uppercase tracking-wide">
         PASS TO P1
       </div>
-      <button onclick="onCurtainConfirm()" class="w-full py-4 rounded-2xl bg-[#38B449] hover:bg-[#42c754] text-[#2B1D16] font-black text-xl uppercase tracking-wider shadow-lg border-b-4 border-[#237A30] active:translate-y-0.5 transition">
-        GO
+      <div id="curtainSub" class="hidden text-base font-extrabold text-[#E5B363]"></div>
+      <button onclick="onCurtainConfirm()" class="w-full py-5 rounded-2xl bg-[#38B449] hover:bg-[#42c754] text-[#2A1B15] font-black text-3xl uppercase tracking-wider shadow-lg border-b-4 border-[#237A30] active:translate-y-0.5 transition">
+        GO!
       </button>
     </div>
   </section>
@@ -305,52 +345,38 @@
   <!-- ==================== SCREEN 3: ACTIVE GAMEPLAY & SVG JUMBLE ==================== -->
   <section id="gameScreen" class="hidden flex-1 flex flex-col w-full max-w-4xl mx-auto p-1.5 sm:p-3 gap-1.5 sm:gap-2 h-full overflow-hidden">
     
-    <!-- COMPACT TOP HUD BAR -->
-    <header class="bg-[#314766] border-2 border-[#435E85] rounded-2xl px-2.5 py-1.5 flex items-center justify-between gap-2 shrink-0 shadow-lg">
-      
-      <!-- Left: Lobby Back + Player Score Pill -->
+    <!-- HUD: row 1 = back, who + pie, clock.  Row 2 = what to find (full width, never cut off) -->
+    <header class="bg-[#314766] border-2 border-[#435E85] rounded-2xl px-2.5 py-1.5 flex flex-wrap items-center justify-between gap-x-2 gap-y-1.5 shrink-0 shadow-lg">
+
       <div class="flex items-center gap-1.5">
-        <button onclick="returnToLobby()" class="w-9 h-9 rounded-xl bg-[#24344D] text-[#EFECE6] font-black flex items-center justify-center border border-[#435E85]">
+        <button onclick="returnToLobby()" class="w-11 h-11 rounded-xl bg-[#24344D] text-[#EFECE6] text-lg font-black flex items-center justify-center border border-[#435E85] active:scale-95 transition">
           ✕
         </button>
-        <div class="bg-[#24344D] px-2.5 py-1.5 rounded-xl border border-[#435E85] flex items-center gap-1.5">
-          <span id="hudPlayerTag" class="text-xs font-black text-[#E5B363]">P1</span>
-          <span class="text-xs text-[#435E85]">•</span>
-          <span id="hudTurnScore" class="text-base font-black text-[#4BB543]">0</span>
+        <div class="bg-[#24344D] pl-2.5 pr-1.5 py-0.5 rounded-xl border border-[#435E85] flex items-center gap-1.5">
+          <span id="hudPlayerTag" class="text-sm font-black text-[#E5B363]">P1</span>
+          <span id="hudPie" class="block w-10 h-10"></span>
         </div>
       </div>
 
-      <!-- Center: Canonical Target Box OR 15s Pick Counter -->
-      <div class="flex-1 flex items-center justify-center min-w-0">
-        <!-- Hunt Target Badge -->
-        <div id="hudHuntBox" class="bg-[#EFECE6] text-[#2A1B15] px-3.5 py-1 rounded-xl border-2 border-[#D69847] min-h-[42px] flex items-center justify-center gap-2 shadow-inner max-w-full overflow-hidden">
-          <div id="hudCanonicalBadge" class="font-black text-xl sm:text-2xl tracking-wider flex items-center justify-center gap-2 truncate">
-            42
-          </div>
+      <div class="order-last w-full sm:order-none sm:w-auto sm:flex-1 flex items-center justify-center min-w-0">
+        <!-- Hunt target -->
+        <div id="hudHuntBox" class="bg-[#EFECE6] text-[#2A1B15] px-4 py-1 rounded-xl border-2 border-[#D69847] min-h-[52px] flex items-center justify-center gap-2 shadow-inner max-w-full">
+          <div id="hudCanonicalBadge" class="font-black flex flex-wrap items-center justify-center gap-x-2 text-center"></div>
         </div>
 
-        <!-- 15s Opponent Pick Bar -->
-        <div id="hudPickBox" class="hidden bg-[#24344D] border-2 border-[#E5B363] px-3 py-1.5 rounded-xl flex items-center gap-2.5">
-          <span id="hudPickCount" class="text-xs sm:text-sm font-black text-[#E5B363] uppercase">PICK: 0</span>
-          <button onclick="finishTargetSelectionPhase()" class="px-3 py-1 rounded-lg bg-[#4BB543] text-[#2A1B15] font-black text-xs uppercase">
+        <!-- Junebug: pick 5 -->
+        <div id="hudPickBox" class="hidden bg-[#24344D] border-2 border-[#E5B363] px-3 py-1.5 rounded-xl flex items-center gap-3">
+          <span id="hudPickText" class="text-sm sm:text-base font-black text-[#E5B363] uppercase">PICK 5</span>
+          <button id="pickDoneBtn" onclick="finishTargetSelectionPhase()" disabled class="px-4 py-2 rounded-lg bg-[#4BB543] text-[#2A1B15] font-black text-sm uppercase opacity-40">
             DONE
           </button>
         </div>
       </div>
 
-      <!-- Right: Skip + Countdown OR "TIME'S UP!" -->
       <div class="flex items-center gap-1.5">
-        <button id="skipBtn" onclick="skipCurrentTarget()" class="px-2.5 py-2 rounded-xl bg-[#24344D] text-[#EFECE6] font-extrabold text-xs border border-[#435E85] active:scale-95 transition">
-          SKIP
-        </button>
-
-        <div id="clockBox" class="bg-[#24344D] border border-[#435E85] rounded-xl px-2.5 py-1.5 min-w-[54px] text-center">
-          <span id="clockText" class="text-sm sm:text-base font-mono font-black text-[#E5B363]">30s</span>
+        <div id="clockBox" class="bg-[#24344D] border border-[#435E85] rounded-xl px-3 py-2 min-w-[70px] text-center">
+          <span id="clockText" class="text-base font-mono font-black text-[#E5B363]">0.0s</span>
         </div>
-
-        <button id="timesUpBtn" onclick="triggerHumanTimesUp()" class="hidden px-3 py-2 rounded-xl bg-[#C9252D] text-[#EFECE6] font-black text-xs sm:text-sm uppercase tracking-wider shadow border-b-2 border-[#8E161C] active:scale-95 transition">
-          TIME'S UP!
-        </button>
       </div>
 
     </header>
@@ -372,11 +398,10 @@
           <g id="feedbackLayer"></g>
         </svg>
 
-        <!-- 1s Freeze Lock -->
-        <div id="freezeOverlay" class="hidden absolute inset-0 bg-[#C9252D]/40 backdrop-blur-[1px] flex items-center justify-center">
-          <div class="bg-[#24344D] border-2 border-[#C9252D] text-[#EFECE6] font-black text-lg px-5 py-2.5 rounded-2xl uppercase">
-            WAIT 1s
-          </div>
+        <!-- Leg finished: baked pie + your time -->
+        <div id="doneOverlay" class="hidden absolute inset-0 bg-[#24344D]/90 flex flex-col items-center justify-center gap-3 z-10">
+          <div id="donePie" class="done-pop w-44 h-44"></div>
+          <div id="doneTime" class="done-pop text-6xl font-black text-[#EFECE6]" style="font-family:'Fredoka',sans-serif;">0.0s</div>
         </div>
       </div>
     </div>
@@ -386,28 +411,30 @@
   <!-- ==================== SCREEN 4: MINIMAL TURN SUMMARY MODAL ==================== -->
   <section id="summaryModal" class="hidden fixed inset-0 z-50 bg-[#24344D]/90 backdrop-blur-sm flex items-center justify-center p-4">
     <div class="max-w-xs w-full bg-[#314766] border-2 border-[#435E85] rounded-3xl p-6 shadow-2xl space-y-5 text-center">
-      
-      <div id="summaryTurnTitle" class="text-xl font-black text-[#E5B363] uppercase">
-        P1: +0
+
+      <div id="summaryTurnTitle" class="text-3xl font-black text-[#E5B363] uppercase">
+        P1 WINS!
       </div>
 
-      <div class="grid grid-cols-2 gap-3 bg-[#24344D] p-3.5 rounded-2xl border border-[#435E85]">
-        <div>
-          <div class="text-xs font-extrabold text-[#E5B363]">P1</div>
-          <div id="sumP1Score" class="text-3xl font-black text-[#EFECE6]">0</div>
+      <div class="grid grid-cols-2 gap-3 bg-[#24344D] p-3 rounded-2xl border border-[#435E85]">
+        <div id="sumCell1" class="rounded-xl p-2 border-2 border-transparent">
+          <div class="text-sm font-extrabold text-[#E5B363]">P1</div>
+          <div id="sumP1Time" class="text-3xl font-black text-[#EFECE6]">0.0s</div>
+          <div id="sumP1Wins" class="text-[11px] font-extrabold text-[#EFECE6]/60">WINS: 0</div>
         </div>
-        <div>
-          <div class="text-xs font-extrabold text-[#F2C6A0]">P2</div>
-          <div id="sumP2Score" class="text-3xl font-black text-[#EFECE6]">0</div>
+        <div id="sumCell2" class="rounded-xl p-2 border-2 border-transparent">
+          <div class="text-sm font-extrabold text-[#F2C6A0]">P2</div>
+          <div id="sumP2Time" class="text-3xl font-black text-[#EFECE6]">0.0s</div>
+          <div id="sumP2Wins" class="text-[11px] font-extrabold text-[#EFECE6]/60">WINS: 0</div>
         </div>
       </div>
 
       <div class="flex gap-2.5">
-        <button onclick="returnToLobby()" class="w-1/3 py-3.5 rounded-2xl bg-[#24344D] text-[#EFECE6] font-extrabold text-xs uppercase border border-[#435E85]">
-          LOBBY
+        <button onclick="returnToLobby()" class="w-1/3 py-4 rounded-2xl bg-[#24344D] text-[#EFECE6] font-extrabold text-lg border border-[#435E85] active:scale-95 transition">
+          🏠
         </button>
-        <button onclick="advanceFromSummary()" class="w-2/3 py-3.5 rounded-2xl bg-[#E5B363] text-[#2B1D16] font-black text-sm uppercase shadow-lg border-b-4 border-[#D69847]">
-          NEXT TURN
+        <button onclick="advanceFromSummary()" class="w-2/3 py-4 rounded-2xl bg-[#E5B363] text-[#2B1D16] font-black text-xl uppercase shadow-lg border-b-4 border-[#D69847] active:translate-y-0.5 transition">
+          AGAIN ▶
         </button>
       </div>
 
@@ -440,6 +467,27 @@
       "TAN", "ONE", "TWO", "SIX", "TEN", "MOM", "DAD", "BOY", "PAL", "EYE",
       "EAR", "ARM", "LEG", "TOE", "LIP", "PAW", "FIN", "HOP", "RUN", "FLY",
       "HUG", "WIN", "ZIP", "POP"
+    ];
+
+    const UNIQUE_WORDS_4 = [
+      "FROG", "DUCK", "FISH", "BIRD", "BEAR", "LION", "DEER", "GOAT", "CRAB", "SEAL",
+      "WOLF", "MOTH", "CAKE", "CORN", "PEAR", "PLUM", "MILK", "RICE", "SOUP", "BEAN",
+      "LIME", "BALL", "BOOK", "DOLL", "DRUM", "KITE", "LAMP", "BELL", "COIN", "DOOR",
+      "FORK", "RING", "SHOE", "SOCK", "SHIP", "TENT", "BOAT", "BIKE", "MOON", "STAR",
+      "RAIN", "SNOW", "WIND", "LEAF", "TREE", "ROCK", "SAND", "POND", "LAKE", "HILL",
+      "FIRE", "WAVE", "CAVE", "HAND", "FOOT", "NOSE", "HAIR", "KNEE", "HEAD", "PLAY",
+      "JUMP", "SWIM", "SING", "GAME", "GIFT", "KING", "FARM", "BARN", "NEST", "WING",
+      "TAIL", "BONE", "CAMP", "CLAP", "DISH", "FLAG", "GOLD", "HOOP"
+    ];
+
+    const UNIQUE_WORDS_5 = [
+      "APPLE", "GRAPE", "LEMON", "MANGO", "PEACH", "BERRY", "PIZZA", "BREAD", "CANDY", "HONEY",
+      "JUICE", "SALAD", "TOAST", "PASTA", "HORSE", "MOUSE", "SHEEP", "TIGER", "ZEBRA", "SNAKE",
+      "SHARK", "WHALE", "PANDA", "KOALA", "OTTER", "SNAIL", "BUNNY", "PUPPY", "ROBIN", "CAMEL",
+      "CHAIR", "CLOCK", "TABLE", "PLANT", "BEACH", "BRUSH", "CROWN", "PAINT", "PIANO", "ROBOT",
+      "TRAIN", "TRUCK", "WATER", "SMILE", "HAPPY", "LAUGH", "DREAM", "MUSIC", "PARTY", "RIVER",
+      "STONE", "STORM", "SUNNY", "OCEAN", "FIELD", "HEART", "LIGHT", "NIGHT", "CLOUD", "DAISY",
+      "DANCE", "EAGLE", "TOWER", "MAGIC"
     ];
 
     const AMBIGUOUS_NUMBERS = new Set([6, 9, 66, 68, 69, 86, 89, 96, 98, 99]);
@@ -479,46 +527,6 @@
       { id: "double", label: "Double" }
     ];
 
-    // 36 Kid-Friendly Everyday Objects
-    const EVERYDAY_OBJECTS = [
-      { id: "apple", name: "Apple", svg: `<path d="M50 28 C35 24 16 34 16 56 C16 76 32 90 45 90 C48 90 50 88 50 88 C50 88 52 90 55 90 C68 90 84 76 84 56 C84 34 65 24 50 28 Z" fill="#2A1B15"/><path d="M50 28 Q50 14 60 10" stroke="#2A1B15" stroke-width="6.5" stroke-linecap="round" fill="none"/><path d="M52 20 C62 12 74 16 70 24 C64 28 54 24 52 20 Z" fill="#2A1B15"/>` },
-      { id: "banana", name: "Banana", svg: `<path d="M22 20 C16 56 44 86 84 80 C62 70 42 50 34 16 Z" fill="#2A1B15" stroke="#2A1B15" stroke-width="5" stroke-linejoin="round"/><path d="M22 20 L34 14" stroke="#2A1B15" stroke-width="7" stroke-linecap="round"/>` },
-      { id: "cherries", name: "Cherries", svg: `<circle cx="30" cy="70" r="16" fill="#2A1B15"/><circle cx="70" cy="70" r="16" fill="#2A1B15"/><path d="M30 56 Q44 24 56 14 Q66 32 70 56" stroke="#2A1B15" stroke-width="6.5" stroke-linecap="round" stroke-linejoin="round" fill="none"/>` },
-      { id: "pie", name: "Pie Slice", svg: `<path d="M14 72 L86 72 C84 42 64 20 34 16 Z" fill="#2A1B15"/><path d="M32 14 C66 18 88 42 88 74" stroke="#2A1B15" stroke-width="7.5" stroke-linecap="round" fill="none"/><circle cx="52" cy="36" r="8" fill="#EFECE6"/><circle cx="52" cy="36" r="5" fill="#2A1B15"/>` },
-      { id: "icecream", name: "Ice Cream", svg: `<polygon points="30,48 70,48 50,92" fill="#2A1B15"/><circle cx="50" cy="34" r="22" fill="#2A1B15"/><path d="M28 46 H72" stroke="#EFECE6" stroke-width="4" stroke-linecap="round"/>` },
-      { id: "pizza", name: "Pizza Slice", svg: `<polygon points="50,88 16,22 84,22" fill="none" stroke="#2A1B15" stroke-width="7" stroke-linejoin="round"/><path d="M14 20 Q50 10 86 20" stroke="#2A1B15" stroke-width="9" stroke-linecap="round" fill="none"/><circle cx="44" cy="40" r="6" fill="#2A1B15"/><circle cx="58" cy="52" r="6" fill="#2A1B15"/><circle cx="46" cy="64" r="5" fill="#2A1B15"/>` },
-      { id: "cupcake", name: "Cupcake", svg: `<polygon points="24,54 76,54 68,88 32,88" fill="#2A1B15"/><path d="M20 50 C14 50 14 34 26 34 C28 20 44 16 50 22 C56 16 72 20 74 34 C86 34 86 50 80 50 Z" fill="none" stroke="#2A1B15" stroke-width="6.5" stroke-linejoin="round"/><circle cx="50" cy="14" r="6" fill="#2A1B15"/>` },
-      { id: "fish", name: "Fish", svg: `<path d="M10 50 C26 22 60 22 74 50 C60 78 26 78 10 50 Z" fill="#2A1B15"/><polygon points="70,50 92,26 88,50 92,74" fill="#2A1B15"/><circle cx="26" cy="45" r="4.5" fill="#EFECE6"/>` },
-      { id: "butterfly", name: "Butterfly", svg: `<path d="M46 44 C20 12 8 28 16 46 C22 54 36 52 46 52 C24 58 14 78 30 84 C42 88 48 68 48 58 M54 44 C80 12 92 28 84 46 C78 54 64 52 54 52 C76 58 86 78 70 84 C58 88 52 68 52 58" fill="#2A1B15"/><rect x="46" y="26" width="8" height="52" rx="4" fill="#2A1B15"/>` },
-      { id: "bird", name: "Bird", svg: `<path d="M22 56 C22 36 38 24 56 24 C70 24 80 34 80 46 C80 68 58 80 34 78 L12 82 L24 66 C22 62 22 58 22 56 Z" fill="#2A1B15"/><polygon points="80,38 94,44 80,50" fill="#2A1B15"/><circle cx="66" cy="38" r="4" fill="#EFECE6"/>` },
-      { id: "cat", name: "Cat", svg: `<path d="M18 42 L18 14 L38 30 H62 L82 14 L82 42 C86 64 72 86 50 86 C28 86 14 64 18 42 Z" fill="#2A1B15"/><circle cx="36" cy="52" r="5" fill="#EFECE6"/><circle cx="64" cy="52" r="5" fill="#EFECE6"/><polygon points="45,62 55,62 50,69" fill="#EFECE6"/>` },
-      { id: "bone", name: "Dog Bone", svg: `<path d="M26 36 C16 36 12 24 20 18 C28 12 36 20 36 28 L64 28 C64 20 72 12 80 18 C88 24 84 36 74 36 L74 64 C84 64 88 76 80 82 C72 88 64 80 64 72 L36 72 C36 80 28 88 20 82 C12 76 16 64 26 64 Z" fill="#2A1B15"/>` },
-      { id: "duck", name: "Duck", svg: `<path d="M64 38 C76 38 82 24 70 16 C58 10 46 20 48 34 C48 38 50 42 46 44 C30 44 16 40 12 56 C10 74 28 86 52 86 C74 86 84 72 80 56 C78 46 70 42 64 38 Z" fill="#2A1B15"/><polygon points="75,24 92,28 75,34" fill="#2A1B15"/><circle cx="64" cy="24" r="3.5" fill="#EFECE6"/>` },
-      { id: "crown", name: "Crown", svg: `<path d="M12 76 L18 28 L38 52 L50 20 L62 52 L82 28 L88 76 Z" fill="#2A1B15"/><rect x="12" y="80" width="76" height="9" rx="3" fill="#2A1B15"/>` },
-      { id: "key", name: "Key", svg: `<circle cx="28" cy="50" r="18" stroke="#2A1B15" stroke-width="8" fill="none"/><path d="M46 50 H90 M72 50 V68 M84 50 V64" stroke="#2A1B15" stroke-width="8" stroke-linecap="round"/>` },
-      { id: "scissors", name: "Scissors", svg: `<circle cx="24" cy="30" r="12" stroke="#2A1B15" stroke-width="7" fill="none"/><circle cx="24" cy="70" r="12" stroke="#2A1B15" stroke-width="7" fill="none"/><path d="M34 36 L88 76 M34 64 L88 24" stroke="#2A1B15" stroke-width="8" stroke-linecap="round"/>` },
-      { id: "umbrella", name: "Umbrella", svg: `<path d="M10 52 C10 24 30 12 50 12 C70 12 90 24 90 52 Z" fill="#2A1B15"/><path d="M50 50 V80 C50 88 36 88 36 78" stroke="#2A1B15" stroke-width="7.5" stroke-linecap="round" fill="none"/>` },
-      { id: "bell", name: "Bell", svg: `<path d="M50 12 C32 12 22 26 22 48 L12 72 H88 L78 48 C78 26 68 12 50 12 Z" fill="#2A1B15"/><circle cx="50" cy="82" r="9" fill="#2A1B15"/>` },
-      { id: "mug", name: "Mug", svg: `<path d="M18 24 H68 V66 C68 80 58 88 43 88 C28 88 18 80 18 66 Z" fill="#2A1B15"/><path d="M68 32 H78 C86 32 88 40 88 48 C88 56 84 62 76 62 H68" stroke="#2A1B15" stroke-width="8" fill="none"/>` },
-      { id: "house", name: "House", svg: `<polygon points="50,12 10,48 22,48 22,88 78,88 78,48 90,48" fill="#2A1B15"/><rect x="42" y="58" width="16" height="30" rx="2" fill="#EFECE6"/>` },
-      { id: "car", name: "Car", svg: `<path d="M18 52 L28 30 H72 L82 52 H92 V74 H8 V52 Z" fill="#2A1B15"/><circle cx="26" cy="76" r="11" fill="#2A1B15" stroke="#EFECE6" stroke-width="3"/><circle cx="74" cy="76" r="11" fill="#2A1B15" stroke="#EFECE6" stroke-width="3"/>` },
-      { id: "boat", name: "Sailboat", svg: `<polygon points="48,12 48,64 16,64" fill="#2A1B15"/><polygon points="54,22 54,64 82,64" fill="#2A1B15"/><path d="M12 70 H88 L76 86 H24 Z" fill="#2A1B15"/>` },
-      { id: "rocket", name: "Rocket", svg: `<path d="M50 10 C68 28 70 54 66 72 H34 C30 54 32 28 50 10 Z" fill="#2A1B15"/><polygon points="34,54 16,74 34,72" fill="#2A1B15"/><polygon points="66,54 84,74 66,72" fill="#2A1B15"/><circle cx="50" cy="42" r="7" fill="#EFECE6"/>` },
-      { id: "plane", name: "Airplane", svg: `<path d="M50 10 L58 36 L90 50 L90 60 L58 52 L56 76 L70 84 L70 90 L50 85 L30 90 L30 84 L44 76 L42 52 L10 60 L10 50 L42 36 Z" fill="#2A1B15"/>` },
-      { id: "tree", name: "Tree", svg: `<rect x="42" y="64" width="16" height="26" fill="#2A1B15"/><circle cx="50" cy="34" r="22" fill="#2A1B15"/><circle cx="32" cy="52" r="18" fill="#2A1B15"/><circle cx="68" cy="52" r="18" fill="#2A1B15"/>` },
-      { id: "flower", name: "Flower", svg: `<circle cx="50" cy="24" r="14" fill="#2A1B15"/><circle cx="50" cy="76" r="14" fill="#2A1B15"/><circle cx="24" cy="50" r="14" fill="#2A1B15"/><circle cx="76" cy="50" r="14" fill="#2A1B15"/><circle cx="32" cy="32" r="14" fill="#2A1B15"/><circle cx="68" cy="32" r="14" fill="#2A1B15"/><circle cx="32" cy="68" r="14" fill="#2A1B15"/><circle cx="68" cy="68" r="14" fill="#2A1B15"/><circle cx="50" cy="50" r="12" fill="#EFECE6"/>` },
-      { id: "sun", name: "Sun", svg: `<circle cx="50" cy="50" r="22" fill="#2A1B15"/><path d="M50 8 V20 M50 80 V92 M8 50 H20 M80 50 H92 M20 20 L29 29 M71 71 L80 80 M80 20 L71 29 M29 71 L20 80" stroke="#2A1B15" stroke-width="7.5" stroke-linecap="round"/>` },
-      { id: "bolt", name: "Lightning Bolt", svg: `<polygon points="58,8 20,54 48,54 38,92 80,44 52,44" fill="#2A1B15"/>` },
-      { id: "glasses", name: "Glasses", svg: `<circle cx="26" cy="56" r="17" stroke="#2A1B15" stroke-width="7" fill="none"/><circle cx="74" cy="56" r="17" stroke="#2A1B15" stroke-width="7" fill="none"/><path d="M43 52 Q50 45 57 52 M9 52 L18 32 M91 52 L82 32" stroke="#2A1B15" stroke-width="6.5" stroke-linecap="round" fill="none"/>` },
-      { id: "music", name: "Music Note", svg: `<ellipse cx="28" cy="76" rx="14" ry="10" fill="#2A1B15"/><ellipse cx="72" cy="68" rx="14" ry="10" fill="#2A1B15"/><path d="M38 74 V22 L82 14 V66" stroke="#2A1B15" stroke-width="8" fill="none"/><path d="M38 34 L82 26" stroke="#2A1B15" stroke-width="8"/>` },
-      { id: "balloon", name: "Balloon", svg: `<path d="M50 10 C30 10 18 24 18 42 C18 60 36 72 50 74 C64 72 82 60 82 42 C82 24 70 10 50 10 Z" fill="#2A1B15"/><polygon points="50,72 43,80 57,80" fill="#2A1B15"/><path d="M50 80 Q56 88 46 94" stroke="#2A1B15" stroke-width="5" stroke-linecap="round" fill="none"/>` },
-      { id: "gift", name: "Gift Box", svg: `<rect x="18" y="42" width="64" height="46" rx="4" fill="#2A1B15"/><rect x="14" y="28" width="72" height="14" rx="3" fill="#2A1B15"/><rect x="44" y="28" width="12" height="60" fill="#EFECE6"/><path d="M50 28 C34 12 24 22 36 28 M50 28 C66 12 76 22 64 28" stroke="#2A1B15" stroke-width="6.5" stroke-linecap="round" fill="none"/>` },
-      { id: "pencil", name: "Pencil", svg: `<polygon points="16,84 26,60 68,18 82,32 40,74" fill="#2A1B15"/><polygon points="14,86 28,80 20,72" fill="#EFECE6"/><polygon points="14,86 22,83 17,78" fill="#2A1B15"/>` },
-      { id: "book", name: "Book", svg: `<path d="M12 22 C28 18 44 22 50 28 C56 22 72 18 88 22 V78 C72 74 56 78 50 84 C44 78 28 74 12 78 Z" fill="none" stroke="#2A1B15" stroke-width="7.5" stroke-linejoin="round"/><line x1="50" y1="28" x2="50" y2="84" stroke="#2A1B15" stroke-width="7"/>` },
-      { id: "boot", name: "Boot", svg: `<path d="M28 14 H58 V56 L84 66 C90 68 90 84 82 84 H24 V14 Z" fill="#2A1B15"/>` },
-      { id: "clock", name: "Clock", svg: `<circle cx="50" cy="50" r="38" stroke="#2A1B15" stroke-width="7.5" fill="none"/><path d="M50 26 V50 L68 58" stroke="#2A1B15" stroke-width="7.5" stroke-linecap="round" stroke-linejoin="round" fill="none"/>` }
-    ];
-
     /********************************************************************
      * 2. WEB AUDIO SYNTH
      ********************************************************************/
@@ -530,6 +538,24 @@
         if (!audioCtx) return;
         if (audioCtx.state === "suspended") audioCtx.resume();
         const now = audioCtx.currentTime;
+
+        if (type === "win") {
+          [523.25, 659.25, 783.99, 1046.5].forEach((f, i) => {
+            const o = audioCtx.createOscillator();
+            const g = audioCtx.createGain();
+            o.connect(g);
+            g.connect(audioCtx.destination);
+            o.type = "triangle";
+            o.frequency.setValueAtTime(f, now + i * 0.11);
+            g.gain.setValueAtTime(0.0001, now + i * 0.11);
+            g.gain.exponentialRampToValueAtTime(0.2, now + i * 0.11 + 0.02);
+            g.gain.exponentialRampToValueAtTime(0.001, now + i * 0.11 + 0.3);
+            o.start(now + i * 0.11);
+            o.stop(now + i * 0.11 + 0.32);
+          });
+          return;
+        }
+
         const osc = audioCtx.createOscillator();
         const gain = audioCtx.createGain();
         osc.connect(gain);
@@ -573,12 +599,23 @@
     /********************************************************************
      * 3. STATE & LOBBY CONTROLS
      ********************************************************************/
-    const DENSITY_MAP = { easy: 32, medium: 48, hard: 120 };
+    const TARGETS_PER_ROUND = 5;   // a pie has 5 slices: find 5 things to bake it
+    const HINT_MS = 8000;          // no find for this long -> the target glows
+
+    // Easy = few, BIG, mostly upright. Medium/Hard = the original crowded boards.
+    const DENSITY = {
+      easy:   { count: 18,  min: 56, max: 84, rotRange: 28 },
+      medium: { count: 48,  min: 32, max: 60, rotRange: 180 },
+      hard:   { count: 120, min: 32, max: 60, rotRange: 180 }
+    };
 
     const state = {
-      p1TotalScore: 0,
+      p1TotalScore: 0,   // rounds won
       p2TotalScore: 0,
-      activeHunter: 1, // 1 or 2
+      firstHunter: 1,    // alternates every round
+      hunter: 1,         // who is hunting right now
+      leg: 0,            // 0 = first hunter, 1 = second hunter
+      times: { 1: null, 2: null },
       phase: "lobby",
       nextCurtainAction: null,
 
@@ -586,111 +623,81 @@
         numbers: true,
         bigrams: true,
         words: true,
-        polygons: true,
-        icons: true
+        words4: false,
+        words5: false,
+        polygons: true
       },
-      mode: "auto",       // 'auto' | 'junebug'
-      densityKey: "hard", // 'easy' (32) | 'medium' (48) | 'hard' (64)
+      mode: "auto",        // 'auto' (surprise) | 'junebug' (friend picks)
+      densityKey: "easy",
+      moving: false,
 
       boardItems: [],
-      customTargetQueue: [],
-      usedTargetIds: new Set(),
+      targetUids: [],      // the 5 things to find, in order
+      pickQueue: [],       // junebug: what the picker has tapped so far
+      targetIdx: 0,
+      found: 0,
       currentTarget: null,
-      turnScore: 0,
 
       timerInterval: null,
-      timeRemainingMs: 20000,
-      wrongTapStreak: 0,
-      isFrozen: false,
-      moving: false
+      flowTimer: null,
+      hintTimer: null,
+      huntStartTs: 0,
+      wrongTapStreak: 0
     };
 
+    function otherPlayer(n) { return n === 1 ? 2 : 1; }
+    function fmtTime(ms) { return (ms / 1000).toFixed(1) + "s"; }
+
+    function paint(el, on) {
+      el.classList.toggle("tile-on", !!on);
+      el.classList.toggle("tile-off", !on);
+    }
+
     function syncLobbyUI() {
-      // Category Pills
-      document.querySelectorAll(".cat-pill").forEach(btn => {
-        const key = btn.dataset.cat;
-        const active = state.categories[key];
-        if (active) {
-          btn.className = "cat-pill py-2 px-3 rounded-xl font-extrabold text-xs sm:text-sm border-2 transition flex items-center justify-center gap-1.5 bg-[#E5B363] text-[#2B1D16] border-[#D69847] shadow";
-          if (key === "icons") btn.classList.add("col-span-2", "sm:col-span-2");
-        } else {
-          btn.className = "cat-pill py-2 px-3 rounded-xl font-extrabold text-xs sm:text-sm border-2 transition flex items-center justify-center gap-1.5 bg-[#24344D] text-[#EFECE6]/70 border-[#435E85]";
-          if (key === "icons") btn.classList.add("col-span-2", "sm:col-span-2");
-        }
-      });
+      document.querySelectorAll(".cat-pill").forEach(btn => paint(btn, state.categories[btn.dataset.cat]));
 
-      // Mode Toggle
-      const autoBtn = document.getElementById("modeAutoBtn");
-      const humanBtn = document.getElementById("modeHumanBtn");
-      if (state.mode === "auto") {
-        autoBtn.className = "py-1.5 sm:py-2 rounded-xl font-extrabold text-xs sm:text-sm transition bg-[#E5B363] text-[#2B1D16] shadow";
-        humanBtn.className = "py-1.5 sm:py-2 rounded-xl font-extrabold text-xs sm:text-sm transition text-[#EFECE6]/70";
-      } else {
-        humanBtn.className = "py-1.5 sm:py-2 rounded-xl font-extrabold text-xs sm:text-sm transition bg-[#E5B363] text-[#2B1D16] shadow";
-        autoBtn.className = "py-1.5 sm:py-2 rounded-xl font-extrabold text-xs sm:text-sm transition text-[#EFECE6]/70";
-      }
+      paint(document.getElementById("modeAutoBtn"), state.mode === "auto");
+      paint(document.getElementById("modeHumanBtn"), state.mode === "junebug");
 
-      // Density Toggle
-      const dMap = {
-        easy: document.getElementById("densEasyBtn"),
-        medium: document.getElementById("densMedBtn"),
-        hard: document.getElementById("densHardBtn")
-      };
-      Object.keys(dMap).forEach(k => {
-        if (k === state.densityKey) {
-          dMap[k].className = "py-1.5 sm:py-2 rounded-xl font-extrabold text-xs sm:text-sm transition bg-[#E5B363] text-[#2B1D16] shadow";
-        } else {
-          dMap[k].className = "py-1.5 sm:py-2 rounded-xl font-extrabold text-xs sm:text-sm transition text-[#EFECE6]/70";
-        }
-      });
+      paint(document.getElementById("densEasyBtn"), state.densityKey === "easy");
+      paint(document.getElementById("densMedBtn"), state.densityKey === "medium");
+      paint(document.getElementById("densHardBtn"), state.densityKey === "hard");
 
-      // Scores
+      paint(document.getElementById("moveOffBtn"), !state.moving);
+      paint(document.getElementById("moveOnBtn"), state.moving);
+
       document.getElementById("lobbyP1Score").textContent = state.p1TotalScore;
       document.getElementById("lobbyP2Score").textContent = state.p2TotalScore;
-
-      // Moving Toggle
-      const moveOff = document.getElementById("moveOffBtn");
-      const moveOn = document.getElementById("moveOnBtn");
-      if (state.moving) {
-        moveOn.className = "py-1.5 sm:py-2 rounded-xl font-extrabold text-xs sm:text-sm transition bg-[#E5B363] text-[#2B1D16] shadow";
-        moveOff.className = "py-1.5 sm:py-2 rounded-xl font-extrabold text-xs sm:text-sm transition text-[#EFECE6]/70";
-      } else {
-        moveOff.className = "py-1.5 sm:py-2 rounded-xl font-extrabold text-xs sm:text-sm transition bg-[#E5B363] text-[#2B1D16] shadow";
-        moveOn.className = "py-1.5 sm:py-2 rounded-xl font-extrabold text-xs sm:text-sm transition text-[#EFECE6]/70";
-      }
     }
 
     function toggleCat(key) {
       const activeCount = Object.values(state.categories).filter(Boolean).length;
-      if (state.categories[key] && activeCount <= 1) return; // Keep at least 1 active
+      if (state.categories[key] && activeCount <= 1) {
+        // Need at least one thing to find: wiggle the button so it doesn't feel broken
+        const btn = document.querySelector(`.cat-pill[data-cat="${key}"]`);
+        if (btn) {
+          btn.classList.add("shake");
+          setTimeout(() => btn.classList.remove("shake"), 320);
+        }
+        return;
+      }
       state.categories[key] = !state.categories[key];
       syncLobbyUI();
     }
 
-    function setGameMode(m) {
-      state.mode = m;
-      syncLobbyUI();
-    }
-
-    function setDensity(d) {
-      state.densityKey = d;
-      syncLobbyUI();
-    }
-
-    function setMoving(m) {
-      state.moving = m;
-      syncLobbyUI();
-    }
+    function setGameMode(m) { state.mode = m; syncLobbyUI(); }
+    function setDensity(d) { state.densityKey = d; syncLobbyUI(); }
+    function setMoving(m) { state.moving = m; syncLobbyUI(); }
 
     function resetMatchScores() {
       state.p1TotalScore = 0;
       state.p2TotalScore = 0;
-      state.activeHunter = 1;
+      state.firstHunter = 1;
       syncLobbyUI();
     }
 
     /********************************************************************
-     * 4. GUARANTEED 800x1000 SVG JUMBLE GENERATOR
+     * 4. SVG JUMBLE GENERATOR
      ********************************************************************/
     function shuffleArray(arr) {
       const a = [...arr];
@@ -733,8 +740,14 @@
         pools.push(shuffleArray(list));
       }
 
-      if (state.categories.words) {
-        const list = UNIQUE_WORDS.map(w => {
+      const WORD_SETS = [
+        { cat: "words",  list: UNIQUE_WORDS },
+        { cat: "words4", list: UNIQUE_WORDS_4 },
+        { cat: "words5", list: UNIQUE_WORDS_5 }
+      ];
+      for (const set of WORD_SETS) {
+        if (!state.categories[set.cat]) continue;
+        const list = set.list.map(w => {
           const r = Math.random();
           const txt = r < 0.35 ? w.toLowerCase() : (r < 0.7 ? w[0] + w.slice(1).toLowerCase() : w);
           return {
@@ -761,16 +774,6 @@
             });
           }
         }
-        pools.push(shuffleArray(list));
-      }
-
-      if (state.categories.icons) {
-        const list = EVERYDAY_OBJECTS.map(ic => ({
-          uid: `icon_${ic.id}`,
-          category: "icon",
-          canonicalText: ic.name,
-          iconData: ic
-        }));
         pools.push(shuffleArray(list));
       }
 
@@ -853,12 +856,6 @@
         innerG.setAttribute("transform", `scale(${s}) translate(-50, -50)`);
         innerG.innerHTML = getPolygonInnerMarkup(item.baseShape, item.modifier);
         g.appendChild(innerG);
-      } else if (item.category === "icon") {
-        const innerG = document.createElementNS(ns, "g");
-        const s = sz / 100;
-        innerG.setAttribute("transform", `scale(${s}) translate(-50, -50)`);
-        innerG.innerHTML = item.iconData.svg;
-        g.appendChild(innerG);
       }
 
       return g;
@@ -882,7 +879,7 @@
       let charW = 1.05;
       if (item.category === "number") charW = item.boardText.length === 1 ? 0.82 : 1.38;
       else if (item.category === "bigram") charW = 1.55;
-      else if (item.category === "word") charW = 2.25;
+      else if (item.category === "word") charW = item.canonicalText.length <= 3 ? 2.25 : 0.64 * item.canonicalText.length;
 
       const rawW = curSize * charW * item.sx;
       const rawH = curSize * 1.02 * item.sy;
@@ -902,58 +899,56 @@
     }
 
     function generateAndRenderSvgJumble() {
-      const W = 800;
-      const H = 1050;
-      const targetCount = DENSITY_MAP[state.densityKey] || 64;
-      const candidates = buildCandidatePool(targetCount);
+      const cfg = DENSITY[state.densityKey] || DENSITY.easy;
+      const candidates = buildCandidatePool(cfg.count);
       const count = candidates.length;
 
-      const layer = document.getElementById("jumbleLayer");
-      const fbLayer = document.getElementById("feedbackLayer");
-      layer.innerHTML = "";
-      fbLayer.innerHTML = "";
-
-      const bonus = count <= 34 ? 8 : (count <= 50 ? 4 : 0);
+      document.getElementById("jumbleLayer").innerHTML = "";
+      document.getElementById("feedbackLayer").innerHTML = "";
 
       const rawItems = candidates.map((item, idx) => {
-        const isGraphic = item.category === "polygon" || item.category === "icon";
-        const minAllowed = isGraphic ? 36 : 32;
-        const maxAllowed = isGraphic ? 64 : 60;
+        const isGraphic = item.category === "polygon";
+        const minAllowed = cfg.min + (isGraphic ? 4 : 0);
+        const maxAllowed = cfg.max + (isGraphic ? 4 : 0);
 
+        // a few big ones, a bunch of medium ones, the rest small (within this density's range)
         const ratio = idx / count;
-        let baseSize;
-        if (ratio < 0.16) {
-          baseSize = (isGraphic ? 66 : 58) + Math.random() * 14 + bonus;
-        } else if (ratio < 0.55) {
-          baseSize = (isGraphic ? 54 : 46) + Math.random() * 10 + bonus * 0.5;
-        } else {
-          baseSize = minAllowed + Math.random() * 8;
-        }
-
-        const clampedSize = Math.min(maxAllowed, Math.max(minAllowed, Math.round(baseSize)));
+        const t = ratio < 0.16 ? 0.85 + Math.random() * 0.15
+                : ratio < 0.55 ? 0.40 + Math.random() * 0.30
+                : Math.random() * 0.25;
+        const size = Math.round(minAllowed + (maxAllowed - minAllowed) * t);
 
         const velocity = state.moving ? { vx: (Math.random() - 0.5) * 0.8, vy: (Math.random() - 0.5) * 0.8 } : {};
 
         return {
           ...item,
-          size: clampedSize,
+          size,
           ...velocity,
           minSize: minAllowed,
           fontSpec: FONT_STYLES[Math.floor(Math.random() * FONT_STYLES.length)],
-          rot: Math.floor(Math.random() * 360),
+          rot: Math.round((Math.random() * 2 - 1) * cfg.rotRange),
           sx: +(0.94 + Math.random() * 0.14).toFixed(2),
           sy: +(0.94 + Math.random() * 0.14).toFixed(2)
         };
       });
 
-      rawItems.sort((a, b) => b.size - a.size);
+      state.boardItems = placeItems(rawItems);
+      renderSvgItemsToDOM();
+    }
+
+    // Scatter items on the 800x1050 sheet without overlaps. Returns the ones that fit.
+    function placeItems(rawItems) {
+      const W = 800;
+      const H = 1050;
+      const layer = document.getElementById("jumbleLayer");
+      const ordered = [...rawItems].sort((a, b) => b.size - a.size);
 
       const placedBoxes = [];
       const placedItems = [];
       const outerMargin = 24;
       const safetyPad = 8;
 
-      for (const item of rawItems) {
+      for (const item of ordered) {
         let curSize = item.size;
         let placed = false;
 
@@ -1000,8 +995,20 @@
           }
         }
       }
+      return placedItems;
+    }
 
-      state.boardItems = placedItems;
+    // Second player gets the SAME things, scattered in NEW spots (so watching the first player doesn't help)
+    function relayoutSameItems() {
+      const base = state.boardItems;
+      for (let attempt = 0; attempt < 12; attempt++) {
+        const clones = base.map(({ el, hintEl, ...rest }) => ({ ...rest }));
+        const placed = placeItems(clones);
+        if (placed.length === base.length) {
+          state.boardItems = placed;
+          break;
+        }
+      }
       renderSvgItemsToDOM();
     }
 
@@ -1048,43 +1055,56 @@
     }
 
     /********************************************************************
-     * 5. GAME FLOW (DIRECT JUMBLE START IN AUTO, 15s PICK IN JUNEBUG)
+     * 5. ROUND FLOW
+     *    A round = two hunts on the same 5 targets. Lowest time wins.
+     *    Surprise: 5 random targets.  Junebug: your friend picks the 5.
      ********************************************************************/
     function startMatchFromLobby() {
       document.getElementById("lobbyScreen").classList.add("hidden");
       document.getElementById("summaryModal").classList.add("hidden");
       document.getElementById("curtainScreen").classList.add("hidden");
+      document.getElementById("doneOverlay").classList.add("hidden");
       document.getElementById("gameScreen").classList.remove("hidden");
-
-      startTurnForActiveHunter(true);
+      startRound();
     }
 
-    function startTurnForActiveHunter(isImmediateFromLobby) {
+    function startRound() {
       clearActiveTimer();
-      state.customTargetQueue = [];
-      state.usedTargetIds = new Set();
-      state.turnScore = 0;
-      state.wrongTapStreak = 0;
-      state.isFrozen = false;
+      state.times = { 1: null, 2: null };
+      state.leg = 0;
+      state.hunter = state.firstHunter;
+      setupLeg();
+    }
 
-      generateAndRenderSvgJumble();
+    function setupLeg(curtainSub) {
+      clearActiveTimer();
+      document.getElementById("doneOverlay").classList.add("hidden");
 
       if (state.mode === "junebug") {
-        beginOpponentPickPhase();
+        // fresh board every leg; the other player picks 5 things for the hunter
+        generateAndRenderSvgJumble();
+        beginPickPhase();
+        return;
+      }
+
+      if (state.leg === 0) {
+        generateAndRenderSvgJumble();
+        state.targetUids = shuffleArray(state.boardItems).slice(0, TARGETS_PER_ROUND).map(it => it.uid);
+        showCurtain(`P${state.hunter} READY?`, `Find ${TARGETS_PER_ROUND}!`, beginHunt);
       } else {
-        if (isImmediateFromLobby) {
-          beginHuntingPhase();
-        } else {
-          showCurtain(`PASS TO P${state.activeHunter}`, () => beginHuntingPhase());
-        }
+        relayoutSameItems();
+        showCurtain(`PASS TO P${state.hunter}`, curtainSub, beginHunt);
       }
     }
 
-    function showCurtain(titleText, callback) {
+    function showCurtain(titleText, subText, callback) {
       clearActiveTimer();
       state.phase = "curtain";
       state.nextCurtainAction = callback;
       document.getElementById("curtainTitle").textContent = titleText;
+      const sub = document.getElementById("curtainSub");
+      sub.textContent = subText || "";
+      sub.classList.toggle("hidden", !subText);
       document.getElementById("curtainScreen").classList.remove("hidden");
     }
 
@@ -1093,176 +1113,192 @@
       if (state.nextCurtainAction) state.nextCurtainAction();
     }
 
-    function beginOpponentPickPhase() {
+    /* ---------- the pie (progress + reward) ---------- */
+    function pieSvg(n, popLast) {
+      const total = TARGETS_PER_ROUND;
+      const cx = 50, cy = 50, r = 44;
+      let out = "";
+      for (let i = 0; i < total; i++) {
+        const a1 = (-90 + (i * 360) / total) * Math.PI / 180;
+        const a2 = (-90 + ((i + 1) * 360) / total) * Math.PI / 180;
+        const x1 = (cx + r * Math.cos(a1)).toFixed(1), y1 = (cy + r * Math.sin(a1)).toFixed(1);
+        const x2 = (cx + r * Math.cos(a2)).toFixed(1), y2 = (cy + r * Math.sin(a2)).toFixed(1);
+        const d = `M${cx} ${cy} L${x1} ${y1} A${r} ${r} 0 0 1 ${x2} ${y2} Z`;
+
+        if (i < n) {
+          const mid = (a1 + a2) / 2;
+          const bx = (cx + r * 0.6 * Math.cos(mid)).toFixed(1);
+          const by = (cy + r * 0.6 * Math.sin(mid)).toFixed(1);
+          const cls = popLast && i === n - 1 ? ' class="pie-pop"' : "";
+          out += `<g${cls}>
+            <path d="${d}" fill="#E5B363" stroke="#D69847" stroke-width="3" stroke-linejoin="round"/>
+            <circle cx="${bx}" cy="${by}" r="7.5" fill="#C9252D"/>
+            <circle cx="${(bx - 2.2).toFixed(1)}" cy="${(by - 2.4).toFixed(1)}" r="2" fill="#F29B9E"/>
+          </g>`;
+        } else {
+          out += `<path d="${d}" fill="rgba(239,236,230,0.10)" stroke="#435E85" stroke-width="2.5" stroke-linejoin="round"/>`;
+        }
+      }
+      if (n >= total) {
+        out += `<circle cx="${cx}" cy="${cy}" r="${r}" fill="none" stroke="#D69847" stroke-width="5"/>`;
+      }
+      return `<svg viewBox="0 0 100 100" class="w-full h-full">${out}</svg>`;
+    }
+
+    function setHudPie(n, popLast) {
+      document.getElementById("hudPie").innerHTML = pieSvg(n, popLast);
+    }
+
+    /* ---------- Junebug: the other player picks the 5 targets ---------- */
+    function beginPickPhase() {
       state.phase = "selecting";
-      state.customTargetQueue = [];
+      state.pickQueue = [];
+      const picker = otherPlayer(state.hunter);
 
-      const pickerNum = state.activeHunter === 1 ? 2 : 1;
-      document.getElementById("hudPlayerTag").textContent = `P${pickerNum} PICK`;
-      document.getElementById("hudTurnScore").textContent = "15s";
-
+      document.getElementById("hudPlayerTag").textContent = `P${picker}`;
       document.getElementById("hudHuntBox").classList.add("hidden");
       document.getElementById("hudPickBox").classList.remove("hidden");
-      document.getElementById("hudPickCount").textContent = "PICK: 0";
+      document.getElementById("clockBox").classList.add("hidden");
+      document.getElementById("hudPickText").textContent = `PICK ${TARGETS_PER_ROUND} FOR P${state.hunter}`;
 
-      document.getElementById("skipBtn").classList.add("hidden");
-      document.getElementById("timesUpBtn").classList.add("hidden");
-      document.getElementById("clockBox").classList.remove("hidden");
+      refreshPickBadges();
+      updatePickUI(false);
+    }
 
-      state.timeRemainingMs = 15000;
-      const startTs = performance.now();
-      updateClockText(15000);
-
-      state.timerInterval = setInterval(() => {
-        const rem = Math.max(0, 15000 - (performance.now() - startTs));
-        state.timeRemainingMs = rem;
-        updateClockText(rem);
-        if (rem <= 0) finishTargetSelectionPhase();
-      }, 80);
+    function updatePickUI(popLast) {
+      const n = state.pickQueue.length;
+      const ready = n === TARGETS_PER_ROUND;
+      setHudPie(n, popLast);
+      const btn = document.getElementById("pickDoneBtn");
+      btn.disabled = !ready;
+      btn.classList.toggle("opacity-40", !ready);
     }
 
     function finishTargetSelectionPhase() {
-      clearActiveTimer();
+      if (state.pickQueue.length !== TARGETS_PER_ROUND) return;
+      state.targetUids = [...state.pickQueue];
       state.boardItems.forEach(it => {
         const b = document.getElementById(`qbadge_${it.uid}`);
         if (b) b.classList.add("hidden");
       });
-
-      showCurtain(`PASS TO P${state.activeHunter}`, () => beginHuntingPhase());
+      showCurtain(`PASS TO P${state.hunter}`, `P${otherPlayer(state.hunter)} picked ${TARGETS_PER_ROUND} for you!`, beginHunt);
     }
 
-    function beginHuntingPhase() {
+    /* ---------- the hunt ---------- */
+    function beginHunt() {
+      clearActiveTimer();
       state.phase = "hunting";
-      state.turnScore = 0;
+      state.found = 0;
+      state.wrongTapStreak = 0;
 
-      document.getElementById("hudPlayerTag").textContent = `P${state.activeHunter}`;
-      document.getElementById("hudTurnScore").textContent = "0";
-
+      document.getElementById("hudPlayerTag").textContent = `P${state.hunter}`;
       document.getElementById("hudPickBox").classList.add("hidden");
       document.getElementById("hudHuntBox").classList.remove("hidden");
-      document.getElementById("skipBtn").classList.remove("hidden");
+      document.getElementById("clockBox").classList.remove("hidden");
+      setHudPie(0, false);
 
-      if (state.mode === "junebug") {
-        document.getElementById("clockBox").classList.add("hidden");
-        document.getElementById("timesUpBtn").classList.remove("hidden");
-      } else {
-        document.getElementById("timesUpBtn").classList.add("hidden");
-        document.getElementById("clockBox").classList.remove("hidden");
-      }
+      setTarget(0);
 
-      advanceToNextTarget();
-
-      clearActiveTimer();
+      state.huntStartTs = performance.now();
+      updateClockText(0);
+      state.timerInterval = setInterval(() => {
+        updateClockText(performance.now() - state.huntStartTs);
+      }, 80);
       startMoving();
-      if (state.mode === "auto") {
-        const startTs = performance.now();
-        state.timeRemainingMs = 30000;
-        updateClockText(30000);
-        state.timerInterval = setInterval(() => {
-          const rem = Math.max(0, 30000 - (performance.now() - startTs));
-          state.timeRemainingMs = rem;
-          updateClockText(rem);
-          if (rem <= 0) endHuntingTurn();
-        }, 80);
-      }
     }
 
     function updateClockText(ms) {
-      const s = Math.ceil(ms / 1000);
-      const el = document.getElementById("clockText");
-      el.textContent = `${s}s`;
-      el.style.color = ms <= 5000 ? "#C9252D" : "#E5B363";
+      document.getElementById("clockText").textContent = fmtTime(ms);
     }
 
-    function advanceToNextTarget() {
-      let nextItem = null;
-
-      while (state.customTargetQueue.length > 0) {
-        const uid = state.customTargetQueue.shift();
-        if (!state.usedTargetIds.has(uid)) {
-          nextItem = state.boardItems.find(it => it.uid === uid);
-          if (nextItem) break;
-        }
-      }
-
-      if (!nextItem) {
-        const pool = state.boardItems.filter(it => !state.usedTargetIds.has(it.uid));
-        if (pool.length === 0) {
-          state.usedTargetIds.clear();
-          nextItem = state.boardItems[Math.floor(Math.random() * state.boardItems.length)];
-        } else {
-          nextItem = pool[Math.floor(Math.random() * pool.length)];
-        }
-      }
-
-      state.currentTarget = nextItem;
-      state.usedTargetIds.add(nextItem.uid);
-      renderCanonicalHUD(nextItem);
+    function setTarget(idx) {
+      clearHint();
+      state.targetIdx = idx;
+      const uid = state.targetUids[idx];
+      state.currentTarget = state.boardItems.find(it => it.uid === uid) || null;
+      if (state.currentTarget) renderCanonicalHUD(state.currentTarget);
+      state.hintTimer = setTimeout(showHint, HINT_MS);
     }
 
     function renderCanonicalHUD(item) {
       const badge = document.getElementById("hudCanonicalBadge");
 
       if (item.category === "number" || item.category === "bigram" || item.category === "word") {
-        badge.innerHTML = `<span class="text-xl sm:text-2xl font-black tracking-wider">${item.canonicalText}</span>`;
+        badge.innerHTML = `<span class="text-3xl sm:text-4xl font-black tracking-wider">${item.canonicalText}</span>`;
       } else if (item.category === "polygon") {
         badge.innerHTML = `
-          <svg width="32" height="32" viewBox="0 0 100 100" class="shrink-0">
+          <svg width="40" height="40" viewBox="0 0 100 100" class="shrink-0">
             ${getPolygonInnerMarkup(item.baseShape, item.modifier)}
           </svg>
-          <span class="text-sm sm:text-base font-black uppercase tracking-wide">${item.canonicalText}</span>
-        `;
-      } else if (item.category === "icon") {
-        badge.innerHTML = `
-          <svg width="32" height="32" viewBox="0 0 100 100" class="shrink-0">
-            ${item.iconData.svg}
-          </svg>
-          <span class="text-sm sm:text-base font-black uppercase tracking-wide">${item.canonicalText}</span>
+          <span class="text-lg sm:text-xl font-black uppercase tracking-wide">${item.canonicalText}</span>
         `;
       }
     }
 
+    /* ---------- the hint: a glowing ring instead of a penalty ---------- */
+    function showHint() {
+      const t = state.currentTarget;
+      if (state.phase !== "hunting" || !t || !t.el || t.hintEl) return;
+      const g = document.createElementNS("http://www.w3.org/2000/svg", "g");
+      g.setAttribute("class", "hint-ring");
+      g.innerHTML = `
+        <circle r="${t.hitR + 6}" fill="none" stroke="#2A1B15" stroke-width="15"/>
+        <circle r="${t.hitR + 6}" fill="none" stroke="#E5B363" stroke-width="9"/>
+      `;
+      t.el.appendChild(g);
+      t.hintEl = g;
+    }
+
+    function clearHint() {
+      if (state.hintTimer) { clearTimeout(state.hintTimer); state.hintTimer = null; }
+      const t = state.currentTarget;
+      if (t && t.hintEl) { t.hintEl.remove(); t.hintEl = null; }
+    }
+
     /********************************************************************
-     * 6. TAP INTERACTION & END OF TURN
+     * 6. TAPS, FINISHING, RESULTS
      ********************************************************************/
-    function onItemTapped(item, gEl) {
+    function onItemTapped(item) {
       if (state.phase === "selecting") {
-        const idx = state.customTargetQueue.indexOf(item.uid);
+        const idx = state.pickQueue.indexOf(item.uid);
         if (idx !== -1) {
-          state.customTargetQueue.splice(idx, 1);
-        } else {
-          state.customTargetQueue.push(item.uid);
+          state.pickQueue.splice(idx, 1);
+          refreshPickBadges();
+          updatePickUI(false);
+        } else if (state.pickQueue.length < TARGETS_PER_ROUND) {
+          state.pickQueue.push(item.uid);
           playTone("queue");
+          refreshPickBadges();
+          updatePickUI(true);
+        } else {
+          playTone("wrong");   // already picked 5: tap one to un-pick it
         }
-        refreshPickBadges();
-        document.getElementById("hudPickCount").textContent = `PICK: ${state.customTargetQueue.length}`;
         return;
       }
 
-      if (state.phase !== "hunting" || state.isFrozen || !state.currentTarget) return;
+      if (state.phase !== "hunting" || !state.currentTarget) return;
 
       if (item.uid === state.currentTarget.uid) {
         playTone("find");
-        state.turnScore++;
-        state.wrongTapStreak = 0;
-        document.getElementById("hudTurnScore").textContent = String(state.turnScore);
+        clearHint();
+        // pop it off the board
+        if (item.el) {
+          item.el.style.transition = "opacity .25s";
+          item.el.style.opacity = "0";
+          item.el.style.pointerEvents = "none";
+        }
         spawnSvgRing(item.cx, item.cy, "#38B449", 450);
-        advanceToNextTarget();
+        state.found++;
+        state.wrongTapStreak = 0;
+        setHudPie(state.found, true);
+
+        if (state.found >= TARGETS_PER_ROUND) finishLeg();
+        else setTarget(state.found);
       } else {
         playTone("wrong");
-        state.wrongTapStreak++;
         spawnSvgRing(item.cx, item.cy, "#C9252D", 300);
-
-        if (state.wrongTapStreak >= 3) {
-          state.isFrozen = true;
-          state.wrongTapStreak = 0;
-          const fz = document.getElementById("freezeOverlay");
-          fz.classList.remove("hidden");
-          setTimeout(() => {
-            state.isFrozen = false;
-            fz.classList.add("hidden");
-          }, 1000);
-        }
+        state.wrongTapStreak++;
+        if (state.wrongTapStreak >= 3) showHint();   // stuck? help, don't punish
       }
     }
 
@@ -1271,7 +1307,7 @@
         const b = document.getElementById(`qbadge_${item.uid}`);
         const t = document.getElementById(`qtext_${item.uid}`);
         if (!b || !t) return;
-        const idx = state.customTargetQueue.indexOf(item.uid);
+        const idx = state.pickQueue.indexOf(item.uid);
         if (idx === -1) {
           b.classList.add("hidden");
         } else {
@@ -1296,51 +1332,55 @@
       return c;
     }
 
-    function skipCurrentTarget() {
-      if (state.phase !== "hunting" || state.isFrozen) return;
-      if (state.currentTarget) {
-        spawnSvgRing(state.currentTarget.cx, state.currentTarget.cy, "#E5B363", 600);
-      }
-      advanceToNextTarget();
-    }
-
-    function triggerHumanTimesUp() {
-      if (state.phase !== "hunting") return;
-      endHuntingTurn();
-    }
-
-    function endHuntingTurn() {
+    function finishLeg() {
+      const elapsed = performance.now() - state.huntStartTs;
       clearActiveTimer();
-      state.phase = "reveal";
-      playTone("timesup");
+      state.phase = "legDone";
+      state.times[state.hunter] = elapsed;
+      updateClockText(elapsed);
+      playTone("win");
 
-      if (state.activeHunter === 1) {
-        state.p1TotalScore += state.turnScore;
-      } else {
-        state.p2TotalScore += state.turnScore;
-      }
+      // big baked pie + your time
+      document.getElementById("donePie").innerHTML = pieSvg(TARGETS_PER_ROUND, false);
+      document.getElementById("doneTime").textContent = fmtTime(elapsed);
+      document.getElementById("doneOverlay").classList.remove("hidden");
 
-      if (state.currentTarget) {
-        spawnSvgRing(state.currentTarget.cx, state.currentTarget.cy, "#C9252D", 1400);
-      }
-
-      setTimeout(() => {
-        showSummaryModal();
-      }, 1200);
+      state.flowTimer = setTimeout(() => {
+        state.flowTimer = null;
+        if (state.leg === 0) {
+          const prev = state.hunter;
+          state.leg = 1;
+          state.hunter = otherPlayer(prev);
+          setupLeg(`P${prev} took ${fmtTime(elapsed)}. Beat it!`);
+        } else {
+          document.getElementById("doneOverlay").classList.add("hidden");
+          showSummaryModal();
+        }
+      }, 1500);
     }
 
     function showSummaryModal() {
       state.phase = "summary";
-      document.getElementById("summaryTurnTitle").textContent = `P${state.activeHunter}: +${state.turnScore}`;
-      document.getElementById("sumP1Score").textContent = String(state.p1TotalScore);
-      document.getElementById("sumP2Score").textContent = String(state.p2TotalScore);
+      // compare the times the players actually saw (1 decimal)
+      const t1 = Math.round(state.times[1] / 100);
+      const t2 = Math.round(state.times[2] / 100);
+      const winner = t1 === t2 ? 0 : (t1 < t2 ? 1 : 2);
+      if (winner === 1) state.p1TotalScore++;
+      if (winner === 2) state.p2TotalScore++;
+
+      document.getElementById("summaryTurnTitle").textContent = winner ? `P${winner} WINS!` : "TIE!";
+      [1, 2].forEach(p => {
+        document.getElementById(`sumP${p}Time`).textContent = fmtTime(state.times[p]);
+        document.getElementById(`sumP${p}Wins`).textContent = `WINS: ${p === 1 ? state.p1TotalScore : state.p2TotalScore}`;
+        document.getElementById(`sumCell${p}`).classList.toggle("sum-win", winner === p);
+      });
       document.getElementById("summaryModal").classList.remove("hidden");
     }
 
     function advanceFromSummary() {
       document.getElementById("summaryModal").classList.add("hidden");
-      state.activeHunter = state.activeHunter === 1 ? 2 : 1;
-      startTurnForActiveHunter(false);
+      state.firstHunter = otherPlayer(state.firstHunter);   // take turns going first
+      startRound();
     }
 
     function returnToLobby() {
@@ -1349,15 +1389,15 @@
       document.getElementById("gameScreen").classList.add("hidden");
       document.getElementById("summaryModal").classList.add("hidden");
       document.getElementById("curtainScreen").classList.add("hidden");
+      document.getElementById("doneOverlay").classList.add("hidden");
       document.getElementById("lobbyScreen").classList.remove("hidden");
       syncLobbyUI();
     }
 
     function clearActiveTimer() {
-      if (state.timerInterval) {
-        clearInterval(state.timerInterval);
-        state.timerInterval = null;
-      }
+      if (state.timerInterval) { clearInterval(state.timerInterval); state.timerInterval = null; }
+      if (state.flowTimer) { clearTimeout(state.flowTimer); state.flowTimer = null; }
+      clearHint();
       stopMoving();
     }
 
