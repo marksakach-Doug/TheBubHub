@@ -23,6 +23,8 @@
 // The topic and pull lists come in through ctx.lists. In the Bub Hub version,
 // import them from a file instead and ignore ctx.lists.
 
+import data from './facts.json' with { type: 'json' };
+
 export const meta = {
   id: 'facts',
   title: 'Just the Facts',
@@ -149,8 +151,8 @@ export function init(ctx) {
     history: [],             // { roundNo, topic, reader, winner, line, how, winnerName, readerName }
     result: null,            // { topic, reader, winner, line, how: 'bare' | 'spin' | 'none' }
     winnerIds: [],           // match winner id(s), set at game over
-    topics: [],
-    pulls: [],
+    topics: Array.isArray(data.topics) ? data.topics.slice() : [],
+    pulls: Array.isArray(data.pulls) ? data.pulls.slice() : [],
   };
 }
 
@@ -161,7 +163,6 @@ export function reduce(state, action, ctx) {
   if (!id) return { error: 'Sit down at the table first.' };
   const a = action && action.a;
   if (a === 'join') return join(state, id, from);
-  if (a === 'lists') return setLists(state, from, action);
   if (a === 'start') return start(state, from, rng, ctx);
   if (a === 'toLobby') return toLobby(state, from);
   if (a === 'line') return line(state, id, from, action, rng);
@@ -185,14 +186,6 @@ function join(state, id, from) {
   const s = clone(state);
   s.order.push(id);
   s.names[id] = nm || 'someone';
-  return s;
-}
-
-function setLists(state, from, action) {
-  if (!from.host) return { error: 'Only the host can set the lists.' };
-  const s = clone(state);
-  if (Array.isArray(action.topics)) s.topics = action.topics.slice();
-  if (Array.isArray(action.pulls)) s.pulls = action.pulls.slice();
   return s;
 }
 
@@ -587,8 +580,7 @@ export function summarize(state, nameOf) {
 // ---------------------------------------------------------------- view
 
 const CSS = `
-.jtf{--ground:#eef1f3;--slip:#ffffff;--ink:#16224d;--soft:#5d6579;--flag:#b3202a;--on:#fff2b8;color:var(--ink);font:18px/1.5 "Century Schoolbook","New Century Schoolbook","Century Schoolbook L",Cambria,Georgia,serif}
-@media (prefers-color-scheme:dark){.jtf{--ground:#13161c;--slip:#1c2029;--ink:#e6e9f5;--soft:#9aa2b8;--flag:#ff8d84;--on:#4a4220}}
+.jtf{--ground:#111827;--slip:#1f2937;--ink:#f3f4f6;--soft:#9ca3af;--flag:#ff8d84;--on:#4a4220;color:var(--ink);font:18px/1.5 "Century Schoolbook","New Century Schoolbook","Century Schoolbook L",Cambria,Georgia,serif}
 .jtf *{box-sizing:border-box;border-radius:0}
 .jtf h1{font-size:34px;line-height:1.1;margin:0 0 6px}
 .jtf h2{font-size:18px;margin:22px 0 8px}
@@ -628,38 +620,12 @@ const CSS = `
 `;
 
 export function mount(root, api) {
-  root.innerHTML = '<style>' + CSS + '</style><div class="jtf"><div class="setup" id="setup" hidden><label><b>Topics</b></label><textarea id="topics" rows="4"></textarea><label><b>Secret Pulls</b></label><textarea id="pulls" rows="6"></textarea><div class="soft" id="listnote"></div></div><div class="board"></div></div>';
+  root.innerHTML = '<style>' + CSS + '</style><div class="jtf"><div class="board"></div></div>';
   const boardEl = root.querySelector('.board');
-  const setupEl = root.querySelector('#setup');
-  const topicsEl = root.querySelector('#topics');
-  const pullsEl = root.querySelector('#pulls');
-  const noteEl = root.querySelector('#listnote');
   const doc = root.ownerDocument || document;
-
-  const store = {
-    get(k){ try { return localStorage.getItem(k) || ''; } catch(e){ return ''; } },
-    set(k,v){ try { localStorage.setItem(k,v); } catch(e){} }
-  };
-  let ui = { topicsText: store.get('jtf-topics'), pullsText: store.get('jtf-pulls') };
-  if (topicsEl) topicsEl.value = ui.topicsText;
-  if (pullsEl) pullsEl.value = ui.pullsText;
-
-  function refreshLists() {
-    const topics = ui.topicsText.split(/\r?\n/).map((x)=>x.trim()).filter((x)=>x.length>1 && x.length<=40);
-    const pulls = ui.pullsText.split(/\r?\n/).map((x)=>x.trim()).filter(Boolean);
-    const t = [...new Set(topics)], p = [...new Set(pulls)];
-    if (noteEl) noteEl.textContent = t.length + ' topics, ' + p.length + ' pulls';
-    if (api.isHost) {
-      try { api.send({ a: 'lists', topics: t, pulls: p }); } catch(e){}
-    }
-    return { topics: t, pulls: p };
-  }
-  if (topicsEl) topicsEl.addEventListener('input', (e)=>{ ui.topicsText=e.target.value; store.set('jtf-topics', ui.topicsText); refreshLists(); });
-  if (pullsEl) pullsEl.addEventListener('input', (e)=>{ ui.pullsText=e.target.value; store.set('jtf-pulls', ui.pullsText); refreshLists(); });
 
 
   let view = null;
-  let listsSent = false;
   let draft = null;        // the line box as typed; null means untouched, show my line
   let roundKey = null;     // resets local drafts when the round changes
   let note = '';           // a local message for a click refused before sending
@@ -1020,8 +986,6 @@ export function mount(root, api) {
         autoSent = false;
       }
       marksLocal = v.check && v.isSpinner ? v.check.marks.slice() : [];
-      if (setupEl) setupEl.hidden = !(api.isHost && v.phase === 'lobby');
-      if (api.isHost && !listsSent) { listsSent = true; refreshLists(); }
       if (!v.canJoin && v.isSeated) joinTries = 0;
       ensureSeat();
       render();
