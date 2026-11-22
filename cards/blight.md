@@ -1,7 +1,7 @@
 id: blight
 title: Blight
 players: 3-6
-max-lines: 1200
+max-lines: 1300
 hidden: none
 
 rules: |

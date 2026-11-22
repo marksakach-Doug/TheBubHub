@@ -7,7 +7,7 @@
     "min": 3,
     "max": 6
   },
-  "maxLines": 1200,
+  "maxLines": 1300,
   "summarizeMaxChars": 120,
   "hidden": [],
   "roster": [
@@ -27,7 +27,7 @@
       "host": false
     }
   ],
-  "rules": "Blight — bluffing game of Living Plants and Dead Trees.",
+  "rules": "Blight \u2014 bluffing game of Living Plants and Dead Trees.",
   "actions": {},
   "scenarios": [
     {

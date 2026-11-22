@@ -1,0 +1,47 @@
+{
+  "id": "whowhat",
+  "title": "Who Did What?",
+  "version": 1,
+  "note": "Generated manually from cards/whowhat.md.",
+  "players": { "min": 3, "max": 8 },
+  "maxLines": 400,
+  "summarizeMaxChars": 120,
+  "seed": 12345,
+  "hidden": [],
+  "roster": [
+    { "id": "p1", "name": "Alice", "host": true },
+    { "id": "p2", "name": "Bo", "host": false },
+    { "id": "p3", "name": "Cy", "host": false }
+  ],
+  "rules": "Everyone writes one true line about the last five years, unsigned, 140 characters max. Lines are shuffled. Everyone guesses the author of every line except their own. A right guess scores +1 to the guesser; a wrong guess on your line scores +1 to you. The host reveals, then starts the next round or returns to the lobby.",
+  "actions": {},
+  "summarize": "",
+  "scenarios": [
+    {
+      "name": "only the host can start",
+      "steps": [
+        { "as": "p1", "action": { "a": "join" } },
+        { "as": "p2", "action": { "a": "join" } },
+        { "as": "p3", "action": { "a": "join" } },
+        { "as": "p2", "action": { "a": "start" } }
+      ],
+      "expect": { "error": true }
+    },
+    {
+      "name": "a three-player round reaches reveal",
+      "steps": [
+        { "as": "p1", "action": { "a": "join" } },
+        { "as": "p2", "action": { "a": "join" } },
+        { "as": "p3", "action": { "a": "join" } },
+        { "as": "p1", "action": { "a": "start" } },
+        { "as": "p1", "action": { "a": "line", "text": "climbed a mountain" } },
+        { "as": "p2", "action": { "a": "line", "text": "ate a bug" } },
+        { "as": "p3", "action": { "a": "line", "text": "met a celebrity" } },
+        { "as": "p1", "action": { "a": "guess", "picks": ["p2", "p2", "p2"] } },
+        { "as": "p2", "action": { "a": "guess", "picks": ["p1", "p1", "p1"] } },
+        { "as": "p3", "action": { "a": "guess", "picks": ["p1", "p1", "p1"] } }
+      ],
+      "expect": { "summarize": "Cy fooled the table best this round.", "final": true }
+    }
+  ]
+}
