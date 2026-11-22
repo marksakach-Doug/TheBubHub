@@ -11,12 +11,13 @@ export const meta = {
   players: '3-8',
   color: '#00694E',
   icon: '🕵️',
-  desc: 'Write one true thing you did in the last five years. Guess who wrote the rest.',
+  desc: 'Write one true thing you did in the last few years. Guess who wrote the rest.',
 };
 
 const MIN_SEATS = 3;
 const MAX_SEATS = 8;
 const MAX_LINE = 140;
+const TOTAL_ROUNDS = 5;
 
 const has = (o, k) => Object.prototype.hasOwnProperty.call(o, k);
 const clone = (s) => JSON.parse(JSON.stringify(s));
@@ -60,6 +61,8 @@ export function init(ctx) {
   return {
     epoch: 0,
     round: 0,
+    totalRounds: TOTAL_ROUNDS,
+    gameOver: false,
     phase: 'lobby',     // lobby | write | guess | reveal
     order,              // seated players
     names,              // id -> name
@@ -96,9 +99,15 @@ function start(s, from, ctx) {
   if (s.phase === 'write' || s.phase === 'guess') return { error: 'A round is already running.' };
   seatAll(s.order, s.names, ctx && ctx.atTable);
   if (s.order.length < MIN_SEATS) return { error: 'Need ' + MIN_SEATS + ' people seated. Anyone missing should press "Sit in".' };
+  const newMatch = (s.phase === 'lobby' || s.gameOver);
   s.epoch = s.phase === 'lobby' ? s.epoch : s.epoch + 1;
+  if (newMatch) {
+    s.round = 0;
+    s.scores = {};
+    s.gameOver = false;
+  }
   s.round += 1;
-  s.scores = {};
+  s.totalRounds = TOTAL_ROUNDS;
   s.writers = s.order.slice();
   s.lines = {};
   s.shuffle = [];
@@ -142,7 +151,7 @@ function guess(s, id, action) {
 function finish(s) {
   if (s.phase !== 'guess') return { error: 'Nothing to reveal yet.' };
   const scores = {};
-  s.writers.forEach((w) => { scores[w] = 0; });
+  s.writers.forEach((w) => { scores[w] = (s.scores && s.scores[w]) || 0; });
   s.writers.forEach((g) => {
     if (!has(s.guesses, g)) return;
     s.shuffle.forEach((author, i) => {
@@ -153,12 +162,16 @@ function finish(s) {
   });
   s.scores = scores;
   s.phase = 'reveal';
+  if (s.round >= (s.totalRounds || TOTAL_ROUNDS)) s.gameOver = true;
   return s;
 }
 
 function toLobby(s) {
   s.epoch += 1;
   s.phase = 'lobby';
+  s.round = 0;
+  s.totalRounds = TOTAL_ROUNDS;
+  s.gameOver = false;
   s.writers = [];
   s.lines = {};
   s.shuffle = [];
@@ -198,6 +211,8 @@ export function project(state, playerId) {
     phase: state.phase,
     epoch: state.epoch,
     round: state.round,
+    totalRounds: state.totalRounds || TOTAL_ROUNDS,
+    gameOver: !!state.gameOver,
     seated: state.order.map((x) => ({ id: x, name: names[x] || '…' })),
     writers: state.writers.map((x) => ({ id: x, name: names[x] || '…' })),
     canJoin: state.order.indexOf(playerId) < 0 && state.order.length < MAX_SEATS,
@@ -262,15 +277,15 @@ export function mount(root, api) {
   function body() {
     const v = view;
     if (v.phase === 'lobby') {
-      return '<div class="box"><p class="muted">Each round, everyone writes one true thing they did in the last five years, unsigned. '
-        + 'Then everyone guesses who wrote each line. Right guess: 1 point. Each time someone guesses wrong on your line: 1 point.</p></div>'
+      return '<div class="box"><p class="muted">There are 5 rounds. Each round, everyone writes one thing they did in the last few years that the other people dont know about. '
+        + ' Everyone guesses who wrote each line. Right guess: 1 point, and when someone guesses wrong on your line: 1 point.' + 'This is for us to catch up with each other. I made it so the game has actual OU color themes.'</p></div>'
         + '<div class="box">' + v.seated.map((p) => '<span class="chip">' + esc(p.name) + '</span>').join('') + '</div>'
         + (v.canJoin ? '<button data-act="join">Sit in</button>' : '')
         + (api.isHost ? '<button data-act="start" ' + (v.seated.length < MIN_SEATS ? 'disabled' : '') + '>Start (need ' + MIN_SEATS + ')</button>' : '<p class="muted">The host starts the game.</p>');
     }
     if (v.phase === 'write') {
       if (v.isWriter && !v.myLine) {
-        return '<div class="box"><p>Write one true thing you did in the last five years. Don\'t sign it.</p>'
+        return '<div class="box"><p>Write one true thing you did in the last few years. </p>'
           + '<textarea id="line" maxlength="' + MAX_LINE + '" placeholder="I once...">' + esc(draft) + '</textarea>'
           + '<button data-act="send">Send it in</button></div>';
       }
@@ -290,8 +305,17 @@ export function mount(root, api) {
     }
     // reveal
     const lines = v.entries.map((e) => '<div class="entry"><p>' + esc(e.text) + '</p><p class="muted">Written by <b>' + esc(e.author) + '</b></p></div>').join('');
-    return '<div class="box"><h2>Round ' + v.round + ' reveal</h2>' + lines + '</div>'
-      + (api.isHost ? '<button data-act="start">Next round</button><button data-act="lobby">Back to lobby</button>' : '<p class="muted">The host starts the next round.</p>');
+    const toast = v.gameOver ? (function () {
+      const best = Math.max.apply(null, v.board.map((p) => p.points));
+      const winners = v.board.filter((p) => p.points === best).map((p) => p.name);
+      const msg = winners.length === 1 ? winners[0] + ' won the game!' : winners.join(' and ') + ' won the game! It is a Thai.';
+      return '<div class="box" style="text-align:center;font-size:24px;font-weight:800;margin:10px 0">' + esc(msg) + '</div>';
+    })() : '';
+    const acts = v.gameOver
+      ? (api.isHost ? '<button data-act="start">Play again</button><button data-act="lobby">Back to lobby</button>' : '<p class="muted">The host can play again or go back to the lobby.</p>')
+      : (api.isHost ? '<button data-act="start">Next round</button><button data-act="lobby">Back to lobby</button>' : '<p class="muted">The host starts the next round.</p>');
+    return '<div class="box"><h2>Round ' + v.round + ' of ' + v.totalRounds + ' reveal</h2>' + lines + '</div>'
+      + toast + acts;
   }
 
   function render() {
@@ -302,7 +326,7 @@ export function mount(root, api) {
       draft = '';
       picks = view.phase === 'guess' ? view.entries.map(() => null) : null;
     }
-    const board = '<div class="box">' + view.board.map((p) => '<span class="chip' + (p.you ? '" style="outline:1px solid #F4F1E8' : '') + '">'
+    const board = '<div class="box"><div class="muted"><b>Scores</b></div>' + view.board.map((p) => '<span class="chip' + (p.you ? '" style="outline:1px solid #F4F1E8' : '') + '">'
       + esc(p.name) + ' <b>' + p.points + '</b></span>').join('') + '</div>';
     const html = '<h2>Who Did What?</h2>' + body() + (view.phase === 'lobby' ? '' : board);
     if (typeof document.createRange === 'function') {
