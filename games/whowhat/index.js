@@ -278,8 +278,7 @@ export function mount(root, api) {
     const v = view;
     if (v.phase === 'lobby') {
       return '<div class="box"><p class="muted">There are 5 rounds. Each round, everyone writes one thing they did in the last few years that the other people dont know about. '
-        + ' Everyone guesses who wrote each line. Right guess: 1 point, and when someone guesses wrong on your line: 1 point.' + 'This is for us to catch up with each other. I made it so the game has actual OU color themes.'</p></div>'
-        + '<div class="box">' + v.seated.map((p) => '<span class="chip">' + esc(p.name) + '</span>').join('') + '</div>'
+        + ' Everyone guesses who wrote each line. Right guess: 1 point, and when someone guesses wrong on your line: 1 point.' + 'This is for us to catch up with each other. I made it so the game has actual OU color themes.</p></div>'        + '<div class="box">' + v.seated.map((p) => '<span class="chip">' + esc(p.name) + '</span>').join('') + '</div>'
         + (v.canJoin ? '<button data-act="join">Sit in</button>' : '')
         + (api.isHost ? '<button data-act="start" ' + (v.seated.length < MIN_SEATS ? 'disabled' : '') + '>Start (need ' + MIN_SEATS + ')</button>' : '<p class="muted">The host starts the game.</p>');
     }
