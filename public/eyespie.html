@@ -138,6 +138,29 @@
     .beacon-circle {
       animation: ringPulse 0.9s ease-out infinite;
     }
+
+    /* ---- my words shelf ---- */
+    #shelfScreen:not(.hidden) { -webkit-overflow-scrolling: touch; touch-action: pan-y; }
+    #shelfScreen:not(.hidden) * { touch-action: pan-y; }
+    .shelf-head { font-size: 11px; font-weight: 800; letter-spacing: .12em; text-transform: uppercase; color: var(--pie-gold); margin: 6px 0; }
+    .shelf-grid { display: grid; grid-template-columns: repeat(3, 1fr); gap: 10px; }
+    .shelf-card {
+      position: relative; height: 60px; border-radius: 14px;
+      background: var(--cream); color: var(--ink-brown); border: 3px solid #DFD9CE;
+      display: flex; flex-direction: column; align-items: center; justify-content: center;
+      font-family: 'Fredoka', sans-serif; font-weight: 700; font-size: 20px; line-height: 1.1;
+    }
+    .shelf-berry { border-color: var(--pie-crust); }
+    .shelf-stamp { position: absolute; top: -10px; right: -8px; width: 30px; height: 30px; transform: rotate(14deg); filter: drop-shadow(0 2px 0 rgba(0,0,0,.25)); }
+    .shelf-dots { display: flex; gap: 4px; margin-top: 3px; }
+    .shelf-dots i { display: block; width: 8px; height: 8px; border-radius: 50%; background: #C9B9A6; }
+    .shelf-dots i.on { background: var(--cherry-red); }
+    .shelf-new {
+      height: 40px; border-radius: 12px; border: 2px dashed #435E85; color: rgba(239,236,230,.5);
+      display: flex; align-items: center; justify-content: center;
+      font-family: 'Fredoka', sans-serif; font-weight: 600; font-size: 16px;
+    }
+    .shelf-empty { font-size: 14px; font-weight: 700; color: rgba(239,236,230,.6); padding: 6px 2px 2px; }
   </style>
 </head>
 <body>
@@ -249,28 +272,58 @@
           </button>
         </div>
 
+        <!-- MY WORDS: berry shelf -->
+        <button type="button" onclick="openShelf()" class="tile tile-on w-full h-12 text-lg" style="flex-direction:row; gap:10px; font-family:'Fredoka',sans-serif;">
+          <span>🫐 MY WORDS</span>
+          <span id="shelfCount" class="text-sm font-black bg-[#C9252D] text-[#EFECE6] px-2.5 py-0.5 rounded-full">0</span>
+        </button>
+
         <!-- FIND: what shows up on the board (the tile shows an example) -->
-        <div class="space-y-2">
+        <div id="findSection" class="space-y-2">
           <div class="text-[11px] font-extrabold uppercase tracking-widest text-[#E5B363]">Find</div>
+          <div class="grid grid-cols-4 gap-2.5">
+            <button type="button" data-cat="numbers" onclick="toggleCat('numbers')" class="cat-pill tile h-14 text-xl" style="font-family:'Fredoka',sans-serif;">
+              <span>42</span><span class="tick">✓</span>
+            </button>
+            <button type="button" data-cat="words" onclick="toggleCat('words')" class="cat-pill tile h-14 text-xl" style="font-family:'Fredoka',sans-serif;">
+              <span>cat</span><span class="tick">✓</span>
+            </button>
+            <button type="button" data-cat="words4" onclick="toggleCat('words4')" class="cat-pill tile h-14 text-xl" style="font-family:'Fredoka',sans-serif;">
+              <span>cake</span><span class="tick">✓</span>
+            </button>
+            <button type="button" data-cat="words5" onclick="toggleCat('words5')" class="cat-pill tile h-14 text-xl" style="font-family:'Fredoka',sans-serif;">
+              <span>night</span><span class="tick">✓</span>
+            </button>
+          </div>
+        </div>
+
+        <!-- CLUE: how the thing to find is shown to the hunter -->
+        <div class="space-y-2">
+          <div class="text-[11px] font-extrabold uppercase tracking-widest text-[#E5B363]">Clue</div>
           <div class="grid grid-cols-3 gap-2.5">
-          <button type="button" data-cat="numbers" onclick="toggleCat('numbers')" class="cat-pill tile h-14 text-2xl" style="font-family:'Fredoka',sans-serif;">
-            <span>42</span><span class="tick">✓</span>
-          </button>
-          <button type="button" data-cat="bigrams" onclick="toggleCat('bigrams')" class="cat-pill tile h-14 text-2xl" style="font-family:'Fredoka',sans-serif;">
-            <span>ab</span><span class="tick">✓</span>
-          </button>
-          <button type="button" data-cat="words" onclick="toggleCat('words')" class="cat-pill tile h-14 text-2xl" style="font-family:'Fredoka',sans-serif;">
-            <span>cat</span><span class="tick">✓</span>
-          </button>
-          <button type="button" data-cat="words4" onclick="toggleCat('words4')" class="cat-pill tile h-14 text-2xl" style="font-family:'Fredoka',sans-serif;">
-            <span>frog</span><span class="tick">✓</span>
-          </button>
-          <button type="button" data-cat="words5" onclick="toggleCat('words5')" class="cat-pill tile h-14 text-2xl" style="font-family:'Fredoka',sans-serif;">
-            <span>apple</span><span class="tick">✓</span>
-          </button>
-          <button type="button" data-cat="polygons" onclick="toggleCat('polygons')" class="cat-pill tile h-14 text-2xl" style="font-family:'Fredoka',sans-serif;">
-            <span><svg viewBox="0 0 100 100" class="w-9 h-9"><path d="M50 7 L62 35 L93 36 L68 55 L77 86 L50 68 L23 86 L32 55 L7 36 L38 35 Z" fill="none" stroke="currentColor" stroke-width="9" stroke-linejoin="round"/></svg></span><span class="tick">✓</span>
-          </button>
+            <button type="button" id="clueSeeBtn" onclick="setClue('see')" class="tile py-2">
+              <span class="text-2xl leading-none">👀</span>
+              <span class="text-sm">SEE</span>
+              <span class="text-[11px] font-bold opacity-70">read it</span>
+            </button>
+            <button type="button" id="clueHearBtn" onclick="setClue('hear')" class="tile py-2">
+              <span class="text-2xl leading-none">🔊</span>
+              <span class="text-sm">HEAR</span>
+              <span class="text-[11px] font-bold opacity-70">sounds only</span>
+            </button>
+            <button type="button" id="clueMathBtn" onclick="setClue('math')" class="tile py-2">
+              <span class="text-2xl leading-none">🧮</span>
+              <span class="text-sm">MATH</span>
+              <span class="text-[11px] font-bold opacity-70">find the answer</span>
+            </button>
+          </div>
+          <div id="mathOpRow" class="hidden">
+            <select id="mathOpSelect" onchange="setOp(this.value)" class="w-full h-12 rounded-2xl bg-[#24344D] text-[#EFECE6] border-2 border-[#E5B363] px-3 text-lg font-extrabold" style="font-family:'Fredoka',sans-serif;">
+              <option value="add">➕ Addition</option>
+              <option value="sub">➖ Subtraction</option>
+              <option value="mul">✖️ Multiplication</option>
+              <option value="div">➗ Division</option>
+            </select>
           </div>
         </div>
 
@@ -299,7 +352,7 @@
         <!-- HOW MANY -->
         <div class="space-y-2">
           <div class="text-[11px] font-extrabold uppercase tracking-widest text-[#E5B363]">How many</div>
-          <div class="grid grid-cols-4 gap-2.5">
+          <div class="grid grid-cols-3 gap-2.5">
             <button type="button" id="densEasyBtn" onclick="setDensity('easy')" class="tile py-2">
               <span class="text-xs leading-none">⭐</span><span class="text-sm">EASY</span>
             </button>
@@ -308,9 +361,6 @@
             </button>
             <button type="button" id="densHardBtn" onclick="setDensity('hard')" class="tile py-2">
               <span class="text-xs leading-none">⭐⭐⭐</span><span class="text-sm">HARD</span>
-            </button>
-            <button type="button" id="densSuperBtn" onclick="setDensity('superhard')" class="tile py-2">
-              <span class="text-xs leading-none">💀</span><span class="text-sm">SUPER</span>
             </button>
           </div>
         </div>
@@ -393,14 +443,6 @@
     <div class="flex-1 w-full flex items-center justify-center overflow-hidden relative">
       <div class="paper-sheet w-full h-full rounded-2xl flex items-center justify-center overflow-hidden relative">
         <svg id="jumbleSvg" viewBox="0 0 800 1050" preserveAspectRatio="xMidYMid meet" class="w-full h-full block select-none">
-          <defs>
-            <pattern id="svgStripePattern" width="12" height="12" patternTransform="rotate(45 0 0)" patternUnits="userSpaceOnUse">
-              <line x1="0" y1="0" x2="0" y2="12" stroke="#2A1B15" stroke-width="4.5" />
-            </pattern>
-            <pattern id="svgDotPattern" width="18" height="18" patternUnits="userSpaceOnUse">
-              <circle cx="9" cy="9" r="3.8" fill="#2A1B15" />
-            </pattern>
-          </defs>
           <!-- Jumble items & feedback rings injected directly here -->
           <g id="jumbleLayer"></g>
           <g id="feedbackLayer"></g>
@@ -412,6 +454,14 @@
           <div id="doneTime" class="done-pop text-6xl font-black text-[#EFECE6]" style="font-family:'Fredoka',sans-serif;">0.0s</div>
           <div id="doneMsg" class="hidden done-pop text-3xl font-black text-[#E5B363]" style="font-family:'Fredoka',sans-serif;">You found everything!</div>
           <button id="newPageBtn" class="hidden px-6 py-3 rounded-2xl bg-[#E5B363] text-[#2B1D16] font-black text-xl uppercase shadow-lg border-b-4 border-[#D69847] active:translate-y-0.5 transition" onclick="newSoloPage()">NEW PAGE ▶</button>
+        </div>
+
+        <!-- A word just earned its berry stamp -->
+        <div id="berryToast" class="hidden absolute top-3 inset-x-0 z-20 flex justify-center pointer-events-none">
+          <div class="done-pop flex items-center gap-2 bg-[#24344D]/95 border-2 border-[#E5B363] rounded-2xl px-4 py-2 shadow-xl">
+            <span id="berryToastIcon" class="block w-9 h-9"></span>
+            <span id="berryToastText" class="text-xl font-black text-[#E5B363]" style="font-family:'Fredoka',sans-serif;"></span>
+          </div>
         </div>
       </div>
     </div>
@@ -451,56 +501,101 @@
     </div>
   </section>
 
+  <!-- ==================== MY WORDS SHELF ==================== -->
+  <section id="shelfScreen" class="hidden fixed inset-0 z-50 bg-[#24344D] overflow-y-auto overflow-x-hidden">
+    <div class="w-full max-w-md mx-auto px-3 sm:px-5 pb-10">
+      <div class="sticky top-0 z-10 bg-[#24344D] py-3 flex items-center justify-between gap-2">
+        <button onclick="closeShelf()" class="w-11 h-11 rounded-xl bg-[#314766] text-[#EFECE6] text-lg font-black flex items-center justify-center border border-[#435E85] active:scale-95 transition">✕</button>
+        <h2 class="text-2xl font-bold text-[#EFECE6]" style="font-family:'Fredoka',sans-serif;">MY <span class="text-[#E5B363]">WORDS</span></h2>
+        <div id="shelfSummary" class="text-sm font-black text-[#E5B363] bg-[#314766] border border-[#435E85] rounded-xl px-2.5 py-2 min-w-[44px] text-center">0</div>
+      </div>
+      <div id="shelfBody" class="space-y-4"></div>
+    </div>
+  </section>
+
   <!-- ==================== JAVASCRIPT ENGINE ==================== -->
   <script>
     /********************************************************************
      * 1. KID-FRIENDLY POOLS & DATA
      ********************************************************************/
-    const UNIQUE_BIGRAMS = [
-      "TH", "HE", "AN", "IN", "ER", "ON", "RE", "ED", "ND", "HA",
-      "AT", "EN", "ES", "OF", "NT", "EA", "TI", "TO", "IO", "LE",
-      "IS", "OU", "AR", "AS", "DE", "RT", "VE", "SH", "CH", "QU",
-      "TR", "BR", "CR", "DR", "FR", "GR", "PL", "CL", "BL", "FL",
-      "GL", "SL", "SP", "ST", "SK", "SM", "SN", "SW", "TW", "WH",
-      "WR", "OR", "IT", "AL", "SE", "CO", "ME", "HI", "RO", "NE",
-      "LI", "LL", "BE", "MA", "CA", "EL", "LA", "FO", "HO", "PE",
-      "PR", "NO", "US", "OT", "SO", "UN", "LO", "WA", "EE", "WI",
-      "PO", "WE", "OW", "PA", "AM", "UP", "GO", "DO", "BY", "MY"
-    ];
+    // Look-alike words. Every word on the board has "near-misses" to be confused with
+    // (cat / cap / cut / car / can). Only words with at least two one-letter-off
+    // neighbours in their list are kept, so there are always look-alikes to pair up.
+    const RAW_WORDS_3 = `
+      cat cap can car cab cut cup cot cub bat bag bad ban bar bed big bit bin bog box bud bug bun bus but
+      hat ham had hen him hip his hit hog hop hot hub hug hum hut pan pad pal paw pet peg pen pig pin pit
+      pod pop pot pup dad den dig dim dip dog dot dug fan fat fed fig fin fit fox fun gap gas gum gun jam
+      jar jet jig job jog jug lap leg let lid lip lit log lot mad man map mat men met mix mob mop mud mug
+      nap net nod nut rag ram ran rat red rib rid rim rip rob rod rot rub rug run sad sat saw set sip sit
+      six sob sub sum sun tab tag tan tap ten tin tip top toy tub tug van vet wag wax web wet wig win zip
+      zap bib kid kit nip sap sag yes yet`;
 
-    const UNIQUE_WORDS = [
-      "CAT", "DOG", "SUN", "HAT", "PIG", "COW", "BEE", "ANT", "FOX", "OWL",
-      "BUG", "BAT", "HEN", "CUB", "PUP", "CAR", "BUS", "VAN", "JET", "SUB",
-      "PIE", "JAM", "EGG", "NUT", "TEA", "CUP", "MUG", "PAN", "POT", "BOX",
-      "BAG", "KEY", "PEN", "MAP", "BED", "RUG", "FAN", "TOY", "TOP", "NET",
-      "SKI", "BOW", "ICE", "SKY", "SEA", "MUD", "LOG", "WEB", "GEM", "RED",
-      "TAN", "ONE", "TWO", "SIX", "TEN", "MOM", "DAD", "BOY", "PAL", "EYE",
-      "EAR", "ARM", "LEG", "TOE", "LIP", "PAW", "FIN", "HOP", "RUN", "FLY",
-      "HUG", "WIN", "ZIP", "POP"
-    ];
+    const RAW_WORDS_4 = `
+      bake cake lake make rake take wake cave gave wave save came game name same tame fame cane lane mane
+      pane bone cone tone dime lime time fine line mine nine pine vine wine dine bike hike five dive hive
+      fire hire tire wire hole mole pole sole role home dome hose nose rose pose cube tube cute mute tune
+      dune rule mule kite bite site dice mice nice rice face lace race pace cage page wage rage back pack
+      sack tack rack lack jack bell fell sell tell well yell ball call fall hall tall wall bill fill hill
+      mill pill will hand band land sand bank sank tank rank ring sing king wing duck luck buck sock rock
+      lock dock deck neck peck bump jump lump pump dump camp lamp damp ramp best nest rest test vest west
+      fist list mist fast last mast past cast mask task bend mend send tend bent dent rent sent tent vent
+      went belt melt felt gift lift fish dish wish beat heat meat neat seat boat coat goat moat book cook
+      hook look took moon noon soon rain gain main pain tail bail fail hail jail mail nail pail rail sail
+      boot foot root food good hood mood wood deer seed need feed weed keep deep peep fork cork pork corn
+      horn born torn bear pear gear year fear hear near dear flag flat flip slip slap clap clip chip ship
+      shop chop drop crop slow snow blow glow flow grow crow show`;
 
-    const UNIQUE_WORDS_4 = [
-      "FROG", "DUCK", "FISH", "BIRD", "BEAR", "LION", "DEER", "GOAT", "CRAB", "SEAL",
-      "WOLF", "MOTH", "CAKE", "CORN", "PEAR", "PLUM", "MILK", "RICE", "SOUP", "BEAN",
-      "LIME", "BALL", "BOOK", "DOLL", "DRUM", "KITE", "LAMP", "BELL", "COIN", "DOOR",
-      "FORK", "RING", "SHOE", "SOCK", "SHIP", "TENT", "BOAT", "BIKE", "MOON", "STAR",
-      "RAIN", "SNOW", "WIND", "LEAF", "TREE", "ROCK", "SAND", "POND", "LAKE", "HILL",
-      "FIRE", "WAVE", "CAVE", "HAND", "FOOT", "NOSE", "HAIR", "KNEE", "HEAD", "PLAY",
-      "JUMP", "SWIM", "SING", "GAME", "GIFT", "KING", "FARM", "BARN", "NEST", "WING",
-      "TAIL", "BONE", "CAMP", "CLAP", "DISH", "FLAG", "GOLD", "HOOP"
-    ];
+    const RAW_WORDS_5 = `
+      house mouse horse nurse purse curse worse paint faint saint point joint plant plane plate brush
+      crush blush flush plush brick trick click clock block flock black beach peach reach teach bread
+      break dread tread light night right sight tight fight might stone store shore score snore stove
+      sheep sheet sleep sweep steep whale while white whole grape grade grace graze brave grave shave
+      crown brown drown frown grown tower power lower mower bunny funny sunny berry merry ferry candy
+      handy sandy dandy share shape shade shake shame shark snake stake skate slate state crane crate
+      grate`;
 
-    const UNIQUE_WORDS_5 = [
-      "APPLE", "GRAPE", "LEMON", "MANGO", "PEACH", "BERRY", "PIZZA", "BREAD", "CANDY", "HONEY",
-      "JUICE", "SALAD", "TOAST", "PASTA", "HORSE", "MOUSE", "SHEEP", "TIGER", "ZEBRA", "SNAKE",
-      "SHARK", "WHALE", "PANDA", "KOALA", "OTTER", "SNAIL", "BUNNY", "PUPPY", "ROBIN", "CAMEL",
-      "CHAIR", "CLOCK", "TABLE", "PLANT", "BEACH", "BRUSH", "CROWN", "PAINT", "PIANO", "ROBOT",
-      "TRAIN", "TRUCK", "WATER", "SMILE", "HAPPY", "LAUGH", "DREAM", "MUSIC", "PARTY", "RIVER",
-      "STONE", "STORM", "SUNNY", "OCEAN", "FIELD", "HEART", "LIGHT", "NIGHT", "CLOUD", "DAISY",
-      "DANCE", "EAGLE", "TOWER", "MAGIC"
-    ];
+    function parseWordList(raw) { return [...new Set(raw.trim().split(/\s+/).map(w => w.toUpperCase()))]; }
+    function isOneOff(a, b) {
+      if (a.length !== b.length) return false;
+      let diff = 0;
+      for (let i = 0; i < a.length; i++) if (a[i] !== b[i] && ++diff > 1) return false;
+      return diff === 1;
+    }
+    function keepConnected(list) { return list.filter(w => list.filter(x => isOneOff(w, x)).length >= 2); }
 
-    const AMBIGUOUS_NUMBERS = new Set([6, 9, 66, 68, 69, 86, 89, 96, 98, 99]);
+    const WORDS_3 = keepConnected(parseWordList(RAW_WORDS_3));
+    const WORDS_4 = keepConnected(parseWordList(RAW_WORDS_4));
+    const WORDS_5 = keepConnected(parseWordList(RAW_WORDS_5));
+    const ALL_WORDS = [...WORDS_3, ...WORDS_4, ...WORDS_5].sort();
+
+    // Cut a word list into families of look-alikes (a seed word + words one letter off it),
+    // preferring words that change the same letter (cat / cap / can / car).
+    const FAMILY_SIZE = 5;
+    function lookAlikeFamilies(list) {
+      const used = new Set();
+      const families = [];
+      for (const seed of shuffleArray(list)) {
+        if (used.has(seed)) continue;
+        const mates = list.filter(w => !used.has(w) && isOneOff(seed, w));
+        if (mates.length < 2) continue;
+        const byPos = {};
+        mates.forEach(m => {
+          let p = 0;
+          while (seed[p] === m[p]) p++;
+          (byPos[p] = byPos[p] || []).push(m);
+        });
+        const picked = [];
+        Object.values(byPos).sort((a, b) => b.length - a.length).forEach(group => {
+          shuffleArray(group).forEach(m => { if (picked.length < FAMILY_SIZE - 1) picked.push(m); });
+        });
+        const family = [seed, ...picked];
+        family.forEach(w => used.add(w));
+        families.push(family);
+      }
+      return families;
+    }
+
+        const AMBIGUOUS_NUMBERS = new Set([6, 9, 66, 68, 69, 86, 89, 96, 98, 99]);
 
     const FONT_STYLES = [
       { family: "'DM Sans', sans-serif", weight: "800", style: "normal", outline: false },
@@ -513,29 +608,176 @@
       { family: "'Fredoka', sans-serif", weight: "700", style: "normal", outline: true }
     ];
 
-    // 12 Kid-Friendly Shapes ONLY
-    const BASE_POLYGONS = [
-      { id: "circle", name: "Circle", path: "M50 10 A40 40 0 1 0 50 90 A40 40 0 1 0 50 10 Z" },
-      { id: "square", name: "Square", path: "M15 15 H85 V85 H15 Z" },
-      { id: "triangle", name: "Triangle", path: "M50 10 L90 86 L10 86 Z" },
-      { id: "star", name: "Star", path: "M50 7 L62 35 L93 36 L68 55 L77 86 L50 68 L23 86 L32 55 L7 36 L38 35 Z" },
-      { id: "heart", name: "Heart", path: "M50 88 C50 88 10 62 10 34 C10 17 25 10 38 15 C45 18 50 26 50 26 C50 26 55 18 62 15 C75 10 90 17 90 34 C90 62 50 88 50 88 Z" },
-      { id: "diamond", name: "Diamond", path: "M50 7 L86 50 L50 93 L14 50 Z" },
-      { id: "oval", name: "Oval", path: "M50 22 A42 28 0 1 0 50 78 A42 28 0 1 0 50 22 Z" },
-      { id: "rectangle", name: "Rectangle", path: "M10 25 H90 V75 H10 Z" },
-      { id: "moon", name: "Moon", path: "M66 10 C35 12 14 34 14 52 C14 73 35 90 66 90 C44 80 38 66 38 50 C38 34 44 20 66 10 Z" },
-      { id: "cross", name: "Cross", path: "M35 10 H65 V35 H90 V65 H65 V90 H35 V65 H10 V35 H35 Z" },
-      { id: "arrow", name: "Arrow", path: "M50 8 L90 48 H66 V90 H34 V48 H10 Z" },
-      { id: "cloud", name: "Cloud", path: "M26 76 H76 C86 76 92 68 92 58 C92 49 85 42 77 41 C75 26 62 16 47 16 C33 16 22 25 19 38 C11 40 6 48 6 57 C6 68 15 76 26 76 Z" }
-    ];
+    /* ---------- MATH clues: the clue is an equation, the thing to find is its answer ---------- */
+    const MATH_SYMBOLS = { add: "+", sub: "−", mul: "×", div: "÷" };
+    function mathRange() { return state.densityKey === "easy" ? 20 : state.densityKey === "medium" ? 50 : 99; }
+    // every kid-sized [a, b] where a (op) b = n
+    function mathPairs(op, n) {
+      const out = [];
+      if (op === "add") {
+        for (let a = 1; a <= n - 1; a++) out.push([a, n - a]);
+      } else if (op === "sub") {
+        for (let b = 1; b <= 9; b++) out.push([n + b, b]);
+      } else if (op === "mul") {
+        for (let a = 2; a <= 10; a++) if (n % a === 0 && n / a >= 2 && n / a <= 10) out.push([a, n / a]);
+      } else if (op === "div") {
+        // Easy keeps the dividend small (at most 50) and divides by 2 to 5 only
+        const easy = state.densityKey === "easy";
+        const maxB = easy ? 5 : 10, cap = easy ? 50 : 100;
+        for (let b = 2; b <= maxB; b++) if (n * b <= cap) out.push([n * b, b]);
+      }
+      return out;
+    }
+    function makeEquation(op, n) {
+      const pairs = mathPairs(op, n);
+      const [a, b] = pairs[Math.floor(Math.random() * pairs.length)];
+      return `${a} ${MATH_SYMBOLS[op]} ${b} = ?`;
+    }
 
-    const POLYGON_MODIFIERS = [
-      { id: "outline", label: "Outline" },
-      { id: "solid", label: "Solid" },
-      { id: "dotted", label: "Dotted" },
-      { id: "striped", label: "Striped" },
-      { id: "double", label: "Double" }
-    ];
+    /* ---------- HEAR clues: the word is spoken, never shown ---------- */
+    const SPEECH_OK = typeof window !== "undefined" && "speechSynthesis" in window && "SpeechSynthesisUtterance" in window;
+    // Set this to a folder (for example "sounds/") to play recorded files like sounds/cat.mp3.
+    // Any word without a file falls back to the device voice. Leave "" to use the device voice only.
+    const AUDIO_FOLDER = "";
+    const CAN_SPEAK = SPEECH_OK || !!AUDIO_FOLDER;
+    let clueAudio = null;
+
+    // Prefer the nicest English voice the device has (natural / neural / enhanced), never the compact robot ones
+    function pickVoice() {
+      try {
+        const all = window.speechSynthesis.getVoices().filter(v => /^en[-_]/i.test(v.lang));
+        const good = all.filter(v => !/compact|espeak/i.test(v.name));
+        const pool = good.length ? good : all;
+        const prefs = [/natural|neural/i, /premium|enhanced/i, /google (us|uk) english/i, /samantha|ava|allison|aria|jenny|zoe|karen/i];
+        for (const re of prefs) { const v = pool.find(x => re.test(x.name)); if (v) return v; }
+        return pool.find(v => /en[-_]US/i.test(v.lang)) || pool[0] || null;
+      } catch (e) { return null; }
+    }
+    function speakSynth(word) {
+      if (!SPEECH_OK) return;
+      try {
+        const synth = window.speechSynthesis;
+        if (synth.speaking || synth.pending) synth.cancel();
+        const u = new SpeechSynthesisUtterance(word.toLowerCase());
+        const v = pickVoice();
+        if (v) { u.voice = v; u.lang = v.lang; } else { u.lang = "en-US"; }
+        u.rate = 0.85;
+        u.pitch = 1;
+        synth.speak(u);
+      } catch (e) {}
+    }
+    function speakWord(word) {
+      if (AUDIO_FOLDER) {
+        try {
+          if (clueAudio) clueAudio.pause();
+          if (SPEECH_OK && window.speechSynthesis.speaking) window.speechSynthesis.cancel();
+          const a = new Audio(`${AUDIO_FOLDER}${word.toLowerCase()}.mp3`);
+          clueAudio = a;
+          a.onerror = () => speakSynth(word);
+          const pr = a.play();
+          if (pr && pr.catch) pr.catch(() => speakSynth(word));
+          return;
+        } catch (e) {}
+      }
+      speakSynth(word);
+    }
+    function stopSpeaking() {
+      if (state.speakTimer) { clearTimeout(state.speakTimer); state.speakTimer = null; }
+      try { if (clueAudio) clueAudio.pause(); } catch (e) {}
+      try { if (SPEECH_OK) window.speechSynthesis.cancel(); } catch (e) {}
+    }
+    function speakClue(delayMs) {
+      const t = state.currentTarget;
+      if (!t || !CAN_SPEAK) return;
+      if (state.speakTimer) { clearTimeout(state.speakTimer); state.speakTimer = null; }
+      const go = () => { state.speakTimer = null; speakWord(t.canonicalText); };
+      if (delayMs) state.speakTimer = setTimeout(go, delayMs);
+      else go();
+    }
+
+    /* ---------- MY WORDS shelf: 3 finds = a berry stamp (saved on this device only) ---------- */
+    const SHELF_KEY = "eyespie_my_words_v1";
+    const BERRY_AT = 3;
+    let shelfMemory = {};
+    let berryToastTimer = null;
+
+    function loadShelf() {
+      try {
+        const raw = localStorage.getItem(SHELF_KEY);
+        const parsed = raw ? JSON.parse(raw) : {};
+        shelfMemory = parsed && typeof parsed === "object" ? parsed : {};
+      } catch (e) { shelfMemory = {}; }
+    }
+    function saveShelf() {
+      try { localStorage.setItem(SHELF_KEY, JSON.stringify(shelfMemory)); } catch (e) {}
+    }
+    function shelfBerryCount() {
+      return ALL_WORDS.filter(w => (shelfMemory[w] || 0) >= BERRY_AT).length;
+    }
+    function berryStampSvg() {
+      return `<svg viewBox="0 0 40 40" class="w-full h-full">
+        <path d="M20 12 Q22 4 31 4 Q29 11 20 12 Z" fill="#4BB543"/>
+        <circle cx="20" cy="25" r="13" fill="#C9252D" stroke="#9E1B22" stroke-width="2"/>
+        <circle cx="15" cy="20" r="3.4" fill="#F29B9E"/>
+        <circle cx="25" cy="29" r="1.6" fill="#9E1B22"/><circle cx="19" cy="31" r="1.6" fill="#9E1B22"/><circle cx="27" cy="22" r="1.6" fill="#9E1B22"/>
+      </svg>`;
+    }
+    function noteWordFound(word) {
+      const before = shelfMemory[word] || 0;
+      shelfMemory[word] = before + 1;
+      saveShelf();
+      if (before < BERRY_AT && before + 1 >= BERRY_AT) showBerryToast(word);
+    }
+    function showBerryToast(word) {
+      const toast = document.getElementById("berryToast");
+      document.getElementById("berryToastIcon").innerHTML = berryStampSvg();
+      document.getElementById("berryToastText").textContent = `BERRY WORD! ${word.toLowerCase()}`;
+      toast.classList.remove("hidden");
+      if (berryToastTimer) clearTimeout(berryToastTimer);
+      berryToastTimer = setTimeout(() => { toast.classList.add("hidden"); berryToastTimer = null; }, 1700);
+    }
+
+    function renderShelf() {
+      const berry = [], practice = [], fresh = [];
+      ALL_WORDS.forEach(w => {
+        const n = shelfMemory[w] || 0;
+        (n >= BERRY_AT ? berry : n > 0 ? practice : fresh).push(w);
+      });
+      document.getElementById("shelfSummary").textContent = `🫐 ${berry.length}`;
+
+      const cardBerry = w => `<div class="shelf-card shelf-berry"><span>${w.toLowerCase()}</span><span class="shelf-stamp">${berryStampSvg()}</span></div>`;
+      const cardPractice = w => {
+        const n = shelfMemory[w] || 0;
+        let dots = "";
+        for (let i = 0; i < BERRY_AT; i++) dots += `<i class="${i < n ? "on" : ""}"></i>`;
+        return `<div class="shelf-card"><span>${w.toLowerCase()}</span><span class="shelf-dots">${dots}</span></div>`;
+      };
+
+      let html = `<div><div class="shelf-head">Berry words · ${berry.length}</div>`;
+      html += berry.length
+        ? `<div class="shelf-grid">${berry.map(cardBerry).join("")}</div>`
+        : `<div class="shelf-empty">Find a word ${BERRY_AT} times to earn its berry stamp!</div>`;
+      html += `</div>`;
+
+      if (practice.length) {
+        html += `<div><div class="shelf-head">Practicing · ${practice.length}</div><div class="shelf-grid">${practice.map(cardPractice).join("")}</div></div>`;
+      }
+
+      html += `<details class="pb-6"><summary class="shelf-head cursor-pointer" style="list-style:none;">▸ New words · ${fresh.length}</summary>
+        <div class="grid grid-cols-4 gap-2 mt-2">${fresh.map(w => `<div class="shelf-new">${w.toLowerCase()}</div>`).join("")}</div></details>`;
+
+      document.getElementById("shelfBody").innerHTML = html;
+    }
+    function openShelf() {
+      renderShelf();
+      const s = document.getElementById("shelfScreen");
+      s.classList.remove("hidden");
+      s.scrollTop = 0;
+    }
+    function closeShelf() {
+      document.getElementById("shelfScreen").classList.add("hidden");
+    }
+    loadShelf();
 
     /********************************************************************
      * 2. WEB AUDIO SYNTH
@@ -613,12 +855,11 @@
     const HINT_MS = 8000;          // no find for this long -> the target glows
 
     // Easy = few, BIG, mostly upright. Medium/Hard = the original crowded boards.
-     const DENSITY = {
-       easy:   { count: 18,  min: 56, max: 84, rotRange: 28 },
-       medium: { count: 48,  min: 32, max: 60, rotRange: 180 },
-       hard:   { count: 120, min: 32, max: 60, rotRange: 180 },
-       superhard: { count: 200, min: 8, max: 18, rotRange: 180, overlap: true }
-     };
+    const DENSITY = {
+      easy:   { count: 18,  min: 56, max: 84, rotRange: 28 },
+      medium: { count: 48,  min: 32, max: 60, rotRange: 180 },
+      hard:   { count: 120, min: 32, max: 60, rotRange: 180 }
+    };
 
     const state = {
       p1TotalScore: 0,   // rounds won
@@ -632,13 +873,13 @@
 
       categories: {
         numbers: true,
-        bigrams: true,
         words: true,
         words4: false,
-        words5: false,
-        polygons: true
+        words5: false
       },
-      mode: "auto",        // 'auto' (surprise) | 'junebug' (friend picks)
+      clue: "see",         // 'see' (read it) | 'hear' (spoken word only) | 'math' (equation -> its answer)
+      op: "add",           // math clue: 'add' | 'sub' | 'mul' | 'div'
+      mode: "auto",        // 'auto' (surprise) | 'junebug' (friend picks) | 'solo'
       densityKey: "easy",
       moving: false,
 
@@ -652,6 +893,7 @@
       timerInterval: null,
       flowTimer: null,
       hintTimer: null,
+      speakTimer: null,
       huntStartTs: 0,
       wrongTapStreak: 0
     };
@@ -667,24 +909,36 @@
     function syncLobbyUI() {
       document.querySelectorAll(".cat-pill").forEach(btn => paint(btn, state.categories[btn.dataset.cat]));
 
-       paint(document.getElementById("modeAutoBtn"), state.mode === "auto");
-       paint(document.getElementById("modeHumanBtn"), state.mode === "junebug");
-       paint(document.getElementById("modeSoloBtn"), state.mode === "solo");
+      paint(document.getElementById("clueSeeBtn"), state.clue === "see");
+      paint(document.getElementById("clueHearBtn"), state.clue === "hear");
+      paint(document.getElementById("clueMathBtn"), state.clue === "math");
+      document.getElementById("findSection").classList.toggle("hidden", state.clue === "math");
+      document.getElementById("mathOpRow").classList.toggle("hidden", state.clue !== "math");
+      document.getElementById("mathOpSelect").value = state.op;
+      const numTile = document.querySelector('.cat-pill[data-cat="numbers"]');
+      numTile.classList.toggle("opacity-30", state.clue === "hear");          // HEAR is words only
+      numTile.classList.toggle("pointer-events-none", state.clue === "hear");
 
-       paint(document.getElementById("densEasyBtn"), state.densityKey === "easy");
-       paint(document.getElementById("densMedBtn"), state.densityKey === "medium");
-       paint(document.getElementById("densHardBtn"), state.densityKey === "hard");
-       paint(document.getElementById("densSuperBtn"), state.densityKey === "superhard");
+      paint(document.getElementById("modeAutoBtn"), state.mode === "auto");
+      paint(document.getElementById("modeHumanBtn"), state.mode === "junebug");
+      paint(document.getElementById("modeSoloBtn"), state.mode === "solo");
+
+      paint(document.getElementById("densEasyBtn"), state.densityKey === "easy");
+      paint(document.getElementById("densMedBtn"), state.densityKey === "medium");
+      paint(document.getElementById("densHardBtn"), state.densityKey === "hard");
 
       paint(document.getElementById("moveOffBtn"), !state.moving);
       paint(document.getElementById("moveOnBtn"), state.moving);
 
       document.getElementById("lobbyP1Score").textContent = state.p1TotalScore;
       document.getElementById("lobbyP2Score").textContent = state.p2TotalScore;
+      document.getElementById("shelfCount").textContent = shelfBerryCount();
     }
 
     function toggleCat(key) {
-      const activeCount = Object.values(state.categories).filter(Boolean).length;
+      // in HEAR only the word tiles count; otherwise numbers count too
+      const relevant = state.clue === "hear" ? ["words", "words4", "words5"] : ["numbers", "words", "words4", "words5"];
+      const activeCount = relevant.filter(k => state.categories[k]).length;
       if (state.categories[key] && activeCount <= 1) {
         // Need at least one thing to find: wiggle the button so it doesn't feel broken
         const btn = document.querySelector(`.cat-pill[data-cat="${key}"]`);
@@ -698,6 +952,13 @@
       syncLobbyUI();
     }
 
+    function setClue(c) {
+      state.clue = c;
+      // HEAR needs at least one kind of word switched on
+      if (c === "hear" && !["words", "words4", "words5"].some(k => state.categories[k])) state.categories.words = true;
+      syncLobbyUI();
+    }
+    function setOp(o) { state.op = o; syncLobbyUI(); }
     function setGameMode(m) { state.mode = m; syncLobbyUI(); }
     function setDensity(d) { state.densityKey = d; syncLobbyUI(); }
     function setMoving(m) { state.moving = m; syncLobbyUI(); }
@@ -724,70 +985,46 @@
     function buildCandidatePool(targetCount) {
       const pools = [];
 
-      if (state.categories.numbers) {
+      if (state.clue === "math") {
+        // numbers only; each one carries an equation whose answer it is
         const list = [];
-        for (let n = 1; n <= 99; n++) {
+        for (let n = 1; n <= mathRange(); n++) {
+          if (!mathPairs(state.op, n).length) continue;
           list.push({
             uid: `num_${n}`,
             category: "number",
             canonicalText: String(n),
             boardText: String(n),
-            underline: AMBIGUOUS_NUMBERS.has(n)
+            underline: AMBIGUOUS_NUMBERS.has(n),
+            clueText: makeEquation(state.op, n)
           });
         }
         pools.push(shuffleArray(list));
-      }
-
-      if (state.categories.bigrams) {
-        const list = UNIQUE_BIGRAMS.map(bg => {
-          const r = Math.random();
-          const txt = r < 0.35 ? bg.toLowerCase() : (r < 0.7 ? bg[0] + bg[1].toLowerCase() : bg);
-          return {
-            uid: `bi_${bg}`,
-            category: "bigram",
-            canonicalText: bg,
-            boardText: txt,
-            underline: true
-          };
-        });
-        pools.push(shuffleArray(list));
-      }
-
-      const WORD_SETS = [
-        { cat: "words",  list: UNIQUE_WORDS },
-        { cat: "words4", list: UNIQUE_WORDS_4 },
-        { cat: "words5", list: UNIQUE_WORDS_5 }
-      ];
-      for (const set of WORD_SETS) {
-        if (!state.categories[set.cat]) continue;
-        const list = set.list.map(w => {
-          const r = Math.random();
-          const txt = r < 0.35 ? w.toLowerCase() : (r < 0.7 ? w[0] + w.slice(1).toLowerCase() : w);
-          return {
-            uid: `word_${w}`,
-            category: "word",
-            canonicalText: w,
-            boardText: txt,
-            underline: true
-          };
-        });
-        pools.push(shuffleArray(list));
-      }
-
-      if (state.categories.polygons) {
-        const list = [];
-        for (const base of BASE_POLYGONS) {
-          for (const mod of POLYGON_MODIFIERS) {
+      } else {
+        if (state.clue === "see" && state.categories.numbers) {
+          const list = [];
+          for (let n = 1; n <= 99; n++) {
             list.push({
-              uid: `poly_${base.id}_${mod.id}`,
-              category: "polygon",
-              canonicalText: `${mod.label} ${base.name}`,
-              baseShape: base,
-              modifier: mod
+              uid: `num_${n}`,
+              category: "number",
+              canonicalText: String(n),
+              boardText: String(n),
+              underline: AMBIGUOUS_NUMBERS.has(n)
             });
           }
+          pools.push(shuffleArray(list));
         }
-        pools.push(shuffleArray(list));
+
+        const WORD_SETS = [
+          { cat: "words",  list: WORDS_3 },
+          { cat: "words4", list: WORDS_4 },
+          { cat: "words5", list: WORDS_5 }
+        ];
+        for (const set of WORD_SETS) {
+          if (!state.categories[set.cat]) continue;
+          pools.push(wordPoolFromFamilies(set.list));
+        }
+        if (!pools.length) pools.push(wordPoolFromFamilies(WORDS_3));
       }
 
       const selected = [];
@@ -807,19 +1044,23 @@
       return shuffleArray(selected);
     }
 
-    function getPolygonInnerMarkup(baseShape, modifier) {
-      const strokeW = 7.5;
-      let fill = "none";
-      if (modifier.id === "solid") fill = "#2A1B15";
-      else if (modifier.id === "striped") fill = "url(#svgStripePattern)";
-      else if (modifier.id === "dotted") fill = "url(#svgDotPattern)";
-
-      let extra = "";
-      if (modifier.id === "double") {
-        extra = `<path d="${baseShape.path}" transform="translate(50,50) scale(0.56) translate(-50,-50)" fill="none" stroke="#2A1B15" stroke-width="8.5" stroke-linejoin="round" stroke-linecap="round"/>`;
-      }
-
-      return `<path d="${baseShape.path}" fill="${fill}" stroke="#2A1B15" stroke-width="${strokeW}" stroke-linejoin="round" stroke-linecap="round"/>${extra}`;
+    // Look-alike families laid end to end, so a board gets whole families (cat, cap, cut, car, can...)
+    function wordPoolFromFamilies(list) {
+      const out = [];
+      lookAlikeFamilies(list).forEach(family => {
+        family.forEach(w => {
+          const r = Math.random();
+          const txt = r < 0.35 ? w.toLowerCase() : (r < 0.7 ? w[0] + w.slice(1).toLowerCase() : w);
+          out.push({
+            uid: `word_${w}`,
+            category: "word",
+            canonicalText: w,
+            boardText: txt,
+            underline: true
+          });
+        });
+      });
+      return out;
     }
 
     function buildVisualItemGroup(item, sizeOverride) {
@@ -828,7 +1069,7 @@
       const g = document.createElementNS(ns, "g");
       g.setAttribute("transform", `rotate(${item.rot}) scale(${item.sx}, ${item.sy})`);
 
-      if (item.category === "number" || item.category === "bigram" || item.category === "word") {
+      if (item.category === "number" || item.category === "word") {
         const textEl = document.createElementNS(ns, "text");
         textEl.setAttribute("x", "0");
         textEl.setAttribute("y", "0");
@@ -863,12 +1104,6 @@
           line.setAttribute("stroke-linecap", "round");
           g.appendChild(line);
         }
-      } else if (item.category === "polygon") {
-        const innerG = document.createElementNS(ns, "g");
-        const s = sz / 100;
-        innerG.setAttribute("transform", `scale(${s}) translate(-50, -50)`);
-        innerG.innerHTML = getPolygonInnerMarkup(item.baseShape, item.modifier);
-        g.appendChild(innerG);
       }
 
       return g;
@@ -891,7 +1126,6 @@
 
       let charW = 1.05;
       if (item.category === "number") charW = item.boardText.length === 1 ? 0.82 : 1.38;
-      else if (item.category === "bigram") charW = 1.55;
       else if (item.category === "word") charW = item.canonicalText.length <= 3 ? 2.25 : 0.64 * item.canonicalText.length;
 
       const rawW = curSize * charW * item.sx;
@@ -920,9 +1154,8 @@
       document.getElementById("feedbackLayer").innerHTML = "";
 
       const rawItems = candidates.map((item, idx) => {
-        const isGraphic = item.category === "polygon";
-        const minAllowed = cfg.min + (isGraphic ? 4 : 0);
-        const maxAllowed = cfg.max + (isGraphic ? 4 : 0);
+        const minAllowed = cfg.min;
+        const maxAllowed = cfg.max;
 
         // a few big ones, a bunch of medium ones, the rest small (within this density's range)
         const ratio = idx / count;
@@ -981,18 +1214,16 @@
               const cx = minX + Math.random() * (maxX - minX);
               const cy = minY + Math.random() * (maxY - minY);
 
-             let hit = false;
-               if (!cfg.overlap) {
-                 for (let i = 0; i < placedBoxes.length; i++) {
-                   const b = placedBoxes[i];
-                   if (Math.abs(cx - b.cx) < (rx + b.halfW) && Math.abs(cy - b.cy) < (ry + b.halfH)) {
-                     hit = true;
-                     break;
-                   }
+              let hit = false;
+               for (let i = 0; i < placedBoxes.length; i++) {
+                 const b = placedBoxes[i];
+                 if (Math.abs(cx - b.cx) < (rx + b.halfW) && Math.abs(cy - b.cy) < (ry + b.halfH)) {
+                   hit = true;
+                   break;
                  }
                }
 
-               if (!hit) {
+              if (!hit) {
                 item.size = Math.round(curSize);
                 item.cx = Math.round(cx);
                 item.cy = Math.round(cy);
@@ -1279,26 +1510,31 @@
       const uid = state.targetUids[idx];
       state.currentTarget = state.boardItems.find(it => it.uid === uid) || null;
       if (state.currentTarget) renderCanonicalHUD(state.currentTarget);
+      // HEAR: say the word right away for the first one, a beat after the chime for the rest
+      if (state.clue === "hear" && state.currentTarget) speakClue(idx === 0 ? 0 : 400);
       state.hintTimer = setTimeout(showHint, HINT_MS);
     }
 
     function renderCanonicalHUD(item) {
       const badge = document.getElementById("hudCanonicalBadge");
 
-      if (item.category === "number" || item.category === "bigram" || item.category === "word") {
-        badge.innerHTML = `<span class="text-3xl sm:text-4xl font-black tracking-wider">${item.canonicalText}</span>`;
-      } else if (item.category === "polygon") {
+      if (state.clue === "math" && item.clueText) {
+        badge.innerHTML = `<span class="text-3xl sm:text-4xl font-black tracking-wide">${item.clueText}</span>`;
+      } else if (state.clue === "hear" && CAN_SPEAK && item.category === "word") {
+        // audio only: no letters on screen, just a button to hear it again
         badge.innerHTML = `
-          <svg width="40" height="40" viewBox="0 0 100 100" class="shrink-0">
-            ${getPolygonInnerMarkup(item.baseShape, item.modifier)}
-          </svg>
-          <span class="text-lg sm:text-xl font-black uppercase tracking-wide">${item.canonicalText}</span>
-        `;
+          <button type="button" onclick="speakClue(0)" class="flex items-center gap-2 px-4 py-0.5 rounded-xl bg-[#E5B363] border-b-4 border-[#D69847] text-[#2A1B15] font-black active:translate-y-0.5 transition">
+            <span class="text-3xl leading-none">🔊</span>
+            <span class="text-sm uppercase tracking-wide">hear it again</span>
+          </button>`;
+      } else {
+        badge.innerHTML = `<span class="text-3xl sm:text-4xl font-black tracking-wider">${item.canonicalText}</span>`;
       }
     }
 
     /* ---------- the hint: a glowing ring instead of a penalty ---------- */
      function showHint() {
+       if (state.clue === "hear" && state.phase === "hunting") speakClue(0);   // audio hint: say it again
        return;   // hints disabled
        const t = state.currentTarget;
        if (state.phase !== "hunting" || !t || !t.el || t.hintEl) return;
@@ -1343,6 +1579,7 @@
 
       if (item.uid === state.currentTarget.uid) {
         playTone("find");
+        if (item.category === "word") noteWordFound(item.canonicalText);
         clearHint();
         // pop it off the board
         if (item.el) {
@@ -1462,6 +1699,7 @@
     }
 
     function clearActiveTimer() {
+      stopSpeaking();
       if (state.timerInterval) { clearInterval(state.timerInterval); state.timerInterval = null; }
       if (state.flowTimer) { clearTimeout(state.flowTimer); state.flowTimer = null; }
       clearHint();
