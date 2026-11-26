@@ -57,6 +57,10 @@ p{margin:6px 0}.muted{color:var(--muted);font-size:14px}
 .playerlist li.current{outline:2px solid var(--accent);font-weight:800}
 .playerlist li.out{opacity:.45;text-decoration:line-through}
 .dot{width:9px;height:9px;display:inline-block}
+.twistrow{display:flex;gap:10px;align-items:center;flex-wrap:wrap;margin-top:10px}
+.twistrow button{border-color:#a45f3b;color:#7a3f22}
+.twistrow button:disabled{border-color:var(--line);color:var(--ink)}
+.twistrow .muted{flex:1;min-width:200px;font-size:13px}
 details summary{cursor:pointer;font-weight:750;color:#805033}
 details p{max-width:78ch;font-size:14px}
 .rulesgrid{display:grid;grid-template-columns:1fr 1fr;gap:4px 20px;margin-top:8px}
@@ -85,6 +89,7 @@ details p{max-width:78ch;font-size:14px}
       <div id="seedEntry" class="entry hidden"><input id="seedWord" type="text" maxlength="32" autocomplete="off" placeholder="Your one seed word"><button id="addSeed" class="primary">Add seed word</button></div>
       <div id="playEntry" class="hidden">
         <div class="entry"><input id="newWord" type="text" maxlength="32" autocomplete="off" placeholder="One word only" aria-label="Your one-word bridge"><button id="addWord" class="primary">Add one word</button></div>
+        <div class="twistrow"><button id="twist">Twist</button><span id="twistNote" class="muted"></span></div>
       </div>
       <div id="judging" class="hidden">
         <h2 id="judgeHeading">Other players: vote</h2>
@@ -99,6 +104,7 @@ details p{max-width:78ch;font-size:14px}
     <section class="card">
       <h2>The braid</h2>
       <div class="boardwrap"><div id="board"></div></div>
+      <p id="boardNote" class="muted hidden">Shaded band: a twist. The same two strands crossed again, so the strand that went over the first time now goes under.</p>
     </section>
 
     <section class="card">
@@ -114,6 +120,7 @@ details p{max-width:78ch;font-size:14px}
       <p><b>3. Other players vote.</b> Your clock pauses while the other players answer two questions: is your word associated with the middle word (it needs a <b>Yes</b>), and is it associated with the loose word (it needs a <b>No</b>). If rejected, your clock resumes and you must try again.</p>
       <p><b>4. Beat the 60s clock.</b> If your timer hits zero, you are knocked out and the next player takes the turn. Last player standing wins.</p>
       <p><b>5. Solo mode.</b> Play alone (the default until others are in the room) and judge your own words honestly. You lay both seeds, then weave as many crossings as you can before the clock runs out.</p>
+      <p><b>6. Twist.</b> Stuck? Cross the same side again: the strand that went over now goes under, and the loose word becomes the other outer one. It costs you 10 seconds off every turn from now on, up to five twists, and unlocks after the first crossing.</p>
     </div>
   </details>
 </div>
@@ -125,7 +132,7 @@ const $=id=>document.getElementById(id);
 const STRAND_COLORS=['#a45f3b','#3f7778','#8a5a72'];
 const SLOT_NAMES=['Left','Middle','Right'];
 const PLAYER_COLORS=['#a45f3b','#3f7778','#8a5a72','#71834e','#746b9b','#b08336'];
-const TURN_MS=60000;
+const TURN_MS=60000, TWIST_MS=10000, MAX_TWISTS=5;
 let S=null, mode='wait', Hub={me:null,roster:[],up(k,p){try{window.parent.postMessage({t:'gu',game:'braid',k,p},'*')}catch(e){}}};
 let verdict={syn:null,ant:null}, pickTurn=null, focusKey=null, heightTimer=null;
 
@@ -184,6 +191,8 @@ function start(order,names){
     words:[],
     nextId:1,
     stepCount:0,
+    twists:{},
+    twistNow:false,
     pending:null,
     timeLeftMs:TURN_MS,
     turnDeadline:Date.now()+TURN_MS
@@ -196,10 +205,13 @@ function localStart(){
   start(['local-0'],{'local-0':'Player 1'});
 }
 
+function sideNow(){return S.twistNow?(S.nextSide==='L'?'R':'L'):S.nextSide}
+function turnMs(id){return Math.max(TWIST_MS,TURN_MS-TWIST_MS*((S&&S.twists&&S.twists[id])||0))}
 function currentTargets(){
   if(!S)return {outerSlot:0,looseSlot:2,midSlot:1,movingStrand:0,A:null,B:null};
-  let outerSlot=S.nextSide==='L'?0:2;
-  let looseSlot=S.nextSide==='L'?2:0;
+  let side=sideNow();
+  let outerSlot=side==='L'?0:2;
+  let looseSlot=side==='L'?2:0;
   let midSlot=1;
   let movingStrand=S.slots[outerSlot];
   let A=latestOnStrand(S.slots[midSlot]);
@@ -208,8 +220,9 @@ function currentTargets(){
 }
 
 function resetClock(){
-  S.timeLeftMs=TURN_MS;
-  S.turnDeadline=Date.now()+TURN_MS;
+  let ms=turnMs(S.turnId);
+  S.timeLeftMs=ms;
+  S.turnDeadline=Date.now()+ms;
 }
 
 function apply(a,from){
@@ -248,7 +261,8 @@ function apply(a,from){
       text,
       by:from,
       strand:t.movingStrand,
-      side:S.nextSide,
+      side:sideNow(),
+      twist:!!S.twistNow,
       aId:t.A.id,
       bId:t.B.id,
       slotsBefore:S.slots.slice()
@@ -277,13 +291,14 @@ function apply(a,from){
         strand:p.strand,
         step:S.stepCount,
         side:p.side,
+        twist:!!p.twist,
         crossedFrom:outerSlot,
         slotsBefore:p.slotsBefore.slice(),
         slots:newSlots.slice(),
         aId:p.aId,
         bId:p.bId
       });
-      S.nextSide=S.nextSide==='L'?'R':'L';
+      S.nextSide=p.side==='L'?'R':'L';S.twistNow=false;
       let doneBy=S.turnId;
       S.pending=null;
       S.phase='play';
@@ -295,6 +310,14 @@ function apply(a,from){
       S.turnDeadline=Date.now()+Math.max(500,S.timeLeftMs||TURN_MS);
       say('Rejected — clock resumed! Try another word.');
     }
+  }else if(a.a==='twist'){
+    let n=(S.twists&&S.twists[from])||0;
+    if(S.phase!=='play'||from!==S.turnId)return 'It is not your turn.';
+    if(S.stepCount<1)return 'Twist unlocks after the first crossing.';
+    if(S.twistNow)return 'Already twisted this turn.';
+    if(n>=MAX_TWISTS)return 'No twists left.';
+    S.twists=S.twists||{};S.twists[from]=n+1;S.twistNow=true;
+    S.turnDeadline=Math.min(S.turnDeadline,Date.now()+turnMs(from));
   }else if(a.a==='timeout'){
     if((S.phase!=='seed'&&S.phase!=='play')||!isHost())return null;
     let outId=S.turnId;
@@ -311,6 +334,7 @@ function apply(a,from){
       say(`${playerName(outId)} ran out of time! ${playerName(S.winnerId)} wins!`);
     }else{
       S.turnId=nextAfter(outId);
+      S.twistNow=false;
       resetClock();
       say(`${playerName(outId)} ran out of time and is knocked out!`);
     }
@@ -379,12 +403,21 @@ function svgBoard(){
   }
 
   let beads=[];
+  const ACC='#a45f3b';
+  const twistBand=(col,side,dashed)=>{
+    let xa=X0+(col-1)*DX, xb=X0+(col+1)*DX;
+    let ya=(side==='L'?Y[0]:Y[1])-26, yb=(side==='L'?Y[1]:Y[2])+26;
+    return `<rect x="${xa}" y="${ya}" width="${xb-xa}" height="${yb-ya}" fill="${ACC}" fill-opacity="${dashed?.05:.1}" stroke="${ACC}" stroke-width="1.5"${dashed?' stroke-dasharray="5 4"':''}/>`+
+      `<text x="${xb-6}" y="${ya-5}" text-anchor="end" font-family="Segoe UI,system-ui,sans-serif" font-size="12" font-weight="700" fill="#874c2d">twist</text>`;
+  };
+  const tagText=(x,y,s,fill)=>`<text x="${x}" y="${y}" text-anchor="middle" font-family="Segoe UI,system-ui,sans-serif" font-size="12" font-weight="700" fill="${fill}">${s}</text>`;
   out+=`<rect x="${X0-6}" y="${Y[0]-6}" width="12" height="12" fill="${STRAND_COLORS[0]}"/>`;
   seeds.forEach(w=>{
     beads.push({x:X0,y:Y[w.strand],text:w.text,strand:w.strand});
   });
 
   let crossings=S.words.filter(w=>!w.seed);
+  crossings.forEach((c,idx)=>{if(c.twist)out+=twistBand(idx,c.crossedFrom===0?'L':'R',false)});
   crossings.forEach((c,idx)=>{
     let xPrev=X0+idx*DX, x=X0+(idx+1)*DX;
     let lb=c.slotsBefore;
@@ -400,9 +433,21 @@ function svgBoard(){
     let t=currentTargets();
     let xPrev=X0+steps*DX, xNext=X0+(steps+1)*DX;
     let lb=S.slots;
+    if(S.twistNow)out+=twistBand(steps,t.outerSlot===0?'L':'R',true);
     out+=drawCurve(xPrev,Y[t.looseSlot],xNext,Y[t.looseSlot],STRAND_COLORS[lb[t.looseSlot]],false,true);
     out+=drawCurve(xPrev,Y[1],xNext,Y[t.outerSlot],STRAND_COLORS[lb[1]],false,true);
     out+=drawCurve(xPrev,Y[t.outerSlot],xNext,Y[1],STRAND_COLORS[lb[t.outerSlot]],true,true);
+    out+=tagText(xPrev,Y[1]-22,'near','#3f7778');
+    out+=`<rect x="${xPrev-6}" y="${Y[t.outerSlot]-6}" width="12" height="12" fill="${STRAND_COLORS[lb[t.outerSlot]]}"/>`;
+    out+=tagText(xPrev,t.outerSlot===0?Y[0]-14:Y[2]+24,'crosses','#874c2d');
+    if(t.B){
+      if(steps>0){
+        let tw=Math.max(62,Math.min(128,t.B.text.length*8+26));
+        out+=`<rect x="${xPrev-tw/2}" y="${Y[t.looseSlot]-13}" width="${tw}" height="26" fill="#fffdf8" stroke="${STRAND_COLORS[lb[t.looseSlot]]}" stroke-width="2" stroke-dasharray="3 3"/>`;
+        out+=`<text x="${xPrev}" y="${Y[t.looseSlot]+5}" text-anchor="middle" font-family="Georgia,serif" font-size="${t.B.text.length>13?11:13}" fill="#302c25">${esc(t.B.text)}</text>`;
+        out+=tagText(xPrev,t.looseSlot===0?Y[0]-20:Y[2]+30,'far','#94607e');
+      }else out+=tagText(xPrev,Y[t.looseSlot]-22,'far','#94607e');
+    }
     if(S.pending){
       beads.push({x:xNext,y:Y[1],text:S.pending.text,strand:S.pending.strand,pending:true});
     }
@@ -419,7 +464,7 @@ function svgBoard(){
 function drawBoard(){
   $('board').innerHTML=svgBoard();
   let wrap=$('board').parentElement;
-  if(wrap)wrap.scrollLeft=wrap.scrollWidth;
+  if(wrap)wrap.scrollLeft=(S&&S.phase!=='gameover')?Math.max(0,S.stepCount*162):wrap.scrollWidth;
 }
 
 function renderPlayers(){
@@ -432,6 +477,7 @@ function renderPlayers(){
     else if(isOut)li.className='out';
     let dot=document.createElement('i');dot.className='dot';dot.style.background=playerColor(id);
     let suffix=isOut?' · out':(S.phase==='gameover'&&id===S.winnerId?' · winner':(isCurrent?' · active':''));
+    let tw=(S.twists&&S.twists[id])||0;if(tw)suffix+=` · ${tw} twist${tw===1?'':'s'} (${fmtClock(turnMs(id))} turns)`;
     li.append(dot,document.createTextNode(playerName(id)+suffix));
     ul.append(li);
   });
@@ -486,7 +532,7 @@ function render(){
     $('prompt').textContent=`Add one word to start the ${strandName} strand (seed ${S.seedCount+1} of 2).`;
   }else if(S.phase==='play'){
     $('turn').textContent=S.solo?'Your turn.':myTurn?`${playerName(S.turnId)}’s turn.`:`Waiting for ${playerName(S.turnId)}.`;
-    $('prompt').textContent=`Enter a word that is associated with “${t.A?t.A.text:''}” and clearly NOT associated with “${t.B?t.B.text:''}”.`;
+    $('prompt').textContent=(S.twistNow?'Twisted: the other outer strand crosses, so the loose word changed. ':'')+`Enter a word that is associated with “${t.A?t.A.text:''}” and clearly NOT associated with “${t.B?t.B.text:''}”.`;
   }else if(S.phase==='judge'){
     $('turn').textContent=S.solo?'Judge your own word.':voter?`Other players: vote on ${playerName(S.turnId)}’s word.`:`Waiting for the other players to vote on “${S.pending?S.pending.text:''}”…`;
     $('prompt').textContent=`Timer paused for ${playerName(S.turnId)}.`;
@@ -516,6 +562,14 @@ function render(){
   $('saveBraid').classList.toggle('hidden',!(S && S.phase==='gameover'));
   $('new').classList.toggle('hidden',!isHost());
   $('lobbyBtn').classList.toggle('hidden',!isHost());
+  let myTw=(S.twists&&S.twists[S.turnId])||0, cap=turnMs(S.turnId);
+  $('twist').disabled=!(S.phase==='play'&&myTurn)||S.stepCount<1||S.twistNow||myTw>=MAX_TWISTS;
+  $('twist').textContent=S.twistNow?'Twisted':'Twist';
+  $('twistNote').textContent=S.stepCount<1?'Twist unlocks after the first crossing.':
+    S.twistNow?`Twisted: the loose word is now “${t.B?t.B.text:''}”. Each of your turns is now ${fmtClock(cap)}.`:
+    myTw>=MAX_TWISTS?`No twists left. Your turns are ${fmtClock(cap)}.`:
+    `Stuck? Cross the same side again so the loose word changes. Costs 10s off each of your turns from now on (${fmtClock(cap)} → ${fmtClock(cap-TWIST_MS)}).`;
+  $('boardNote').classList.toggle('hidden',!(S.twistNow||S.words.some(w=>w.twist)));
   drawBoard();renderPlayers();reportHeight();
 
   let newFocusKey=S.phase+':'+S.turnId+':'+(S.words.length);
@@ -601,7 +655,7 @@ function saveBraid(){
   parts.push('<section class="card"><h2>Words</h2><table><thead><tr><th>#</th><th>Word</th><th>Kind</th><th>Player</th><th>Bridge</th></tr></thead><tbody>');
   S.words.forEach(function(w,i){
     var who=esc(playerName(w.by));
-    var kind=w.seed?'<span class="seed">Seed ('+esc(SLOT_NAMES[w.strand]||'')+' strand)</span>':'Crossing '+esc(String(w.step||'' ));
+    var kind=w.seed?'<span class="seed">Seed ('+esc(SLOT_NAMES[w.strand]||'')+' strand)</span>':'Crossing '+esc(String(w.step||'' ))+(w.twist?' (twist)':'');
     var bridge='';
     if(!w.seed){
       var aWord=byId(w.aId), bWord=byId(w.bId);
@@ -623,6 +677,7 @@ function saveBraid(){
 
 $('saveBraid').addEventListener('click', saveBraid);
 $('new').addEventListener('click',()=>{if(mode==='local')localStart();else if(isHost())act({a:'new'})});
+$('twist').addEventListener('click',()=>{act({a:'twist'});setTimeout(()=>$('newWord').focus(),30)});
 $('lobbyBtn').addEventListener('click',()=>{if(isHost())act({a:'toLobby'})});
 setInterval(updateTimerDisplay,200);
 
